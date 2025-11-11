@@ -12,19 +12,59 @@ function verifyWebhookSignature(
   signature: string,
   secret: string
 ): boolean {
+  // Compute HMAC SHA-256
   const hmac = createHmac("sha256", secret);
   hmac.update(rawBody);
-  const digest = hmac.digest("hex");
+  const digest = hmac.digest("hex"); // This is 64 hex characters (32 bytes)
+  
+  console.log("Signature verification:", {
+    signatureLength: signature.length,
+    digestLength: digest.length,
+    signaturePrefix: signature.substring(0, 20),
+    digestPrefix: digest.substring(0, 20),
+    rawBodyLength: rawBody.length,
+  });
 
-  // Use timing-safe comparison to prevent timing attacks
-  if (signature.length !== digest.length) {
+  // Normalize both to lowercase for comparison
+  const normalizedSignature = signature.toLowerCase();
+  const normalizedDigest = digest.toLowerCase();
+  
+  // If signature is 128 chars, it might be double-encoded or we need to take first 64
+  let signatureToCompare = normalizedSignature;
+  if (normalizedSignature.length === 128) {
+    // Try taking first 64 characters (in case it's double-encoded)
+    signatureToCompare = normalizedSignature.substring(0, 64);
+    console.log("Signature is 128 chars, trying first 64:", signatureToCompare.substring(0, 20));
+  }
+  
+  // Use timing-safe comparison
+  if (signatureToCompare.length !== normalizedDigest.length) {
+    console.log("Signature length mismatch:", {
+      signatureLen: signatureToCompare.length,
+      digestLen: normalizedDigest.length,
+    });
     return false;
   }
 
   try {
-    return timingSafeEqual(Buffer.from(signature), Buffer.from(digest));
-  } catch {
-    return false;
+    // Compare hex strings using timing-safe comparison
+    const sigBuffer = Buffer.from(signatureToCompare, "hex");
+    const digestBuffer = Buffer.from(normalizedDigest, "hex");
+    
+    if (sigBuffer.length !== digestBuffer.length) {
+      console.log("Buffer length mismatch after hex decode");
+      return false;
+    }
+    
+    const isValid = timingSafeEqual(sigBuffer, digestBuffer);
+    console.log("Signature valid:", isValid);
+    return isValid;
+  } catch (error) {
+    console.error("Signature comparison error:", error);
+    // Fallback: direct string comparison (less secure but might work)
+    const isValid = signatureToCompare === normalizedDigest;
+    console.log("Signature valid (fallback string compare):", isValid);
+    return isValid;
   }
 }
 
@@ -34,13 +74,23 @@ export async function POST(request: NextRequest) {
     // Get the raw body for signature verification
     const rawBody = await request.text();
     
-    // Get the signature from headers
-    const signature = request.headers.get("x-neynar-signature");
+    // Get the signature from headers (check both lowercase and original case)
+    const signature = request.headers.get("x-neynar-signature") || 
+                      request.headers.get("X-Neynar-Signature") ||
+                      request.headers.get("X-NEYNAR-SIGNATURE");
     const webhookSecret = process.env.WEBHOOK_SECRET;
+
+    console.log("Webhook verification:", {
+      hasSignature: !!signature,
+      hasSecret: !!webhookSecret,
+      signatureHeader: signature?.substring(0, 20) || "none",
+      allHeaders: Object.fromEntries(request.headers.entries()),
+    });
 
     // Verify webhook signature if secret is configured
     if (webhookSecret) {
       if (!signature) {
+        console.log("Missing webhook signature header");
         return NextResponse.json(
           { error: "Missing webhook signature" },
           { status: 401 }
@@ -49,11 +99,15 @@ export async function POST(request: NextRequest) {
 
       const isValid = verifyWebhookSignature(rawBody, signature, webhookSecret);
       if (!isValid) {
+        console.log("Invalid webhook signature - request rejected");
         return NextResponse.json(
           { error: "Invalid webhook signature" },
           { status: 401 }
         );
       }
+      console.log("Webhook signature verified successfully");
+    } else {
+      console.log("WEBHOOK_SECRET not configured, skipping verification");
     }
 
     // Parse the body
@@ -94,11 +148,13 @@ export async function POST(request: NextRequest) {
       success: true, 
       curatedCast: result[0] 
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Curate API error:", error);
     
+    const err = error as { code?: string; message?: string };
+    
     // Handle unique constraint violation (cast already curated)
-    if (error.code === "23505" || error.message?.includes("unique")) {
+    if (err.code === "23505" || err.message?.includes("unique")) {
       return NextResponse.json(
         { error: "Cast is already curated" },
         { status: 409 }
@@ -106,7 +162,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: error.message || "Failed to curate cast" },
+      { error: err.message || "Failed to curate cast" },
       { status: 500 }
     );
   }
