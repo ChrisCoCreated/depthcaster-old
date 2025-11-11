@@ -31,21 +31,78 @@ A Farcaster client focused on deep thoughts, philosophy, art, and meaningful con
    NEYNAR_API_KEY=your_neynar_api_key_here
    NEXT_PUBLIC_NEYNAR_CLIENT_ID=your_neynar_client_id_here
    NEXT_PUBLIC_APP_URL=http://localhost:3000
+   POSTGRES_URL=your_postgres_url_here
    ```
 
    Get your API keys from [Neynar](https://neynar.com)
+   
+   For local development, you can use a local PostgreSQL database or a service like [Neon](https://neon.tech) or [Supabase](https://supabase.com)
 
-3. **Configure curated lists** (optional):
+3. **Set up the database**:
+   ```bash
+   npm run setup-db
+   ```
+   This will create the necessary tables for user preferences and notification tracking.
+
+4. **Configure curated lists** (optional):
    Edit `lib/curated.ts` to add:
    - Curated FIDs of high-quality users
    - Curated channels focused on philosophy/art
 
-4. **Run the development server**:
+5. **Run the development server**:
    ```bash
    npm run dev
    ```
 
-5. Open [http://localhost:3000](http://localhost:3000) in your browser.
+6. Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+## Deployment
+
+### Deploy to Vercel
+
+1. **Push to GitHub**:
+   ```bash
+   git remote add origin https://github.com/yourusername/depthcaster.git
+   git push -u origin main
+   ```
+
+2. **Connect to Vercel**:
+   - Go to [Vercel](https://vercel.com) and sign in
+   - Click "New Project" and import your GitHub repository
+   - Vercel will automatically detect Next.js
+
+3. **Set up Vercel Postgres**:
+   - In your Vercel project dashboard, go to the "Storage" tab
+   - Click "Create Database" and select "Postgres"
+   - This will automatically add `POSTGRES_URL` to your environment variables
+
+4. **Configure Environment Variables**:
+   In your Vercel project settings, add these environment variables:
+   - `NEYNAR_API_KEY` - Your Neynar API key
+   - `NEXT_PUBLIC_NEYNAR_CLIENT_ID` - Your Neynar client ID
+   - `NEXT_PUBLIC_APP_URL` - Your Vercel deployment URL (e.g., `https://depthcaster.vercel.app`)
+   - `POSTGRES_URL` - Automatically set by Vercel Postgres
+
+5. **Initialize the Database**:
+   After deployment, run the database setup:
+   ```bash
+   npm run setup-db
+   ```
+   Or use Vercel's CLI:
+   ```bash
+   vercel env pull .env.local
+   npm run setup-db
+   ```
+
+6. **Deploy**:
+   Vercel will automatically deploy on every push to the main branch.
+
+### Manual Database Setup
+
+If you need to set up the database manually, you can run the SQL script:
+```bash
+psql $POSTGRES_URL -f lib/db-setup.sql
+```
 
 ## Project Structure
 
@@ -103,6 +160,7 @@ The app uses a hybrid filtering approach:
 - **TypeScript** - Type safety
 - **Tailwind CSS** - Styling
 - **Neynar SDK** - Farcaster API integration
+- **Vercel Postgres** - Database for user preferences and notifications
 - **date-fns** - Date formatting
 
 ## License
