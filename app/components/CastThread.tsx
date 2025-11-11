@@ -10,6 +10,16 @@ interface CastThreadProps {
   viewerFid?: number;
 }
 
+// Helper function to check if a cast mentions @deepbot
+function mentionsDeepbot(cast: Cast): boolean {
+  if (cast.mentioned_profiles && Array.isArray(cast.mentioned_profiles)) {
+    return cast.mentioned_profiles.some(
+      (profile: any) => profile?.username?.toLowerCase() === "deepbot"
+    );
+  }
+  return false;
+}
+
 export function CastThread({ castHash, viewerFid }: CastThreadProps) {
   const [conversation, setConversation] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -81,7 +91,9 @@ export function CastThread({ castHash, viewerFid }: CastThreadProps) {
   }
 
   const mainCast = conversation.conversation.cast;
-  const directReplies = mainCast.direct_replies || [];
+  const allReplies = mainCast.direct_replies || [];
+  // Filter out replies that mention @deepbot
+  const directReplies = allReplies.filter((reply: Cast) => !mentionsDeepbot(reply));
   const parentCasts = conversation.chronological_parent_casts || [];
 
   return (
@@ -106,7 +118,7 @@ export function CastThread({ castHash, viewerFid }: CastThreadProps) {
       {directReplies && directReplies.length > 0 && (
         <div className="mt-4">
           <h3 className="px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
-            Replies ({directReplies.length})
+            Replies ({directReplies.length}{allReplies.length !== directReplies.length ? ` (${allReplies.length - directReplies.length} hidden)` : ""})
           </h3>
           {directReplies.map((reply: Cast) => (
             <div key={reply.hash} className="pl-8 border-l-2 border-gray-200 dark:border-gray-800">

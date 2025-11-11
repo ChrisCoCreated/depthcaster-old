@@ -217,8 +217,18 @@ export async function GET(request: NextRequest) {
     }
 
     // Apply quality filters (skip for curated feed since casts are already manually curated)
+    // But still filter out @deepbot mentions
     const filteredCasts = feedType === "curated" 
-      ? casts 
+      ? casts.filter((cast) => {
+          // Filter out casts that mention @deepbot
+          if (cast.mentioned_profiles && Array.isArray(cast.mentioned_profiles)) {
+            const hasDeepbot = cast.mentioned_profiles.some(
+              (profile: any) => profile?.username?.toLowerCase() === "deepbot"
+            );
+            if (hasDeepbot) return false;
+          }
+          return true;
+        })
       : casts.filter((cast) => {
           // Use experimental flag is already set via headers in the client
           return filterCast(cast, {

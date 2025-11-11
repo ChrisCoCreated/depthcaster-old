@@ -18,6 +18,16 @@ export function filterCast(cast: Cast, options: FilterOptions = {}): boolean {
     requireCuratedChannel = false,
   } = options;
 
+  // Hide replies that mention @deepbot
+  if (cast.mentioned_profiles && Array.isArray(cast.mentioned_profiles)) {
+    const hasDeepbot = cast.mentioned_profiles.some(
+      (profile: any) => profile?.username?.toLowerCase() === "deepbot"
+    );
+    if (hasDeepbot) {
+      return false;
+    }
+  }
+
   // Check user quality score
   const userScore = cast.author.experimental?.neynar_user_score;
   if (userScore !== undefined && userScore < minUserScore) {
