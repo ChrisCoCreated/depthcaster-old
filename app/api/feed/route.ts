@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
       }
     } else if (feedType === "curated") {
       // Fetch curated casts from database
-      let queryBuilder = db
+      let query = db
         .select()
         .from(curatedCasts);
 
@@ -124,13 +124,13 @@ export async function GET(request: NextRequest) {
       if (cursor) {
         try {
           const cursorDate = new Date(cursor);
-          queryBuilder = queryBuilder.where(lt(curatedCasts.createdAt, cursorDate));
+          query = query.where(lt(curatedCasts.createdAt, cursorDate)) as typeof query;
         } catch {
           // Invalid cursor, ignore it
         }
       }
 
-      const curatedResults = await queryBuilder
+      const curatedResults = await query
         .orderBy(desc(curatedCasts.createdAt))
         .limit(limit + 1); // Fetch one extra to check if there's more
       

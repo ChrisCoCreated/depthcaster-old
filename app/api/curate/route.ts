@@ -29,6 +29,7 @@ function verifyWebhookSignature(
 }
 
 export async function POST(request: NextRequest) {
+  console.log("Curate endpoint hit");
   try {
     // Get the raw body for signature verification
     const rawBody = await request.text();
