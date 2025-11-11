@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { curatedCasts } from "@/lib/schema";
 import { createHmac, timingSafeEqual } from "crypto";
+import { neynarClient } from "@/lib/neynar";
+import { LookupCastConversationTypeEnum } from "@neynar/nodejs-sdk/build/api";
 
 // Disable body parsing to read raw body for signature verification
 export const runtime = "nodejs";
@@ -125,12 +127,51 @@ export async function POST(request: NextRequest) {
     const body = JSON.parse(rawBody);
     
     // Extract cast hash from webhook payload or direct body
-    // Neynar webhook format: { type: "cast.created", data: { hash: "0x...", author: { fid: 123 } } }
+    // Neynar webhook format: { type: "cast.created", data: { hash: "0x...", parent_hash: "0x...", author: { fid: 123 } } }
     // Direct API format: { castHash: "0x...", curatorFid: 123 }
-    const castHash = body.data?.hash || body.castHash;
-    const curatorFid = body.data?.author?.fid || body.curatorFid;
-    // Store the full cast data object for easy rendering
     const castData = body.data || body.castData;
+    const parentHash = castData?.parent_hash;
+    
+    // If there's a parent_hash, fetch and store the parent cast instead
+    let castHash: string;
+    let finalCastData: unknown;
+    
+    if (parentHash) {
+      console.log(`Cast has parent, fetching parent cast: ${parentHash}`);
+      try {
+        // Fetch the parent cast
+        const conversation = await neynarClient.lookupCastConversation({
+          identifier: parentHash,
+          type: LookupCastConversationTypeEnum.Hash,
+          replyDepth: 0,
+          includeChronologicalParentCasts: false,
+        });
+        
+        const parentCast = conversation.conversation?.cast;
+        if (parentCast) {
+          castHash = parentHash;
+          finalCastData = parentCast;
+          console.log(`Storing parent cast: ${parentHash}`);
+        } else {
+          // Fallback to current cast if parent not found
+          castHash = castData?.hash || body.castHash;
+          finalCastData = castData;
+          console.log(`Parent cast not found, storing current cast: ${castHash}`);
+        }
+      } catch (error) {
+        console.error("Error fetching parent cast:", error);
+        // Fallback to current cast if fetch fails
+        castHash = castData?.hash || body.castHash;
+        finalCastData = castData;
+        console.log(`Error fetching parent, storing current cast: ${castHash}`);
+      }
+    } else {
+      // No parent, store the current cast
+      castHash = castData?.hash || body.castHash;
+      finalCastData = castData;
+    }
+    
+    const curatorFid = castData?.author?.fid || body.curatorFid;
     
     console.log(`Processing curation for cast: ${castHash}, curator: ${curatorFid || 'unknown'}`);
 
@@ -141,7 +182,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!castData) {
+    if (!finalCastData) {
       return NextResponse.json(
         { error: "castData is required" },
         { status: 400 }
@@ -151,7 +192,7 @@ export async function POST(request: NextRequest) {
     // Insert the cast into curated_casts table
     const result = await db.insert(curatedCasts).values({
       castHash,
-      castData,
+      castData: finalCastData,
       curatorFid: curatorFid || null,
     }).returning();
 
