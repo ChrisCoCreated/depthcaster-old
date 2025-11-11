@@ -78,6 +78,25 @@ async function setupDatabase() {
       CREATE INDEX IF NOT EXISTS user_pack_subscriptions_user_fid_idx ON user_pack_subscriptions(user_fid);
     `);
 
+    // Create curated_casts table
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS curated_casts (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        cast_hash TEXT NOT NULL UNIQUE,
+        cast_data JSONB NOT NULL,
+        curator_fid BIGINT REFERENCES users(fid),
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL
+      );
+    `);
+
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS curator_fid_idx ON curated_casts(curator_fid);
+    `);
+
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS created_at_idx ON curated_casts(created_at DESC);
+    `);
+
     console.log("Database tables created successfully!");
   } catch (error) {
     console.error("Error setting up database:", error);

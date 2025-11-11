@@ -56,6 +56,18 @@ export const packFavorites = pgTable("pack_favorites", {
   userFidIdx: index("user_fid_favorite_idx").on(table.userFid),
 }));
 
+export const curatedCasts = pgTable("curated_casts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  castHash: text("cast_hash").notNull(),
+  castData: jsonb("cast_data").notNull(),
+  curatorFid: bigint("curator_fid", { mode: "number" }).references(() => users.fid),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  castHashUnique: uniqueIndex("cast_hash_unique").on(table.castHash),
+  curatorFidIdx: index("curator_fid_idx").on(table.curatorFid),
+  createdAtIdx: index("created_at_idx").on(table.createdAt),
+}));
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type CuratorPack = typeof curatorPacks.$inferSelect;
@@ -66,4 +78,6 @@ export type UserPackSubscription = typeof userPackSubscriptions.$inferSelect;
 export type NewUserPackSubscription = typeof userPackSubscriptions.$inferInsert;
 export type PackFavorite = typeof packFavorites.$inferSelect;
 export type NewPackFavorite = typeof packFavorites.$inferInsert;
+export type CuratedCast = typeof curatedCasts.$inferSelect;
+export type NewCuratedCast = typeof curatedCasts.$inferInsert;
 
