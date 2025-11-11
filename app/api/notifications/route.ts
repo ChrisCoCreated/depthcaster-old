@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { neynarClient } from "@/lib/neynar";
 import { FetchAllNotificationsTypeEnum } from "@neynar/nodejs-sdk/build/api";
+import { cacheNotifications } from "@/lib/cache";
+import { deduplicateRequest } from "@/lib/neynar-batch";
 
 export async function GET(request: NextRequest) {
   try {
@@ -45,12 +47,32 @@ export async function GET(request: NextRequest) {
         }) as FetchAllNotificationsTypeEnum[]
       : undefined;
 
-    const notifications = await neynarClient.fetchAllNotifications({
+    // Generate cache key
+    const cacheKey = cacheNotifications.generateKey({
       fid: parseInt(fid),
-      type: notificationTypes,
-      limit,
+      types: types || "all",
       cursor,
+      limit,
     });
+
+    // Check cache first
+    const cachedResult = cacheNotifications.get(cacheKey);
+    if (cachedResult) {
+      return NextResponse.json(cachedResult);
+    }
+
+    // Use deduplication to prevent concurrent duplicate requests
+    const notifications = await deduplicateRequest(cacheKey, async () => {
+      return await neynarClient.fetchAllNotifications({
+        fid: parseInt(fid),
+        type: notificationTypes,
+        limit,
+        cursor,
+      });
+    });
+
+    // Cache the response
+    cacheNotifications.set(cacheKey, notifications);
 
     return NextResponse.json(notifications);
   } catch (error: any) {

@@ -2,9 +2,11 @@
 
 import { NotificationSettings } from "../components/NotificationSettings";
 import { useNeynarContext } from "@neynar/react";
+import { useRouter } from "next/navigation";
 
 export default function SettingsPage() {
-  const { user } = useNeynarContext();
+  const { user, logoutUser } = useNeynarContext();
+  const router = useRouter();
 
   if (!user) {
     return (
@@ -18,12 +20,35 @@ export default function SettingsPage() {
     );
   }
 
+  const handleLogout = () => {
+    logoutUser();
+    router.push("/");
+  };
+
   return (
     <div className="min-h-screen">
       {/* Main content */}
       <main className="max-w-4xl mx-auto px-4 py-8">
-        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800">
-          <NotificationSettings />
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-8">
+          Settings
+        </h1>
+        
+        <div className="space-y-6">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+            <NotificationSettings />
+          </div>
+
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+              Account
+            </h2>
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Log Out
+            </button>
+          </div>
         </div>
       </main>
     </div>

@@ -155,41 +155,41 @@ export function CastCard({ cast, showThread = false, onUpdate }: CastCardProps) 
 
   return (
     <>
-      <div className="border-b border-gray-200 dark:border-gray-800 py-6 px-4 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
-        <div className="flex gap-3">
+      <div className="border-b border-gray-200 dark:border-gray-800 py-4 sm:py-6 px-2 sm:px-4 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
+        <div className="flex gap-2 sm:gap-3">
           {/* Avatar */}
           <Link href={`/profile/${author.fid}`}>
             <img
               src={author.pfp_url || "/default-avatar.png"}
               alt={author.username}
-              className="w-12 h-12 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
+              className="w-10 h-10 sm:w-12 sm:h-12 rounded-full cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
             />
           </Link>
 
           {/* Content */}
           <div className="flex-1 min-w-0">
             {/* Author info */}
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 flex-wrap">
               <Link href={`/profile/${author.fid}`}>
-                <span className="font-semibold text-gray-900 dark:text-gray-100 hover:underline cursor-pointer">
+                <span className="font-semibold text-sm sm:text-base text-gray-900 dark:text-gray-100 hover:underline cursor-pointer">
                   {author.display_name || author.username}
                 </span>
               </Link>
-              <span className="text-gray-500 dark:text-gray-400 text-sm">
+              <span className="text-gray-500 dark:text-gray-400 text-xs sm:text-sm">
                 @{author.username}
               </span>
               {author.power_badge && (
-                <span className="text-blue-500" title="Power Badge">
+                <span className="text-blue-500 text-sm" title="Power Badge">
                   ⚡
                 </span>
               )}
-              <span className="text-gray-400 dark:text-gray-500 text-sm">
+              <span className="text-gray-400 dark:text-gray-500 text-xs sm:text-sm">
                 · {timeAgo}
               </span>
             </div>
 
             {/* Cast text */}
-            <div className="text-gray-900 dark:text-gray-100 mb-3 whitespace-pre-wrap break-words text-base leading-7">
+            <div className="text-gray-900 dark:text-gray-100 mb-2 sm:mb-3 whitespace-pre-wrap break-words text-sm sm:text-base leading-6 sm:leading-7">
               {cast.text}
             </div>
 
@@ -438,9 +438,9 @@ export function CastCard({ cast, showThread = false, onUpdate }: CastCardProps) 
             )}
 
             {/* Action buttons */}
-            <div className="flex items-center gap-6 mt-4">
+            <div className="flex items-center gap-3 sm:gap-6 mt-3 sm:mt-4 flex-wrap">
               {/* Reply */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 <button
                   onClick={() => {
                     if (!user) {
@@ -449,9 +449,9 @@ export function CastCard({ cast, showThread = false, onUpdate }: CastCardProps) 
                     }
                     setShowReplyBox(!showReplyBox);
                   }}
-                  className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                  className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors py-1 px-1 sm:px-0"
                 >
-                  <span>💬</span>
+                  <span className="text-base sm:text-lg">💬</span>
                   <span>{cast.replies?.count || 0}</span>
                 </button>
                 {showThread && cast.hash && (
@@ -469,13 +469,13 @@ export function CastCard({ cast, showThread = false, onUpdate }: CastCardProps) 
               <button
                 onClick={handleLike}
                 disabled={isReacting || !user}
-                className={`flex items-center gap-2 text-sm transition-colors ${
+                className={`flex items-center gap-1 sm:gap-2 text-xs sm:text-sm transition-colors py-1 px-1 sm:px-0 ${
                   isLiked
                     ? "text-red-600 dark:text-red-400"
                     : "text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400"
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
-                <span>❤️</span>
+                <span className="text-base sm:text-lg">❤️</span>
                 <span>{likesCount}</span>
               </button>
 
@@ -484,13 +484,13 @@ export function CastCard({ cast, showThread = false, onUpdate }: CastCardProps) 
                 <button
                   onClick={() => setShowRecastMenu(!showRecastMenu)}
                   disabled={isReacting || !user}
-                  className={`flex items-center gap-2 text-sm transition-colors ${
+                  className={`flex items-center gap-1 sm:gap-2 text-xs sm:text-sm transition-colors py-1 px-1 sm:px-0 ${
                     isRecasted
                       ? "text-green-600 dark:text-green-400"
                       : "text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400"
                   } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
-                  <span>🔄</span>
+                  <span className="text-base sm:text-lg">🔄</span>
                   <span>{recastsCount}</span>
                 </button>
 
@@ -517,7 +517,7 @@ export function CastCard({ cast, showThread = false, onUpdate }: CastCardProps) 
               {showThread && cast.hash && (
                 <Link
                   href={`/cast/${cast.hash}`}
-                  className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                  className="text-xs sm:text-sm text-blue-600 dark:text-blue-400 hover:underline hidden sm:inline"
                 >
                   View thread →
                 </Link>
@@ -528,7 +528,7 @@ export function CastCard({ cast, showThread = false, onUpdate }: CastCardProps) 
 
         {/* Reply box */}
         {showReplyBox && (
-          <div className="mt-2 pl-14 border-t border-gray-200 dark:border-gray-800 pt-4">
+          <div className="mt-2 pl-0 sm:pl-14 border-t border-gray-200 dark:border-gray-800 pt-3 sm:pt-4">
             <CastComposer
               parentHash={cast.hash}
               onSuccess={() => {

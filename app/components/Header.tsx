@@ -8,15 +8,21 @@ export function Header() {
   const { user } = useNeynarContext();
 
   return (
-    <header className="sticky top-0 z-20 bg-white/80 dark:bg-black/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
-      <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-        <Link href="/" className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+    <header className="sticky top-0 z-[200] bg-white/80 dark:bg-black/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between">
+        <Link href="/" className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
           Depthcaster
         </Link>
         
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           {user ? (
             <>
+              <Link
+                href="/packs"
+                className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors hidden sm:block"
+              >
+                Packs
+              </Link>
               <NotificationBell />
               <Link
                 href="/settings"
@@ -24,7 +30,7 @@ export function Header() {
                 aria-label="Settings"
               >
                 <svg
-                  className="w-6 h-6"
+                  className="w-5 h-5 sm:w-6 sm:h-6"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -45,14 +51,14 @@ export function Header() {
               </Link>
               <Link
                 href={`/profile/${user.fid}`}
-                className="flex items-center gap-2 px-4 py-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors"
+                className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors"
               >
                 <img
                   src={user.pfp_url || "/default-avatar.png"}
                   alt={user.username}
-                  className="w-8 h-8 rounded-full"
+                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-full"
                 />
-                <span className="text-sm font-medium">{user.username}</span>
+                <span className="text-sm font-medium hidden sm:inline">{user.username}</span>
               </Link>
             </>
           ) : (

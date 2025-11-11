@@ -2,6 +2,7 @@
 
 import { NeynarContextProvider } from "@neynar/react";
 import { ReactNode } from "react";
+import { UserInitializer } from "./UserInitializer";
 
 const NEYNAR_CLIENT_ID = process.env.NEXT_PUBLIC_NEYNAR_CLIENT_ID || "";
 
@@ -16,6 +17,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         clientId: NEYNAR_CLIENT_ID,
       }}
     >
+      <UserInitializer />
       {children}
     </NeynarContextProvider>
   );

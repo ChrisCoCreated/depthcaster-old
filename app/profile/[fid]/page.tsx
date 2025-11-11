@@ -40,25 +40,25 @@ export default function ProfilePage({
 
   return (
     <div className="min-h-screen">
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="mb-8">
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
+        <div className="mb-6 sm:mb-8">
           <Link
             href="/"
-            className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+            className="text-xs sm:text-sm text-blue-600 dark:text-blue-400 hover:underline"
           >
             ← Back to feed
           </Link>
         </div>
         
-        <div className="mb-8 p-6 border border-gray-200 dark:border-gray-800 rounded-lg">
-          <h1 className="text-2xl font-bold mb-2">Profile FID: {fid}</h1>
-          <p className="text-gray-600 dark:text-gray-400">
+        <div className="mb-6 sm:mb-8 p-4 sm:p-6 border border-gray-200 dark:border-gray-800 rounded-lg">
+          <h1 className="text-xl sm:text-2xl font-bold mb-2">Profile FID: {fid}</h1>
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
             Profile details coming soon
           </p>
         </div>
 
         <div>
-          <h2 className="text-xl font-semibold mb-4">Casts</h2>
+          <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Casts</h2>
           <Feed viewerFid={fid} initialFeedType="curated" />
         </div>
       </main>

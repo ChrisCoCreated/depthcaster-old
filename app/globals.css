@@ -35,4 +35,21 @@ body {
   .prose {
     @apply text-base leading-7;
   }
+  
+  /* Hide scrollbar for mobile horizontal scrolling */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* Smooth scrolling for mobile */
+  @media (max-width: 640px) {
+    * {
+      -webkit-overflow-scrolling: touch;
+    }
+  }
 }

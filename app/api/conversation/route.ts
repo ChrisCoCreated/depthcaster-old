@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { neynarClient } from "@/lib/neynar";
 import { LookupCastConversationTypeEnum, LookupCastConversationSortTypeEnum, LookupCastConversationFoldEnum } from "@neynar/nodejs-sdk/build/api";
+import { cacheConversation } from "@/lib/cache";
+import { deduplicateRequest } from "@/lib/neynar-batch";
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,15 +25,35 @@ export async function GET(request: NextRequest) {
       ? LookupCastConversationTypeEnum.Url 
       : LookupCastConversationTypeEnum.Hash;
 
-    const conversation = await neynarClient.lookupCastConversation({
+    // Generate cache key
+    const cacheKey = cacheConversation.generateKey({
       identifier,
-      type,
+      type: typeParam,
       replyDepth,
       viewerFid,
-      sortType: LookupCastConversationSortTypeEnum.Quality, // Rank by quality
-      // fold: LookupCastConversationFoldEnum.Above, // Temporarily remove fold to see all replies
-      includeChronologicalParentCasts: true,
     });
+
+    // Check cache first
+    const cachedResult = cacheConversation.get(cacheKey);
+    if (cachedResult) {
+      return NextResponse.json(cachedResult);
+    }
+
+    // Use deduplication to prevent concurrent duplicate requests
+    const conversation = await deduplicateRequest(cacheKey, async () => {
+      return await neynarClient.lookupCastConversation({
+        identifier,
+        type,
+        replyDepth,
+        viewerFid,
+        sortType: LookupCastConversationSortTypeEnum.Quality, // Rank by quality
+        // fold: LookupCastConversationFoldEnum.Above, // Temporarily remove fold to see all replies
+        includeChronologicalParentCasts: true,
+      });
+    });
+
+    // Cache the response
+    cacheConversation.set(cacheKey, conversation);
 
     return NextResponse.json(conversation);
   } catch (error: any) {
