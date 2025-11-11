@@ -12,60 +12,71 @@ function verifyWebhookSignature(
   signature: string,
   secret: string
 ): boolean {
-  // Compute HMAC SHA-256
-  const hmac = createHmac("sha256", secret);
-  hmac.update(rawBody);
-  const digest = hmac.digest("hex"); // This is 64 hex characters (32 bytes)
+  // Try both SHA-256 and SHA-512 since signature is 128 chars (64 bytes)
+  // SHA-256 produces 32 bytes (64 hex chars)
+  // SHA-512 produces 64 bytes (128 hex chars) - this matches!
+  
+  // Try SHA-512 first since signature is 128 chars
+  const hmac512 = createHmac("sha512", secret);
+  hmac512.update(rawBody);
+  const digest512 = hmac512.digest("hex"); // This is 128 hex characters (64 bytes)
+  
+  // Also try SHA-256
+  const hmac256 = createHmac("sha256", secret);
+  hmac256.update(rawBody);
+  const digest256 = hmac256.digest("hex"); // This is 64 hex characters (32 bytes)
   
   console.log("Signature verification:", {
     signatureLength: signature.length,
-    digestLength: digest.length,
+    digest512Length: digest512.length,
+    digest256Length: digest256.length,
     signaturePrefix: signature.substring(0, 20),
-    digestPrefix: digest.substring(0, 20),
+    digest512Prefix: digest512.substring(0, 20),
+    digest256Prefix: digest256.substring(0, 20),
     rawBodyLength: rawBody.length,
   });
 
-  // Normalize both to lowercase for comparison
+  // Normalize signature to lowercase
   const normalizedSignature = signature.toLowerCase();
-  const normalizedDigest = digest.toLowerCase();
   
-  // If signature is 128 chars, it might be double-encoded or we need to take first 64
-  let signatureToCompare = normalizedSignature;
-  if (normalizedSignature.length === 128) {
-    // Try taking first 64 characters (in case it's double-encoded)
-    signatureToCompare = normalizedSignature.substring(0, 64);
-    console.log("Signature is 128 chars, trying first 64:", signatureToCompare.substring(0, 20));
-  }
-  
-  // Use timing-safe comparison
-  if (signatureToCompare.length !== normalizedDigest.length) {
-    console.log("Signature length mismatch:", {
-      signatureLen: signatureToCompare.length,
-      digestLen: normalizedDigest.length,
-    });
-    return false;
-  }
-
-  try {
-    // Compare hex strings using timing-safe comparison
-    const sigBuffer = Buffer.from(signatureToCompare, "hex");
-    const digestBuffer = Buffer.from(normalizedDigest, "hex");
-    
-    if (sigBuffer.length !== digestBuffer.length) {
-      console.log("Buffer length mismatch after hex decode");
-      return false;
+  // Try SHA-512 first (matches 128 char signature)
+  if (normalizedSignature.length === digest512.length) {
+    try {
+      const sigBuffer = Buffer.from(normalizedSignature, "hex");
+      const digestBuffer = Buffer.from(digest512.toLowerCase(), "hex");
+      
+      if (sigBuffer.length === digestBuffer.length) {
+        const isValid = timingSafeEqual(sigBuffer, digestBuffer);
+        console.log("Signature valid (SHA-512):", isValid);
+        if (isValid) return true;
+      }
+    } catch (error) {
+      console.error("SHA-512 comparison error:", error);
     }
-    
-    const isValid = timingSafeEqual(sigBuffer, digestBuffer);
-    console.log("Signature valid:", isValid);
-    return isValid;
-  } catch (error) {
-    console.error("Signature comparison error:", error);
-    // Fallback: direct string comparison (less secure but might work)
-    const isValid = signatureToCompare === normalizedDigest;
-    console.log("Signature valid (fallback string compare):", isValid);
-    return isValid;
   }
+  
+  // Try SHA-256 (if signature is 64 chars or first 64 chars match)
+  if (normalizedSignature.length === digest256.length || normalizedSignature.length === 128) {
+    const sigToCompare = normalizedSignature.length === 128 
+      ? normalizedSignature.substring(0, 64) 
+      : normalizedSignature;
+    
+    try {
+      const sigBuffer = Buffer.from(sigToCompare, "hex");
+      const digestBuffer = Buffer.from(digest256.toLowerCase(), "hex");
+      
+      if (sigBuffer.length === digestBuffer.length) {
+        const isValid = timingSafeEqual(sigBuffer, digestBuffer);
+        console.log("Signature valid (SHA-256):", isValid);
+        if (isValid) return true;
+      }
+    } catch (error) {
+      console.error("SHA-256 comparison error:", error);
+    }
+  }
+  
+  console.log("Signature verification failed for both SHA-256 and SHA-512");
+  return false;
 }
 
 export async function POST(request: NextRequest) {
