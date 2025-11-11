@@ -71,7 +71,6 @@ export async function GET(request: NextRequest) {
     } else if (packIds.length > 0 && packFids.length > 0) {
       // Curator packs feed - use FIDs from selected packs
       // Neynar API has limits on fids parameter, so we may need to handle large lists
-      const fidsString = packFids.join(",");
       
       // Only use cursor if it looks like a valid Neynar cursor (not a cast hash)
       // Cast hashes start with 0x, Neynar cursors are typically different format
@@ -84,7 +83,7 @@ export async function GET(request: NextRequest) {
             return await neynarClient.fetchFeed({
               feedType: FetchFeedFeedTypeEnum.Filter,
               filterType: FetchFeedFilterTypeEnum.Fids,
-              fids: fidsString,
+              fids: packFids,
               limit,
               ...(validCursor ? { cursor: validCursor } : {}),
               withRecasts: true,
@@ -106,7 +105,7 @@ export async function GET(request: NextRequest) {
         console.error("Error fetching pack feed:", error);
         console.error("Error details:", {
           fidsCount: packFids.length,
-          fidsString: fidsString.substring(0, 100),
+          fidsString: packFids.join(",").substring(0, 100),
           cursor,
           validCursor,
           errorMessage: error.message,
@@ -124,7 +123,7 @@ export async function GET(request: NextRequest) {
             return await neynarClient.fetchFeed({
               feedType: FetchFeedFeedTypeEnum.Filter,
               filterType: FetchFeedFilterTypeEnum.Fids,
-              fids: CURATED_FIDS.join(","),
+              fids: CURATED_FIDS,
               limit,
               cursor,
               withRecasts: true,

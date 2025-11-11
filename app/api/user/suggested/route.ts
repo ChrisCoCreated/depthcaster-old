@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       limit: Math.min(limit, 100), // API max is 100
     });
 
-    const suggestedUsers = bestFriends.result?.users || [];
+    const suggestedUsers = bestFriends.users || [];
 
     return NextResponse.json({
       users: suggestedUsers.map((u: any) => ({

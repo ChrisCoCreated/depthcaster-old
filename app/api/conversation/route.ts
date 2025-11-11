@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
         type,
         replyDepth,
         viewerFid,
-        sortType: LookupCastConversationSortTypeEnum.Quality, // Rank by quality
+        sortType: LookupCastConversationSortTypeEnum.Algorithmic, // Rank by quality
         // fold: LookupCastConversationFoldEnum.Above, // Temporarily remove fold to see all replies
         includeChronologicalParentCasts: true,
       });

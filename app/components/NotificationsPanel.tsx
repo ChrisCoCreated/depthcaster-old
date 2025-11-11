@@ -140,7 +140,9 @@ export function NotificationsPanel({ isOpen, onClose }: NotificationsPanelProps)
       return `/cast/${notification.cast.hash}`;
     }
     if (notification.follows && notification.follows.length > 0) {
-      return `/profile/${notification.follows[0].fid}`;
+      const follower = notification.follows[0];
+      const fid = (follower as any).fid || (follower as any).user?.fid;
+      if (fid) return `/profile/${fid}`;
     }
     return null;
   };
@@ -148,9 +150,11 @@ export function NotificationsPanel({ isOpen, onClose }: NotificationsPanelProps)
   const getNotificationText = (notification: Notification): string => {
     const count = notification.count || 1;
     const users = notification.follows || notification.reactions?.map((r) => r.user) || [];
-    const firstName = users[0]?.username || "Someone";
+    const firstUser = users[0];
+    const firstName = (firstUser as any)?.username || (firstUser as any)?.user?.username || "Someone";
+    const type = String(notification.type).toLowerCase();
 
-    switch (notification.type) {
+    switch (type) {
       case "follows":
         if (count === 1) return `${firstName} followed you`;
         return `${firstName} and ${count - 1} others followed you`;
@@ -161,12 +165,13 @@ export function NotificationsPanel({ isOpen, onClose }: NotificationsPanelProps)
         if (count === 1) return `${firstName} liked your cast`;
         return `${firstName} and ${count - 1} others liked your cast`;
       case "mention":
+      case "mentions":
         return `${firstName} mentioned you`;
-      case "replies":
       case "reply":
+      case "replies":
         return `${firstName} replied to your cast`;
-      case "quotes":
       case "quote":
+      case "quotes":
         return `${firstName} quoted your cast`;
       default:
         return "New notification";

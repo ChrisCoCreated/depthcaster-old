@@ -49,7 +49,7 @@ async function processBatchQueue() {
 
   try {
     const response = await neynarClient.fetchBulkUsers({ fids });
-    const users = response.result?.users || [];
+    const users = response.users || [];
     const userMap = new Map(users.map((u: any) => [u.fid, u]));
 
     // Resolve all promises in the batch

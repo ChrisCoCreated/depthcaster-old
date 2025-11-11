@@ -12,7 +12,7 @@ export async function upsertUser(fid: number, userData?: { username?: string; di
       const cacheKey = cacheUser.generateKey([fid]);
       const cached = cacheUser.get(cacheKey);
       if (cached) {
-        const cachedUser = cached.result?.users?.[0];
+        const cachedUser = cached.users?.[0];
         if (cachedUser) {
           userData = {
             username: cachedUser.username,
@@ -24,7 +24,7 @@ export async function upsertUser(fid: number, userData?: { username?: string; di
         const response = await neynarClient.fetchBulkUsers({ fids: [fid] });
         // Cache the response
         cacheUser.set(cacheKey, response);
-        const neynarUser = response.result?.users?.[0];
+        const neynarUser = response.users?.[0];
         if (neynarUser) {
           userData = {
             username: neynarUser.username,
@@ -106,7 +106,7 @@ export async function upsertBulkUsers(
           cacheUser.set(cacheKey, response);
         }
         
-        const neynarUsers = response.result?.users || [];
+        const neynarUsers = response.users || [];
         
         for (const neynarUser of neynarUsers) {
           const fid = neynarUser.fid;

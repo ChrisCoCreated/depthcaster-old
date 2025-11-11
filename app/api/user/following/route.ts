@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json({
-      users: following.result?.users || [],
+      users: following.users || [],
     });
   } catch (error: any) {
     console.error("Error fetching user following:", error);
