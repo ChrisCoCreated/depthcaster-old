@@ -1,4 +1,3 @@
-import { NextRequest, NextResponse } from "next/server";
 import { neynarClient } from "@/lib/neynar";
 import { FetchFeedFeedTypeEnum, FetchFeedFilterTypeEnum, FetchTrendingFeedTimeWindowEnum } from "@neynar/nodejs-sdk/build/api";
 import { filterCast, sortCastsByQuality } from "@/lib/filters";
@@ -8,6 +7,7 @@ import { curatorPackUsers, curatedCasts } from "@/lib/schema";
 import { eq, inArray, desc, lt } from "drizzle-orm";
 import { cacheFeed } from "@/lib/cache";
 import { deduplicateRequest } from "@/lib/neynar-batch";
+import { getUser } from "@/lib/users";
 
 export async function GET(request: NextRequest) {
   try {
@@ -134,8 +134,56 @@ export async function GET(request: NextRequest) {
         .orderBy(desc(curatedCasts.createdAt))
         .limit(limit + 1); // Fetch one extra to check if there's more
       
-      // Extract cast data from stored JSONB
-      casts = curatedResults.slice(0, limit).map((row) => row.castData as any);
+      // Extract cast data from stored JSONB and include curator info
+      // Fetch curator user info for all unique curator FIDs
+      const curatorFids = [...new Set(curatedResults.map(r => r.curatorFid).filter(Boolean) as number[])];
+      const curatorInfoMap = new Map<number, { fid: number; username?: string; display_name?: string; pfp_url?: string }>();
+      
+      // Fetch curator info from database or Neynar
+      for (const fid of curatorFids) {
+        try {
+          const dbUser = await getUser(fid);
+          if (dbUser) {
+            curatorInfoMap.set(fid, {
+              fid,
+              username: dbUser.username || undefined,
+              display_name: dbUser.displayName || undefined,
+              pfp_url: dbUser.pfpUrl || undefined,
+            });
+          } else {
+            // Fetch from Neynar if not in DB
+            try {
+              const neynarUsers = await neynarClient.fetchBulkUsers({ fids: [fid] });
+              const neynarUser = neynarUsers.users?.[0];
+              if (neynarUser) {
+                curatorInfoMap.set(fid, {
+                  fid,
+                  username: neynarUser.username,
+                  display_name: neynarUser.display_name || undefined,
+                  pfp_url: neynarUser.pfp_url || undefined,
+                });
+              }
+            } catch (error) {
+              console.error(`Failed to fetch curator ${fid} from Neynar:`, error);
+            }
+          }
+        } catch (error) {
+          console.error(`Failed to fetch curator ${fid}:`, error);
+        }
+      }
+      
+      casts = curatedResults.slice(0, limit).map((row) => {
+        const cast = row.castData as any;
+        // Add curator info to the cast object
+        if (row.curatorFid) {
+          cast._curatorFid = row.curatorFid;
+          const curatorInfo = curatorInfoMap.get(row.curatorFid);
+          if (curatorInfo) {
+            cast._curatorInfo = curatorInfo;
+          }
+        }
+        return cast;
+      });
       
       // Set cursor to the last item's created_at timestamp if there are more results
       if (curatedResults.length > limit) {

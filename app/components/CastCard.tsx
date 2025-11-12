@@ -10,12 +10,14 @@ import { QuoteCastModal } from "./QuoteCastModal";
 import { CastComposer } from "./CastComposer";
 
 interface CastCardProps {
-  cast: Cast;
+  cast: Cast & { _curatorFid?: number; _curatorInfo?: { fid: number; username?: string; display_name?: string; pfp_url?: string } };
   showThread?: boolean;
   onUpdate?: () => void;
+  feedType?: string; // 'curated' or other feed types
+  curatorInfo?: { fid: number; username?: string; display_name?: string; pfp_url?: string };
 }
 
-export function CastCard({ cast, showThread = false, onUpdate }: CastCardProps) {
+export function CastCard({ cast, showThread = false, onUpdate, feedType, curatorInfo }: CastCardProps) {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showRecastMenu, setShowRecastMenu] = useState(false);
   const [showQuoteModal, setShowQuoteModal] = useState(false);
@@ -25,6 +27,7 @@ export function CastCard({ cast, showThread = false, onUpdate }: CastCardProps) 
   const [likesCount, setLikesCount] = useState(cast.reactions?.likes_count || 0);
   const [recastsCount, setRecastsCount] = useState(cast.reactions?.recasts_count || 0);
   const [isReacting, setIsReacting] = useState(false);
+  const [isCurating, setIsCurating] = useState(false);
   const recastMenuRef = useRef<HTMLDivElement>(null);
   const { user } = useNeynarContext();
 
@@ -149,13 +152,78 @@ export function CastCard({ cast, showThread = false, onUpdate }: CastCardProps) 
     setShowQuoteModal(true);
   };
 
+  const handleCurate = async () => {
+    if (!user?.fid) {
+      alert("Please sign in to curate casts");
+      return;
+    }
+
+    try {
+      setIsCurating(true);
+      
+      const response = await fetch("/api/curate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          castHash: cast.hash,
+          curatorFid: user.fid,
+          castData: cast,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (response.status === 403) {
+          alert("You don't have curator permissions. Please request curator role from chris.");
+        } else if (response.status === 409) {
+          alert("This cast is already curated");
+        } else {
+          throw new Error(errorData.error || "Failed to curate cast");
+        }
+        return;
+      }
+
+      alert("Cast curated successfully!");
+      if (onUpdate) {
+        onUpdate();
+      }
+    } catch (error: any) {
+      console.error("Curate error:", error);
+      alert(error.message || "Failed to curate cast");
+    } finally {
+      setIsCurating(false);
+    }
+  };
+
   const author = cast.author;
   const timestamp = new Date(cast.timestamp);
   const timeAgo = formatDistanceToNow(timestamp, { addSuffix: true });
 
   return (
     <>
-      <div className="border-b border-gray-200 dark:border-gray-800 py-4 sm:py-6 px-2 sm:px-4 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
+      <div className="border-b border-gray-200 dark:border-gray-800 py-4 sm:py-6 px-2 sm:px-4 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors relative">
+        {/* Curator badge - top right corner */}
+        {feedType === "curated" && (cast._curatorFid || curatorInfo || cast._curatorInfo) && (
+          <div className="absolute top-2 right-2 sm:top-4 sm:right-4 z-10">
+            <Link href={`/profile/${cast._curatorFid || curatorInfo?.fid || cast._curatorInfo?.fid}`}>
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-blue-50 dark:bg-blue-900/30 rounded-full border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors cursor-pointer">
+                {(curatorInfo?.pfp_url || cast._curatorInfo?.pfp_url) && (
+                  <img
+                    src={curatorInfo?.pfp_url || cast._curatorInfo?.pfp_url}
+                    alt={curatorInfo?.username || cast._curatorInfo?.username || "Curator"}
+                    className="w-4 h-4 rounded-full"
+                  />
+                )}
+                <span className="text-xs text-blue-700 dark:text-blue-300 font-medium">
+                  Curated by {curatorInfo?.display_name || curatorInfo?.username || cast._curatorInfo?.display_name || cast._curatorInfo?.username || `@user${cast._curatorFid || curatorInfo?.fid || cast._curatorInfo?.fid}`}
+                </span>
+              </div>
+            </Link>
+          </div>
+        )}
+        
         <div className="flex gap-2 sm:gap-3">
           {/* Avatar */}
           <Link href={`/profile/${author.fid}`}>
@@ -200,6 +268,8 @@ export function CastCard({ cast, showThread = false, onUpdate }: CastCardProps) 
                   // URL embed (images, videos, links)
                   if (embed.url) {
                     const metadata = embed.metadata;
+                    const urlObj = new URL(embed.url);
+                    const isXEmbed = urlObj.hostname === 'x.com' || urlObj.hostname === 'twitter.com';
                     
                     // HTML metadata (for link previews)
                     if (metadata?.html) {
@@ -208,6 +278,51 @@ export function CastCard({ cast, showThread = false, onUpdate }: CastCardProps) 
                       const imageUrl = ogImage?.url || null;
                       const title = htmlMeta.ogTitle || htmlMeta.title || null;
                       const description = htmlMeta.ogDescription || htmlMeta.description || null;
+                      
+                      // Special handling for X embeds - skip images as they often fail to load
+                      if (isXEmbed) {
+                        // Extract post ID from URL if possible for better display
+                        const urlMatch = embed.url.match(/\/status\/(\d+)/);
+                        const postId = urlMatch ? urlMatch[1] : null;
+                        
+                        return (
+                          <div key={index} className="rounded-lg overflow-hidden border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-gray-400 dark:hover:border-gray-600 transition-colors">
+                            <a
+                              href={embed.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block p-4"
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className="flex-shrink-0 mt-0.5">
+                                  <svg className="w-5 h-5 text-gray-900 dark:text-gray-100" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                                  </svg>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  {title ? (
+                                    <div className="font-semibold text-base text-gray-900 dark:text-gray-100 mb-1.5 line-clamp-2">
+                                      {title}
+                                    </div>
+                                  ) : (
+                                    <div className="font-semibold text-base text-gray-900 dark:text-gray-100 mb-1.5">
+                                      View on X
+                                    </div>
+                                  )}
+                                  {description && (
+                                    <div className="text-sm text-gray-600 dark:text-gray-400 mb-2 line-clamp-2">
+                                      {description}
+                                    </div>
+                                  )}
+                                  <div className="text-xs text-gray-500 dark:text-gray-500 truncate">
+                                    {postId ? `x.com/status/${postId}` : embed.url}
+                                  </div>
+                                </div>
+                              </div>
+                            </a>
+                          </div>
+                        );
+                      }
                       
                       return (
                         <div key={index} className="rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
@@ -241,7 +356,7 @@ export function CastCard({ cast, showThread = false, onUpdate }: CastCardProps) 
                                 </div>
                               )}
                               <div className="text-xs text-gray-500 dark:text-gray-500 mt-2 truncate">
-                                {new URL(embed.url).hostname}
+                                {urlObj.hostname}
                               </div>
                             </div>
                           </a>
@@ -289,6 +404,30 @@ export function CastCard({ cast, showThread = false, onUpdate }: CastCardProps) 
                     }
                     
                     // Generic URL embed (fallback)
+                    // Special styling for X embeds even without metadata
+                    if (isXEmbed) {
+                      return (
+                        <div key={index} className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-gray-400 dark:hover:border-gray-600 transition-colors p-4">
+                          <a
+                            href={embed.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block"
+                          >
+                            <div className="flex items-center gap-2 mb-2">
+                              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                              </svg>
+                              <span className="font-semibold text-gray-900 dark:text-gray-100">View on X</span>
+                            </div>
+                            <div className="text-sm text-gray-600 dark:text-gray-400 break-all">
+                              {embed.url}
+                            </div>
+                          </a>
+                        </div>
+                      );
+                    }
+                    
                     return (
                       <div key={index} className="rounded-lg border border-gray-200 dark:border-gray-800 p-3 bg-gray-50 dark:bg-gray-900">
                         <a
@@ -521,6 +660,19 @@ export function CastCard({ cast, showThread = false, onUpdate }: CastCardProps) 
                 >
                   View thread →
                 </Link>
+              )}
+
+              {/* Curate button - only show when not in curated feed */}
+              {feedType !== "curated" && user && (
+                <button
+                  onClick={handleCurate}
+                  disabled={isCurating}
+                  className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors py-1 px-1 sm:px-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Add to curated feed"
+                >
+                  <span className="text-base sm:text-lg">⭐</span>
+                  <span className="hidden sm:inline">Curate</span>
+                </button>
               )}
             </div>
           </div>
