@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { curatedCasts } from "@/lib/schema";
+import { curatedCasts, users, curatorCastCurations, curatedCastInteractions } from "@/lib/schema";
 import { createHmac, timingSafeEqual } from "crypto";
 import { neynarClient } from "@/lib/neynar";
-import { LookupCastConversationTypeEnum } from "@neynar/nodejs-sdk/build/api";
+import { LookupCastConversationTypeEnum, LookupCastConversationSortTypeEnum, LookupCastConversationFoldEnum } from "@neynar/nodejs-sdk/build/api";
+import { eq, and, asc, sql, inArray } from "drizzle-orm";
+import { shouldHideBotCastClient } from "@/lib/bot-filter";
+
+const DEFAULT_HIDDEN_BOTS = ["betonbangers", "deepbot", "bracky"];
 
 // Disable body parsing to read raw body for signature verification
 export const runtime = "nodejs";
@@ -28,15 +32,6 @@ function verifyWebhookSignature(
   hmac256.update(rawBody);
   const digest256 = hmac256.digest("hex"); // This is 64 hex characters (32 bytes)
   
-  console.log("Signature verification:", {
-    signatureLength: signature.length,
-    digest512Length: digest512.length,
-    digest256Length: digest256.length,
-    signaturePrefix: signature.substring(0, 20),
-    digest512Prefix: digest512.substring(0, 20),
-    digest256Prefix: digest256.substring(0, 20),
-    rawBodyLength: rawBody.length,
-  });
 
   // Normalize signature to lowercase
   const normalizedSignature = signature.toLowerCase();
@@ -49,11 +44,10 @@ function verifyWebhookSignature(
       
       if (sigBuffer.length === digestBuffer.length) {
         const isValid = timingSafeEqual(sigBuffer, digestBuffer);
-        console.log("Signature valid (SHA-512):", isValid);
         if (isValid) return true;
       }
     } catch (error) {
-      console.error("SHA-512 comparison error:", error);
+      // Continue to try SHA-256
     }
   }
   
@@ -69,20 +63,153 @@ function verifyWebhookSignature(
       
       if (sigBuffer.length === digestBuffer.length) {
         const isValid = timingSafeEqual(sigBuffer, digestBuffer);
-        console.log("Signature valid (SHA-256):", isValid);
         if (isValid) return true;
       }
     } catch (error) {
-      console.error("SHA-256 comparison error:", error);
+      // Signature verification failed
     }
   }
   
-  console.log("Signature verification failed for both SHA-256 and SHA-512");
   return false;
 }
 
+/**
+ * Fetch and sort top replies for a curated cast
+ * Sorts by interaction count (from curatedCastInteractions), falling back to algorithmic order
+ */
+async function fetchAndSortTopReplies(castHash: string): Promise<{ replies: any[]; updatedAt: Date } | null> {
+  try {
+    // Fetch conversation with replies
+    const conversation = await neynarClient.lookupCastConversation({
+      identifier: castHash,
+      type: LookupCastConversationTypeEnum.Hash,
+      replyDepth: 5, // Fetch more than needed for sorting
+      sortType: LookupCastConversationSortTypeEnum.Algorithmic,
+      fold: LookupCastConversationFoldEnum.Above,
+      includeChronologicalParentCasts: false,
+    });
+
+    const replies = conversation.conversation?.cast?.direct_replies || [];
+    
+    if (replies.length === 0) {
+      return { replies: [], updatedAt: new Date() };
+    }
+
+    // Filter out bot casts using default bot list (no viewer context in curation)
+    const filteredReplies = replies.filter((reply: any) => {
+      return !shouldHideBotCastClient(reply, DEFAULT_HIDDEN_BOTS, true);
+    });
+
+    if (filteredReplies.length === 0) {
+      return { replies: [], updatedAt: new Date() };
+    }
+
+    // Get cast hashes for all replies
+    const replyHashes = filteredReplies.map((reply: any) => reply.hash).filter(Boolean);
+    
+    if (replyHashes.length === 0) {
+      return { replies: [], updatedAt: new Date() };
+    }
+
+    // Query interaction counts for each reply
+    const interactionCounts = await db
+      .select({
+        targetCastHash: curatedCastInteractions.targetCastHash,
+        count: sql<number>`count(*)::int`.as("count"),
+      })
+      .from(curatedCastInteractions)
+      .where(
+        and(
+          eq(curatedCastInteractions.curatedCastHash, castHash),
+          inArray(curatedCastInteractions.targetCastHash, replyHashes)
+        )
+      )
+      .groupBy(curatedCastInteractions.targetCastHash);
+
+    // Create a map of interaction counts
+    const interactionCountMap = new Map<string, number>();
+    interactionCounts.forEach((ic) => {
+      interactionCountMap.set(ic.targetCastHash, ic.count);
+    });
+
+    // Sort replies by interaction count (descending), then by algorithmic order (preserve original order)
+    const sortedReplies = filteredReplies.sort((a: any, b: any) => {
+      const aCount = interactionCountMap.get(a.hash) || 0;
+      const bCount = interactionCountMap.get(b.hash) || 0;
+      
+      // First sort by interaction count (descending)
+      if (bCount !== aCount) {
+        return bCount - aCount;
+      }
+      
+      // If counts are equal, preserve algorithmic order (keep original position)
+      return 0;
+    });
+
+    // Take top 5
+    const topReplies = sortedReplies.slice(0, 5);
+
+    return {
+      replies: topReplies,
+      updatedAt: new Date(),
+    };
+  } catch (error) {
+    console.error(`Error fetching replies for cast ${castHash}:`, error);
+    // Return null to indicate failure, but don't throw - curation should still succeed
+    return null;
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const searchParams = request.nextUrl.searchParams;
+    const castHash = searchParams.get("castHash");
+
+    if (!castHash) {
+      return NextResponse.json(
+        { error: "castHash is required" },
+        { status: 400 }
+      );
+    }
+
+    // Check curator_cast_curations table and join with users to get curator info
+    // Order by createdAt ASC to show oldest curator first
+    const curations = await db
+      .select({
+        curatorFid: curatorCastCurations.curatorFid,
+        createdAt: curatorCastCurations.createdAt,
+        username: users.username,
+        displayName: users.displayName,
+        pfpUrl: users.pfpUrl,
+      })
+      .from(curatorCastCurations)
+      .leftJoin(users, eq(curatorCastCurations.curatorFid, users.fid))
+      .where(eq(curatorCastCurations.castHash, castHash))
+      .orderBy(asc(curatorCastCurations.createdAt));
+
+    const curatorInfo = curations.map(c => ({
+      fid: c.curatorFid,
+      username: c.username || undefined,
+      display_name: c.displayName || undefined,
+      pfp_url: c.pfpUrl || undefined,
+    }));
+
+    return NextResponse.json({ 
+      isCurated: curations.length > 0,
+      curatorFids: curations.map(c => c.curatorFid),
+      curatorInfo: curatorInfo,
+    });
+  } catch (error: unknown) {
+    const err = error as { message?: string; code?: string };
+    console.error("Check curated API error:", err.message || err);
+    return NextResponse.json(
+      { error: err.message || "Failed to check curation status" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(request: NextRequest) {
-  console.log("Curate endpoint hit");
   try {
     // Get the raw body for signature verification
     const rawBody = await request.text();
@@ -93,17 +220,15 @@ export async function POST(request: NextRequest) {
                       request.headers.get("X-NEYNAR-SIGNATURE");
     const webhookSecret = process.env.WEBHOOK_SECRET;
 
-    console.log("Webhook verification:", {
-      hasSignature: !!signature,
-      hasSecret: !!webhookSecret,
-      signatureHeader: signature?.substring(0, 20) || "none",
-      allHeaders: Object.fromEntries(request.headers.entries()),
-    });
+    // Check if this is a webhook call (has signature) or direct API call
+    const isWebhook = !!signature && !!webhookSecret;
+
+    // Parse the body once
+    const body = JSON.parse(rawBody);
 
     // Verify webhook signature if secret is configured
-    if (webhookSecret) {
+    if (isWebhook && webhookSecret) {
       if (!signature) {
-        console.log("Missing webhook signature header");
         return NextResponse.json(
           { error: "Missing webhook signature" },
           { status: 401 }
@@ -112,32 +237,45 @@ export async function POST(request: NextRequest) {
 
       const isValid = verifyWebhookSignature(rawBody, signature, webhookSecret);
       if (!isValid) {
-        console.log("Invalid webhook signature - request rejected");
         return NextResponse.json(
           { error: "Invalid webhook signature" },
           { status: 401 }
         );
       }
-      console.log("Webhook signature verified successfully");
-    } else {
-      console.log("WEBHOOK_SECRET not configured, skipping verification");
-    }
+    } else if (!isWebhook) {
+      // Direct API call - check curator role
+      const curatorFid = body.curatorFid;
+      
+      if (!curatorFid) {
+        return NextResponse.json(
+          { error: "curatorFid is required" },
+          { status: 400 }
+        );
+      }
 
-    // Parse the body
-    const body = JSON.parse(rawBody);
+      // Check if user has curator role
+      const user = await db.select().from(users).where(eq(users.fid, curatorFid)).limit(1);
+      if (user.length === 0 || user[0].role !== "curator") {
+        return NextResponse.json(
+          { error: "User does not have curator role" },
+          { status: 403 }
+        );
+      }
+    }
     
     // Extract cast hash from webhook payload or direct body
     // Neynar webhook format: { type: "cast.created", data: { hash: "0x...", parent_hash: "0x...", author: { fid: 123 } } }
-    // Direct API format: { castHash: "0x...", curatorFid: 123 }
+    // Direct API format: { castHash: "0x...", curatorFid: 123, castData: {...} }
     const castData = body.data || body.castData;
     const parentHash = castData?.parent_hash;
     
-    // If there's a parent_hash, fetch and store the parent cast instead
-    let castHash: string;
-    let finalCastData: unknown;
+    // For direct API calls, prioritize explicitly provided values
+    let castHash: string = body.castHash || castData?.hash;
+    let finalCastData: unknown = castData;
+    const curatorFid = body.curatorFid || castData?.author?.fid;
     
-    if (parentHash) {
-      console.log(`Cast has parent, fetching parent cast: ${parentHash}`);
+    // If there's a parent_hash, fetch and store the parent cast instead
+    if (parentHash && isWebhook) {
       try {
         // Fetch the parent cast
         const conversation = await neynarClient.lookupCastConversation({
@@ -151,29 +289,17 @@ export async function POST(request: NextRequest) {
         if (parentCast) {
           castHash = parentHash;
           finalCastData = parentCast;
-          console.log(`Storing parent cast: ${parentHash}`);
         } else {
           // Fallback to current cast if parent not found
           castHash = castData?.hash || body.castHash;
           finalCastData = castData;
-          console.log(`Parent cast not found, storing current cast: ${castHash}`);
         }
       } catch (error) {
-        console.error("Error fetching parent cast:", error);
         // Fallback to current cast if fetch fails
         castHash = castData?.hash || body.castHash;
         finalCastData = castData;
-        console.log(`Error fetching parent, storing current cast: ${castHash}`);
       }
-    } else {
-      // No parent, store the current cast
-      castHash = castData?.hash || body.castHash;
-      finalCastData = castData;
     }
-    
-    const curatorFid = castData?.author?.fid || body.curatorFid;
-    
-    console.log(`Processing curation for cast: ${castHash}, curator: ${curatorFid || 'unknown'}`);
 
     if (!castHash) {
       return NextResponse.json(
@@ -189,17 +315,63 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Insert the cast into curated_casts table
-    const result = await db.insert(curatedCasts).values({
-      castHash,
-      castData: finalCastData,
-      curatorFid: curatorFid || null,
-    }).returning();
+    if (!curatorFid) {
+      return NextResponse.json(
+        { error: "curatorFid is required" },
+        { status: 400 }
+      );
+    }
 
-    return NextResponse.json({ 
-      success: true, 
-      curatedCast: result[0] 
-    });
+    // Check if cast already exists in curated_casts, if not insert it
+    const existingCast = await db.select().from(curatedCasts).where(eq(curatedCasts.castHash, castHash)).limit(1);
+    
+    // Fetch and sort top replies
+    const topRepliesResult = await fetchAndSortTopReplies(castHash);
+    
+    if (existingCast.length === 0) {
+      // Insert the cast into curated_casts table (store cast data once)
+      await db.insert(curatedCasts).values({
+        castHash,
+        castData: finalCastData,
+        curatorFid: curatorFid || null,
+        topReplies: topRepliesResult?.replies || null,
+        repliesUpdatedAt: topRepliesResult?.updatedAt || null,
+      });
+    } else if (topRepliesResult) {
+      // Update existing cast with replies if this is the first curation
+      // (only update if replies haven't been fetched yet)
+      if (!existingCast[0].topReplies) {
+        await db
+          .update(curatedCasts)
+          .set({
+            topReplies: topRepliesResult.replies,
+            repliesUpdatedAt: topRepliesResult.updatedAt,
+          })
+          .where(eq(curatedCasts.castHash, castHash));
+      }
+    }
+
+    // Insert into curator_cast_curations (link curator to cast)
+    try {
+      const curationResult = await db.insert(curatorCastCurations).values({
+        castHash,
+        curatorFid,
+      }).returning();
+
+      return NextResponse.json({ 
+        success: true, 
+        curation: curationResult[0] 
+      });
+    } catch (insertError: any) {
+      // Handle unique constraint violation (same user trying to curate twice)
+      if (insertError.code === "23505" || insertError.message?.includes("unique")) {
+        return NextResponse.json(
+          { error: "Cast is already curated by this user" },
+          { status: 409 }
+        );
+      }
+      throw insertError;
+    }
   } catch (error: unknown) {
     console.error("Curate API error:", error);
     
@@ -215,6 +387,93 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       { error: err.message || "Failed to curate cast" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const searchParams = request.nextUrl.searchParams;
+    const castHash = searchParams.get("castHash");
+    const curatorFid = searchParams.get("curatorFid") ? parseInt(searchParams.get("curatorFid")!) : undefined;
+
+    if (!castHash) {
+      return NextResponse.json(
+        { error: "castHash is required" },
+        { status: 400 }
+      );
+    }
+
+    if (!curatorFid) {
+      return NextResponse.json(
+        { error: "curatorFid is required" },
+        { status: 400 }
+      );
+    }
+
+    // Check if user has curator role
+    const user = await db.select().from(users).where(eq(users.fid, curatorFid)).limit(1);
+    if (user.length === 0 || user[0].role !== "curator") {
+      return NextResponse.json(
+        { error: "User does not have curator role" },
+        { status: 403 }
+      );
+    }
+
+    // Check if this curator has curated this cast
+    const curation = await db
+      .select()
+      .from(curatorCastCurations)
+      .where(
+        and(
+          eq(curatorCastCurations.castHash, castHash),
+          eq(curatorCastCurations.curatorFid, curatorFid)
+        )
+      )
+      .limit(1);
+
+    if (curation.length === 0) {
+      return NextResponse.json(
+        { error: "Cast is not curated by this user" },
+        { status: 404 }
+      );
+    }
+
+    // Delete from curator_cast_curations
+    await db
+      .delete(curatorCastCurations)
+      .where(
+        and(
+          eq(curatorCastCurations.castHash, castHash),
+          eq(curatorCastCurations.curatorFid, curatorFid)
+        )
+      );
+
+    // Check if there are any remaining curators for this cast
+    const remainingCurations = await db
+      .select()
+      .from(curatorCastCurations)
+      .where(eq(curatorCastCurations.castHash, castHash))
+      .limit(1);
+
+    // If no curators remain, remove the cast from curated_casts table
+    // This ensures it won't appear in the curated feed
+    if (remainingCurations.length === 0) {
+      await db
+        .delete(curatedCasts)
+        .where(eq(curatedCasts.castHash, castHash));
+    }
+
+    return NextResponse.json({ 
+      success: true,
+      message: "Cast removed from curated feed"
+    });
+  } catch (error: unknown) {
+    console.error("Uncurate API error:", error);
+    const err = error as { message?: string };
+    return NextResponse.json(
+      { error: err.message || "Failed to uncurate cast" },
       { status: 500 }
     );
   }

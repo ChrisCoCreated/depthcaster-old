@@ -1,0 +1,1030 @@
+{
+  "id": "f8fe8417-0a2d-48b3-94fb-8ca1fb58896f",
+  "prevId": "25824d27-43d7-4fee-ba34-b3505483eccb",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.curated_cast_replies": {
+      "name": "curated_cast_replies",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "curated_cast_hash": {
+          "name": "curated_cast_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reply_hash": {
+          "name": "reply_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reply_data": {
+          "name": "reply_data",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "author_fid": {
+          "name": "author_fid",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "reply_hash_unique": {
+          "name": "reply_hash_unique",
+          "columns": [
+            {
+              "expression": "reply_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "curated_cast_hash_created_at_idx": {
+          "name": "curated_cast_hash_created_at_idx",
+          "columns": [
+            {
+              "expression": "curated_cast_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "curated_cast_replies_curated_cast_hash_curated_casts_cast_hash_fk": {
+          "name": "curated_cast_replies_curated_cast_hash_curated_casts_cast_hash_fk",
+          "tableFrom": "curated_cast_replies",
+          "tableTo": "curated_casts",
+          "columnsFrom": [
+            "curated_cast_hash"
+          ],
+          "columnsTo": [
+            "cast_hash"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "curated_cast_replies_reply_hash_unique": {
+          "name": "curated_cast_replies_reply_hash_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "reply_hash"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.curated_casts": {
+      "name": "curated_casts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "cast_hash": {
+          "name": "cast_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cast_data": {
+          "name": "cast_data",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "curator_fid": {
+          "name": "curator_fid",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "cast_hash_unique": {
+          "name": "cast_hash_unique",
+          "columns": [
+            {
+              "expression": "cast_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "curator_fid_idx": {
+          "name": "curator_fid_idx",
+          "columns": [
+            {
+              "expression": "curator_fid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "created_at_idx": {
+          "name": "created_at_idx",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "curated_casts_curator_fid_users_fid_fk": {
+          "name": "curated_casts_curator_fid_users_fid_fk",
+          "tableFrom": "curated_casts",
+          "tableTo": "users",
+          "columnsFrom": [
+            "curator_fid"
+          ],
+          "columnsTo": [
+            "fid"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.curator_pack_users": {
+      "name": "curator_pack_users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "pack_id": {
+          "name": "pack_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_fid": {
+          "name": "user_fid",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "added_at": {
+          "name": "added_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "pack_user_unique": {
+          "name": "pack_user_unique",
+          "columns": [
+            {
+              "expression": "pack_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "user_fid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "user_fid_idx": {
+          "name": "user_fid_idx",
+          "columns": [
+            {
+              "expression": "user_fid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "curator_pack_users_pack_id_curator_packs_id_fk": {
+          "name": "curator_pack_users_pack_id_curator_packs_id_fk",
+          "tableFrom": "curator_pack_users",
+          "tableTo": "curator_packs",
+          "columnsFrom": [
+            "pack_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "curator_pack_users_user_fid_users_fid_fk": {
+          "name": "curator_pack_users_user_fid_users_fid_fk",
+          "tableFrom": "curator_pack_users",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_fid"
+          ],
+          "columnsTo": [
+            "fid"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.curator_packs": {
+      "name": "curator_packs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "creator_fid": {
+          "name": "creator_fid",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_public": {
+          "name": "is_public",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "usage_count": {
+          "name": "usage_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "creator_fid_idx": {
+          "name": "creator_fid_idx",
+          "columns": [
+            {
+              "expression": "creator_fid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "curator_packs_creator_fid_users_fid_fk": {
+          "name": "curator_packs_creator_fid_users_fid_fk",
+          "tableFrom": "curator_packs",
+          "tableTo": "users",
+          "columnsFrom": [
+            "creator_fid"
+          ],
+          "columnsTo": [
+            "fid"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.pack_favorites": {
+      "name": "pack_favorites",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_fid": {
+          "name": "user_fid",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pack_id": {
+          "name": "pack_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "user_pack_favorite_unique": {
+          "name": "user_pack_favorite_unique",
+          "columns": [
+            {
+              "expression": "user_fid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "pack_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "user_fid_favorite_idx": {
+          "name": "user_fid_favorite_idx",
+          "columns": [
+            {
+              "expression": "user_fid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "pack_favorites_user_fid_users_fid_fk": {
+          "name": "pack_favorites_user_fid_users_fid_fk",
+          "tableFrom": "pack_favorites",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_fid"
+          ],
+          "columnsTo": [
+            "fid"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "pack_favorites_pack_id_curator_packs_id_fk": {
+          "name": "pack_favorites_pack_id_curator_packs_id_fk",
+          "tableFrom": "pack_favorites",
+          "tableTo": "curator_packs",
+          "columnsFrom": [
+            "pack_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.user_notifications": {
+      "name": "user_notifications",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_fid": {
+          "name": "user_fid",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cast_hash": {
+          "name": "cast_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cast_data": {
+          "name": "cast_data",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "author_fid": {
+          "name": "author_fid",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_read": {
+          "name": "is_read",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "user_fid_is_read_created_at_idx": {
+          "name": "user_fid_is_read_created_at_idx",
+          "columns": [
+            {
+              "expression": "user_fid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "is_read",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "user_notifications_user_fid_users_fid_fk": {
+          "name": "user_notifications_user_fid_users_fid_fk",
+          "tableFrom": "user_notifications",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_fid"
+          ],
+          "columnsTo": [
+            "fid"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.user_pack_subscriptions": {
+      "name": "user_pack_subscriptions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_fid": {
+          "name": "user_fid",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pack_id": {
+          "name": "pack_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "user_pack_unique": {
+          "name": "user_pack_unique",
+          "columns": [
+            {
+              "expression": "user_fid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "pack_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "user_fid_subscription_idx": {
+          "name": "user_fid_subscription_idx",
+          "columns": [
+            {
+              "expression": "user_fid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "user_pack_subscriptions_user_fid_users_fid_fk": {
+          "name": "user_pack_subscriptions_user_fid_users_fid_fk",
+          "tableFrom": "user_pack_subscriptions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_fid"
+          ],
+          "columnsTo": [
+            "fid"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "user_pack_subscriptions_pack_id_curator_packs_id_fk": {
+          "name": "user_pack_subscriptions_pack_id_curator_packs_id_fk",
+          "tableFrom": "user_pack_subscriptions",
+          "tableTo": "curator_packs",
+          "columnsFrom": [
+            "pack_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.user_watches": {
+      "name": "user_watches",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "watcher_fid": {
+          "name": "watcher_fid",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "watched_fid": {
+          "name": "watched_fid",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "watcher_watched_unique": {
+          "name": "watcher_watched_unique",
+          "columns": [
+            {
+              "expression": "watcher_fid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "watched_fid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "watcher_fid_idx": {
+          "name": "watcher_fid_idx",
+          "columns": [
+            {
+              "expression": "watcher_fid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "user_watches_watcher_fid_users_fid_fk": {
+          "name": "user_watches_watcher_fid_users_fid_fk",
+          "tableFrom": "user_watches",
+          "tableTo": "users",
+          "columnsFrom": [
+            "watcher_fid"
+          ],
+          "columnsTo": [
+            "fid"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "user_watches_watched_fid_users_fid_fk": {
+          "name": "user_watches_watched_fid_users_fid_fk",
+          "tableFrom": "user_watches",
+          "tableTo": "users",
+          "columnsFrom": [
+            "watched_fid"
+          ],
+          "columnsTo": [
+            "fid"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "fid": {
+          "name": "fid",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "username": {
+          "name": "username",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pfp_url": {
+          "name": "pfp_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "preferences": {
+          "name": "preferences",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "usage_stats": {
+          "name": "usage_stats",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "username_idx": {
+          "name": "username_idx",
+          "columns": [
+            {
+              "expression": "username",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.webhooks": {
+      "name": "webhooks",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "neynar_webhook_id": {
+          "name": "neynar_webhook_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "config": {
+          "name": "config",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "type_idx": {
+          "name": "type_idx",
+          "columns": [
+            {
+              "expression": "type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "neynar_webhook_id_idx": {
+          "name": "neynar_webhook_id_idx",
+          "columns": [
+            {
+              "expression": "neynar_webhook_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "webhooks_neynar_webhook_id_unique": {
+          "name": "webhooks_neynar_webhook_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "neynar_webhook_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

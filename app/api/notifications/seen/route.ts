@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { neynarClient } from "@/lib/neynar";
 import { NotificationType } from "@neynar/nodejs-sdk/build/api";
+import { cacheNotifications } from "@/lib/cache";
 
 export async function POST(request: NextRequest) {
   try {
@@ -49,6 +50,9 @@ export async function POST(request: NextRequest) {
       signerUuid,
       type: mappedType,
     });
+
+    // Clear notification cache to force fresh fetch
+    cacheNotifications.clear();
 
     return NextResponse.json({ success: true, result });
   } catch (error: any) {

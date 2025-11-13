@@ -1,5 +1,6 @@
 import { Cast } from "@neynar/nodejs-sdk/build/api";
 import { CURATED_FIDS, MIN_DEEP_THOUGHT_LENGTH, MIN_USER_SCORE, MIN_REPLY_COUNT } from "./curated";
+import { shouldHideBotCastClient } from "./bot-filter";
 
 export interface FilterOptions {
   minLength?: number;
@@ -7,6 +8,9 @@ export interface FilterOptions {
   minReplies?: number;
   requireCuratedFid?: boolean;
   requireCuratedChannel?: boolean;
+  hiddenBots?: string[];
+  hideBots?: boolean;
+  viewerFid?: number;
 }
 
 export function filterCast(cast: Cast, options: FilterOptions = {}): boolean {
@@ -16,16 +20,14 @@ export function filterCast(cast: Cast, options: FilterOptions = {}): boolean {
     minReplies = MIN_REPLY_COUNT,
     requireCuratedFid = false,
     requireCuratedChannel = false,
+    hiddenBots,
+    hideBots,
+    viewerFid,
   } = options;
 
-  // Hide replies that mention @deepbot
-  if (cast.mentioned_profiles && Array.isArray(cast.mentioned_profiles)) {
-    const hasDeepbot = cast.mentioned_profiles.some(
-      (profile: any) => profile?.username?.toLowerCase() === "deepbot"
-    );
-    if (hasDeepbot) {
-      return false;
-    }
+  // Check bot filtering (using client-side version for compatibility)
+  if (shouldHideBotCastClient(cast, hiddenBots, hideBots)) {
+    return false;
   }
 
   // Check user quality score

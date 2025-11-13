@@ -8,6 +8,41 @@
       "when": 1762886647675,
       "tag": "0000_dusty_exiles",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1763004415782,
+      "tag": "0001_slow_sally_floyd",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1763006504900,
+      "tag": "0002_lovely_iron_patriot",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1763058235077,
+      "tag": "0003_complete_shatterstar",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1763064774447,
+      "tag": "0004_youthful_black_panther",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1763097524878,
+      "tag": "0005_add_webhook_secret",
+      "breakpoints": true
     }
   ]
 }

@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
     const identifier = searchParams.get("identifier");
     const typeParam = searchParams.get("type") || "hash";
     const replyDepth = parseInt(searchParams.get("replyDepth") || "3");
+    const foldParam = searchParams.get("fold") || "above"; // above, below, or not set
     const viewerFid = searchParams.get("viewerFid")
       ? parseInt(searchParams.get("viewerFid")!)
       : undefined;
@@ -25,12 +26,18 @@ export async function GET(request: NextRequest) {
       ? LookupCastConversationTypeEnum.Url 
       : LookupCastConversationTypeEnum.Hash;
 
-    // Generate cache key
+    // Determine fold enum value
+    const foldEnum = foldParam === "below" 
+      ? LookupCastConversationFoldEnum.Below 
+      : LookupCastConversationFoldEnum.Above;
+
+    // Generate cache key (include fold in cache key)
     const cacheKey = cacheConversation.generateKey({
       identifier,
       type: typeParam,
       replyDepth,
       viewerFid,
+      fold: foldParam, // Include fold in cache key
     });
 
     // Check cache first
@@ -47,7 +54,7 @@ export async function GET(request: NextRequest) {
         replyDepth,
         viewerFid,
         sortType: LookupCastConversationSortTypeEnum.Algorithmic, // Rank by quality
-        // fold: LookupCastConversationFoldEnum.Above, // Temporarily remove fold to see all replies
+        fold: foldEnum, // Use Neynar's fold to separate high/low quality replies
         includeChronologicalParentCasts: true,
       });
     });

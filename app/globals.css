@@ -19,10 +19,21 @@
   }
 }
 
+html {
+  overflow-x: hidden;
+  width: 100%;
+  /* Set a larger base font size that respects system preferences */
+  /* 18px base (vs default 16px) makes text ~12.5% larger */
+  /* This scales proportionally with system font size settings */
+  font-size: 112.5%; /* 18px when system default is 16px, scales up/down with system settings */
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  overflow-x: hidden;
+  width: 100%;
 }
 
 @layer base {

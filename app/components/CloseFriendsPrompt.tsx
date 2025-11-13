@@ -44,9 +44,10 @@ export function CloseFriendsPrompt({ onPackCreated }: CloseFriendsPromptProps) {
       const response = await fetch(`/api/curator-packs?creatorFid=${user.fid}`);
       if (response.ok) {
         const data = await response.json();
-        const userHasPacks = data.packs && data.packs.length > 0;
-        setHasPacks(userHasPacks);
-        setShowPrompt(!userHasPacks);
+        // Check specifically for "My 37" pack
+        const hasMy37Pack = data.packs && data.packs.some((p: any) => p.name === "My 37");
+        setHasPacks(hasMy37Pack);
+        setShowPrompt(!hasMy37Pack);
       }
     } catch (error) {
       console.error("Error checking packs:", error);
@@ -57,13 +58,13 @@ export function CloseFriendsPrompt({ onPackCreated }: CloseFriendsPromptProps) {
     if (!user?.fid) return;
     
     try {
-      const response = await fetch(`/api/user/suggested?fid=${user.fid}&limit=20`);
+      const response = await fetch(`/api/user/suggested?fid=${user.fid}&limit=50`);
       if (response.ok) {
         const data = await response.json();
         const users = data.users || [];
         setSuggestedUsers(users);
-        // Pre-select first 10 suggested users
-        setSelectedUsers(users.slice(0, 10));
+        // Pre-select first 37 suggested users (up to max)
+        setSelectedUsers(users.slice(0, 37));
       }
     } catch (error) {
       console.error("Error fetching suggested users:", error);
@@ -83,6 +84,12 @@ export function CloseFriendsPrompt({ onPackCreated }: CloseFriendsPromptProps) {
         return;
       }
 
+      if (fids.length > 37) {
+        alert("Maximum 37 users allowed!");
+        setIsCreating(false);
+        return;
+      }
+
       // Build userData map from selectedUsers
       const userData: Record<number, { username?: string; displayName?: string; pfpUrl?: string }> = {};
       for (const selectedUser of selectedUsers) {
@@ -95,14 +102,14 @@ export function CloseFriendsPrompt({ onPackCreated }: CloseFriendsPromptProps) {
         }
       }
 
-      // Create the close friends pack
+      // Create the My 37 pack
       const response = await fetch("/api/curator-packs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: "Close Friends",
-          description: "Your close friends on Farcaster",
-          fids,
+          name: "My 37",
+          description: "Your selected 37 users",
+          fids: fids.slice(0, 37), // Limit to 37 users
           userData,
           isPublic: false,
           creatorFid: user.fid,
@@ -120,7 +127,7 @@ export function CloseFriendsPrompt({ onPackCreated }: CloseFriendsPromptProps) {
       onPackCreated?.();
     } catch (error) {
       console.error("Error creating close friends pack:", error);
-      alert("Failed to create close friends pack");
+      alert("Failed to create My 37 pack");
     } finally {
       setIsCreating(false);
     }
@@ -138,18 +145,18 @@ export function CloseFriendsPrompt({ onPackCreated }: CloseFriendsPromptProps) {
             <div className="flex-1 min-w-0">
               <div className="mb-3">
                 <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 mb-1.5">
-                  Create Your First Curator Pack
+                  Create Your My 37 Pack
                 </h3>
                 <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-                  Start by creating a <span className="font-medium text-gray-900 dark:text-gray-100">"Close Friends"</span> pack. 
-                  We've suggested users you interact with frequently.
+                  Start by creating your <span className="font-medium text-gray-900 dark:text-gray-100">"My 37"</span> pack. 
+                  Select up to 37 users for your personalized feed. We've suggested users you interact with frequently.
                 </p>
               </div>
               <button
                 onClick={() => setShowForm(true)}
                 className="px-4 sm:px-5 py-2 sm:py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs sm:text-sm font-medium shadow-sm hover:shadow-md"
               >
-                Create Close Friends Pack
+                Create My 37 Pack
               </button>
             </div>
             <button
@@ -169,10 +176,10 @@ export function CloseFriendsPrompt({ onPackCreated }: CloseFriendsPromptProps) {
             <div className="flex items-start sm:items-center justify-between mb-3 sm:mb-4 gap-2">
               <div className="flex-1 min-w-0">
                 <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 mb-1">
-                  Create Close Friends Pack
+                  Create My 37 Pack
                 </h3>
                 <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                  Select users to include in your pack
+                  Select up to 37 users to include in your pack
                 </p>
               </div>
               <button

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { neynarClient } from "@/lib/neynar";
 import { ReactionType } from "@neynar/nodejs-sdk/build/api";
+import { trackCuratedCastInteraction } from "@/lib/interactions";
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,12 +15,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get user FID from signer
+    let userFid: number | undefined;
+    try {
+      const signer = await neynarClient.lookupSigner({ signerUuid });
+      userFid = signer.fid;
+    } catch (error) {
+      console.error("Error fetching signer:", error);
+    }
+
     const reaction = await neynarClient.publishReaction({
       signerUuid,
       reactionType: reactionType as ReactionType,
       target,
       targetAuthorFid,
     });
+
+    // Track interaction if this is a reaction to a curated cast thread
+    if (target && userFid) {
+      const interactionType = reactionType === "like" ? "like" : reactionType === "recast" ? "recast" : null;
+      if (interactionType) {
+        trackCuratedCastInteraction(target, interactionType, userFid).catch((error) => {
+          console.error("Error tracking reaction interaction:", error);
+        });
+      }
+    }
 
     return NextResponse.json({ success: true, reaction });
   } catch (error: any) {
@@ -43,6 +63,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    // Note: We don't track deletion of interactions - only additions count for bumping
     const reaction = await neynarClient.deleteReaction({
       signerUuid,
       reactionType: reactionType as ReactionType,
@@ -59,5 +80,6 @@ export async function DELETE(request: NextRequest) {
     );
   }
 }
+
 
 

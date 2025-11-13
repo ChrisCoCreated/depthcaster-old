@@ -19,11 +19,25 @@ async function setupDatabase() {
         username TEXT,
         display_name TEXT,
         pfp_url TEXT,
+        role TEXT,
         preferences JSONB,
         usage_stats JSONB,
         created_at TIMESTAMP DEFAULT NOW() NOT NULL,
         updated_at TIMESTAMP DEFAULT NOW() NOT NULL
       );
+    `);
+
+    // Add role column if it doesn't exist (migration for existing tables)
+    await db.execute(sql`
+      DO $$ 
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'users' AND column_name = 'role'
+        ) THEN
+          ALTER TABLE users ADD COLUMN role TEXT;
+        END IF;
+      END $$;
     `);
 
     await db.execute(sql`
@@ -78,15 +92,45 @@ async function setupDatabase() {
       CREATE INDEX IF NOT EXISTS user_pack_subscriptions_user_fid_idx ON user_pack_subscriptions(user_fid);
     `);
 
-    // Create curated_casts table
+    // Create curated_casts table (removed UNIQUE constraint to allow multiple curators)
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS curated_casts (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        cast_hash TEXT NOT NULL UNIQUE,
+        cast_hash TEXT NOT NULL,
         cast_data JSONB NOT NULL,
         curator_fid BIGINT REFERENCES users(fid),
         created_at TIMESTAMP DEFAULT NOW() NOT NULL
       );
+    `);
+
+    // Remove unique constraint if it exists (migration for existing tables)
+    await db.execute(sql`
+      DO $$ 
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM pg_constraint 
+          WHERE conname = 'curated_casts_cast_hash_key'
+        ) THEN
+          ALTER TABLE curated_casts DROP CONSTRAINT curated_casts_cast_hash_key;
+        END IF;
+      END $$;
+    `);
+
+    // Add cast_data column if it doesn't exist (migration for existing tables)
+    await db.execute(sql`
+      DO $$ 
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'curated_casts' AND column_name = 'cast_data'
+        ) THEN
+          ALTER TABLE curated_casts ADD COLUMN cast_data JSONB;
+          -- Update existing rows to have empty object if needed
+          UPDATE curated_casts SET cast_data = '{}'::jsonb WHERE cast_data IS NULL;
+          -- Make it NOT NULL after updating
+          ALTER TABLE curated_casts ALTER COLUMN cast_data SET NOT NULL;
+        END IF;
+      END $$;
     `);
 
     await db.execute(sql`
@@ -95,6 +139,65 @@ async function setupDatabase() {
 
     await db.execute(sql`
       CREATE INDEX IF NOT EXISTS created_at_idx ON curated_casts(created_at DESC);
+    `);
+
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS cast_hash_idx ON curated_casts(cast_hash);
+    `);
+
+    // Create curator_cast_curations junction table
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS curator_cast_curations (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        cast_hash TEXT NOT NULL REFERENCES curated_casts(cast_hash) ON DELETE CASCADE,
+        curator_fid BIGINT NOT NULL REFERENCES users(fid),
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+        UNIQUE(cast_hash, curator_fid)
+      );
+    `);
+
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS curator_cast_curations_cast_hash_idx ON curator_cast_curations(cast_hash);
+    `);
+
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS curator_cast_curations_curator_fid_idx ON curator_cast_curations(curator_fid);
+    `);
+
+    // Migrate existing curated_casts data to curator_cast_curations
+    await db.execute(sql`
+      INSERT INTO curator_cast_curations (cast_hash, curator_fid, created_at)
+      SELECT cast_hash, curator_fid, created_at
+      FROM curated_casts
+      WHERE curator_fid IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM curator_cast_curations 
+        WHERE curator_cast_curations.cast_hash = curated_casts.cast_hash 
+        AND curator_cast_curations.curator_fid = curated_casts.curator_fid
+      );
+    `);
+
+    // Create push_subscriptions table
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_fid BIGINT NOT NULL REFERENCES users(fid),
+        endpoint TEXT NOT NULL,
+        p256dh TEXT NOT NULL,
+        auth TEXT NOT NULL,
+        user_agent TEXT,
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+        updated_at TIMESTAMP DEFAULT NOW() NOT NULL,
+        UNIQUE(endpoint)
+      );
+    `);
+
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS push_subscriptions_user_fid_idx ON push_subscriptions(user_fid);
+    `);
+
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS push_subscriptions_endpoint_idx ON push_subscriptions(endpoint);
     `);
 
     console.log("Database tables created successfully!");

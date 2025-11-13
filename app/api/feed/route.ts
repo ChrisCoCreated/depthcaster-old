@@ -1,13 +1,15 @@
+import { NextRequest, NextResponse } from "next/server";
 import { neynarClient } from "@/lib/neynar";
-import { FetchFeedFeedTypeEnum, FetchFeedFilterTypeEnum, FetchTrendingFeedTimeWindowEnum } from "@neynar/nodejs-sdk/build/api";
+import { FetchFeedFeedTypeEnum, FetchFeedFilterTypeEnum, FetchTrendingFeedTimeWindowEnum, FetchFeedForYouProviderEnum } from "@neynar/nodejs-sdk/build/api";
 import { filterCast, sortCastsByQuality } from "@/lib/filters";
 import { CURATED_FIDS, CURATED_CHANNELS } from "@/lib/curated";
 import { db } from "@/lib/db";
-import { curatorPackUsers, curatedCasts } from "@/lib/schema";
-import { eq, inArray, desc, lt } from "drizzle-orm";
+import { curatorPackUsers, curatedCasts, curatedCastInteractions, curatorPacks, users, curatorCastCurations } from "@/lib/schema";
+import { eq, inArray, desc, lt, and, sql, asc } from "drizzle-orm";
 import { cacheFeed } from "@/lib/cache";
 import { deduplicateRequest } from "@/lib/neynar-batch";
 import { getUser } from "@/lib/users";
+import { shouldHideBotCast, shouldHideBotCastClient } from "@/lib/bot-filter";
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,14 +21,66 @@ export async function GET(request: NextRequest) {
     const cursor = searchParams.get("cursor") || undefined;
     const limit = parseInt(searchParams.get("limit") || "30");
     const packIds = searchParams.get("packIds")?.split(",").filter(Boolean) || [];
+    const provider = searchParams.get("provider") || undefined;
+    const providerMetadata = searchParams.get("provider_metadata") || undefined;
+    
+    // Filter preferences from query params
+    const hideDollarCasts = searchParams.get("hideDollarCasts") === "true";
+    const hideShortCasts = searchParams.get("hideShortCasts") === "true";
+    const minCastLength = searchParams.get("minCastLength") 
+      ? parseInt(searchParams.get("minCastLength")!) 
+      : 50;
+    const hideTradingWords = searchParams.get("hideTradingWords") === "true";
+    const tradingWords = searchParams.get("tradingWords")
+      ? searchParams.get("tradingWords")!.split(",").filter(Boolean)
+      : [];
+    const selectedCuratorFids = searchParams.get("curatorFids")
+      ? searchParams.get("curatorFids")!.split(",").map(fid => parseInt(fid)).filter(fid => !isNaN(fid))
+      : [];
+    const hideRecasts = searchParams.get("hideRecasts") === "true";
 
-    // Generate cache key
+    // Fetch user preferences for bot filtering
+    let userBotPreferences: { hideBots?: boolean; hiddenBots?: string[] } = {};
+    if (viewerFid) {
+      try {
+        const user = await getUser(viewerFid);
+        const preferences = (user?.preferences || {}) as { hideBots?: boolean; hiddenBots?: string[] };
+        userBotPreferences = {
+          hideBots: preferences.hideBots !== undefined ? preferences.hideBots : true,
+          hiddenBots: preferences.hiddenBots || ["betonbangers", "deepbot", "bracky"],
+        };
+      } catch (error) {
+        console.error("Error fetching user preferences:", error);
+        // Use defaults
+        userBotPreferences = {
+          hideBots: true,
+          hiddenBots: ["betonbangers", "deepbot", "bracky"],
+        };
+      }
+    } else {
+      // Default behavior when no viewer
+      userBotPreferences = {
+        hideBots: true,
+        hiddenBots: ["betonbangers", "deepbot", "bracky"],
+      };
+    }
+
+    // Generate cache key (include filter params)
     const cacheKey = cacheFeed.generateKey({
       feedType,
       viewerFid,
       cursor,
       limit,
       packIds: packIds.sort().join(","),
+      hideDollarCasts,
+      hideShortCasts,
+      minCastLength,
+      hideTradingWords,
+      tradingWords: tradingWords.sort().join(","),
+      curatorFids: selectedCuratorFids.sort().join(","),
+      provider,
+      providerMetadata,
+      hideRecasts,
     });
 
     // Check cache first
@@ -38,9 +92,10 @@ export async function GET(request: NextRequest) {
     let casts: any[] = [];
     let neynarCursor: string | null = null;
 
-    // If packIds provided, fetch FIDs from packs and use them for filtering
+    // If packIds provided (and NOT my-37 feed), fetch FIDs from packs and use them for filtering
+    // My 37 feed fetches its pack separately below
     let packFids: number[] = [];
-    if (packIds.length > 0) {
+    if (packIds.length > 0 && feedType !== "my-37") {
       const packUsers = await db
         .select({
           userFid: curatorPackUsers.userFid,
@@ -50,6 +105,39 @@ export async function GET(request: NextRequest) {
       
       // Get unique FIDs from all packs
       packFids = [...new Set(packUsers.map((pu) => pu.userFid))];
+    }
+
+    if (feedType === "my-37" && viewerFid) {
+      // My 37 feed - fetch user's "My 37" pack
+      try {
+        const packsResponse = await db
+          .select({
+            id: curatorPacks.id,
+          })
+          .from(curatorPacks)
+          .where(
+            and(
+              eq(curatorPacks.creatorFid, viewerFid),
+              eq(curatorPacks.name, "My 37")
+            )
+          )
+          .limit(1);
+
+        if (packsResponse.length > 0) {
+          const my37PackId = packsResponse[0].id;
+          // Fetch FIDs from My 37 pack
+          const packUsers = await db
+            .select({
+              userFid: curatorPackUsers.userFid,
+            })
+            .from(curatorPackUsers)
+            .where(eq(curatorPackUsers.packId, my37PackId));
+          
+          packFids = packUsers.map((pu) => pu.userFid);
+        }
+      } catch (error) {
+        console.error("Error fetching My 37 pack:", error);
+      }
     }
 
     if (feedType === "following" && viewerFid) {
@@ -68,8 +156,66 @@ export async function GET(request: NextRequest) {
       );
       casts = feed.casts || [];
       neynarCursor = feed.next?.cursor || null;
+    } else if (feedType === "my-37" && packFids.length === 0) {
+      // My 37 feed with no users selected - return empty feed
+      casts = [];
+      neynarCursor = null;
+    } else if (feedType === "my-37" && packFids.length > 0) {
+      // My 37 feed - use FIDs from My 37 pack only
+      // Neynar API has limits on fids parameter, so we may need to handle large lists
+      
+      // Only use cursor if it looks like a valid Neynar cursor (not a cast hash)
+      // Cast hashes start with 0x, Neynar cursors are typically different format
+      const validCursor = cursor && !cursor.startsWith("0x") ? cursor : undefined;
+      
+      try {
+        const feed = await deduplicateRequest(
+          `feed-my37-${packFids.join(",")}-${viewerFid}-${validCursor || "initial"}-${limit}`,
+          async () => {
+            return await neynarClient.fetchFeed({
+              feedType: FetchFeedFeedTypeEnum.Filter,
+              filterType: FetchFeedFilterTypeEnum.Fids,
+              fids: packFids,
+              limit,
+              ...(validCursor ? { cursor: validCursor } : {}),
+              withRecasts: true,
+              ...(viewerFid ? { viewerFid } : {}),
+            });
+          }
+        );
+        casts = feed.casts || [];
+        neynarCursor = feed.next?.cursor || null;
+        
+        // Filter to only include casts from users in the pack
+        // This ensures we only show casts authored by pack users
+        const packFidsSet = new Set(packFids);
+        casts = casts.filter((cast) => {
+          const authorFid = cast.author?.fid;
+          // Only show casts authored by pack users
+          if (!authorFid || !packFidsSet.has(authorFid)) {
+            return false;
+          }
+          // Filter out recasts if hideRecasts is enabled
+          if (hideRecasts && cast.parent_hash) {
+            return false;
+          }
+          return true;
+        });
+      } catch (error: any) {
+        console.error("Error fetching My 37 feed:", error);
+        console.error("Error details:", {
+          fidsCount: packFids.length,
+          fidsString: packFids.join(",").substring(0, 100),
+          cursor,
+          validCursor,
+          errorMessage: error.message,
+        });
+        // If Neynar API fails, return empty results rather than crashing
+        casts = [];
+        neynarCursor = null;
+      }
     } else if (packIds.length > 0 && packFids.length > 0) {
-      // Curator packs feed - use FIDs from selected packs
+      // Curator packs feed - use FIDs from selected packs (not My 37)
       // Neynar API has limits on fids parameter, so we may need to handle large lists
       
       // Only use cursor if it looks like a valid Neynar cursor (not a cast hash)
@@ -115,80 +261,157 @@ export async function GET(request: NextRequest) {
         neynarCursor = null;
       }
     } else if (feedType === "curated") {
-      // Fetch curated casts from database
-      let query = db
-        .select()
-        .from(curatedCasts);
+      // Fetch curated casts from database with reply bumping
+      // Sort by latest reply time (COALESCE with cast creation time)
+      // Join with curatorCastCurations to only show casts that have at least one curator
+      
+      // Build where conditions for curator filtering
+      const curatorWhereConditions = [];
+      
+      // Only show curations from selected curators
+      // If curators are selected, filter to only show those curations
+      // If no curators are selected, default to showing curators with role="curator"
+      if (selectedCuratorFids.length > 0) {
+        curatorWhereConditions.push(inArray(curatorCastCurations.curatorFid, selectedCuratorFids));
+      } else {
+        // Default: show only curators with role="curator"
+        const curatorRoleUsers = await db
+          .select({ fid: users.fid })
+          .from(users)
+          .where(eq(users.role, "curator"));
+        
+        const curatorRoleFids = curatorRoleUsers.map((u) => u.fid);
+        if (curatorRoleFids.length > 0) {
+          curatorWhereConditions.push(inArray(curatorCastCurations.curatorFid, curatorRoleFids));
+        } else {
+          // If no curators with role exist, return empty results
+          return NextResponse.json({
+            casts: [],
+            next: { cursor: null },
+          });
+        }
+      }
 
-      // If cursor provided, use it for pagination (cursor is the created_at timestamp)
+      // Query with join to curatorCastCurations to only show casts with active curators
+      // Use a subquery to get distinct cast hashes that have curators matching our filter
+      const castHashesWithCurators = await db
+        .selectDistinct({ castHash: curatorCastCurations.castHash })
+        .from(curatorCastCurations)
+        .where(curatorWhereConditions.length > 0 ? and(...curatorWhereConditions) : undefined);
+
+      const castHashSet = new Set(castHashesWithCurators.map(c => c.castHash));
+      
+      if (castHashSet.size === 0) {
+        return NextResponse.json({
+          casts: [],
+          next: { cursor: null },
+        });
+      }
+
+      // Query curated casts that have active curators
+      let query = db
+        .select({
+          id: curatedCasts.id,
+          castHash: curatedCasts.castHash,
+          castData: curatedCasts.castData,
+          topReplies: curatedCasts.topReplies,
+          repliesUpdatedAt: curatedCasts.repliesUpdatedAt,
+          createdAt: curatedCasts.createdAt,
+          latestInteractionTime: sql<Date | null>`(
+            SELECT MAX(${curatedCastInteractions.createdAt})
+            FROM ${curatedCastInteractions}
+            WHERE ${curatedCastInteractions.curatedCastHash} = ${curatedCasts.castHash}
+          )`.as("latest_interaction_time"),
+        })
+        .from(curatedCasts)
+        .where(inArray(curatedCasts.castHash, Array.from(castHashSet)));
+
+      // Sort by latest interaction time (or cast creation time if no interactions)
+      // Use COALESCE to fall back to cast creation time
+      const curatedResults = await query
+        .orderBy(desc(sql`COALESCE((
+          SELECT MAX(${curatedCastInteractions.createdAt})
+          FROM ${curatedCastInteractions}
+          WHERE ${curatedCastInteractions.curatedCastHash} = ${curatedCasts.castHash}
+        ), ${curatedCasts.createdAt})`))
+        .limit(limit + 1); // Fetch one extra to check if there's more
+
+      // If cursor provided, filter results after sorting
+      // Note: Cursor logic needs to be adjusted since we're sorting by interaction time now
+      let filteredResults = curatedResults;
       if (cursor) {
         try {
           const cursorDate = new Date(cursor);
-          query = query.where(lt(curatedCasts.createdAt, cursorDate)) as typeof query;
+          // Filter by comparing the sort value (latest interaction time or cast creation time)
+          filteredResults = curatedResults.filter((row) => {
+            const sortTime = row.latestInteractionTime || row.createdAt;
+            return sortTime < cursorDate;
+          });
         } catch {
           // Invalid cursor, ignore it
         }
       }
-
-      const curatedResults = await query
-        .orderBy(desc(curatedCasts.createdAt))
-        .limit(limit + 1); // Fetch one extra to check if there's more
       
-      // Extract cast data from stored JSONB and include curator info
-      // Fetch curator user info for all unique curator FIDs
-      const curatorFids = [...new Set(curatedResults.map(r => r.curatorFid).filter(Boolean) as number[])];
-      const curatorInfoMap = new Map<number, { fid: number; username?: string; display_name?: string; pfp_url?: string }>();
+      // Extract cast data from stored JSONB
+      // Fetch curator info for each cast hash from curatorCastCurations
+      const castHashes = filteredResults.map(r => r.castHash);
+      const curatorInfoByCastHash = new Map<string, Array<{ fid: number; username?: string; display_name?: string; pfp_url?: string }>>();
       
-      // Fetch curator info from database or Neynar
-      for (const fid of curatorFids) {
-        try {
-          const dbUser = await getUser(fid);
-          if (dbUser) {
-            curatorInfoMap.set(fid, {
-              fid,
-              username: dbUser.username || undefined,
-              display_name: dbUser.displayName || undefined,
-              pfp_url: dbUser.pfpUrl || undefined,
-            });
-          } else {
-            // Fetch from Neynar if not in DB
-            try {
-              const neynarUsers = await neynarClient.fetchBulkUsers({ fids: [fid] });
-              const neynarUser = neynarUsers.users?.[0];
-              if (neynarUser) {
-                curatorInfoMap.set(fid, {
-                  fid,
-                  username: neynarUser.username,
-                  display_name: neynarUser.display_name || undefined,
-                  pfp_url: neynarUser.pfp_url || undefined,
-                });
-              }
-            } catch (error) {
-              console.error(`Failed to fetch curator ${fid} from Neynar:`, error);
-            }
+      if (castHashes.length > 0) {
+        // Get all curators for these casts
+        const curatorsForCasts = await db
+          .select({
+            castHash: curatorCastCurations.castHash,
+            curatorFid: curatorCastCurations.curatorFid,
+            username: users.username,
+            displayName: users.displayName,
+            pfpUrl: users.pfpUrl,
+          })
+          .from(curatorCastCurations)
+          .leftJoin(users, eq(curatorCastCurations.curatorFid, users.fid))
+          .where(inArray(curatorCastCurations.castHash, castHashes))
+          .orderBy(curatorCastCurations.castHash, asc(curatorCastCurations.createdAt));
+        
+        // Group curators by cast hash
+        for (const c of curatorsForCasts) {
+          if (!curatorInfoByCastHash.has(c.castHash)) {
+            curatorInfoByCastHash.set(c.castHash, []);
           }
-        } catch (error) {
-          console.error(`Failed to fetch curator ${fid}:`, error);
+          curatorInfoByCastHash.get(c.castHash)!.push({
+            fid: c.curatorFid,
+            username: c.username || undefined,
+            display_name: c.displayName || undefined,
+            pfp_url: c.pfpUrl || undefined,
+          });
         }
       }
       
-      casts = curatedResults.slice(0, limit).map((row) => {
+      casts = filteredResults.slice(0, limit).map((row) => {
         const cast = row.castData as any;
         // Add curator info to the cast object
-        if (row.curatorFid) {
-          cast._curatorFid = row.curatorFid;
-          const curatorInfo = curatorInfoMap.get(row.curatorFid);
+        const curators = curatorInfoByCastHash.get(row.castHash) || [];
+        if (curators.length > 0) {
+          cast._curatorFid = curators[0].fid; // Keep first curator for backward compatibility
+          const curatorInfo = curators[0];
           if (curatorInfo) {
             cast._curatorInfo = curatorInfo;
           }
         }
+        // Add top replies and replies updated timestamp
+        if (row.topReplies) {
+          cast._topReplies = row.topReplies;
+        }
+        if (row.repliesUpdatedAt) {
+          cast._repliesUpdatedAt = row.repliesUpdatedAt;
+        }
         return cast;
       });
       
-      // Set cursor to the last item's created_at timestamp if there are more results
-      if (curatedResults.length > limit) {
-        const lastItem = curatedResults[limit - 1];
-        neynarCursor = lastItem.createdAt.toISOString();
+      // Set cursor to the last item's sort time (latest interaction or cast creation) if there are more results
+      if (filteredResults.length > limit) {
+        const lastItem = filteredResults[limit - 1];
+        const sortTime = lastItem.latestInteractionTime || lastItem.createdAt;
+        neynarCursor = sortTime.toISOString();
       } else {
         neynarCursor = null;
       }
@@ -244,6 +467,29 @@ export async function GET(request: NextRequest) {
       );
       casts = feed.casts || [];
       neynarCursor = feed.next?.cursor || null;
+    } else if (feedType === "for-you" && viewerFid) {
+      // For You feed - personalized feed using Neynar's algorithm
+      // Default to Neynar provider (SDK enum), but also support string values for openrank/mbd
+      const forYouProvider = provider 
+        ? (provider === "openrank" || provider === "mbd" || provider === "karma3" 
+            ? provider as any // SDK enum only has "neynar", but API supports these
+            : FetchFeedForYouProviderEnum.Neynar)
+        : FetchFeedForYouProviderEnum.Neynar;
+      
+      const feed = await deduplicateRequest(
+        `feed-for-you-${viewerFid}-${provider || "neynar"}-${providerMetadata || "default"}-${cursor}-${limit}`,
+        async () => {
+          return await neynarClient.fetchFeedForYou({
+            fid: viewerFid,
+            viewerFid: viewerFid,
+            provider: forYouProvider,
+            limit,
+            cursor,
+          });
+        }
+      );
+      casts = feed.casts || [];
+      neynarCursor = feed.next?.cursor || null;
     } else {
       // Default: Optimize to use single GlobalTrending call instead of 3 parallel calls
       // This reduces API calls significantly while still providing good content
@@ -265,29 +511,78 @@ export async function GET(request: NextRequest) {
     }
 
     // Apply quality filters (skip for curated feed since casts are already manually curated)
-    // But still filter out @deepbot mentions
-    const filteredCasts = feedType === "curated" 
-      ? casts.filter((cast) => {
-          // Filter out casts that mention @deepbot
-          if (cast.mentioned_profiles && Array.isArray(cast.mentioned_profiles)) {
-            const hasDeepbot = cast.mentioned_profiles.some(
-              (profile: any) => profile?.username?.toLowerCase() === "deepbot"
-            );
-            if (hasDeepbot) return false;
-          }
-          return true;
-        })
-      : casts.filter((cast) => {
-          // Use experimental flag is already set via headers in the client
-          return filterCast(cast, {
-            minLength: feedType === "deep-thoughts" ? 100 : 50,
-            minUserScore: 0.55,
-            minReplies: feedType === "conversations" ? 2 : 0,
-          });
+    // Use user preferences for bot filtering
+    let filteredCasts: any[];
+    
+    if (feedType === "curated") {
+      // For curated feed, apply bot filtering using already-fetched preferences
+      filteredCasts = casts.filter((cast) => {
+        if (userBotPreferences.hideBots) {
+          return !shouldHideBotCastClient(cast, userBotPreferences.hiddenBots, userBotPreferences.hideBots);
+        }
+        return true;
+      });
+    } else if (feedType === "following" || feedType === "for-you") {
+      // For following and for-you feeds: apply bot filtering and user preferences
+      filteredCasts = casts.filter((cast) => {
+        if (userBotPreferences.hideBots) {
+          const shouldHide = shouldHideBotCastClient(cast, userBotPreferences.hiddenBots, userBotPreferences.hideBots);
+          if (shouldHide) return false;
+        }
+        
+        // Apply user filter preferences
+        if (hideDollarCasts && cast.text?.includes("$")) {
+          return false;
+        }
+        if (hideShortCasts && cast.text && cast.text.length < minCastLength) {
+          return false;
+        }
+        if (hideTradingWords && cast.text && tradingWords.length > 0) {
+          const textLower = cast.text.toLowerCase();
+          const hasTradingWord = tradingWords.some((word) =>
+            textLower.includes(word.toLowerCase())
+          );
+          if (hasTradingWord) return false;
+        }
+        
+        return true;
+      });
+    } else {
+      // For other feeds: use filterCast with bot preferences
+      filteredCasts = casts.filter((cast) => {
+        const passesQualityFilter = filterCast(cast, {
+          minLength: feedType === "deep-thoughts" ? 100 : 50,
+          minUserScore: 0.55,
+          minReplies: feedType === "conversations" ? 2 : 0,
+          hiddenBots: userBotPreferences.hiddenBots,
+          hideBots: userBotPreferences.hideBots,
+          viewerFid,
         });
+        
+        if (!passesQualityFilter) return false;
+        
+        // Apply user filter preferences
+        if (hideDollarCasts && cast.text?.includes("$")) {
+          return false;
+        }
+        if (hideShortCasts && cast.text && cast.text.length < minCastLength) {
+          return false;
+        }
+        if (hideTradingWords && cast.text && tradingWords.length > 0) {
+          const textLower = cast.text.toLowerCase();
+          const hasTradingWord = tradingWords.some((word) =>
+            textLower.includes(word.toLowerCase())
+          );
+          if (hasTradingWord) return false;
+        }
+        
+        return true;
+      });
+    }
 
-    // Sort by quality score (skip for curated feed, already sorted by created_at)
-    const sortedCasts = feedType === "curated"
+    // Sort by quality score (skip for curated, for-you, and my-37 feeds)
+    // my-37 uses Neynar's default sorting, curated and for-you are already sorted by algorithm
+    const sortedCasts = feedType === "curated" || feedType === "for-you" || feedType === "my-37"
       ? filteredCasts
       : sortCastsByQuality(filteredCasts);
 

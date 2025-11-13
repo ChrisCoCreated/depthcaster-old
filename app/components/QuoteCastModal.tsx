@@ -1,8 +1,62 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactElement } from "react";
 import { Cast } from "@neynar/nodejs-sdk/build/api";
 import { useNeynarContext } from "@neynar/react";
+
+// Helper function to convert URLs in text to clickable links
+function renderTextWithLinks(text: string) {
+  // URL regex pattern - matches http(s):// URLs, www. URLs, and domain-like patterns
+  const urlRegex = /(https?:\/\/[^\s<>"']+)|(www\.[^\s<>"']+)|([a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.(?:[a-zA-Z]{2,})(?:\/[^\s<>"']*)?)/g;
+  
+  const parts: (string | ReactElement)[] = [];
+  let lastIndex = 0;
+  let match;
+  
+  while ((match = urlRegex.exec(text)) !== null) {
+    // Skip if it looks like an email address (has @ before it)
+    const beforeMatch = text.substring(Math.max(0, match.index - 50), match.index);
+    if (beforeMatch.includes('@') && !beforeMatch.match(/@[\s\n]/)) {
+      continue;
+    }
+    
+    // Add text before the URL
+    if (match.index > lastIndex) {
+      parts.push(text.substring(lastIndex, match.index));
+    }
+    
+    // Determine the full URL - use the first non-empty capture group
+    let url = match[1] || match[2] || match[3];
+    let displayText = match[0];
+    
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://' + url;
+    }
+    
+    // Add the clickable link
+    parts.push(
+      <a
+        key={match.index}
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {displayText}
+      </a>
+    );
+    
+    lastIndex = match.index + match[0].length;
+  }
+  
+  // Add remaining text
+  if (lastIndex < text.length) {
+    parts.push(text.substring(lastIndex));
+  }
+  
+  return parts.length > 0 ? parts : text;
+}
 
 interface QuoteCastModalProps {
   cast: Cast;
@@ -47,8 +101,10 @@ export function QuoteCastModal({ cast, isOpen, onClose, onSuccess }: QuoteCastMo
     };
   }, [isOpen, onClose]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) {
+      e.preventDefault();
+    }
 
     if (!user?.signer_uuid) {
       setError("Please sign in to quote casts");
@@ -58,6 +114,10 @@ export function QuoteCastModal({ cast, isOpen, onClose, onSuccess }: QuoteCastMo
     if (!text.trim()) {
       setError("Quote text cannot be empty");
       return;
+    }
+
+    if (isPosting) {
+      return; // Prevent double submission
     }
 
     try {
@@ -88,6 +148,8 @@ export function QuoteCastModal({ cast, isOpen, onClose, onSuccess }: QuoteCastMo
         throw new Error(errorData.error || "Failed to quote cast");
       }
 
+      // Quote interaction is tracked automatically in the cast API
+
       setText("");
       if (onSuccess) {
         onSuccess();
@@ -97,6 +159,14 @@ export function QuoteCastModal({ cast, isOpen, onClose, onSuccess }: QuoteCastMo
       setError(err.message || "Failed to quote cast");
     } finally {
       setIsPosting(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Command+Return (Mac) or Ctrl+Return (Windows/Linux)
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      handleSubmit();
     }
   };
 
@@ -148,6 +218,7 @@ export function QuoteCastModal({ cast, isOpen, onClose, onSuccess }: QuoteCastMo
               <textarea
                 value={text}
                 onChange={(e) => setText(e.target.value)}
+                onKeyDown={handleKeyDown}
                 placeholder="Add a comment..."
                 className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-black text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 resize-none"
                 rows={4}
@@ -172,7 +243,7 @@ export function QuoteCastModal({ cast, isOpen, onClose, onSuccess }: QuoteCastMo
                       </span>
                     </div>
                     <div className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words">
-                      {cast.text}
+                      {renderTextWithLinks(cast.text)}
                     </div>
                   </div>
                 </div>

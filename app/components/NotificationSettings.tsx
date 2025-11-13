@@ -1,10 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Notification } from "@neynar/nodejs-sdk/build/api";
-import Link from "next/link";
-import { formatDistanceToNow } from "date-fns";
-import { useNeynarContext } from "@neynar/react";
+import { useNotificationPermission } from "@/lib/hooks/useNotificationPermission";
 
 interface NotificationPreferences {
   follows: boolean;
@@ -26,7 +23,9 @@ const DEFAULT_PREFERENCES: NotificationPreferences = {
 
 export function NotificationSettings() {
   const [preferences, setPreferences] = useState<NotificationPreferences>(DEFAULT_PREFERENCES);
+  const [deviceNotificationsEnabled, setDeviceNotificationsEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
+  const { isSupported, isGranted, isDenied, requestPermission } = useNotificationPermission();
 
   useEffect(() => {
     // Load preferences from localStorage
@@ -38,6 +37,11 @@ export function NotificationSettings() {
         console.error("Failed to parse notification preferences", e);
       }
     }
+    
+    // Load device notification preference
+    const deviceEnabled = localStorage.getItem("deviceNotificationsEnabled") === "true";
+    setDeviceNotificationsEnabled(deviceEnabled);
+    
     setLoading(false);
   }, []);
 
@@ -45,6 +49,24 @@ export function NotificationSettings() {
     const newPreferences = { ...preferences, [key]: value };
     setPreferences(newPreferences);
     localStorage.setItem("notificationPreferences", JSON.stringify(newPreferences));
+  };
+
+  const handleDeviceNotificationsToggle = async (enabled: boolean) => {
+    if (enabled) {
+      // Request permission if not already granted
+      const granted = await requestPermission();
+      if (granted) {
+        setDeviceNotificationsEnabled(true);
+        localStorage.setItem("deviceNotificationsEnabled", "true");
+      } else {
+        // Permission denied, don't enable
+        setDeviceNotificationsEnabled(false);
+        localStorage.setItem("deviceNotificationsEnabled", "false");
+      }
+    } else {
+      setDeviceNotificationsEnabled(false);
+      localStorage.setItem("deviceNotificationsEnabled", "false");
+    }
   };
 
   if (loading) {
@@ -56,6 +78,36 @@ export function NotificationSettings() {
       <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
         Notification Settings
       </h2>
+      
+      {/* Device Notifications Toggle */}
+      {isSupported && (
+        <div className="mb-6 p-4 border border-gray-200 dark:border-gray-800 rounded-lg bg-gray-50 dark:bg-gray-900">
+          <label className="flex items-center justify-between cursor-pointer">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-lg">🔔</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  Device Notifications
+                </span>
+              </div>
+              <p className="text-xs text-gray-600 dark:text-gray-400">
+                {isGranted
+                  ? "Receive notifications on your device when you're not using the app"
+                  : isDenied
+                  ? "Permission denied. Please enable notifications in your browser settings."
+                  : "Enable to receive notifications on your device"}
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              checked={deviceNotificationsEnabled && isGranted}
+              onChange={(e) => handleDeviceNotificationsToggle(e.target.checked)}
+              disabled={isDenied}
+              className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 disabled:opacity-50"
+            />
+          </label>
+        </div>
+      )}
       
       <div className="space-y-3">
         {[
@@ -88,5 +140,7 @@ export function NotificationSettings() {
     </div>
   );
 }
+
+
 
 

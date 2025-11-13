@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Notification } from "@neynar/nodejs-sdk/build/api";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
@@ -9,9 +10,10 @@ import { useNeynarContext } from "@neynar/react";
 interface NotificationsPanelProps {
   isOpen: boolean;
   onClose: () => void;
+  onNotificationsSeen?: () => void;
 }
 
-export function NotificationsPanel({ isOpen, onClose }: NotificationsPanelProps) {
+export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: NotificationsPanelProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -63,6 +65,8 @@ export function NotificationsPanel({ isOpen, onClose }: NotificationsPanelProps)
         params.append("cursor", newCursor);
       }
 
+      // Add cache-busting timestamp to ensure fresh data after marking as seen
+      params.append("_t", Date.now().toString());
       const response = await fetch(`/api/notifications?${params}`);
       if (!response.ok) {
         throw new Error("Failed to fetch notifications");
@@ -85,13 +89,7 @@ export function NotificationsPanel({ isOpen, onClose }: NotificationsPanelProps)
     }
   }, [user?.fid]);
 
-  useEffect(() => {
-    if (isOpen && user?.fid) {
-      fetchNotifications();
-    }
-  }, [isOpen, user?.fid, fetchNotifications]);
-
-  const markAsSeen = async (notificationType?: string) => {
+  const markAsSeen = useCallback(async (notificationType?: string) => {
     if (!user?.signer_uuid) return;
 
     try {
@@ -105,13 +103,25 @@ export function NotificationsPanel({ isOpen, onClose }: NotificationsPanelProps)
           notificationType,
         }),
       });
-
-      // Refresh notifications
-      fetchNotifications();
+      
+      // Notify parent component to refresh unread count
+      if (onNotificationsSeen) {
+        onNotificationsSeen();
+      }
     } catch (err) {
       console.error("Failed to mark notifications as seen", err);
     }
-  };
+  }, [user?.signer_uuid, onNotificationsSeen]);
+
+  useEffect(() => {
+    if (isOpen && user?.fid) {
+      // Mark all notifications as seen first, then fetch fresh data
+      markAsSeen().then(() => {
+        // Add cache-busting parameter to ensure fresh data
+        fetchNotifications();
+      });
+    }
+  }, [isOpen, user?.fid, fetchNotifications, markAsSeen]);
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
@@ -149,10 +159,27 @@ export function NotificationsPanel({ isOpen, onClose }: NotificationsPanelProps)
 
   const getNotificationText = (notification: Notification): string => {
     const count = notification.count || 1;
-    const users = notification.follows || notification.reactions?.map((r) => r.user) || [];
-    const firstUser = users[0];
-    const firstName = (firstUser as any)?.username || (firstUser as any)?.user?.username || "Someone";
     const type = String(notification.type).toLowerCase();
+    
+    // Get users based on notification type
+    let users: any[] = [];
+    const notif = notification as any;
+    if (notif.follows) {
+      users = notif.follows;
+    } else if (notif.reactions) {
+      users = notif.reactions.map((r: any) => r.user);
+    } else if (notif.replies) {
+      users = notif.replies.map((r: any) => r.user || r.author);
+    } else if (notification.cast?.author) {
+      // Fallback to cast author for replies/quotes/mentions
+      users = [notification.cast.author];
+    }
+    
+    const firstUser = users[0];
+    const firstName = (firstUser as any)?.username || 
+                     (firstUser as any)?.user?.username || 
+                     (firstUser as any)?.display_name ||
+                     "Someone";
 
     switch (type) {
       case "follows":
@@ -169,27 +196,39 @@ export function NotificationsPanel({ isOpen, onClose }: NotificationsPanelProps)
         return `${firstName} mentioned you`;
       case "reply":
       case "replies":
-        return `${firstName} replied to your cast`;
+        if (count === 1) return `${firstName} replied to your cast`;
+        return `${firstName} and ${count - 1} others replied to your cast`;
       case "quote":
       case "quotes":
-        return `${firstName} quoted your cast`;
+        if (count === 1) return `${firstName} quoted your cast`;
+        return `${firstName} and ${count - 1} others quoted your cast`;
       default:
         return "New notification";
     }
   };
 
-  if (!isOpen) return null;
+  const [mounted, setMounted] = useState(false);
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-end pt-16">
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!isOpen || !mounted) return null;
+
+  const content = (
+    <div className="fixed inset-0 z-[250]">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/50 backdrop-blur-md"
+        style={{ WebkitBackdropFilter: 'blur(12px)' }}
         onClick={onClose}
       />
 
       {/* Panel */}
-      <div className="relative bg-white dark:bg-gray-900 w-full max-w-md h-[calc(100vh-4rem)] shadow-xl flex flex-col">
+      <div 
+        className="absolute inset-y-0 right-0 bg-white dark:bg-gray-900 w-full max-w-md h-full shadow-xl flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -288,5 +327,7 @@ export function NotificationsPanel({ isOpen, onClose }: NotificationsPanelProps)
       </div>
     </div>
   );
+
+  return createPortal(content, document.body);
 }
 

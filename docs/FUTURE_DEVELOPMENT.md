@@ -35,3 +35,7 @@ When scaling to multiple server instances (horizontal scaling), each instance ma
 - Cache hit rate drops below 50% due to instance distribution
 - Need for cache persistence across deployments
 
+
+
+
+

@@ -1,0 +1,162 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useNeynarContext } from "@neynar/react";
+import { useRouter } from "next/navigation";
+import { useNotificationPermission } from "@/lib/hooks/useNotificationPermission";
+
+const ADMIN_FID = 5701;
+
+export default function AdminPage() {
+  const { user } = useNeynarContext();
+  const router = useRouter();
+  const { isGranted, isSupported, isDenied, requestPermission } = useNotificationPermission();
+  const [notificationStatus, setNotificationStatus] = useState<string>("");
+
+  useEffect(() => {
+    if (user && user.fid !== ADMIN_FID) {
+      router.push("/");
+    }
+  }, [user, router]);
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-gray-500">Loading...</div>
+      </div>
+    );
+  }
+
+  if (user.fid !== ADMIN_FID) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-red-600">Access Denied</div>
+      </div>
+    );
+  }
+
+  const handleRequestPermission = async () => {
+    if (!isSupported) {
+      setNotificationStatus("Notifications are not supported in this browser");
+      return;
+    }
+
+    try {
+      const granted = await requestPermission();
+      if (granted) {
+        setNotificationStatus("✓ Notification permission granted!");
+        setTimeout(() => setNotificationStatus(""), 3000);
+      } else {
+        setNotificationStatus("✗ Notification permission denied. Please enable it in your browser settings.");
+      }
+    } catch (error: any) {
+      console.error("Failed to request permission:", error);
+      setNotificationStatus(`Error: ${error.message || "Failed to request permission"}`);
+    }
+  };
+
+  const sendTestNotification = async () => {
+    try {
+      setNotificationStatus("Sending push notification...");
+
+      const response = await fetch("/api/push/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userFid: ADMIN_FID,
+          title: "Depthcaster Test Notification",
+          body: "This is a test notification sent from the admin page. It should appear on your other devices!",
+          icon: "/icon-192x192.webp",
+          badge: "/icon-96x96.webp",
+          data: { url: "/" },
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to send notification");
+      }
+
+      setNotificationStatus(
+        `✓ Push notification sent! Delivered to ${result.sent} device(s). Check your other devices!`
+      );
+      setTimeout(() => setNotificationStatus(""), 5000);
+    } catch (error: any) {
+      console.error("Failed to send push notification:", error);
+      setNotificationStatus(`Error: ${error.message || "Failed to send notification"}`);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-white dark:bg-black p-8">
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-8">
+          Admin Panel
+        </h1>
+
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 mb-6">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+            Notification Testing
+          </h2>
+
+          <div className="space-y-4">
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              <p>Test sending a device notification to user FID {ADMIN_FID}</p>
+              <p className="mt-2">
+                Notification Support: {isSupported ? "✓ Supported" : "✗ Not Supported"}
+              </p>
+              <p>
+                Permission Status:{" "}
+                {isGranted ? "✓ Granted" : isDenied ? "✗ Denied (check browser settings)" : "✗ Not Granted"}
+              </p>
+            </div>
+
+            {!isGranted && !isDenied && (
+              <button
+                onClick={handleRequestPermission}
+                disabled={!isSupported}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Request Notification Permission
+              </button>
+            )}
+
+            <button
+              onClick={sendTestNotification}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Send Test Push Notification (to other devices)
+            </button>
+
+            {notificationStatus && (
+              <div
+                className={`p-3 rounded-lg ${
+                  notificationStatus.startsWith("✓")
+                    ? "bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200"
+                    : "bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-200"
+                }`}
+              >
+                {notificationStatus}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+            User Info
+          </h2>
+          <div className="text-sm text-gray-600 dark:text-gray-400 space-y-2">
+            <p>FID: {user.fid}</p>
+            <p>Username: {user.username || "N/A"}</p>
+            <p>Display Name: {user.display_name || "N/A"}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+

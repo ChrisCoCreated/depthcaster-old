@@ -5,6 +5,7 @@ export const users = pgTable("users", {
   username: text("username"),
   displayName: text("display_name"),
   pfpUrl: text("pfp_url"),
+  role: text("role"), // 'curator' or null
   preferences: jsonb("preferences"),
   usageStats: jsonb("usage_stats"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -61,11 +62,88 @@ export const curatedCasts = pgTable("curated_casts", {
   castHash: text("cast_hash").notNull(),
   castData: jsonb("cast_data").notNull(),
   curatorFid: bigint("curator_fid", { mode: "number" }).references(() => users.fid),
+  topReplies: jsonb("top_replies"),
+  repliesUpdatedAt: timestamp("replies_updated_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
-  castHashUnique: uniqueIndex("cast_hash_unique").on(table.castHash),
+  castHashIdx: index("cast_hash_idx").on(table.castHash),
   curatorFidIdx: index("curator_fid_idx").on(table.curatorFid),
   createdAtIdx: index("created_at_idx").on(table.createdAt),
+}));
+
+export const curatorCastCurations = pgTable("curator_cast_curations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  castHash: text("cast_hash").notNull().references(() => curatedCasts.castHash, { onDelete: "cascade" }),
+  curatorFid: bigint("curator_fid", { mode: "number" }).notNull().references(() => users.fid),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  castHashCuratorUnique: uniqueIndex("cast_hash_curator_unique").on(table.castHash, table.curatorFid),
+  castHashIdx: index("curator_cast_curations_cast_hash_idx").on(table.castHash),
+  curatorFidIdx: index("curator_cast_curations_curator_fid_idx").on(table.curatorFid),
+}));
+
+export const userWatches = pgTable("user_watches", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  watcherFid: bigint("watcher_fid", { mode: "number" }).notNull().references(() => users.fid),
+  watchedFid: bigint("watched_fid", { mode: "number" }).notNull().references(() => users.fid),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  watcherWatchedUnique: uniqueIndex("watcher_watched_unique").on(table.watcherFid, table.watchedFid),
+  watcherFidIdx: index("watcher_fid_idx").on(table.watcherFid),
+}));
+
+export const webhooks = pgTable("webhooks", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  neynarWebhookId: text("neynar_webhook_id").notNull().unique(),
+  type: text("type").notNull(), // 'user-watch' or 'curated-reply'
+  config: jsonb("config").notNull(),
+  url: text("url").notNull(),
+  secret: text("secret"), // Webhook secret for signature verification
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  typeIdx: index("type_idx").on(table.type),
+  neynarWebhookIdIdx: index("neynar_webhook_id_idx").on(table.neynarWebhookId),
+}));
+
+export const curatedCastInteractions = pgTable("curated_cast_interactions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  curatedCastHash: text("curated_cast_hash").notNull().references(() => curatedCasts.castHash, { onDelete: "cascade" }),
+  targetCastHash: text("target_cast_hash").notNull(), // Hash of the cast being interacted with (could be curated cast or any reply in thread)
+  interactionType: text("interaction_type").notNull(), // 'reply', 'like', 'recast', 'quote'
+  userFid: bigint("user_fid", { mode: "number" }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  curatedCastTargetTypeUserUnique: uniqueIndex("curated_cast_target_type_user_unique").on(table.curatedCastHash, table.targetCastHash, table.interactionType, table.userFid),
+  curatedCastHashCreatedAtIdx: index("curated_cast_hash_created_at_idx").on(table.curatedCastHash, table.createdAt),
+}));
+
+export const userNotifications = pgTable("user_notifications", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userFid: bigint("user_fid", { mode: "number" }).notNull().references(() => users.fid),
+  type: text("type").notNull(), // 'cast.created'
+  castHash: text("cast_hash").notNull(),
+  castData: jsonb("cast_data").notNull(),
+  authorFid: bigint("author_fid", { mode: "number" }).notNull(),
+  isRead: boolean("is_read").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  userFidIsReadCreatedAtIdx: index("user_fid_is_read_created_at_idx").on(table.userFid, table.isRead, table.createdAt),
+}));
+
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userFid: bigint("user_fid", { mode: "number" }).notNull().references(() => users.fid),
+  endpoint: text("endpoint").notNull(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  userFidIdx: index("push_subscriptions_user_fid_idx").on(table.userFid),
+  endpointIdx: index("push_subscriptions_endpoint_idx").on(table.endpoint),
+  endpointUnique: uniqueIndex("push_subscriptions_endpoint_unique").on(table.endpoint),
 }));
 
 export type User = typeof users.$inferSelect;
@@ -80,4 +158,16 @@ export type PackFavorite = typeof packFavorites.$inferSelect;
 export type NewPackFavorite = typeof packFavorites.$inferInsert;
 export type CuratedCast = typeof curatedCasts.$inferSelect;
 export type NewCuratedCast = typeof curatedCasts.$inferInsert;
+export type CuratorCastCuration = typeof curatorCastCurations.$inferSelect;
+export type NewCuratorCastCuration = typeof curatorCastCurations.$inferInsert;
+export type UserWatch = typeof userWatches.$inferSelect;
+export type NewUserWatch = typeof userWatches.$inferInsert;
+export type Webhook = typeof webhooks.$inferSelect;
+export type NewWebhook = typeof webhooks.$inferInsert;
+export type CuratedCastInteraction = typeof curatedCastInteractions.$inferSelect;
+export type NewCuratedCastInteraction = typeof curatedCastInteractions.$inferInsert;
+export type UserNotification = typeof userNotifications.$inferSelect;
+export type NewUserNotification = typeof userNotifications.$inferInsert;
+export type PushSubscription = typeof pushSubscriptions.$inferSelect;
+export type NewPushSubscription = typeof pushSubscriptions.$inferInsert;
 
