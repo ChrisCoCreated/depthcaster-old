@@ -81,9 +81,9 @@ export async function GET(request: NextRequest) {
 
     // Fetch webhook-based notifications (user watches - parent casts only)
     // Include webhook notifications for all notification types (they're cast.created events)
+    // Note: Fetch both read and unread to show in feed, but mark unread status correctly
     const webhookWhereConditions = [
       eq(userNotifications.userFid, parseInt(fid)),
-      eq(userNotifications.isRead, false),
     ];
 
     // Apply cursor if provided
@@ -102,6 +102,8 @@ export async function GET(request: NextRequest) {
       .where(and(...webhookWhereConditions))
       .orderBy(desc(userNotifications.createdAt))
       .limit(limit);
+    
+    console.log(`[Notifications] Found ${webhookResults.length} webhook notification(s) for user ${fid}`);
 
     // Convert webhook notifications to Neynar notification format
     const webhookNotifications = webhookResults.map((notif) => {
@@ -144,7 +146,8 @@ export async function GET(request: NextRequest) {
     // Limit to requested limit
     const limitedNotifications = allNotifications.slice(0, limit);
 
-    // Mark webhook notifications as read (only the ones we're returning)
+    // Mark webhook notifications as read ONLY if they're unread and being returned
+    // This allows them to persist in the feed until explicitly marked as read
     if (webhookResults.length > 0 && limitedNotifications.length > 0) {
       const returnedWebhookHashes = new Set(
         limitedNotifications
@@ -153,11 +156,13 @@ export async function GET(request: NextRequest) {
           .filter(Boolean)
       );
 
+      // Only mark as read if they were previously unread
       const readIds = webhookResults
-        .filter((wr) => returnedWebhookHashes.has(wr.castHash))
+        .filter((wr) => returnedWebhookHashes.has(wr.castHash) && !wr.isRead)
         .map((wr) => wr.id);
 
       if (readIds.length > 0) {
+        console.log(`[Notifications] Marking ${readIds.length} webhook notification(s) as read`);
         await db
           .update(userNotifications)
           .set({ isRead: true })
