@@ -129,6 +129,7 @@ export const userNotifications = pgTable("user_notifications", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   userFidIsReadCreatedAtIdx: index("user_fid_is_read_created_at_idx").on(table.userFid, table.isRead, table.createdAt),
+  userFidCastHashUnique: uniqueIndex("user_fid_cast_hash_unique").on(table.userFid, table.castHash),
 }));
 
 export const pushSubscriptions = pgTable("push_subscriptions", {

@@ -186,24 +186,41 @@ export async function POST(request: NextRequest) {
 
       // Create notifications for all watchers
       if (watchers.length > 0) {
-        const notifications = watchers.map((w) => ({
-          userFid: w.watcherFid,
-          type: "cast.created",
-          castHash,
-          castData,
-          authorFid,
-          isRead: false,
-        }));
+        // Check for existing notifications to prevent duplicates
+        const existingNotifications = await db
+          .select({ userFid: userNotifications.userFid })
+          .from(userNotifications)
+          .where(eq(userNotifications.castHash, castHash));
+        
+        const existingUserFids = new Set(existingNotifications.map(n => n.userFid));
+        console.log(`[Webhook] Found ${existingNotifications.length} existing notification(s) for cast ${castHash}`);
 
-        await db.insert(userNotifications).values(notifications).onConflictDoNothing();
-        console.log(`[Webhook] Created ${notifications.length} notification(s) for cast ${castHash}`);
+        // Only create notifications for users who don't already have one
+        const notificationsToCreate = watchers
+          .filter(w => !existingUserFids.has(w.watcherFid))
+          .map((w) => ({
+            userFid: w.watcherFid,
+            type: "cast.created",
+            castHash,
+            castData,
+            authorFid,
+            isRead: false,
+          }));
+
+        if (notificationsToCreate.length > 0) {
+          await db.insert(userNotifications).values(notificationsToCreate).onConflictDoNothing();
+          console.log(`[Webhook] Created ${notificationsToCreate.length} new notification(s) for cast ${castHash} (skipped ${watchers.length - notificationsToCreate.length} duplicate(s))`);
+        } else {
+          console.log(`[Webhook] All watchers already have notifications for cast ${castHash}, skipping creation`);
+        }
 
         // Send push notifications to all watchers who have push subscriptions
+        // Only send to users who actually got new notifications
         const authorUsername = castData.author?.username || castData.author?.display_name || "Someone";
         const castText = castData.text || "";
         const previewText = castText.length > 100 ? castText.substring(0, 100) + "..." : castText;
 
-        for (const notification of notifications) {
+        for (const notification of notificationsToCreate) {
           try {
             const result = await sendPushNotificationToUser(notification.userFid, {
               title: `${authorUsername} posted a new cast`,

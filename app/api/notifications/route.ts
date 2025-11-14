@@ -111,6 +111,7 @@ export async function GET(request: NextRequest) {
         type: "cast.created",
         fid: notif.userFid,
         timestamp: notif.createdAt.toISOString(),
+        most_recent_timestamp: notif.createdAt.toISOString(), // Add for display compatibility
         cast: castData,
         actor: {
           fid: notif.authorFid,
@@ -118,6 +119,7 @@ export async function GET(request: NextRequest) {
           display_name: castData.author?.display_name,
           pfp_url: castData.author?.pfp_url,
         },
+        seen: notif.isRead, // Include seen status
       };
     });
 

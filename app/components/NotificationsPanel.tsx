@@ -140,6 +140,8 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
       case "quote":
       case "quotes":
         return "💭";
+      case "cast.created":
+        return "👀";
       default:
         return "🔔";
     }
@@ -173,6 +175,9 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
     } else if (notification.cast?.author) {
       // Fallback to cast author for replies/quotes/mentions
       users = [notification.cast.author];
+    } else if (notif.actor) {
+      // For webhook notifications (cast.created), use actor field
+      users = [notif.actor];
     }
     
     const firstUser = users[0];
@@ -202,6 +207,8 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
       case "quotes":
         if (count === 1) return `${firstName} quoted your cast`;
         return `${firstName} and ${count - 1} others quoted your cast`;
+      case "cast.created":
+        return `${firstName} posted a new cast`;
       default:
         return "New notification";
     }
@@ -291,7 +298,7 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
                         )}
                         <div className="mt-1 text-xs text-gray-500 dark:text-gray-500">
                           {formatDistanceToNow(
-                            new Date(notification.most_recent_timestamp),
+                            new Date((notification as any).most_recent_timestamp || (notification as any).timestamp || (notification as any).created_at || Date.now()),
                             { addSuffix: true }
                           )}
                         </div>
