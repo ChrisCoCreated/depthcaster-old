@@ -5,9 +5,10 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { neynarClient } from "@/lib/neynar";
 import { LookupCastConversationTypeEnum } from "@neynar/nodejs-sdk/build/api";
 import { eq, asc, and } from "drizzle-orm";
-import { hasCuratorOrAdminRole } from "@/lib/roles";
+import { hasCuratorOrAdminRole, getUserRoles } from "@/lib/roles";
 import { fetchAndStoreConversation } from "@/lib/conversation";
-import { createCuratedConversationWebhook, createQuoteCastWebhook } from "@/lib/webhooks";
+import { deleteCuratedCastWebhooks } from "@/lib/webhooks";
+import { refreshUnifiedCuratedWebhooks } from "@/lib/webhooks-unified";
 
 // Disable body parsing to read raw body for signature verification
 export const runtime = "nodejs";
@@ -168,7 +169,14 @@ export async function POST(request: NextRequest) {
 
       // Check if user has curator/admin/superadmin role
       const user = await db.select().from(users).where(eq(users.fid, curatorFid)).limit(1);
-      if (user.length === 0 || !hasCuratorOrAdminRole(user[0].role)) {
+      if (user.length === 0) {
+        return NextResponse.json(
+          { error: "User not found" },
+          { status: 404 }
+        );
+      }
+      const roles = await getUserRoles(curatorFid);
+      if (!hasCuratorOrAdminRole(roles)) {
         return NextResponse.json(
           { error: "User does not have curator, admin, or superadmin role" },
           { status: 403 }
@@ -238,7 +246,20 @@ export async function POST(request: NextRequest) {
     // Check if cast already exists in curated_casts, if not insert it
     const existingCast = await db.select().from(curatedCasts).where(eq(curatedCasts.castHash, castHash)).limit(1);
     
+    // Check if this curator has already curated this cast
+    const existingCuration = await db
+      .select()
+      .from(curatorCastCurations)
+      .where(
+        and(
+          eq(curatorCastCurations.castHash, castHash),
+          eq(curatorCastCurations.curatorFid, curatorFid)
+        )
+      )
+      .limit(1);
+    
     const isFirstCuration = existingCast.length === 0;
+    const isAdditionalCuration = existingCast.length > 0 && existingCuration.length === 0;
     const conversationNotFetched = !existingCast[0]?.conversationFetchedAt;
     
     if (isFirstCuration) {
@@ -252,10 +273,35 @@ export async function POST(request: NextRequest) {
         repliesUpdatedAt: null, // No longer storing replies here - they're in cast_replies
         conversationFetchedAt: null,
       });
+    } else if (isAdditionalCuration) {
+      // Additional curation: refetch cast data to update reaction counts
+      try {
+        const conversation = await neynarClient.lookupCastConversation({
+          identifier: castHash,
+          type: LookupCastConversationTypeEnum.Hash,
+          replyDepth: 0,
+          includeChronologicalParentCasts: false,
+        });
+        
+        const updatedCastData = conversation.conversation?.cast;
+        if (updatedCastData) {
+          await db
+            .update(curatedCasts)
+            .set({
+              castData: updatedCastData,
+            })
+            .where(eq(curatedCasts.castHash, castHash));
+          
+          console.log(`[Curate] Updated cast data for ${castHash} due to additional curation`);
+        }
+      } catch (error) {
+        console.error(`[Curate] Error updating cast data for ${castHash}:`, error);
+        // Don't fail curation if cast data update fails
+      }
     }
 
-    // Fetch and store full conversation if this is the first curation
-    if (isFirstCuration || conversationNotFetched) {
+    // Fetch and store full conversation if this is the first curation OR if it's an additional curation (to refresh data)
+    if (isFirstCuration || conversationNotFetched || isAdditionalCuration) {
       try {
         await fetchAndStoreConversation(castHash, 5, 50);
         
@@ -267,13 +313,12 @@ export async function POST(request: NextRequest) {
           })
           .where(eq(curatedCasts.castHash, castHash));
 
-        // Set up webhooks for replies and quote casts
+        // Refresh unified webhooks to include this new curated cast
         try {
-          await createCuratedConversationWebhook(castHash);
-          await createQuoteCastWebhook(castHash);
+          await refreshUnifiedCuratedWebhooks();
         } catch (webhookError) {
-          console.error(`Error creating webhooks for cast ${castHash}:`, webhookError);
-          // Don't fail curation if webhook creation fails
+          console.error(`Error refreshing unified webhooks for cast ${castHash}:`, webhookError);
+          // Don't fail curation if webhook refresh fails
         }
       } catch (error) {
         console.error(`Error fetching conversation for cast ${castHash}:`, error);
@@ -344,7 +389,14 @@ export async function DELETE(request: NextRequest) {
 
     // Check if user has curator/admin/superadmin role
     const user = await db.select().from(users).where(eq(users.fid, curatorFid)).limit(1);
-    if (user.length === 0 || !hasCuratorOrAdminRole(user[0].role)) {
+    if (user.length === 0) {
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      );
+    }
+    const roles = await getUserRoles(curatorFid);
+    if (!hasCuratorOrAdminRole(roles)) {
       return NextResponse.json(
         { error: "User does not have curator, admin, or superadmin role" },
         { status: 403 }
@@ -390,6 +442,15 @@ export async function DELETE(request: NextRequest) {
     // If no curators remain, remove the cast from curated_casts table
     // This ensures it won't appear in the curated feed
     if (remainingCurations.length === 0) {
+      // Delete all webhooks related to this cast before deleting the cast
+      try {
+        const deletedCount = await deleteCuratedCastWebhooks(castHash);
+        console.log(`Deleted ${deletedCount} webhook(s) for cast ${castHash}`);
+      } catch (webhookError) {
+        console.error(`Error deleting webhooks for cast ${castHash}:`, webhookError);
+        // Continue with cast deletion even if webhook deletion fails
+      }
+
       await db
         .delete(curatedCasts)
         .where(eq(curatedCasts.castHash, castHash));

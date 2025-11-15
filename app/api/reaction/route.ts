@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { neynarClient } from "@/lib/neynar";
-import { ReactionType } from "@neynar/nodejs-sdk/build/api";
+import { ReactionType, LookupCastConversationTypeEnum } from "@neynar/nodejs-sdk/build/api";
 import { trackCuratedCastInteraction } from "@/lib/interactions";
+import { db } from "@/lib/db";
+import { curatedCasts } from "@/lib/schema";
+import { eq } from "drizzle-orm";
+import { getRootCastHash } from "@/lib/conversation";
 
 export async function POST(request: NextRequest) {
   try {
@@ -41,6 +45,48 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Update database if this is a reaction to a curated cast
+    if (target) {
+      try {
+        // Find the root curated cast
+        const rootHash = await getRootCastHash(target);
+        
+        if (rootHash) {
+          // Check if root cast is curated
+          const curatedCast = await db
+            .select()
+            .from(curatedCasts)
+            .where(eq(curatedCasts.castHash, rootHash))
+            .limit(1);
+
+          if (curatedCast.length > 0) {
+            // Fetch updated cast data from Neynar (includes updated reaction counts)
+            const updatedCast = await neynarClient.lookupCastConversation({
+              identifier: rootHash,
+              type: LookupCastConversationTypeEnum.Hash,
+              replyDepth: 0,
+              includeChronologicalParentCasts: false,
+            });
+            
+            const castData = updatedCast.conversation?.cast;
+            if (castData) {
+              await db
+                .update(curatedCasts)
+                .set({
+                  castData: castData,
+                })
+                .where(eq(curatedCasts.castHash, rootHash));
+              
+              console.log(`[Reaction API] Updated cast data for curated cast ${rootHash} after ${reactionType}`);
+            }
+          }
+        }
+      } catch (error: any) {
+        // Don't fail the reaction publish if database update fails
+        console.error(`[Reaction API] Error updating database for reaction to ${target}:`, error);
+      }
+    }
+
     return NextResponse.json({ success: true, reaction });
   } catch (error: any) {
     console.error("Reaction API error:", error);
@@ -70,6 +116,48 @@ export async function DELETE(request: NextRequest) {
       target,
       targetAuthorFid,
     });
+
+    // Update database if this is a reaction removal from a curated cast
+    if (target) {
+      try {
+        // Find the root curated cast
+        const rootHash = await getRootCastHash(target);
+        
+        if (rootHash) {
+          // Check if root cast is curated
+          const curatedCast = await db
+            .select()
+            .from(curatedCasts)
+            .where(eq(curatedCasts.castHash, rootHash))
+            .limit(1);
+
+          if (curatedCast.length > 0) {
+            // Fetch updated cast data from Neynar (includes updated reaction counts)
+            const updatedCast = await neynarClient.lookupCastConversation({
+              identifier: rootHash,
+              type: LookupCastConversationTypeEnum.Hash,
+              replyDepth: 0,
+              includeChronologicalParentCasts: false,
+            });
+            
+            const castData = updatedCast.conversation?.cast;
+            if (castData) {
+              await db
+                .update(curatedCasts)
+                .set({
+                  castData: castData,
+                })
+                .where(eq(curatedCasts.castHash, rootHash));
+              
+              console.log(`[Reaction API] Updated cast data for curated cast ${rootHash} after removing ${reactionType}`);
+            }
+          }
+        }
+      } catch (error: any) {
+        // Don't fail the reaction deletion if database update fails
+        console.error(`[Reaction API] Error updating database for reaction removal from ${target}:`, error);
+      }
+    }
 
     return NextResponse.json({ success: true, reaction });
   } catch (error: any) {

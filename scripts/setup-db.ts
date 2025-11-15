@@ -19,7 +19,6 @@ async function setupDatabase() {
         username TEXT,
         display_name TEXT,
         pfp_url TEXT,
-        role TEXT,
         preferences JSONB,
         usage_stats JSONB,
         created_at TIMESTAMP DEFAULT NOW() NOT NULL,
@@ -27,21 +26,23 @@ async function setupDatabase() {
       );
     `);
 
-    // Add role column if it doesn't exist (migration for existing tables)
     await db.execute(sql`
-      DO $$ 
-      BEGIN
-        IF NOT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_name = 'users' AND column_name = 'role'
-        ) THEN
-          ALTER TABLE users ADD COLUMN role TEXT;
-        END IF;
-      END $$;
+      CREATE INDEX IF NOT EXISTS username_idx ON users(username);
+    `);
+
+    // Create user_roles table
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS user_roles (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_fid BIGINT NOT NULL REFERENCES users(fid) ON DELETE CASCADE,
+        role TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+        UNIQUE(user_fid, role)
+      );
     `);
 
     await db.execute(sql`
-      CREATE INDEX IF NOT EXISTS username_idx ON users(username);
+      CREATE INDEX IF NOT EXISTS user_roles_user_fid_idx ON user_roles(user_fid);
     `);
 
     // Create curator_packs table
@@ -222,19 +223,6 @@ async function setupDatabase() {
 
     await db.execute(sql`
       CREATE INDEX IF NOT EXISTS cast_tags_admin_fid_idx ON cast_tags(admin_fid);
-    `);
-
-    // Set admin roles
-    await db.execute(sql`
-      INSERT INTO users (fid, role, created_at, updated_at)
-      VALUES (5701, 'superadmin', NOW(), NOW())
-      ON CONFLICT (fid) DO UPDATE SET role = 'superadmin', updated_at = NOW();
-    `);
-
-    await db.execute(sql`
-      INSERT INTO users (fid, role, created_at, updated_at)
-      VALUES (5406, 'admin', NOW(), NOW())
-      ON CONFLICT (fid) DO UPDATE SET role = 'admin', updated_at = NOW();
     `);
 
     console.log("Database tables created successfully!");

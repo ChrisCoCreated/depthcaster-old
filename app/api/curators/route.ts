@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { curatedCasts, users } from "@/lib/schema";
+import { curatedCasts, users, userRoles } from "@/lib/schema";
 import { neynarClient } from "@/lib/neynar";
 import { getUser } from "@/lib/users";
 import { sql, eq, inArray } from "drizzle-orm";
-import { CURATOR_ROLES, hasCuratorOrAdminRole } from "@/lib/roles";
+import { CURATOR_ROLES, hasCuratorOrAdminRole, getUserRoles } from "@/lib/roles";
 
 export async function GET(request: NextRequest) {
   try {
@@ -72,9 +72,10 @@ export async function GET(request: NextRequest) {
 
     // Get users with any curator role from database (curator, admin, superadmin)
     const curatorRoleUsers = await db
-      .select()
+      .selectDistinct({ fid: users.fid })
       .from(users)
-      .where(inArray(users.role, CURATOR_ROLES));
+      .innerJoin(userRoles, eq(users.fid, userRoles.userFid))
+      .where(inArray(userRoles.role, CURATOR_ROLES));
 
     const curatorRoleFids = new Set(curatorRoleUsers.map((u) => u.fid));
 
@@ -102,12 +103,13 @@ export async function GET(request: NextRequest) {
         // Try database first
         const dbUser = await getUser(fid);
         if (dbUser) {
+          const roles = await getUserRoles(fid);
           curatorInfo = {
             fid,
             username: dbUser.username || undefined,
             displayName: dbUser.displayName || undefined,
             pfpUrl: dbUser.pfpUrl || undefined,
-            hasRole: hasCuratorOrAdminRole(dbUser.role),
+            hasRole: hasCuratorOrAdminRole(roles),
           };
         } else {
           // Fetch from Neynar if not in DB

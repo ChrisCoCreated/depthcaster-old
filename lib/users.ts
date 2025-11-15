@@ -190,3 +190,16 @@ export async function updateUserPreferences(fid: number, preferences: Record<str
   return updated;
 }
 
+export async function getUserPreferences(fid: number) {
+  const user = await getUser(fid);
+  const preferences = (user?.preferences || {}) as {
+    autoLikeOnCurate?: boolean;
+    hasSeenAutoLikeNotification?: boolean;
+  };
+  
+  return {
+    autoLikeOnCurate: preferences.autoLikeOnCurate !== undefined ? preferences.autoLikeOnCurate : true,
+    hasSeenAutoLikeNotification: preferences.hasSeenAutoLikeNotification || false,
+  };
+}
+

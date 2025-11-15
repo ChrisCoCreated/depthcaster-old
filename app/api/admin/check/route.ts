@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { users } from "@/lib/schema";
 import { eq } from "drizzle-orm";
-import { isAdmin } from "@/lib/roles";
+import { isAdmin, isSuperAdmin, getUserRoles } from "@/lib/roles";
 
 export async function GET(request: NextRequest) {
   try {
@@ -30,10 +30,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ isAdmin: false, isSuperAdmin: false });
     }
 
+    const roles = await getUserRoles(userFid);
+    const adminStatus = isAdmin(roles);
+    const superAdminStatus = isSuperAdmin(roles);
+
     return NextResponse.json({
-      isAdmin: isAdmin(user[0].role),
-      isSuperAdmin: user[0].role === "superadmin",
-      role: user[0].role || null,
+      isAdmin: adminStatus,
+      isSuperAdmin: superAdminStatus,
+      roles: roles.length > 0 ? roles : null,
     });
   } catch (error: unknown) {
     const err = error as { message?: string };

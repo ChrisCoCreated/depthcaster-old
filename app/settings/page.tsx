@@ -4,6 +4,7 @@ import { NotificationSettings } from "../components/NotificationSettings";
 import { FeedSettings } from "../components/FeedSettings";
 import { BotSettings } from "../components/BotSettings";
 import { WatchSettings } from "../components/WatchSettings";
+import { CurationSettings } from "../components/CurationSettings";
 import { useNeynarContext } from "@neynar/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -68,6 +69,10 @@ export default function SettingsPage() {
 
           <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-6">
             <WatchSettings />
+          </div>
+
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+            <CurationSettings />
           </div>
 
           <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-6">

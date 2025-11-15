@@ -9,6 +9,7 @@ import { ImageModal } from "./ImageModal";
 import { useNeynarContext } from "@neynar/react";
 import { QuoteCastModal } from "./QuoteCastModal";
 import { CastComposer } from "./CastComposer";
+import { AutoLikeNotification } from "./AutoLikeNotification";
 import { MessageCircle, Heart, Repeat2, Star, Share2, RefreshCw, Tag } from "lucide-react";
 import { shouldHideImages } from "./FeedSettings";
 import { convertBaseAppLinksInline, isFarcasterLink, extractCastHashFromUrl } from "@/lib/link-converter";
@@ -704,6 +705,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
   const [isAdmin, setIsAdmin] = useState(false);
   const [showTagMenu, setShowTagMenu] = useState(false);
   const [isTagging, setIsTagging] = useState(false);
+  const [showAutoLikeNotification, setShowAutoLikeNotification] = useState(false);
 
   // Listen for preference changes to trigger re-render
   useEffect(() => {
@@ -1156,11 +1158,72 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
 
       // Success - refresh curation status
       const checkResponse = await fetch(`/api/curate?castHash=${cast.hash}`);
+      let updatedCurators: Array<{ fid: number; username?: string; display_name?: string; pfp_url?: string }> = [];
       if (checkResponse.ok) {
         const data = await checkResponse.json();
         setIsCurated(data.isCurated);
         // Use curators in chronological order (oldest first) from API
-        setCurators(data.curatorInfo || []);
+        updatedCurators = data.curatorInfo || [];
+        setCurators(updatedCurators);
+      }
+
+      // Check if auto-like is enabled and handle auto-like
+      if (user?.fid && user?.signer_uuid) {
+        try {
+          // Fetch user preferences
+          const prefsResponse = await fetch(
+            `/api/user/preferences?fid=${user.fid}&signerUuid=${user.signer_uuid}`
+          );
+          if (prefsResponse.ok) {
+            const prefsData = await prefsResponse.json();
+            const autoLikeEnabled = prefsData.autoLikeOnCurate !== undefined ? prefsData.autoLikeOnCurate : true;
+            const hasSeenNotification = prefsData.hasSeenAutoLikeNotification || false;
+
+            // Check if cast is curated by deepbot (use updated curators list)
+            const isCuratedByDeepbot = updatedCurators.some(c => c.username?.toLowerCase() === "deepbot");
+
+            // Auto-like if enabled and not curated by deepbot
+            if (autoLikeEnabled && !isCuratedByDeepbot) {
+              try {
+                await fetch("/api/reaction", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    signerUuid: user.signer_uuid,
+                    reactionType: "like",
+                    target: cast.hash,
+                    targetAuthorFid: cast.author.fid,
+                  }),
+                });
+              } catch (error) {
+                console.error("Failed to auto-like cast:", error);
+              }
+            }
+
+            // Show notification if first time
+            if (!hasSeenNotification && autoLikeEnabled) {
+              setShowAutoLikeNotification(true);
+              // Update hasSeenAutoLikeNotification flag
+              try {
+                await fetch("/api/user/preferences", {
+                  method: "PUT",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    fid: user.fid,
+                    signerUuid: user.signer_uuid,
+                    hasSeenAutoLikeNotification: true,
+                  }),
+                });
+              } catch (error) {
+                console.error("Failed to update notification flag:", error);
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Failed to fetch preferences for auto-like:", error);
+        }
       }
 
       if (onUpdate) {
@@ -1238,7 +1301,9 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
     }
     
     if (cast.hash) {
-      router.push(`/cast/${cast.hash}`);
+      // Navigate to conversation view for curated casts, regular cast view otherwise
+      const isCurated = feedType === "curated" || cast._curatorFid;
+      router.push(isCurated ? `/conversation/${cast.hash}` : `/cast/${cast.hash}`);
     }
   };
 
@@ -1386,6 +1451,17 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
               <span className="text-gray-400 dark:text-gray-500 text-xs sm:text-sm">
                 · {timeAgo}
               </span>
+              {(cast as any)._isQuoteCast && (
+                <span 
+                  className="text-blue-500 dark:text-blue-400 text-xs sm:text-sm ml-0.5" 
+                  title="Quote cast - This cast quotes the root cast of this conversation"
+                  aria-label="Quote cast"
+                >
+                  <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                  </svg>
+                </span>
+              )}
             </div>
 
             {/* Cast text */}
@@ -2323,7 +2399,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                 })()}
                 {cast.hash && (
                   <Link
-                    href={`/cast/${cast.hash}`}
+                    href={feedType === "curated" || cast._curatorFid ? `/conversation/${cast.hash}` : `/cast/${cast.hash}`}
                     className="block mt-2 text-xs text-blue-600 dark:text-blue-400 hover:underline text-center"
                   >
                     View all replies →
@@ -2337,7 +2413,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                 </p>
                 {cast.hash && (
                   <Link
-                    href={`/cast/${cast.hash}`}
+                    href={feedType === "curated" || cast._curatorFid ? `/conversation/${cast.hash}` : `/cast/${cast.hash}`}
                     className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
                   >
                     View thread →
@@ -2422,6 +2498,27 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
           </div>
         </div>
       )}
+
+      <AutoLikeNotification
+        isOpen={showAutoLikeNotification}
+        onClose={() => setShowAutoLikeNotification(false)}
+        onDisable={async () => {
+          if (!user?.fid || !user?.signer_uuid) return;
+          try {
+            await fetch("/api/user/preferences", {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                fid: user.fid,
+                signerUuid: user.signer_uuid,
+                autoLikeOnCurate: false,
+              }),
+            });
+          } catch (error) {
+            console.error("Failed to disable auto-like:", error);
+          }
+        }}
+      />
     </>
   );
 }

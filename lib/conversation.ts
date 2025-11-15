@@ -124,6 +124,7 @@ export async function fetchAndStoreConversation(
 
     // Fetch and store existing quote casts
     let quotesStored = 0;
+    let quoteRepliesStored = 0;
     try {
       console.log(`[fetchAndStoreConversation] Fetching quotes for cast ${castHash}`);
       const quotesResponse = await neynarClient.fetchCastQuotes({
@@ -136,12 +137,13 @@ export async function fetchAndStoreConversation(
       console.log(`[fetchAndStoreConversation] Quotes API response structure:`, {
         hasResult: !!quotesResponseAny?.result,
         hasQuotes: !!quotesResponseAny?.result?.quotes,
+        hasCasts: !!quotesResponseAny?.casts,
         directQuotes: !!quotesResponseAny?.quotes,
         responseKeys: Object.keys(quotesResponseAny || {}),
       });
       
-      // Handle different response structures - check both result.quotes and direct quotes
-      const quoteCasts = quotesResponseAny?.result?.quotes || quotesResponseAny?.quotes || [];
+      // Handle different response structures - check casts array (actual API response structure)
+      const quoteCasts = quotesResponseAny?.casts || quotesResponseAny?.result?.quotes || quotesResponseAny?.quotes || [];
       console.log(`[fetchAndStoreConversation] Found ${quoteCasts.length} quote casts for cast ${castHash}`);
       
       if (quoteCasts.length > 0) {
@@ -183,6 +185,73 @@ export async function fetchAndStoreConversation(
           .onConflictDoNothing({ target: castReplies.replyCastHash });
         quotesStored = storedQuotes.length;
         console.log(`[fetchAndStoreConversation] Successfully stored ${quotesStored} quote casts for cast ${castHash}`);
+
+        // Fetch and store replies to each quote cast (treat them the same as replies to the original curated cast)
+        for (const quoteCast of qualityQuotes) {
+          try {
+            console.log(`[fetchAndStoreConversation] Fetching replies for quote cast ${quoteCast.hash}`);
+            
+            // Fetch conversation for the quote cast
+            const quoteConversation = await neynarClient.lookupCastConversation({
+              identifier: quoteCast.hash,
+              type: LookupCastConversationTypeEnum.Hash,
+              replyDepth: maxDepth,
+              includeChronologicalParentCasts: false,
+            });
+
+            const quoteRootCast = quoteConversation.conversation?.cast;
+            if (!quoteRootCast) {
+              continue;
+            }
+
+            // Collect replies to the quote cast
+            const quoteCollected = new Set<string>();
+            const quoteReplies: Array<{
+              cast: any;
+              depth: number;
+              parentHash: string | null;
+            }> = [];
+
+            await collectReplies(
+              quoteRootCast,
+              castHash, // Use original curated cast hash as root
+              castHash, // Use original curated cast hash as curated cast hash
+              1, // Start at depth 1 (replies to quote cast)
+              maxDepth,
+              quoteCollected,
+              quoteReplies
+            );
+
+            // Limit to maxReplies per quote cast
+            const quoteRepliesToStore = quoteReplies.slice(0, maxReplies);
+
+            // Store replies to quote cast, but associate them with the original curated cast
+            const storedQuoteReplies = quoteRepliesToStore.map((reply) => ({
+              curatedCastHash: castHash, // Original curated cast hash
+              replyCastHash: reply.cast.hash,
+              castData: reply.cast,
+              parentCastHash: reply.parentHash,
+              rootCastHash: castHash, // Original curated cast hash
+              replyDepth: reply.depth,
+              isQuoteCast: false, // These are regular replies, not quote casts
+              quotedCastHash: null, // Not directly quoting the curated cast
+            }));
+
+            if (storedQuoteReplies.length > 0) {
+              await db
+                .insert(castReplies)
+                .values(storedQuoteReplies)
+                .onConflictDoNothing({ target: castReplies.replyCastHash });
+              quoteRepliesStored += storedQuoteReplies.length;
+              console.log(`[fetchAndStoreConversation] Stored ${storedQuoteReplies.length} replies to quote cast ${quoteCast.hash}`);
+            }
+          } catch (error: any) {
+            console.error(`[fetchAndStoreConversation] Error fetching replies for quote cast ${quoteCast.hash}:`, error);
+            // Continue with next quote cast if one fails
+          }
+        }
+
+        console.log(`[fetchAndStoreConversation] Stored ${quoteRepliesStored} total replies to quote casts for cast ${castHash}`);
       } else {
         console.log(`[fetchAndStoreConversation] No quote casts to store for cast ${castHash} (${quoteCasts.length} found, ${qualityQuotes.length} met threshold)`);
       }
@@ -196,9 +265,13 @@ export async function fetchAndStoreConversation(
       // Don't fail the entire operation if quote fetch fails
     }
 
+    // Calculate total stored (including quote replies)
+    const totalStored = storedReplies.length + quotesStored + (quoteRepliesStored || 0);
+    const totalReplies = replies.length + quotesStored + (quoteRepliesStored || 0);
+
     return {
-      stored: storedReplies.length + quotesStored,
-      total: replies.length + quotesStored,
+      stored: totalStored,
+      total: totalReplies,
     };
   } catch (error) {
     console.error(`Error fetching conversation for cast ${castHash}:`, error);

@@ -130,8 +130,78 @@ export function Header() {
         return;
       }
 
-      // Success - show success message and refresh
+      // Success - show success message
       showToast("Cast curated successfully!", "success");
+
+      // Check if auto-like is enabled and handle auto-like
+      if (user?.fid && user?.signer_uuid) {
+        try {
+          // Fetch user preferences
+          const prefsResponse = await fetch(
+            `/api/user/preferences?fid=${user.fid}&signerUuid=${user.signer_uuid}`
+          );
+          if (prefsResponse.ok) {
+            const prefsData = await prefsResponse.json();
+            const autoLikeEnabled = prefsData.autoLikeOnCurate !== undefined ? prefsData.autoLikeOnCurate : true;
+            const hasSeenNotification = prefsData.hasSeenAutoLikeNotification || false;
+
+            // Check if cast is curated by deepbot by checking curators
+            let isCuratedByDeepbot = false;
+            try {
+              const checkResponse = await fetch(`/api/curate?castHash=${castHash}`);
+              if (checkResponse.ok) {
+                const checkData = await checkResponse.json();
+                isCuratedByDeepbot = (checkData.curatorInfo || []).some((c: any) => c.username?.toLowerCase() === "deepbot");
+              }
+            } catch (error) {
+              console.error("Failed to check curators:", error);
+            }
+
+            // Auto-like if enabled and not curated by deepbot
+            if (autoLikeEnabled && !isCuratedByDeepbot) {
+              try {
+                await fetch("/api/reaction", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    signerUuid: user.signer_uuid,
+                    reactionType: "like",
+                    target: castHash,
+                    targetAuthorFid: castData.author?.fid,
+                  }),
+                });
+              } catch (error) {
+                console.error("Failed to auto-like cast:", error);
+              }
+            }
+
+            // Show notification if first time
+            if (!hasSeenNotification && autoLikeEnabled) {
+              // Update hasSeenAutoLikeNotification flag
+              try {
+                await fetch("/api/user/preferences", {
+                  method: "PUT",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    fid: user.fid,
+                    signerUuid: user.signer_uuid,
+                    hasSeenAutoLikeNotification: true,
+                  }),
+                });
+              } catch (error) {
+                console.error("Failed to update notification flag:", error);
+              }
+              // Note: For paste-to-curate, we'll show a toast instead of modal since we're reloading
+              showToast("Casts you curate will be automatically liked (except those curated with @deepbot)", "success");
+            }
+          }
+        } catch (error) {
+          console.error("Failed to fetch preferences for auto-like:", error);
+        }
+      }
+
       setTimeout(() => {
         window.location.reload();
       }, 1000);
@@ -179,7 +249,7 @@ export function Header() {
           </div>
         </div>
       )}
-      <header className="sticky top-0 z-[200] bg-white/80 dark:bg-black/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
+      <header className="sticky top-0 z-[200] bg-white/80 dark:bg-black/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between">
           <div className="flex flex-col">
             <Link href="/" className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">

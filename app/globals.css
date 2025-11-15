@@ -34,6 +34,8 @@ body {
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
   overflow-x: hidden;
   width: 100%;
+  /* Add padding for iOS home indicator at bottom */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 @layer base {

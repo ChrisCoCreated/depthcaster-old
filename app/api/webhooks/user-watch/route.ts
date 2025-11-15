@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { userWatches } from "@/lib/schema";
 import { eq, and } from "drizzle-orm";
-import { refreshUserWatchWebhook, getWatchedFids } from "@/lib/webhooks";
+import { getWatchedFids } from "@/lib/webhooks";
+import { refreshUnifiedUserWatchWebhook } from "@/lib/webhooks-unified-watches";
 import { getUser } from "@/lib/users";
 import { neynarClient } from "@/lib/neynar";
 
@@ -47,8 +48,8 @@ export async function POST(request: NextRequest) {
       })
       .returning();
 
-    // Refresh webhook to include new watched user
-    await refreshUserWatchWebhook(watcherFid);
+    // Refresh unified webhook to include new watched user
+    await refreshUnifiedUserWatchWebhook();
 
     return NextResponse.json({
       success: true,
@@ -104,8 +105,8 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Refresh webhook to remove watched user
-    await refreshUserWatchWebhook(parseInt(watcherFid));
+    // Refresh unified webhook to remove watched user
+    await refreshUnifiedUserWatchWebhook();
 
     return NextResponse.json({
       success: true,
@@ -212,6 +213,8 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+
 
 
 

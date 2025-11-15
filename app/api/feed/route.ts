@@ -4,7 +4,7 @@ import { FetchFeedFeedTypeEnum, FetchFeedFilterTypeEnum, FetchTrendingFeedTimeWi
 import { filterCast, sortCastsByQuality } from "@/lib/filters";
 import { CURATED_FIDS, CURATED_CHANNELS } from "@/lib/curated";
 import { db } from "@/lib/db";
-import { curatorPackUsers, curatedCasts, curatedCastInteractions, curatorPacks, users, curatorCastCurations, castReplies } from "@/lib/schema";
+import { curatorPackUsers, curatedCasts, curatedCastInteractions, curatorPacks, users, curatorCastCurations, castReplies, userRoles } from "@/lib/schema";
 import { eq, inArray, desc, lt, and, sql, asc, or } from "drizzle-orm";
 import { cacheFeed } from "@/lib/cache";
 import { deduplicateRequest } from "@/lib/neynar-batch";
@@ -277,9 +277,10 @@ export async function GET(request: NextRequest) {
       } else {
         // Default: show curators with any curator role (curator, admin, superadmin)
         const curatorRoleUsers = await db
-          .select({ fid: users.fid })
+          .selectDistinct({ fid: users.fid })
           .from(users)
-          .where(inArray(users.role, CURATOR_ROLES));
+          .innerJoin(userRoles, eq(users.fid, userRoles.userFid))
+          .where(inArray(userRoles.role, CURATOR_ROLES));
         
         const curatorRoleFids = curatorRoleUsers.map((u) => u.fid);
         if (curatorRoleFids.length > 0) {

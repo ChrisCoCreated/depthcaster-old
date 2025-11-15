@@ -192,7 +192,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Handle curated conversation webhooks
+    // Handle curated conversation webhooks (unified webhooks)
     if (webhookType === "curated-reply" || webhookType === "curated-quote") {
       // Check if cast meets quality threshold (webhook filter may have already done this, but double-check)
       if (!meetsCastQualityThreshold(castData)) {
@@ -204,7 +204,7 @@ export async function POST(request: NextRequest) {
       const isQuote = isQuoteCast(castData);
       
       if (isQuote && webhookType === "curated-quote") {
-        // Handle quote cast
+        // Handle quote cast - check if any quoted cast is curated
         const quotedCastHashes = extractQuotedCastHashes(castData);
         
         for (const quotedCastHash of quotedCastHashes) {
@@ -254,64 +254,74 @@ export async function POST(request: NextRequest) {
           }
         }
       } else if (!isQuote && webhookType === "curated-reply") {
-        // Handle regular reply
-        const curatedCastHash = webhookConfig?.curatedCastHash || webhookConfig?.rootCastHash;
+        // Handle regular reply - find the root curated cast
+        // With unified webhooks, we need to check if the root parent is a curated cast
+        const rootHash = await getRootCastHash(castHash);
         
-        if (curatedCastHash) {
-          // Calculate reply depth by traversing parent chain
-          let replyDepth = 1;
-          let currentParentHash = parentHash;
-          let depth = 1;
-          
-          // Traverse up to find depth (limit to prevent infinite loops)
-          while (currentParentHash && depth < 10) {
-            const parentReply = await db
-              .select()
-              .from(castReplies)
-              .where(eq(castReplies.replyCastHash, currentParentHash))
-              .limit(1);
+        if (rootHash) {
+          // Check if root cast is curated
+          const curatedCast = await db
+            .select()
+            .from(curatedCasts)
+            .where(eq(curatedCasts.castHash, rootHash))
+            .limit(1);
+
+          if (curatedCast.length > 0) {
+            const curatedCastHash = rootHash;
             
-            if (parentReply.length > 0) {
-              replyDepth = parentReply[0].replyDepth + 1;
-              break;
-            }
+            // Calculate reply depth by traversing parent chain
+            let replyDepth = 1;
+            let currentParentHash = parentHash;
+            let depth = 1;
             
-            // Try to get parent from Neynar if not in database
-            try {
-              const rootHash = await getRootCastHash(currentParentHash);
-              if (rootHash === curatedCastHash) {
-                depth++;
-                // Get parent hash from cast data if available
-                // For now, assume depth based on iteration
-                replyDepth = depth;
+            // Traverse up to find depth (limit to prevent infinite loops)
+            while (currentParentHash && depth < 10) {
+              const parentReply = await db
+                .select()
+                .from(castReplies)
+                .where(eq(castReplies.replyCastHash, currentParentHash))
+                .limit(1);
+              
+              if (parentReply.length > 0) {
+                replyDepth = parentReply[0].replyDepth + 1;
                 break;
               }
-            } catch (error) {
-              console.error(`[Webhook] Error getting root hash for ${currentParentHash}:`, error);
-              break;
+              
+              // Try to get parent from Neynar if not in database
+              try {
+                const parentRootHash = await getRootCastHash(currentParentHash);
+                if (parentRootHash === curatedCastHash) {
+                  depth++;
+                  replyDepth = depth;
+                  break;
+                }
+              } catch (error) {
+                console.error(`[Webhook] Error getting root hash for ${currentParentHash}:`, error);
+                break;
+              }
+              
+              depth++;
+              if (depth >= 10) break;
             }
-            
-            depth++;
-            if (depth >= 10) break;
-          }
 
-          // Store reply
-          try {
-            await db.insert(castReplies).values({
-              curatedCastHash,
-              replyCastHash: castHash,
-              castData: castData,
-              parentCastHash: parentHash || null,
-              rootCastHash: curatedCastHash,
-              replyDepth,
-              isQuoteCast: false,
-              quotedCastHash: null,
-            }).onConflictDoNothing({ target: castReplies.replyCastHash });
+            // Store reply
+            try {
+              await db.insert(castReplies).values({
+                curatedCastHash,
+                replyCastHash: castHash,
+                castData: castData,
+                parentCastHash: parentHash || null,
+                rootCastHash: curatedCastHash,
+                replyDepth,
+                isQuoteCast: false,
+                quotedCastHash: null,
+              }).onConflictDoNothing({ target: castReplies.replyCastHash });
 
-            console.log(`[Webhook] Stored reply ${castHash} for curated cast ${curatedCastHash} at depth ${replyDepth}`);
-          } catch (error: any) {
-            if (error.code !== "23505") { // Ignore duplicate key errors
-              console.error(`[Webhook] Error storing reply ${castHash}:`, error);
+              console.log(`[Webhook] Stored reply ${castHash} for curated cast ${curatedCastHash} at depth ${replyDepth}`);
+            } catch (error: any) {
+              if (error.code !== "23505") { // Ignore duplicate key errors
+                console.error(`[Webhook] Error storing reply ${castHash}:`, error);
+              }
             }
           }
         }
@@ -319,10 +329,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Handle user notifications for parent casts (not replies)
-    // This webhook is filtered to only send casts from watched users
+    // Unified webhook sends all casts from watched users, we filter by watch table
     if ((parentHash === null || parentHash === undefined) && webhookType === "user-watch") {
       // Parent cast - check if this should trigger user notifications
-      // We need to find which watchers are watching this author
+      // With unified webhook, we need to check the watch table to see who is watching this author
       const { userWatches } = await import("@/lib/schema");
       const watchers = await db
         .select({ watcherFid: userWatches.watcherFid })
@@ -343,8 +353,10 @@ export async function POST(request: NextRequest) {
         console.log(`[Webhook] Found ${existingNotifications.length} existing notification(s) for cast ${castHash}`);
 
         // Only create notifications for users who don't already have one
+        // TEMPORARY: Block notifications for user 5406
+        const BLOCKED_USER_FID = 5406;
         const notificationsToCreate = watchers
-          .filter(w => !existingUserFids.has(w.watcherFid))
+          .filter(w => !existingUserFids.has(w.watcherFid) && w.watcherFid !== BLOCKED_USER_FID)
           .map((w) => ({
             userFid: w.watcherFid,
             type: "cast.created",
@@ -357,6 +369,12 @@ export async function POST(request: NextRequest) {
         if (notificationsToCreate.length > 0) {
           await db.insert(userNotifications).values(notificationsToCreate).onConflictDoNothing();
           console.log(`[Webhook] Created ${notificationsToCreate.length} new notification(s) for cast ${castHash} (skipped ${watchers.length - notificationsToCreate.length} duplicate(s))`);
+          
+          // Invalidate count cache for all affected users
+          const { cacheNotificationCount } = await import("@/lib/cache");
+          for (const notification of notificationsToCreate) {
+            cacheNotificationCount.invalidateUser(notification.userFid);
+          }
         } else {
           console.log(`[Webhook] All watchers already have notifications for cast ${castHash}, skipping creation`);
         }

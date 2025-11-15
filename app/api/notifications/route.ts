@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { neynarClient } from "@/lib/neynar";
 import { FetchAllNotificationsTypeEnum } from "@neynar/nodejs-sdk/build/api";
-import { cacheNotifications } from "@/lib/cache";
+import { cacheNotifications, cacheNotificationCount } from "@/lib/cache";
 import { deduplicateRequest } from "@/lib/neynar-batch";
 import { db } from "@/lib/db";
 import { userNotifications } from "@/lib/schema";
@@ -21,6 +21,15 @@ export async function GET(request: NextRequest) {
         { error: "fid is required" },
         { status: 400 }
       );
+    }
+
+    // TEMPORARY: Block notifications for user 5406
+    const BLOCKED_USER_FID = 5406;
+    if (parseInt(fid) === BLOCKED_USER_FID) {
+      return NextResponse.json({
+        notifications: [],
+        next: null,
+      });
     }
 
     // Map string types to enum values
@@ -79,69 +88,112 @@ export async function GET(request: NextRequest) {
       });
     });
 
+    console.log(`[Notifications] Found ${neynarNotifications.notifications?.length || 0} Neynar notification(s) for user ${fid}, types: ${types || 'all'}`);
+
     // Fetch webhook-based notifications (user watches - parent casts only)
     // Include webhook notifications for all notification types (they're cast.created events)
     // Note: Fetch both read and unread to show in feed, but mark unread status correctly
+    // Fetch more webhook notifications to ensure good mix after merging
     const webhookWhereConditions = [
       eq(userNotifications.userFid, parseInt(fid)),
     ];
 
     // Apply cursor if provided
+    // Neynar cursor is base64-encoded JSON with most_recent_timestamp
     if (cursor) {
       try {
-        const cursorDate = new Date(cursor);
-        webhookWhereConditions.push(lt(userNotifications.createdAt, cursorDate));
+        // Try to decode base64 cursor (may be URL-encoded)
+        let cursorTimestamp: string | null = null;
+        try {
+          // Decode URL encoding first if present
+          const urlDecoded = decodeURIComponent(cursor);
+          const decoded = Buffer.from(urlDecoded, 'base64').toString('utf-8');
+          const cursorData = JSON.parse(decoded);
+          cursorTimestamp = cursorData.most_recent_timestamp;
+        } catch {
+          // If not base64 JSON, try parsing as direct date string
+          try {
+            const urlDecoded = decodeURIComponent(cursor);
+            cursorTimestamp = urlDecoded;
+          } catch {
+            cursorTimestamp = cursor;
+          }
+        }
+        
+        if (cursorTimestamp) {
+          const cursorDate = new Date(cursorTimestamp);
+          if (!isNaN(cursorDate.getTime())) {
+            webhookWhereConditions.push(lt(userNotifications.createdAt, cursorDate));
+          }
+        }
       } catch {
         // Invalid cursor, ignore it
       }
     }
 
+    // Fetch more webhook notifications to ensure good mix when merged with Neynar notifications
     const webhookResults = await db
       .select()
       .from(userNotifications)
       .where(and(...webhookWhereConditions))
       .orderBy(desc(userNotifications.createdAt))
-      .limit(limit);
+      .limit(limit * 2); // Fetch more to ensure good mix after merging
     
     console.log(`[Notifications] Found ${webhookResults.length} webhook notification(s) for user ${fid}`);
 
     // Convert webhook notifications to Neynar notification format
-    const webhookNotifications = webhookResults.map((notif) => {
-      const castData = notif.castData as any;
-      return {
-        object: "notification",
-        type: "cast.created",
-        fid: notif.userFid,
-        timestamp: notif.createdAt.toISOString(),
-        most_recent_timestamp: notif.createdAt.toISOString(), // Add for display compatibility
-        cast: castData,
-        actor: {
-          fid: notif.authorFid,
-          username: castData.author?.username,
-          display_name: castData.author?.display_name,
-          pfp_url: castData.author?.pfp_url,
-        },
-        seen: notif.isRead, // Include seen status
-      };
-    });
+    const webhookNotifications = webhookResults
+      .filter((notif) => notif.createdAt != null) // Filter out invalid dates
+      .map((notif) => {
+        const castData = notif.castData as any;
+        const timestamp = notif.createdAt instanceof Date 
+          ? notif.createdAt.toISOString()
+          : new Date(notif.createdAt).toISOString();
+        return {
+          object: "notification",
+          type: "cast.created",
+          fid: notif.userFid,
+          timestamp,
+          most_recent_timestamp: timestamp, // Add for display compatibility
+          cast: castData,
+          actor: {
+            fid: notif.authorFid,
+            username: castData.author?.username,
+            display_name: castData.author?.display_name,
+            pfp_url: castData.author?.pfp_url,
+          },
+          seen: notif.isRead, // Include seen status
+        };
+      });
 
     // Merge notifications: webhook notifications first (newer), then Neynar notifications
     // Sort by timestamp descending
     const allNotifications = [...webhookNotifications, ...(neynarNotifications.notifications || [])];
     allNotifications.sort((a, b) => {
       const getTimestamp = (notif: any): string | number => {
+        // Try multiple timestamp fields
         if ('timestamp' in notif && typeof notif.timestamp === 'string') {
           return notif.timestamp;
+        }
+        if ('most_recent_timestamp' in notif && typeof notif.most_recent_timestamp === 'string') {
+          return notif.most_recent_timestamp;
         }
         if ('created_at' in notif && typeof notif.created_at === 'string') {
           return notif.created_at;
         }
+        // Fallback to 0 for invalid timestamps (will sort to end)
         return 0;
       };
       const timeA = new Date(getTimestamp(a)).getTime();
       const timeB = new Date(getTimestamp(b)).getTime();
+      // Handle invalid dates
+      if (isNaN(timeA) && isNaN(timeB)) return 0;
+      if (isNaN(timeA)) return 1; // Invalid dates go to end
+      if (isNaN(timeB)) return -1;
       return timeB - timeA;
     });
+    
+    console.log(`[Notifications] Merged ${allNotifications.length} total notifications (${webhookNotifications.length} webhook + ${neynarNotifications.notifications?.length || 0} Neynar)`);
 
     // Limit to requested limit
     const limitedNotifications = allNotifications.slice(0, limit);
@@ -167,6 +219,9 @@ export async function GET(request: NextRequest) {
           .update(userNotifications)
           .set({ isRead: true })
           .where(inArray(userNotifications.id, readIds));
+        
+        // Invalidate count cache since unread count changed
+        cacheNotificationCount.invalidateUser(parseInt(fid));
       }
     }
 

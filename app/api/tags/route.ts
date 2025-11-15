@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { castTags, users, curatedCasts } from "@/lib/schema";
 import { eq, and, sql, inArray } from "drizzle-orm";
-import { isAdmin } from "@/lib/roles";
+import { isAdmin, getUserRoles } from "@/lib/roles";
 import { neynarClient } from "@/lib/neynar";
 
 export async function GET(request: NextRequest) {
@@ -118,7 +118,14 @@ export async function POST(request: NextRequest) {
 
     // Check if user has admin/superadmin role
     const user = await db.select().from(users).where(eq(users.fid, adminFid)).limit(1);
-    if (user.length === 0 || !isAdmin(user[0].role)) {
+    if (user.length === 0) {
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      );
+    }
+    const roles = await getUserRoles(adminFid);
+    if (!isAdmin(roles)) {
       return NextResponse.json(
         { error: "User does not have admin or superadmin role" },
         { status: 403 }
@@ -185,7 +192,14 @@ export async function DELETE(request: NextRequest) {
 
     // Check if user has admin/superadmin role
     const user = await db.select().from(users).where(eq(users.fid, adminFid)).limit(1);
-    if (user.length === 0 || !isAdmin(user[0].role)) {
+    if (user.length === 0) {
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      );
+    }
+    const roles = await getUserRoles(adminFid);
+    if (!isAdmin(roles)) {
       return NextResponse.json(
         { error: "User does not have admin or superadmin role" },
         { status: 403 }

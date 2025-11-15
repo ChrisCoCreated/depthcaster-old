@@ -1,10 +1,11 @@
 import { neynarClient } from "./neynar";
 import { db } from "./db";
-import { webhooks, userWatches } from "./schema";
-import { eq, and, sql } from "drizzle-orm";
+import { webhooks, userWatches, curatedCasts } from "./schema";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import { MIN_USER_SCORE_THRESHOLD } from "./cast-quality";
+import { refreshUnifiedCuratedWebhooks } from "./webhooks-unified";
 
-const WEBHOOK_BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+const WEBHOOK_BASE_URL = process.env.WEBHOOK_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || "https://depthcaster.vercel.app";
 
 /**
  * Create or update a webhook for a user watching multiple users
@@ -234,10 +235,20 @@ function castHashToRootParentUrl(castHash: string): string {
 }
 
 /**
- * Create webhook for replies to a curated conversation
- * Filters by root_parent_urls and minimum author score
+ * Create or update unified webhook for replies to all curated casts
+ * @deprecated Use refreshUnifiedCuratedWebhooks() instead
+ * This function is kept for backward compatibility but now just refreshes the unified webhook
  */
-export async function createCuratedConversationWebhook(curatedCastHash: string) {
+export async function createCuratedConversationWebhook(curatedCastHash?: string) {
+  // Refresh unified webhook instead of creating per-cast webhooks
+  return await refreshUnifiedCuratedWebhooks();
+}
+
+/**
+ * Create webhook for replies to a curated conversation (legacy - per-cast)
+ * @deprecated Use refreshUnifiedCuratedWebhooks() instead
+ */
+export async function createCuratedConversationWebhookLegacy(curatedCastHash: string) {
   const webhookUrl = `${WEBHOOK_BASE_URL}/api/webhooks`;
   const webhookName = `curated-reply-${curatedCastHash}`;
   const rootParentUrl = castHashToRootParentUrl(curatedCastHash);
@@ -358,14 +369,22 @@ export async function createCuratedConversationWebhook(curatedCastHash: string) 
 }
 
 /**
- * Create webhook for quote casts that quote a curated cast
- * Filters by root_parent_urls and minimum author score
- * Note: Quote cast detection happens in webhook handler (check embeds array)
+ * Create or update unified webhook for quote casts that quote any curated cast
+ * @deprecated Use refreshUnifiedCuratedWebhooks() instead
+ * This function is kept for backward compatibility but now just refreshes the unified webhook
  */
-export async function createQuoteCastWebhook(curatedCastHash: string) {
+export async function createQuoteCastWebhook(curatedCastHash?: string) {
+  // Refresh unified webhook instead of creating per-cast webhooks
+  return await refreshUnifiedCuratedWebhooks();
+}
+
+/**
+ * Create webhook for quote casts that quote a curated cast (legacy - per-cast)
+ * @deprecated Use refreshUnifiedCuratedWebhooks() instead
+ */
+export async function createQuoteCastWebhookLegacy(curatedCastHash: string) {
   const webhookUrl = `${WEBHOOK_BASE_URL}/api/webhooks`;
   const webhookName = `curated-quote-${curatedCastHash}`;
-  const rootParentUrl = castHashToRootParentUrl(curatedCastHash);
 
   // Check if webhook already exists
   const existingWebhook = await db
@@ -381,7 +400,7 @@ export async function createQuoteCastWebhook(curatedCastHash: string) {
 
   const subscription = {
     "cast.created": {
-      root_parent_urls: [rootParentUrl],
+      embedded_cast_hashes: [curatedCastHash],
       author_score_min: MIN_USER_SCORE_THRESHOLD,
     },
   };
@@ -420,6 +439,12 @@ export async function createQuoteCastWebhook(curatedCastHash: string) {
         .where(eq(webhooks.id, existing.id));
     } catch (error: any) {
       console.error("Error updating curated quote webhook:", error);
+      console.error("Error details:", {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status || error?.status,
+        subscription,
+      });
       // Try to delete and recreate
       try {
         await neynarClient.deleteWebhook({ webhookId: existing.neynarWebhookId });
@@ -427,11 +452,23 @@ export async function createQuoteCastWebhook(curatedCastHash: string) {
         console.error("Error deleting old webhook:", deleteError);
       }
 
-      webhookResult = await neynarClient.publishWebhook({
-        name: webhookName,
-        url: webhookUrl,
-        subscription,
-      });
+      try {
+        webhookResult = await neynarClient.publishWebhook({
+          name: webhookName,
+          url: webhookUrl,
+          subscription,
+        });
+      } catch (publishError: any) {
+        console.error("Error publishing curated quote webhook:", publishError);
+        console.error("Publish error details:", {
+          message: publishError?.message,
+          response: publishError?.response?.data,
+          status: publishError?.response?.status || publishError?.status,
+          subscription,
+          curatedCastHash,
+        });
+        throw publishError;
+      }
       neynarWebhookId = (webhookResult.webhook as any).webhook_id || (webhookResult as any).webhook_id;
 
       const webhookData = (webhookResult as any).webhook || webhookResult;
@@ -455,11 +492,23 @@ export async function createQuoteCastWebhook(curatedCastHash: string) {
     }
   } else {
     // Create new webhook
-    webhookResult = await neynarClient.publishWebhook({
-      name: webhookName,
-      url: webhookUrl,
-      subscription,
-    });
+    try {
+      webhookResult = await neynarClient.publishWebhook({
+        name: webhookName,
+        url: webhookUrl,
+        subscription,
+      });
+    } catch (error: any) {
+      console.error("Error creating curated quote webhook:", error);
+      console.error("Error details:", {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status || error?.status,
+        subscription,
+        curatedCastHash,
+      });
+      throw error;
+    }
     neynarWebhookId = (webhookResult.webhook as any).webhook_id || (webhookResult as any).webhook_id;
 
     const webhookData = (webhookResult as any).webhook || webhookResult;
@@ -534,11 +583,123 @@ export async function createReplyWebhookForQuote(quotedCastHash: string, quoteCa
   await db.insert(webhooks).values({
     neynarWebhookId,
     type: "curated-reply",
-    config: { quotedCastHash, quoteCastHash, rootCastHash: quoteCastHash },
+    config: { 
+      curatedCastHash: quotedCastHash, // Original curated cast hash
+      quotedCastHash, // Original curated cast hash (for backwards compatibility)
+      quoteCastHash, // The quote cast hash
+      rootCastHash: quotedCastHash // Original curated cast hash
+    },
     url: webhookUrl,
     secret,
   });
 
   return { neynarWebhookId, webhookResult };
+}
+
+/**
+ * Delete all webhooks related to a curated cast
+ * Finds webhooks where type is 'curated-reply' or 'curated-quote'
+ * and config->>'curatedCastHash' equals the cast hash
+ */
+export async function deleteCuratedCastWebhooks(castHash: string): Promise<number> {
+  // Find all webhooks related to this cast
+  const relatedWebhooks = await db
+    .select()
+    .from(webhooks)
+    .where(
+      and(
+        inArray(webhooks.type, ["curated-reply", "curated-quote"]),
+        sql`${webhooks.config}->>'curatedCastHash' = ${castHash}`
+      )
+    );
+
+  let deletedCount = 0;
+
+  // Delete each webhook from Neynar and database
+  for (const webhook of relatedWebhooks) {
+    try {
+      // Delete from Neynar API
+      try {
+        await neynarClient.deleteWebhook({
+          webhookId: webhook.neynarWebhookId,
+        });
+      } catch (neynarError: any) {
+        // Continue with database deletion even if Neynar deletion fails
+        // (webhook may already be deleted, network issues, etc.)
+        console.error(`Error deleting webhook ${webhook.neynarWebhookId} from Neynar:`, neynarError);
+      }
+
+      // Delete from database
+      await db.delete(webhooks).where(eq(webhooks.id, webhook.id));
+      deletedCount++;
+    } catch (error: any) {
+      console.error(`Error deleting webhook ${webhook.id}:`, error);
+      // Continue with next webhook even if one fails
+    }
+  }
+
+  return deletedCount;
+}
+
+/**
+ * Clean up orphaned webhooks that reference casts no longer in curated_casts table
+ * Returns count of cleaned up webhooks
+ */
+export async function cleanupOrphanedWebhooks(): Promise<number> {
+  // Get all curated-reply and curated-quote webhooks
+  const curatedWebhooks = await db
+    .select()
+    .from(webhooks)
+    .where(
+      inArray(webhooks.type, ["curated-reply", "curated-quote"])
+    );
+
+  let cleanedCount = 0;
+
+  for (const webhook of curatedWebhooks) {
+    try {
+      // Extract curatedCastHash from config
+      const config = webhook.config as any;
+      const curatedCastHash = config?.curatedCastHash;
+
+      if (!curatedCastHash) {
+        // Skip webhooks without curatedCastHash in config
+        continue;
+      }
+
+      // Check if the cast still exists in curated_casts table
+      const existingCast = await db
+        .select()
+        .from(curatedCasts)
+        .where(eq(curatedCasts.castHash, curatedCastHash))
+        .limit(1);
+
+      // If cast doesn't exist, delete the webhook
+      if (existingCast.length === 0) {
+        try {
+          // Delete from Neynar API
+          try {
+            await neynarClient.deleteWebhook({
+              webhookId: webhook.neynarWebhookId,
+            });
+          } catch (neynarError: any) {
+            // Continue with database deletion even if Neynar deletion fails
+            console.error(`Error deleting orphaned webhook ${webhook.neynarWebhookId} from Neynar:`, neynarError);
+          }
+
+          // Delete from database
+          await db.delete(webhooks).where(eq(webhooks.id, webhook.id));
+          cleanedCount++;
+        } catch (error: any) {
+          console.error(`Error deleting orphaned webhook ${webhook.id}:`, error);
+        }
+      }
+    } catch (error: any) {
+      console.error(`Error processing webhook ${webhook.id}:`, error);
+      // Continue with next webhook
+    }
+  }
+
+  return cleanedCount;
 }
 

@@ -65,8 +65,12 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
         params.append("cursor", newCursor);
       }
 
-      // Add cache-busting timestamp to ensure fresh data after marking as seen
-      params.append("_t", Date.now().toString());
+      // Only add cache-busting on initial load if explicitly needed
+      // Don't cache-bust on every fetch - let cache work
+      if (!newCursor) {
+        // Only cache-bust if we're explicitly refreshing (not initial load)
+        // For now, let cache work normally
+      }
       const response = await fetch(`/api/notifications?${params}`);
       if (!response.ok) {
         throw new Error("Failed to fetch notifications");
@@ -100,6 +104,7 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
         },
         body: JSON.stringify({
           signerUuid: user.signer_uuid,
+          fid: user.fid, // Include FID for cache invalidation
           notificationType,
         }),
       });
@@ -111,7 +116,7 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
     } catch (err) {
       console.error("Failed to mark notifications as seen", err);
     }
-  }, [user?.signer_uuid, onNotificationsSeen]);
+  }, [user?.signer_uuid, user?.fid, onNotificationsSeen]);
 
   useEffect(() => {
     if (isOpen && user?.fid) {

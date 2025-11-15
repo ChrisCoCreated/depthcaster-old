@@ -27,15 +27,24 @@ export async function GET(request: NextRequest) {
     }
 
     const user = await getUser(fid);
-    const preferences = (user?.preferences || {}) as { hideBots?: boolean; hiddenBots?: string[] };
+    const preferences = (user?.preferences || {}) as { 
+      hideBots?: boolean; 
+      hiddenBots?: string[];
+      autoLikeOnCurate?: boolean;
+      hasSeenAutoLikeNotification?: boolean;
+    };
     
     // Ensure hiddenBots exists with defaults
     const hiddenBots = preferences.hiddenBots || DEFAULT_HIDDEN_BOTS;
     const hideBots = preferences.hideBots !== undefined ? preferences.hideBots : true;
+    const autoLikeOnCurate = preferences.autoLikeOnCurate !== undefined ? preferences.autoLikeOnCurate : true;
+    const hasSeenAutoLikeNotification = preferences.hasSeenAutoLikeNotification || false;
 
     return NextResponse.json({
       hideBots,
       hiddenBots,
+      autoLikeOnCurate,
+      hasSeenAutoLikeNotification,
     });
   } catch (error: any) {
     console.error("Error fetching user preferences:", error);
@@ -49,7 +58,7 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { fid, signerUuid, hideBots, hiddenBots } = body;
+    const { fid, signerUuid, hideBots, hiddenBots, autoLikeOnCurate, hasSeenAutoLikeNotification } = body;
 
     if (!fid || !signerUuid) {
       return NextResponse.json(
@@ -69,13 +78,20 @@ export async function PUT(request: NextRequest) {
 
     // Get existing preferences
     const user = await getUser(fid);
-    const existingPreferences = (user?.preferences || {}) as { hideBots?: boolean; hiddenBots?: string[] };
+    const existingPreferences = (user?.preferences || {}) as { 
+      hideBots?: boolean; 
+      hiddenBots?: string[];
+      autoLikeOnCurate?: boolean;
+      hasSeenAutoLikeNotification?: boolean;
+    };
     
     // Update preferences
     const updatedPreferences = {
       ...existingPreferences,
       hideBots: hideBots !== undefined ? hideBots : existingPreferences.hideBots,
       hiddenBots: hiddenBots !== undefined ? hiddenBots : existingPreferences.hiddenBots || DEFAULT_HIDDEN_BOTS,
+      autoLikeOnCurate: autoLikeOnCurate !== undefined ? autoLikeOnCurate : existingPreferences.autoLikeOnCurate !== undefined ? existingPreferences.autoLikeOnCurate : true,
+      hasSeenAutoLikeNotification: hasSeenAutoLikeNotification !== undefined ? hasSeenAutoLikeNotification : existingPreferences.hasSeenAutoLikeNotification,
     };
 
     await updateUserPreferences(fid, updatedPreferences);
@@ -83,6 +99,8 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({
       hideBots: updatedPreferences.hideBots,
       hiddenBots: updatedPreferences.hiddenBots,
+      autoLikeOnCurate: updatedPreferences.autoLikeOnCurate,
+      hasSeenAutoLikeNotification: updatedPreferences.hasSeenAutoLikeNotification,
     });
   } catch (error: any) {
     console.error("Error updating user preferences:", error);

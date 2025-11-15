@@ -5,13 +5,22 @@ export const users = pgTable("users", {
   username: text("username"),
   displayName: text("display_name"),
   pfpUrl: text("pfp_url"),
-  role: text("role"), // 'curator', 'admin', 'superadmin', or null
   preferences: jsonb("preferences"),
   usageStats: jsonb("usage_stats"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   usernameIdx: index("username_idx").on(table.username),
+}));
+
+export const userRoles = pgTable("user_roles", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userFid: bigint("user_fid", { mode: "number" }).notNull().references(() => users.fid, { onDelete: "cascade" }),
+  role: text("role").notNull(), // 'curator', 'admin', 'superadmin'
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  userRoleUnique: uniqueIndex("user_role_unique").on(table.userFid, table.role),
+  userFidIdx: index("user_roles_user_fid_idx").on(table.userFid),
 }));
 
 export const curatorPacks = pgTable("curator_packs", {
@@ -207,4 +216,6 @@ export type CastTag = typeof castTags.$inferSelect;
 export type NewCastTag = typeof castTags.$inferInsert;
 export type CastReply = typeof castReplies.$inferSelect;
 export type NewCastReply = typeof castReplies.$inferInsert;
+export type UserRole = typeof userRoles.$inferSelect;
+export type NewUserRole = typeof userRoles.$inferInsert;
 
