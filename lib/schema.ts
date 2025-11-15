@@ -5,7 +5,7 @@ export const users = pgTable("users", {
   username: text("username"),
   displayName: text("display_name"),
   pfpUrl: text("pfp_url"),
-  role: text("role"), // 'curator' or null
+  role: text("role"), // 'curator', 'admin', 'superadmin', or null
   preferences: jsonb("preferences"),
   usageStats: jsonb("usage_stats"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -64,6 +64,7 @@ export const curatedCasts = pgTable("curated_casts", {
   curatorFid: bigint("curator_fid", { mode: "number" }).references(() => users.fid),
   topReplies: jsonb("top_replies"),
   repliesUpdatedAt: timestamp("replies_updated_at"),
+  conversationFetchedAt: timestamp("conversation_fetched_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   castHashIdx: index("cast_hash_idx").on(table.castHash),
@@ -95,7 +96,7 @@ export const userWatches = pgTable("user_watches", {
 export const webhooks = pgTable("webhooks", {
   id: uuid("id").defaultRandom().primaryKey(),
   neynarWebhookId: text("neynar_webhook_id").notNull().unique(),
-  type: text("type").notNull(), // 'user-watch' or 'curated-reply'
+  type: text("type").notNull(), // 'user-watch', 'curated-reply', or 'curated-quote'
   config: jsonb("config").notNull(),
   url: text("url").notNull(),
   secret: text("secret"), // Webhook secret for signature verification
@@ -147,6 +148,37 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
   endpointUnique: uniqueIndex("push_subscriptions_endpoint_unique").on(table.endpoint),
 }));
 
+export const castTags = pgTable("cast_tags", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  castHash: text("cast_hash").notNull(),
+  tag: text("tag").notNull(),
+  adminFid: bigint("admin_fid", { mode: "number" }).notNull().references(() => users.fid),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  castHashTagUnique: uniqueIndex("cast_hash_tag_unique").on(table.castHash, table.tag),
+  castHashIdx: index("cast_tags_cast_hash_idx").on(table.castHash),
+  tagIdx: index("cast_tags_tag_idx").on(table.tag),
+  adminFidIdx: index("cast_tags_admin_fid_idx").on(table.adminFid),
+}));
+
+export const castReplies = pgTable("cast_replies", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  curatedCastHash: text("curated_cast_hash").notNull().references(() => curatedCasts.castHash, { onDelete: "cascade" }),
+  replyCastHash: text("reply_cast_hash").notNull(),
+  castData: jsonb("cast_data").notNull(),
+  parentCastHash: text("parent_cast_hash"),
+  rootCastHash: text("root_cast_hash").notNull(),
+  replyDepth: integer("reply_depth").default(0).notNull(),
+  isQuoteCast: boolean("is_quote_cast").default(false).notNull(),
+  quotedCastHash: text("quoted_cast_hash"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  replyCastHashUnique: uniqueIndex("reply_cast_hash_unique").on(table.replyCastHash),
+  curatedCastHashIdx: index("cast_replies_curated_cast_hash_idx").on(table.curatedCastHash),
+  quotedCastHashIdx: index("cast_replies_quoted_cast_hash_idx").on(table.quotedCastHash),
+  curatedCastHashReplyDepthIdx: index("cast_replies_curated_cast_hash_reply_depth_idx").on(table.curatedCastHash, table.replyDepth),
+}));
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type CuratorPack = typeof curatorPacks.$inferSelect;
@@ -171,4 +203,8 @@ export type UserNotification = typeof userNotifications.$inferSelect;
 export type NewUserNotification = typeof userNotifications.$inferInsert;
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 export type NewPushSubscription = typeof pushSubscriptions.$inferInsert;
+export type CastTag = typeof castTags.$inferSelect;
+export type NewCastTag = typeof castTags.$inferInsert;
+export type CastReply = typeof castReplies.$inferSelect;
+export type NewCastReply = typeof castReplies.$inferInsert;
 

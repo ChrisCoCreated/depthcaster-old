@@ -9,61 +9,143 @@ import { ImageModal } from "./ImageModal";
 import { useNeynarContext } from "@neynar/react";
 import { QuoteCastModal } from "./QuoteCastModal";
 import { CastComposer } from "./CastComposer";
-import { MessageCircle, Heart, Repeat2, Star, Share2, RefreshCw } from "lucide-react";
+import { MessageCircle, Heart, Repeat2, Star, Share2, RefreshCw, Tag } from "lucide-react";
 import { shouldHideImages } from "./FeedSettings";
+import { convertBaseAppLinksInline, isFarcasterLink, extractCastHashFromUrl } from "@/lib/link-converter";
+import { useRouter } from "next/navigation";
 
 // Helper function to convert URLs in text to clickable links
-function renderTextWithLinks(text: string) {
-  // URL regex pattern - matches http(s):// URLs, www. URLs, and domain-like patterns
-  const urlRegex = /(https?:\/\/[^\s<>"']+)|(www\.[^\s<>"']+)|([a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.(?:[a-zA-Z]{2,})(?:\/[^\s<>"']*)?)/g;
+function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>) {
+  // First, convert base.app links inline
+  const textWithConvertedBaseLinks = convertBaseAppLinksInline(text);
+  
+  // URL regex pattern - matches http(s):// URLs, www. URLs, domain-like patterns, and /cast/ paths
+  const urlRegex = /(https?:\/\/[^\s<>"']+)|(www\.[^\s<>"']+)|(\/cast\/0x[a-fA-F0-9]{8,})|([a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.(?:[a-zA-Z]{2,})(?:\/[^\s<>"']*)?)/g;
   
   const parts: (string | ReactElement)[] = [];
   let lastIndex = 0;
   let match;
   
-  while ((match = urlRegex.exec(text)) !== null) {
+  while ((match = urlRegex.exec(textWithConvertedBaseLinks)) !== null) {
     // Skip if it looks like an email address (has @ before it)
-    const beforeMatch = text.substring(Math.max(0, match.index - 50), match.index);
+    const beforeMatch = textWithConvertedBaseLinks.substring(Math.max(0, match.index - 50), match.index);
     if (beforeMatch.includes('@') && !beforeMatch.match(/@[\s\n]/)) {
       continue;
     }
     
     // Add text before the URL
     if (match.index > lastIndex) {
-      parts.push(text.substring(lastIndex, match.index));
+      parts.push(textWithConvertedBaseLinks.substring(lastIndex, match.index));
     }
     
     // Determine the full URL - use the first non-empty capture group
-    let url = match[1] || match[2] || match[3];
+    let url = match[1] || match[2] || match[3] || match[4];
     let displayText = match[0];
     
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      url = 'https://' + url;
+    // Check if it's a Depthcaster link (already converted base.app link)
+    if (url && url.startsWith('/cast/')) {
+      parts.push(
+        <Link
+          key={match.index}
+          href={url}
+          className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {displayText}
+        </Link>
+      );
     }
-    
-    // Add the clickable link
-    parts.push(
-      <a
-        key={match.index}
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-blue-600 dark:text-blue-400 hover:underline break-all"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {displayText}
-      </a>
-    );
+    // Handle external URLs
+    else {
+      // Ensure URL is absolute for external links
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'https://' + url;
+      }
+      
+      // Check if it's a Farcaster link (farcaster.xyz, warpcast.com) - convert on click
+      if (isFarcasterLink(url)) {
+        const hash = extractCastHashFromUrl(url);
+        // Full cast hash is 0x + 64 hex chars = 66 chars total
+        if (hash && hash.length === 66) {
+          // Full hash found - convert directly
+          parts.push(
+            <a
+              key={match.index}
+              href={`/cast/${hash}`}
+              className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                router.push(`/cast/${hash}`);
+              }}
+            >
+              {displayText}
+            </a>
+          );
+        } else {
+          // Hash not found or truncated - resolve via API on click
+          parts.push(
+            <a
+              key={match.index}
+              href={url}
+              className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+              onClick={async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                try {
+                  // Resolve the URL to get the cast hash
+                  const response = await fetch(`/api/conversation?identifier=${encodeURIComponent(url)}&type=url&replyDepth=0`);
+                  if (response.ok) {
+                    const data = await response.json();
+                    const castHash = data?.conversation?.cast?.hash;
+                    if (castHash) {
+                      router.push(`/cast/${castHash}`);
+                    } else {
+                      // Fallback to external link
+                      window.open(url, '_blank');
+                    }
+                  } else {
+                    // Fallback to external link on error
+                    window.open(url, '_blank');
+                  }
+                } catch (error) {
+                  console.error('Failed to resolve Farcaster link:', error);
+                  // Fallback to external link
+                  window.open(url, '_blank');
+                }
+              }}
+            >
+              {displayText}
+            </a>
+          );
+        }
+      }
+      // Regular external link
+      else {
+        parts.push(
+          <a
+            key={match.index}
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {displayText}
+          </a>
+        );
+      }
+    }
     
     lastIndex = match.index + match[0].length;
   }
   
   // Add remaining text
-  if (lastIndex < text.length) {
-    parts.push(text.substring(lastIndex));
+  if (lastIndex < textWithConvertedBaseLinks.length) {
+    parts.push(textWithConvertedBaseLinks.substring(lastIndex));
   }
   
-  return parts.length > 0 ? parts : text;
+  return parts.length > 0 ? parts : textWithConvertedBaseLinks;
 }
 
 interface MinimalReplyCardProps {
@@ -260,7 +342,7 @@ function MinimalReplyCard({ reply, onUpdate, parentCastHash }: MinimalReplyCardP
             className="block"
           >
             <p className="text-xs text-gray-700 dark:text-gray-300 line-clamp-2">
-              {renderTextWithLinks(truncatedText)}
+              {renderTextWithLinks(truncatedText, router)}
             </p>
           </Link>
         </div>
@@ -615,9 +697,14 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
   const fetchedUrlsRef = useRef<Set<string>>(new Set());
   const recastMenuRef = useRef<HTMLDivElement>(null);
   const shareMenuRef = useRef<HTMLDivElement>(null);
+  const tagMenuRef = useRef<HTMLDivElement>(null);
   const { user } = useNeynarContext();
   const router = useRouter();
   const [preferencesVersion, setPreferencesVersion] = useState(0);
+  const [tags, setTags] = useState<string[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [showTagMenu, setShowTagMenu] = useState(false);
+  const [isTagging, setIsTagging] = useState(false);
 
   // Listen for preference changes to trigger re-render
   useEffect(() => {
@@ -756,6 +843,35 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
     checkIfCurated();
   }, [cast.hash, user?.fid]);
 
+  // Check if user is admin and fetch tags
+  useEffect(() => {
+    if (!user?.fid || !cast.hash) {
+      return;
+    }
+
+    const checkAdminAndFetchTags = async () => {
+      try {
+        // Check admin status
+        const adminResponse = await fetch(`/api/admin/check?fid=${user.fid}`);
+        if (adminResponse.ok) {
+          const adminData = await adminResponse.json();
+          setIsAdmin(adminData.isAdmin || false);
+        }
+
+        // Fetch tags
+        const tagsResponse = await fetch(`/api/tags?castHash=${cast.hash}`);
+        if (tagsResponse.ok) {
+          const tagsData = await tagsResponse.json();
+          setTags(tagsData.tags?.map((t: any) => t.tag) || []);
+        }
+      } catch (error) {
+        console.error("Failed to check admin status or fetch tags:", error);
+      }
+    };
+
+    checkAdminAndFetchTags();
+  }, [user?.fid, cast.hash]);
+
   // Prevent body scroll when confirmation modal is open
   useEffect(() => {
     if (showUncurateConfirm) {
@@ -802,6 +918,23 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [showShareMenu]);
+
+  // Close tag menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (tagMenuRef.current && !tagMenuRef.current.contains(event.target as Node)) {
+        setShowTagMenu(false);
+      }
+    };
+
+    if (showTagMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showTagMenu]);
 
   const handleLike = async () => {
     if (!user?.signer_uuid) {
@@ -1041,6 +1174,52 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
     }
   };
 
+  const handleTag = async (tag: string) => {
+    if (!user?.fid || !cast.hash) {
+      return;
+    }
+
+    const isTagged = tags.includes(tag);
+    
+    try {
+      setIsTagging(true);
+      setShowTagMenu(false);
+
+      const url = isTagged 
+        ? `/api/tags?castHash=${cast.hash}&tag=${encodeURIComponent(tag)}&adminFid=${user.fid}`
+        : "/api/tags";
+      
+      const response = await fetch(url, {
+        method: isTagged ? "DELETE" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: isTagged ? undefined : JSON.stringify({
+          castHash: cast.hash,
+          tag,
+          adminFid: user.fid,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Tag error:", errorData.error || "Failed to toggle tag");
+        return;
+      }
+
+      // Refresh tags
+      const tagsResponse = await fetch(`/api/tags?castHash=${cast.hash}`);
+      if (tagsResponse.ok) {
+        const tagsData = await tagsResponse.json();
+        setTags(tagsData.tags?.map((t: any) => t.tag) || []);
+      }
+    } catch (error: any) {
+      console.error("Tag error:", error);
+    } finally {
+      setIsTagging(false);
+    }
+  };
+
   const author = cast.author;
   const timestamp = new Date(cast.timestamp);
   const timeAgo = formatDistanceToNow(timestamp, { addSuffix: true });
@@ -1109,6 +1288,20 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
               </div>
             )}
           </div>
+
+          {/* Tags - show when cast has tags */}
+          {tags.length > 0 && (
+            <div className="flex items-center gap-1.5 px-2 sm:px-3 py-1 mb-2 flex-wrap">
+              {tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="px-2 py-0.5 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full border border-blue-200 dark:border-blue-800"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
 
           {/* Curated by pill - show when cast has curators */}
           {curators.length > 0 && (
@@ -1198,7 +1391,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
 
             {/* Cast text */}
             <div className="text-gray-900 dark:text-gray-100 mb-2 sm:mb-3 whitespace-pre-wrap break-words text-sm sm:text-base leading-6 sm:leading-7">
-              {renderTextWithLinks(cast.text)}
+              {renderTextWithLinks(cast.text, router)}
             </div>
 
             {/* Embeds */}
@@ -1832,38 +2025,104 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                 </Link>
               )}
 
-              {/* Curate button - positioned on the right */}
-              {user && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleCurate();
-                  }}
-                  onTouchEnd={(e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    handleCurate();
-                  }}
-                  disabled={isCurating}
-                  className={`flex items-center gap-1 sm:gap-2 text-xs sm:text-sm transition-colors py-1 px-1 sm:px-0 ml-auto ${
-                    isCurated && curators.some(c => c.fid === user.fid)
-                      ? "text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300"
-                      : "text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400"
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
-                  title={
-                    isCurated && curators.some(c => c.fid === user.fid)
-                      ? "Remove from curated feed"
-                      : isCurated
-                      ? "Add your curation"
-                      : "Add to curated feed"
-                  }
-                >
-                  <span className={isCurated && curators.some(c => c.fid === user.fid) ? "text-purple-600 dark:text-purple-400" : "text-gray-400 dark:text-gray-500"}>
-                    {isCurated ? "Curated" : "Curate"}
-                  </span>
-                  <Star className={`w-4 h-4 sm:w-5 sm:h-5 ${isCurated && curators.some(c => c.fid === user.fid) ? "fill-current" : ""}`} />
-                </button>
-              )}
+              {/* Curate and Tag buttons - positioned on the right */}
+              <div className="flex items-center gap-2 ml-auto">
+                {user && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCurate();
+                    }}
+                    onTouchEnd={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      handleCurate();
+                    }}
+                    disabled={isCurating}
+                    className={`flex items-center gap-1 sm:gap-2 text-xs sm:text-sm transition-colors py-1 px-1 sm:px-0 ${
+                      isCurated && curators.some(c => c.fid === user.fid)
+                        ? "text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300"
+                        : "text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400"
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    title={
+                      isCurated && curators.some(c => c.fid === user.fid)
+                        ? "Remove from curated feed"
+                        : isCurated
+                        ? "Add your curation"
+                        : "Add to curated feed"
+                    }
+                  >
+                    <span className={isCurated && curators.some(c => c.fid === user.fid) ? "text-purple-600 dark:text-purple-400" : "text-gray-400 dark:text-gray-500"}>
+                      {isCurated ? "Curated" : "Curate"}
+                    </span>
+                    <Star className={`w-4 h-4 sm:w-5 sm:h-5 ${isCurated && curators.some(c => c.fid === user.fid) ? "fill-current" : ""}`} />
+                  </button>
+                )}
+                
+                {/* Tag button - only visible to admins */}
+                {user && isAdmin && (
+                  <div className="relative tag-menu" ref={tagMenuRef}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowTagMenu(!showTagMenu);
+                      }}
+                      disabled={isTagging}
+                      className={`flex items-center gap-1 sm:gap-2 text-xs sm:text-sm transition-colors py-1 px-1 sm:px-0 ${
+                        tags.length > 0
+                          ? "text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+                          : "text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                      title="Tag cast"
+                    >
+                      <Tag className={`w-4 h-4 sm:w-5 sm:h-5 ${tags.length > 0 ? "fill-current" : ""}`} />
+                      {tags.length > 0 && (
+                        <span className="text-xs">{tags.length}</span>
+                      )}
+                    </button>
+
+                    {/* Tag dropdown menu */}
+                    {showTagMenu && (
+                      <div className="absolute right-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-20 min-w-[180px]">
+                        <div className="p-2">
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-2 px-2">Tags</div>
+                          {tags.length > 0 && (
+                            <div className="mb-2 pb-2 border-b border-gray-200 dark:border-gray-700">
+                              {tags.map((tag) => (
+                                <button
+                                  key={tag}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleTag(tag);
+                                  }}
+                                  className="w-full text-left px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors flex items-center justify-between"
+                                >
+                                  <span>{tag}</span>
+                                  <span className="text-xs text-gray-500">Remove</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleTag("build-idea");
+                            }}
+                            className={`w-full text-left px-3 py-1.5 text-sm rounded transition-colors ${
+                              tags.includes("build-idea")
+                                ? "text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                                : "text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700"
+                            }`}
+                            disabled={tags.includes("build-idea")}
+                          >
+                            {tags.includes("build-idea") ? "✓ build-idea" : "+ build-idea"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

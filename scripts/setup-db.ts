@@ -200,6 +200,43 @@ async function setupDatabase() {
       CREATE INDEX IF NOT EXISTS push_subscriptions_endpoint_idx ON push_subscriptions(endpoint);
     `);
 
+    // Create cast_tags table
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cast_tags (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+        cast_hash TEXT NOT NULL,
+        tag TEXT NOT NULL,
+        admin_fid BIGINT NOT NULL REFERENCES users(fid),
+        created_at TIMESTAMP DEFAULT now() NOT NULL,
+        UNIQUE(cast_hash, tag)
+      );
+    `);
+
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS cast_tags_cast_hash_idx ON cast_tags(cast_hash);
+    `);
+
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS cast_tags_tag_idx ON cast_tags(tag);
+    `);
+
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS cast_tags_admin_fid_idx ON cast_tags(admin_fid);
+    `);
+
+    // Set admin roles
+    await db.execute(sql`
+      INSERT INTO users (fid, role, created_at, updated_at)
+      VALUES (5701, 'superadmin', NOW(), NOW())
+      ON CONFLICT (fid) DO UPDATE SET role = 'superadmin', updated_at = NOW();
+    `);
+
+    await db.execute(sql`
+      INSERT INTO users (fid, role, created_at, updated_at)
+      VALUES (5406, 'admin', NOW(), NOW())
+      ON CONFLICT (fid) DO UPDATE SET role = 'admin', updated_at = NOW();
+    `);
+
     console.log("Database tables created successfully!");
   } catch (error) {
     console.error("Error setting up database:", error);

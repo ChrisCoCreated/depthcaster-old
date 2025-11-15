@@ -3,23 +3,47 @@
 import { useEffect, useState } from "react";
 import { useNeynarContext } from "@neynar/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useNotificationPermission } from "@/lib/hooks/useNotificationPermission";
-
-const ADMIN_FID = 5701;
 
 export default function AdminPage() {
   const { user } = useNeynarContext();
   const router = useRouter();
   const { isGranted, isSupported, isDenied, requestPermission } = useNotificationPermission();
   const [notificationStatus, setNotificationStatus] = useState<string>("");
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (user && user.fid !== ADMIN_FID) {
-      router.push("/");
-    }
+    const checkAdminAccess = async () => {
+      if (!user?.fid) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/admin/check?fid=${user.fid}`);
+        const data = await response.json();
+        
+        if (data.isAdmin) {
+          setIsAdmin(true);
+        } else {
+          setIsAdmin(false);
+          router.push("/");
+        }
+      } catch (error) {
+        console.error("Failed to check admin access:", error);
+        setIsAdmin(false);
+        router.push("/");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkAdminAccess();
   }, [user, router]);
 
-  if (!user) {
+  if (!user || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-gray-500">Loading...</div>
@@ -27,7 +51,7 @@ export default function AdminPage() {
     );
   }
 
-  if (user.fid !== ADMIN_FID) {
+  if (isAdmin === false) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-red-600">Access Denied</div>
@@ -64,8 +88,8 @@ export default function AdminPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          userFid: ADMIN_FID,
+          body: JSON.stringify({
+          userFid: user.fid,
           title: "Depthcaster Test Notification",
           body: "This is a test notification sent from the admin page. It should appear on your other devices!",
           icon: "/icon-192x192.webp",
@@ -104,7 +128,7 @@ export default function AdminPage() {
 
           <div className="space-y-4">
             <div className="text-sm text-gray-600 dark:text-gray-400">
-              <p>Test sending a device notification to user FID {ADMIN_FID}</p>
+              <p>Test sending a device notification to user FID {user.fid}</p>
               <p className="mt-2">
                 Notification Support: {isSupported ? "✓ Supported" : "✗ Not Supported"}
               </p>
@@ -142,6 +166,20 @@ export default function AdminPage() {
                 {notificationStatus}
               </div>
             )}
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 mb-6">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+            Admin Tools
+          </h2>
+          <div className="space-y-4">
+            <Link
+              href="/admin/tags"
+              className="block px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-center"
+            >
+              View Cast Tags
+            </Link>
           </div>
         </div>
 

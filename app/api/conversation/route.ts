@@ -3,6 +3,9 @@ import { neynarClient } from "@/lib/neynar";
 import { LookupCastConversationTypeEnum, LookupCastConversationSortTypeEnum, LookupCastConversationFoldEnum } from "@neynar/nodejs-sdk/build/api";
 import { cacheConversation } from "@/lib/cache";
 import { deduplicateRequest } from "@/lib/neynar-batch";
+import { db } from "@/lib/db";
+import { castReplies, curatedCasts } from "@/lib/schema";
+import { eq, or } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
   try {
@@ -58,6 +61,71 @@ export async function GET(request: NextRequest) {
         includeChronologicalParentCasts: true,
       });
     });
+
+    // Get cast hash from conversation or identifier
+    let castHash: string | null = null;
+    if (type === LookupCastConversationTypeEnum.Hash) {
+      castHash = identifier;
+    } else {
+      castHash = conversation.conversation?.cast?.hash || null;
+    }
+
+    // Merge stored replies/quotes if this is a curated cast
+    if (castHash) {
+      // Check if cast is curated
+      const curatedCast = await db
+        .select()
+        .from(curatedCasts)
+        .where(eq(curatedCasts.castHash, castHash))
+        .limit(1);
+
+      if (curatedCast.length > 0) {
+        // Fetch stored replies/quotes
+        const storedReplies = await db
+          .select()
+          .from(castReplies)
+          .where(
+            or(
+              eq(castReplies.curatedCastHash, castHash),
+              eq(castReplies.quotedCastHash, castHash)
+            )
+          )
+          .orderBy(castReplies.createdAt);
+
+        // Create a map of cast hashes from Neynar replies to avoid duplicates
+        const neynarReplyHashes = new Set<string>();
+        const neynarReplies = conversation.conversation?.cast?.direct_replies || [];
+        neynarReplies.forEach((reply: any) => {
+          if (reply.hash) {
+            neynarReplyHashes.add(reply.hash);
+          }
+        });
+
+        // Add stored replies/quotes that aren't already in Neynar's response
+        const additionalReplies: any[] = [];
+        for (const storedReply of storedReplies) {
+          if (!neynarReplyHashes.has(storedReply.replyCastHash)) {
+            // Cast data is stored as JSONB, extract it
+            const castData = storedReply.castData as any;
+            if (castData) {
+              additionalReplies.push(castData);
+            }
+          }
+        }
+
+        // Merge stored replies with Neynar replies
+        if (additionalReplies.length > 0 && conversation.conversation?.cast) {
+          // Append stored replies to direct_replies array
+          if (!conversation.conversation.cast.direct_replies) {
+            conversation.conversation.cast.direct_replies = [];
+          }
+          conversation.conversation.cast.direct_replies = [
+            ...conversation.conversation.cast.direct_replies,
+            ...additionalReplies,
+          ];
+        }
+      }
+    }
 
     // Cache the response
     cacheConversation.set(cacheKey, conversation);

@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
 import { db } from "@/lib/db";
-import { userNotifications, webhooks } from "@/lib/schema";
-import { eq, and } from "drizzle-orm";
+import { userNotifications, webhooks, castReplies, curatedCasts } from "@/lib/schema";
+import { eq, and, sql, or } from "drizzle-orm";
 import { sendPushNotificationToUser } from "@/lib/pushNotifications";
+import { meetsCastQualityThreshold } from "@/lib/cast-quality";
+import { isQuoteCast, extractQuotedCastHashes, getRootCastHash } from "@/lib/conversation";
+import { createReplyWebhookForQuote } from "@/lib/webhooks";
 
 // Disable body parsing to read raw body for signature verification
 export const runtime = "nodejs";
@@ -79,12 +82,18 @@ export async function POST(request: NextRequest) {
                       request.headers.get("X-NEYNAR-SIGNATURE");
     
     // Look up webhook(s) by type to get the secret(s)
-    // All user-watch webhooks use the same URL endpoint, so we look up by type
+    // Multiple webhook types use the same URL endpoint, so we look up all types
     // and try each secret until one validates (each webhook has its own secret)
     const webhookRecords = await db
       .select()
       .from(webhooks)
-      .where(eq(webhooks.type, "user-watch"));
+      .where(
+        or(
+          eq(webhooks.type, "user-watch"),
+          eq(webhooks.type, "curated-reply"),
+          eq(webhooks.type, "curated-quote")
+        )
+      );
 
     // Verify webhook signature using stored secret(s)
     if (signature && webhookRecords.length > 0) {
@@ -171,9 +180,147 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, message: "Missing required fields" });
     }
 
+    // Determine which webhook type this event belongs to based on verified webhook
+    let webhookType: string | null = null;
+    let webhookConfig: any = null;
+    
+    if (verifiedWebhookId) {
+      const verifiedWebhook = webhookRecords.find(w => w.neynarWebhookId === verifiedWebhookId);
+      if (verifiedWebhook) {
+        webhookType = verifiedWebhook.type;
+        webhookConfig = verifiedWebhook.config;
+      }
+    }
+
+    // Handle curated conversation webhooks
+    if (webhookType === "curated-reply" || webhookType === "curated-quote") {
+      // Check if cast meets quality threshold (webhook filter may have already done this, but double-check)
+      if (!meetsCastQualityThreshold(castData)) {
+        console.log(`[Webhook] Cast ${castHash} does not meet quality threshold, skipping`);
+        return NextResponse.json({ success: true, message: "Cast does not meet quality threshold" });
+      }
+
+      // Check if this is a quote cast
+      const isQuote = isQuoteCast(castData);
+      
+      if (isQuote && webhookType === "curated-quote") {
+        // Handle quote cast
+        const quotedCastHashes = extractQuotedCastHashes(castData);
+        
+        for (const quotedCastHash of quotedCastHashes) {
+          // Check if quoted cast is curated
+          const curatedCast = await db
+            .select()
+            .from(curatedCasts)
+            .where(eq(curatedCasts.castHash, quotedCastHash))
+            .limit(1);
+
+          if (curatedCast.length > 0) {
+            // Calculate reply depth (0 for top-level quote, or traverse parent chain)
+            let replyDepth = 0;
+            if (parentHash) {
+              // If quote cast is also a reply, calculate depth
+              const rootHash = await getRootCastHash(castHash);
+              // For now, assume depth 1 if it has a parent
+              replyDepth = 1;
+            }
+
+            // Store quote cast as reply
+            try {
+              await db.insert(castReplies).values({
+                curatedCastHash: quotedCastHash,
+                replyCastHash: castHash,
+                castData: castData,
+                parentCastHash: parentHash || null,
+                rootCastHash: quotedCastHash,
+                replyDepth,
+                isQuoteCast: true,
+                quotedCastHash: quotedCastHash,
+              }).onConflictDoNothing({ target: castReplies.replyCastHash });
+
+              console.log(`[Webhook] Stored quote cast ${castHash} for curated cast ${quotedCastHash}`);
+
+              // Create webhook for replies to the quote cast conversation
+              try {
+                await createReplyWebhookForQuote(quotedCastHash, castHash);
+              } catch (error) {
+                console.error(`[Webhook] Error creating reply webhook for quote cast ${castHash}:`, error);
+              }
+            } catch (error: any) {
+              if (error.code !== "23505") { // Ignore duplicate key errors
+                console.error(`[Webhook] Error storing quote cast ${castHash}:`, error);
+              }
+            }
+          }
+        }
+      } else if (!isQuote && webhookType === "curated-reply") {
+        // Handle regular reply
+        const curatedCastHash = webhookConfig?.curatedCastHash || webhookConfig?.rootCastHash;
+        
+        if (curatedCastHash) {
+          // Calculate reply depth by traversing parent chain
+          let replyDepth = 1;
+          let currentParentHash = parentHash;
+          let depth = 1;
+          
+          // Traverse up to find depth (limit to prevent infinite loops)
+          while (currentParentHash && depth < 10) {
+            const parentReply = await db
+              .select()
+              .from(castReplies)
+              .where(eq(castReplies.replyCastHash, currentParentHash))
+              .limit(1);
+            
+            if (parentReply.length > 0) {
+              replyDepth = parentReply[0].replyDepth + 1;
+              break;
+            }
+            
+            // Try to get parent from Neynar if not in database
+            try {
+              const rootHash = await getRootCastHash(currentParentHash);
+              if (rootHash === curatedCastHash) {
+                depth++;
+                // Get parent hash from cast data if available
+                // For now, assume depth based on iteration
+                replyDepth = depth;
+                break;
+              }
+            } catch (error) {
+              console.error(`[Webhook] Error getting root hash for ${currentParentHash}:`, error);
+              break;
+            }
+            
+            depth++;
+            if (depth >= 10) break;
+          }
+
+          // Store reply
+          try {
+            await db.insert(castReplies).values({
+              curatedCastHash,
+              replyCastHash: castHash,
+              castData: castData,
+              parentCastHash: parentHash || null,
+              rootCastHash: curatedCastHash,
+              replyDepth,
+              isQuoteCast: false,
+              quotedCastHash: null,
+            }).onConflictDoNothing({ target: castReplies.replyCastHash });
+
+            console.log(`[Webhook] Stored reply ${castHash} for curated cast ${curatedCastHash} at depth ${replyDepth}`);
+          } catch (error: any) {
+            if (error.code !== "23505") { // Ignore duplicate key errors
+              console.error(`[Webhook] Error storing reply ${castHash}:`, error);
+            }
+          }
+        }
+      }
+    }
+
     // Handle user notifications for parent casts (not replies)
     // This webhook is filtered to only send casts from watched users
-    if (parentHash === null || parentHash === undefined) {
+    if ((parentHash === null || parentHash === undefined) && webhookType === "user-watch") {
       // Parent cast - check if this should trigger user notifications
       // We need to find which watchers are watching this author
       const { userWatches } = await import("@/lib/schema");
@@ -241,10 +388,9 @@ export async function POST(request: NextRequest) {
       } else {
         console.log(`[Webhook] No watchers found for author ${authorFid}, skipping notification creation`);
       }
-    } else {
+    } else if (parentHash && webhookType === "user-watch") {
       console.log(`[Webhook] Cast is a reply (parentHash: ${parentHash}), skipping notification`);
     }
-    // Note: Reply tracking is now handled via interaction tracking in the app (cast/reaction APIs)
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {

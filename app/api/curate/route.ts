@@ -6,6 +6,9 @@ import { neynarClient } from "@/lib/neynar";
 import { LookupCastConversationTypeEnum, LookupCastConversationSortTypeEnum, LookupCastConversationFoldEnum } from "@neynar/nodejs-sdk/build/api";
 import { eq, and, asc, sql, inArray } from "drizzle-orm";
 import { shouldHideBotCastClient } from "@/lib/bot-filter";
+import { hasCuratorOrAdminRole } from "@/lib/roles";
+import { fetchAndStoreConversation } from "@/lib/conversation";
+import { createCuratedConversationWebhook, createQuoteCastWebhook } from "@/lib/webhooks";
 
 const DEFAULT_HIDDEN_BOTS = ["betonbangers", "deepbot", "bracky"];
 
@@ -253,11 +256,11 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Check if user has curator role
+      // Check if user has curator/admin/superadmin role
       const user = await db.select().from(users).where(eq(users.fid, curatorFid)).limit(1);
-      if (user.length === 0 || user[0].role !== "curator") {
+      if (user.length === 0 || !hasCuratorOrAdminRole(user[0].role)) {
         return NextResponse.json(
-          { error: "User does not have curator role" },
+          { error: "User does not have curator, admin, or superadmin role" },
           { status: 403 }
         );
       }
@@ -328,7 +331,10 @@ export async function POST(request: NextRequest) {
     // Fetch and sort top replies
     const topRepliesResult = await fetchAndSortTopReplies(castHash);
     
-    if (existingCast.length === 0) {
+    const isFirstCuration = existingCast.length === 0;
+    const conversationNotFetched = !existingCast[0]?.conversationFetchedAt;
+    
+    if (isFirstCuration) {
       // Insert the cast into curated_casts table (store cast data once)
       await db.insert(curatedCasts).values({
         castHash,
@@ -336,6 +342,7 @@ export async function POST(request: NextRequest) {
         curatorFid: curatorFid || null,
         topReplies: topRepliesResult?.replies || null,
         repliesUpdatedAt: topRepliesResult?.updatedAt || null,
+        conversationFetchedAt: null,
       });
     } else if (topRepliesResult) {
       // Update existing cast with replies if this is the first curation
@@ -348,6 +355,33 @@ export async function POST(request: NextRequest) {
             repliesUpdatedAt: topRepliesResult.updatedAt,
           })
           .where(eq(curatedCasts.castHash, castHash));
+      }
+    }
+
+    // Fetch and store full conversation if this is the first curation
+    if (isFirstCuration || conversationNotFetched) {
+      try {
+        await fetchAndStoreConversation(castHash, 5, 50);
+        
+        // Mark conversation as fetched
+        await db
+          .update(curatedCasts)
+          .set({
+            conversationFetchedAt: new Date(),
+          })
+          .where(eq(curatedCasts.castHash, castHash));
+
+        // Set up webhooks for replies and quote casts
+        try {
+          await createCuratedConversationWebhook(castHash);
+          await createQuoteCastWebhook(castHash);
+        } catch (webhookError) {
+          console.error(`Error creating webhooks for cast ${castHash}:`, webhookError);
+          // Don't fail curation if webhook creation fails
+        }
+      } catch (error) {
+        console.error(`Error fetching conversation for cast ${castHash}:`, error);
+        // Don't fail curation if conversation fetch fails
       }
     }
 
@@ -412,11 +446,11 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Check if user has curator role
+    // Check if user has curator/admin/superadmin role
     const user = await db.select().from(users).where(eq(users.fid, curatorFid)).limit(1);
-    if (user.length === 0 || user[0].role !== "curator") {
+    if (user.length === 0 || !hasCuratorOrAdminRole(user[0].role)) {
       return NextResponse.json(
-        { error: "User does not have curator role" },
+        { error: "User does not have curator, admin, or superadmin role" },
         { status: 403 }
       );
     }

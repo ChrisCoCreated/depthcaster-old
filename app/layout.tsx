@@ -23,13 +23,13 @@ export const viewport: Viewport = {
   maximumScale: 5,
   userScalable: true,
   viewportFit: "cover",
+  themeColor: "#000000",
 };
 
 export const metadata: Metadata = {
   title: "Depthcaster - Deep Thoughts on Farcaster",
   description: "A Farcaster client focused on philosophy, art, and meaningful conversations",
   manifest: "/manifest.json",
-  themeColor: "#000000",
   icons: {
     icon: [
       { url: "/icon-48x48.webp", sizes: "48x48", type: "image/webp" },
