@@ -3,6 +3,8 @@ import { db } from "@/lib/db";
 import { userWatches } from "@/lib/schema";
 import { eq, and } from "drizzle-orm";
 import { refreshUserWatchWebhook, getWatchedFids } from "@/lib/webhooks";
+import { getUser } from "@/lib/users";
+import { neynarClient } from "@/lib/neynar";
 
 export async function POST(request: NextRequest) {
   try {
@@ -123,6 +125,7 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const watcherFid = searchParams.get("watcherFid");
+    const includeDetails = searchParams.get("includeDetails") === "true";
 
     if (!watcherFid) {
       return NextResponse.json(
@@ -132,6 +135,69 @@ export async function GET(request: NextRequest) {
     }
 
     const watchedFids = await getWatchedFids(parseInt(watcherFid));
+
+    // If details requested, fetch user info
+    if (includeDetails && watchedFids.length > 0) {
+      const watches = await db
+        .select()
+        .from(userWatches)
+        .where(eq(userWatches.watcherFid, parseInt(watcherFid)));
+
+      const watchesWithDetails = await Promise.all(
+        watches.map(async (watch) => {
+          // Try database first
+          const dbUser = await getUser(watch.watchedFid);
+          if (dbUser) {
+            return {
+              id: watch.id,
+              watchedFid: watch.watchedFid,
+              createdAt: watch.createdAt,
+              username: dbUser.username || undefined,
+              displayName: dbUser.displayName || undefined,
+              pfpUrl: dbUser.pfpUrl || undefined,
+            };
+          }
+
+          // Fetch from Neynar
+          try {
+            const neynarResponse = await neynarClient.fetchBulkUsers({
+              fids: [watch.watchedFid],
+            });
+            const neynarUser = neynarResponse.users?.[0];
+            if (neynarUser) {
+              return {
+                id: watch.id,
+                watchedFid: watch.watchedFid,
+                createdAt: watch.createdAt,
+                username: neynarUser.username,
+                displayName: neynarUser.display_name || undefined,
+                pfpUrl: neynarUser.pfp_url || undefined,
+              };
+            }
+          } catch (error) {
+            console.error(
+              `Failed to fetch user ${watch.watchedFid} from Neynar:`,
+              error
+            );
+          }
+
+          // Fallback
+          return {
+            id: watch.id,
+            watchedFid: watch.watchedFid,
+            createdAt: watch.createdAt,
+            username: undefined,
+            displayName: undefined,
+            pfpUrl: undefined,
+          };
+        })
+      );
+
+      return NextResponse.json({
+        success: true,
+        watches: watchesWithDetails,
+      });
+    }
 
     return NextResponse.json({
       success: true,

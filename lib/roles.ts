@@ -1,7 +1,19 @@
 import { User } from "./schema";
 
+/**
+ * Centralized array of curator roles
+ * Includes curator, admin, and superadmin roles
+ * Update this array to change which roles are considered curators across the app
+ */
+export const CURATOR_ROLES = ["curator", "admin", "superadmin"] as const;
+
+export type CuratorRole = typeof CURATOR_ROLES[number];
+
+/**
+ * Check if a role is a curator role (includes curator, admin, superadmin)
+ */
 export function hasCuratorOrAdminRole(role: string | null | undefined): boolean {
-  return role === "curator" || role === "admin" || role === "superadmin";
+  return role !== null && role !== undefined && CURATOR_ROLES.includes(role as CuratorRole);
 }
 
 export function isAdmin(role: string | null | undefined): boolean {

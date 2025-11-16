@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { curatedCasts, users, curatorCastCurations, curatedCastInteractions } from "@/lib/schema";
+import { curatedCasts, users, curatorCastCurations } from "@/lib/schema";
 import { createHmac, timingSafeEqual } from "crypto";
 import { neynarClient } from "@/lib/neynar";
-import { LookupCastConversationTypeEnum, LookupCastConversationSortTypeEnum, LookupCastConversationFoldEnum } from "@neynar/nodejs-sdk/build/api";
-import { eq, and, asc, sql, inArray } from "drizzle-orm";
-import { shouldHideBotCastClient } from "@/lib/bot-filter";
+import { LookupCastConversationTypeEnum } from "@neynar/nodejs-sdk/build/api";
+import { eq, asc, and } from "drizzle-orm";
 import { hasCuratorOrAdminRole } from "@/lib/roles";
 import { fetchAndStoreConversation } from "@/lib/conversation";
 import { createCuratedConversationWebhook, createQuoteCastWebhook } from "@/lib/webhooks";
-
-const DEFAULT_HIDDEN_BOTS = ["betonbangers", "deepbot", "bracky"];
 
 // Disable body parsing to read raw body for signature verification
 export const runtime = "nodejs";
@@ -74,93 +71,6 @@ function verifyWebhookSignature(
   }
   
   return false;
-}
-
-/**
- * Fetch and sort top replies for a curated cast
- * Sorts by interaction count (from curatedCastInteractions), falling back to algorithmic order
- */
-async function fetchAndSortTopReplies(castHash: string): Promise<{ replies: any[]; updatedAt: Date } | null> {
-  try {
-    // Fetch conversation with replies
-    const conversation = await neynarClient.lookupCastConversation({
-      identifier: castHash,
-      type: LookupCastConversationTypeEnum.Hash,
-      replyDepth: 5, // Fetch more than needed for sorting
-      sortType: LookupCastConversationSortTypeEnum.Algorithmic,
-      fold: LookupCastConversationFoldEnum.Above,
-      includeChronologicalParentCasts: false,
-    });
-
-    const replies = conversation.conversation?.cast?.direct_replies || [];
-    
-    if (replies.length === 0) {
-      return { replies: [], updatedAt: new Date() };
-    }
-
-    // Filter out bot casts using default bot list (no viewer context in curation)
-    const filteredReplies = replies.filter((reply: any) => {
-      return !shouldHideBotCastClient(reply, DEFAULT_HIDDEN_BOTS, true);
-    });
-
-    if (filteredReplies.length === 0) {
-      return { replies: [], updatedAt: new Date() };
-    }
-
-    // Get cast hashes for all replies
-    const replyHashes = filteredReplies.map((reply: any) => reply.hash).filter(Boolean);
-    
-    if (replyHashes.length === 0) {
-      return { replies: [], updatedAt: new Date() };
-    }
-
-    // Query interaction counts for each reply
-    const interactionCounts = await db
-      .select({
-        targetCastHash: curatedCastInteractions.targetCastHash,
-        count: sql<number>`count(*)::int`.as("count"),
-      })
-      .from(curatedCastInteractions)
-      .where(
-        and(
-          eq(curatedCastInteractions.curatedCastHash, castHash),
-          inArray(curatedCastInteractions.targetCastHash, replyHashes)
-        )
-      )
-      .groupBy(curatedCastInteractions.targetCastHash);
-
-    // Create a map of interaction counts
-    const interactionCountMap = new Map<string, number>();
-    interactionCounts.forEach((ic) => {
-      interactionCountMap.set(ic.targetCastHash, ic.count);
-    });
-
-    // Sort replies by interaction count (descending), then by algorithmic order (preserve original order)
-    const sortedReplies = filteredReplies.sort((a: any, b: any) => {
-      const aCount = interactionCountMap.get(a.hash) || 0;
-      const bCount = interactionCountMap.get(b.hash) || 0;
-      
-      // First sort by interaction count (descending)
-      if (bCount !== aCount) {
-        return bCount - aCount;
-      }
-      
-      // If counts are equal, preserve algorithmic order (keep original position)
-      return 0;
-    });
-
-    // Take top 5
-    const topReplies = sortedReplies.slice(0, 5);
-
-    return {
-      replies: topReplies,
-      updatedAt: new Date(),
-    };
-  } catch (error) {
-    console.error(`Error fetching replies for cast ${castHash}:`, error);
-    // Return null to indicate failure, but don't throw - curation should still succeed
-    return null;
-  }
 }
 
 export async function GET(request: NextRequest) {
@@ -328,34 +238,20 @@ export async function POST(request: NextRequest) {
     // Check if cast already exists in curated_casts, if not insert it
     const existingCast = await db.select().from(curatedCasts).where(eq(curatedCasts.castHash, castHash)).limit(1);
     
-    // Fetch and sort top replies
-    const topRepliesResult = await fetchAndSortTopReplies(castHash);
-    
     const isFirstCuration = existingCast.length === 0;
     const conversationNotFetched = !existingCast[0]?.conversationFetchedAt;
     
     if (isFirstCuration) {
       // Insert the cast into curated_casts table (store cast data once)
+      // Replies are now stored in cast_replies table, not in topReplies field
       await db.insert(curatedCasts).values({
         castHash,
         castData: finalCastData,
         curatorFid: curatorFid || null,
-        topReplies: topRepliesResult?.replies || null,
-        repliesUpdatedAt: topRepliesResult?.updatedAt || null,
+        topReplies: null, // No longer storing replies here - they're in cast_replies
+        repliesUpdatedAt: null, // No longer storing replies here - they're in cast_replies
         conversationFetchedAt: null,
       });
-    } else if (topRepliesResult) {
-      // Update existing cast with replies if this is the first curation
-      // (only update if replies haven't been fetched yet)
-      if (!existingCast[0].topReplies) {
-        await db
-          .update(curatedCasts)
-          .set({
-            topReplies: topRepliesResult.replies,
-            repliesUpdatedAt: topRepliesResult.updatedAt,
-          })
-          .where(eq(curatedCasts.castHash, castHash));
-      }
     }
 
     // Fetch and store full conversation if this is the first curation

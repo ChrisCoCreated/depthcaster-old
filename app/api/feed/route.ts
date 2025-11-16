@@ -4,12 +4,13 @@ import { FetchFeedFeedTypeEnum, FetchFeedFilterTypeEnum, FetchTrendingFeedTimeWi
 import { filterCast, sortCastsByQuality } from "@/lib/filters";
 import { CURATED_FIDS, CURATED_CHANNELS } from "@/lib/curated";
 import { db } from "@/lib/db";
-import { curatorPackUsers, curatedCasts, curatedCastInteractions, curatorPacks, users, curatorCastCurations } from "@/lib/schema";
-import { eq, inArray, desc, lt, and, sql, asc } from "drizzle-orm";
+import { curatorPackUsers, curatedCasts, curatedCastInteractions, curatorPacks, users, curatorCastCurations, castReplies } from "@/lib/schema";
+import { eq, inArray, desc, lt, and, sql, asc, or } from "drizzle-orm";
 import { cacheFeed } from "@/lib/cache";
 import { deduplicateRequest } from "@/lib/neynar-batch";
 import { getUser } from "@/lib/users";
 import { shouldHideBotCast, shouldHideBotCastClient } from "@/lib/bot-filter";
+import { CURATOR_ROLES } from "@/lib/roles";
 
 export async function GET(request: NextRequest) {
   try {
@@ -270,21 +271,21 @@ export async function GET(request: NextRequest) {
       
       // Only show curations from selected curators
       // If curators are selected, filter to only show those curations
-      // If no curators are selected, default to showing curators with role="curator"
+      // If no curators are selected, default to showing all curator roles (curator, admin, superadmin)
       if (selectedCuratorFids.length > 0) {
         curatorWhereConditions.push(inArray(curatorCastCurations.curatorFid, selectedCuratorFids));
       } else {
-        // Default: show only curators with role="curator"
+        // Default: show curators with any curator role (curator, admin, superadmin)
         const curatorRoleUsers = await db
           .select({ fid: users.fid })
           .from(users)
-          .where(eq(users.role, "curator"));
+          .where(inArray(users.role, CURATOR_ROLES));
         
         const curatorRoleFids = curatorRoleUsers.map((u) => u.fid);
         if (curatorRoleFids.length > 0) {
           curatorWhereConditions.push(inArray(curatorCastCurations.curatorFid, curatorRoleFids));
         } else {
-          // If no curators with role exist, return empty results
+          // If no curators with any curator role exist, return empty results
           return NextResponse.json({
             casts: [],
             next: { cursor: null },
@@ -314,8 +315,6 @@ export async function GET(request: NextRequest) {
           id: curatedCasts.id,
           castHash: curatedCasts.castHash,
           castData: curatedCasts.castData,
-          topReplies: curatedCasts.topReplies,
-          repliesUpdatedAt: curatedCasts.repliesUpdatedAt,
           createdAt: curatedCasts.createdAt,
           latestInteractionTime: sql<Date | null>`(
             SELECT MAX(${curatedCastInteractions.createdAt})
@@ -356,6 +355,7 @@ export async function GET(request: NextRequest) {
       // Fetch curator info for each cast hash from curatorCastCurations
       const castHashes = filteredResults.map(r => r.castHash);
       const curatorInfoByCastHash = new Map<string, Array<{ fid: number; username?: string; display_name?: string; pfp_url?: string }>>();
+      const repliesByCastHash = new Map<string, any[]>();
       
       if (castHashes.length > 0) {
         // Get all curators for these casts
@@ -384,6 +384,62 @@ export async function GET(request: NextRequest) {
             pfp_url: c.pfpUrl || undefined,
           });
         }
+
+        // Fetch replies from cast_replies table
+        // Get top-level replies (depth 0 or 1) and quote casts (isQuoteCast = true)
+        // Limit to top replies for feed display (e.g., top 5-10 by quality/engagement)
+        const storedReplies = await db
+          .select({
+            curatedCastHash: castReplies.curatedCastHash,
+            quotedCastHash: castReplies.quotedCastHash,
+            castData: castReplies.castData,
+            replyDepth: castReplies.replyDepth,
+            isQuoteCast: castReplies.isQuoteCast,
+            createdAt: castReplies.createdAt,
+          })
+          .from(castReplies)
+          .where(
+            or(
+              inArray(castReplies.curatedCastHash, castHashes),
+              inArray(castReplies.quotedCastHash, castHashes)
+            )
+          )
+          .orderBy(castReplies.curatedCastHash, asc(castReplies.replyDepth), asc(castReplies.createdAt));
+
+        // Group replies by curatedCastHash
+        // Both direct replies and quote casts have curatedCastHash pointing to the curated cast
+        // Quote casts also have quotedCastHash, but for our use case, curatedCastHash is the primary grouping key
+        for (const reply of storedReplies) {
+          const castData = reply.castData as any;
+          if (!castData) continue;
+
+          // Group by curatedCastHash (primary association)
+          if (reply.curatedCastHash) {
+            if (!repliesByCastHash.has(reply.curatedCastHash)) {
+              repliesByCastHash.set(reply.curatedCastHash, []);
+            }
+            repliesByCastHash.get(reply.curatedCastHash)!.push(castData);
+          }
+          
+          // Also group quote casts by quotedCastHash if it differs (for quote casts that quote the curated cast)
+          if (reply.isQuoteCast && reply.quotedCastHash && reply.quotedCastHash !== reply.curatedCastHash) {
+            if (!repliesByCastHash.has(reply.quotedCastHash)) {
+              repliesByCastHash.set(reply.quotedCastHash, []);
+            }
+            repliesByCastHash.get(reply.quotedCastHash)!.push(castData);
+          }
+        }
+
+        // Sort replies by engagement (likes + recasts) for top replies display
+        for (const [hash, replies] of repliesByCastHash.entries()) {
+          replies.sort((a, b) => {
+            const aScore = (a.reactions?.likes_count || 0) + (a.reactions?.recasts_count || 0);
+            const bScore = (b.reactions?.likes_count || 0) + (b.reactions?.recasts_count || 0);
+            return bScore - aScore; // Descending order
+          });
+          // Limit to top 10 replies for feed display
+          repliesByCastHash.set(hash, replies.slice(0, 10));
+        }
       }
       
       casts = filteredResults.slice(0, limit).map((row) => {
@@ -397,12 +453,15 @@ export async function GET(request: NextRequest) {
             cast._curatorInfo = curatorInfo;
           }
         }
-        // Add top replies and replies updated timestamp
-        if (row.topReplies) {
-          cast._topReplies = row.topReplies;
-        }
-        if (row.repliesUpdatedAt) {
-          cast._repliesUpdatedAt = row.repliesUpdatedAt;
+        // Add replies from cast_replies table
+        const replies = repliesByCastHash.get(row.castHash) || [];
+        if (replies.length > 0) {
+          cast._topReplies = replies;
+          // Set replies updated timestamp to most recent reply timestamp
+          const mostRecentReply = replies[replies.length - 1];
+          if (mostRecentReply?.timestamp) {
+            cast._repliesUpdatedAt = new Date(mostRecentReply.timestamp);
+          }
         }
         return cast;
       });

@@ -96,10 +96,10 @@ export async function POST(request: NextRequest) {
       );
 
     // Verify webhook signature using stored secret(s)
+    let verifiedWebhookId: string | null = null;
     if (signature && webhookRecords.length > 0) {
       // Try each webhook's secret until one validates
       let isValid = false;
-      let verifiedWebhookId = null;
       
       console.log(`[Webhook] Attempting signature verification with ${webhookRecords.length} webhook(s)`);
       

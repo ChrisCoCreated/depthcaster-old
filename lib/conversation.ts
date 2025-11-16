@@ -125,18 +125,43 @@ export async function fetchAndStoreConversation(
     // Fetch and store existing quote casts
     let quotesStored = 0;
     try {
+      console.log(`[fetchAndStoreConversation] Fetching quotes for cast ${castHash}`);
       const quotesResponse = await neynarClient.fetchCastQuotes({
         identifier: castHash,
         type: FetchCastQuotesTypeEnum.Hash,
         limit: 50, // Fetch up to 50 quote casts
       });
 
-      const quoteCasts = quotesResponse.result?.quotes || [];
+      const quotesResponseAny = quotesResponse as any;
+      console.log(`[fetchAndStoreConversation] Quotes API response structure:`, {
+        hasResult: !!quotesResponseAny?.result,
+        hasQuotes: !!quotesResponseAny?.result?.quotes,
+        directQuotes: !!quotesResponseAny?.quotes,
+        responseKeys: Object.keys(quotesResponseAny || {}),
+      });
+      
+      // Handle different response structures - check both result.quotes and direct quotes
+      const quoteCasts = quotesResponseAny?.result?.quotes || quotesResponseAny?.quotes || [];
+      console.log(`[fetchAndStoreConversation] Found ${quoteCasts.length} quote casts for cast ${castHash}`);
+      
+      if (quoteCasts.length > 0) {
+        console.log(`[fetchAndStoreConversation] Sample quote cast:`, {
+          hash: quoteCasts[0]?.hash,
+          author: quoteCasts[0]?.author?.username,
+          text: quoteCasts[0]?.text?.substring(0, 50),
+        });
+      }
       
       // Filter quote casts by quality threshold
-      const qualityQuotes = quoteCasts.filter((quote: any) => 
-        meetsCastQualityThreshold(quote)
-      );
+      const qualityQuotes = quoteCasts.filter((quote: any) => {
+        const meetsThreshold = meetsCastQualityThreshold(quote);
+        if (!meetsThreshold && quote.hash) {
+          console.log(`[fetchAndStoreConversation] Quote cast ${quote.hash} does not meet quality threshold (score: ${quote.author?.score}, length: ${quote.text?.length || 0})`);
+        }
+        return meetsThreshold;
+      });
+
+      console.log(`[fetchAndStoreConversation] ${qualityQuotes.length} out of ${quoteCasts.length} quote casts meet quality threshold`);
 
       // Store quote casts as replies
       const storedQuotes = qualityQuotes.map((quote: any) => ({
@@ -151,14 +176,23 @@ export async function fetchAndStoreConversation(
       }));
 
       if (storedQuotes.length > 0) {
-        await db
+        console.log(`[fetchAndStoreConversation] Storing ${storedQuotes.length} quote casts for cast ${castHash}`);
+        const insertResult = await db
           .insert(castReplies)
           .values(storedQuotes)
           .onConflictDoNothing({ target: castReplies.replyCastHash });
         quotesStored = storedQuotes.length;
+        console.log(`[fetchAndStoreConversation] Successfully stored ${quotesStored} quote casts for cast ${castHash}`);
+      } else {
+        console.log(`[fetchAndStoreConversation] No quote casts to store for cast ${castHash} (${quoteCasts.length} found, ${qualityQuotes.length} met threshold)`);
       }
-    } catch (error) {
-      console.error(`Error fetching quotes for cast ${castHash}:`, error);
+    } catch (error: any) {
+      console.error(`[fetchAndStoreConversation] Error fetching/storing quotes for cast ${castHash}:`, error);
+      console.error(`[fetchAndStoreConversation] Error details:`, {
+        message: error?.message,
+        stack: error?.stack,
+        name: error?.name,
+      });
       // Don't fail the entire operation if quote fetch fails
     }
 
@@ -195,7 +229,7 @@ export async function getRootCastHash(castHash: string): Promise<string | null> 
     }
 
     // Traverse up parent chain
-    const parentCasts = conversation.chronological_parent_casts || [];
+    const parentCasts = (conversation as any).chronological_parent_casts || (conversation as any).conversation?.chronological_parent_casts || [];
     if (parentCasts.length > 0) {
       // The first parent cast in chronological order is the root
       return parentCasts[0].hash || cast.hash;
@@ -231,10 +265,11 @@ export function extractQuotedCastHashes(cast: Cast): string[] {
 
   const hashes: string[] = [];
   for (const embed of cast.embeds) {
-    if (embed.cast_id?.hash) {
-      hashes.push(embed.cast_id.hash);
-    } else if (embed.cast?.hash) {
-      hashes.push(embed.cast.hash);
+    const embedAny = embed as any;
+    if (embedAny.cast_id?.hash) {
+      hashes.push(embedAny.cast_id.hash);
+    } else if (embedAny.cast?.hash) {
+      hashes.push(embedAny.cast.hash);
     }
   }
 

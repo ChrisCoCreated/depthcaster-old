@@ -177,6 +177,144 @@ export function CastThread({ castHash, viewerFid }: CastThreadProps) {
   // Check if there are below-fold replies (total count > above-fold count)
   const hasBelowFoldReplies = totalRepliesCount > allAboveFoldReplies.length;
 
+  // Build threaded tree structure from replies
+  interface ThreadedReply extends Cast {
+    children?: ThreadedReply[];
+    _replyDepth?: number;
+    _parentCastHash?: string;
+  }
+
+  function buildThreadTree(replies: ThreadedReply[], rootHash: string): ThreadedReply[] {
+    // Create a map of replies by hash
+    const replyMap = new Map<string, ThreadedReply>();
+    replies.forEach(reply => {
+      replyMap.set(reply.hash, { ...reply, children: [] });
+    });
+
+    // Build tree structure
+    const rootReplies: ThreadedReply[] = [];
+    replies.forEach(reply => {
+      const threadedReply = replyMap.get(reply.hash)!;
+      const parentHash = reply._parentCastHash || reply.parent_hash;
+      
+      // Calculate depth if not provided
+      if (threadedReply._replyDepth === undefined) {
+        if (!parentHash || parentHash === rootHash) {
+          threadedReply._replyDepth = 1;
+        } else {
+          // Try to find parent and calculate depth
+          const parent = replyMap.get(parentHash);
+          if (parent) {
+            threadedReply._replyDepth = (parent._replyDepth || 1) + 1;
+          } else {
+            threadedReply._replyDepth = 1; // Default to depth 1 if parent not found
+          }
+        }
+      }
+
+      if (!parentHash || parentHash === rootHash) {
+        // Root-level reply
+        rootReplies.push(threadedReply);
+      } else {
+        // Nested reply - find parent and add as child
+        const parent = replyMap.get(parentHash);
+        if (parent) {
+          if (!parent.children) {
+            parent.children = [];
+          }
+          parent.children.push(threadedReply);
+        } else {
+          // Parent not in current set, treat as root-level
+          rootReplies.push(threadedReply);
+        }
+      }
+    });
+
+    // Sort root replies by timestamp/created_at
+    rootReplies.sort((a, b) => {
+      const aTime = new Date(a.timestamp || (a as any).created_at || 0).getTime();
+      const bTime = new Date(b.timestamp || (b as any).created_at || 0).getTime();
+      return aTime - bTime;
+    });
+
+    // Sort children recursively
+    function sortChildren(reply: ThreadedReply) {
+      if (reply.children && reply.children.length > 0) {
+        reply.children.sort((a, b) => {
+          const aTime = new Date(a.timestamp || (a as any).created_at || 0).getTime();
+          const bTime = new Date(b.timestamp || (b as any).created_at || 0).getTime();
+          return aTime - bTime;
+        });
+        reply.children.forEach(sortChildren);
+      }
+    }
+    rootReplies.forEach(sortChildren);
+
+    return rootReplies;
+  }
+
+  const threadedReplies = buildThreadTree(aboveFoldReplies as ThreadedReply[], mainCast.hash);
+  const threadedBelowFoldReplies = buildThreadTree(filteredBelowFoldReplies as ThreadedReply[], mainCast.hash);
+
+  // Render threaded reply component
+  function renderThreadedReply(reply: ThreadedReply, depth: number = 1, isLastChild: boolean = false, parentHasMore: boolean = false, hasChildren: boolean = false) {
+    const indentPx = depth > 1 ? 48 : 0; // 48px indent for nested replies
+    
+    // Determine if we should show the vertical line
+    // Show line if: not last child, or has children, or parent has more siblings
+    const showVerticalLine = !isLastChild || hasChildren || parentHasMore;
+    
+    return (
+      <div key={reply.hash} className="relative">
+        <div className="flex relative">
+          {/* Thread line area - vertical line on the left */}
+          <div className="flex-shrink-0 relative" style={{ width: depth > 1 ? '24px' : '8px' }}>
+            {/* Continuous vertical line */}
+            {depth > 1 && showVerticalLine && (
+              <div 
+                className="absolute top-0 left-0 bottom-0 w-px bg-gray-300 dark:bg-gray-600"
+              />
+            )}
+            {/* Vertical line for top-level replies */}
+            {depth === 1 && showVerticalLine && (
+              <div 
+                className="absolute top-0 left-0 bottom-0 w-px bg-gray-300 dark:bg-gray-600"
+              />
+            )}
+          </div>
+          
+          {/* Reply content */}
+          <div className="flex-1 min-w-0" style={{ marginLeft: `${indentPx}px` }}>
+            <CastCard cast={reply} showThread={false} onUpdate={() => fetchConversation()} />
+          </div>
+        </div>
+        
+        {/* Render children */}
+        {reply.children && reply.children.length > 0 && (
+          <div className="relative" style={{ marginLeft: depth > 1 ? '24px' : '8px' }}>
+            {/* Vertical line connecting children */}
+            {reply.children.length > 0 && (
+              <div 
+                className="absolute left-0 top-0 bottom-0 w-px bg-gray-300 dark:bg-gray-600"
+              />
+            )}
+            <div style={{ marginLeft: '24px' }}>
+              {reply.children.map((child, index) => 
+                renderThreadedReply(
+                  child, 
+                  depth + 1, 
+                  index === reply.children!.length - 1,
+                  index < reply.children!.length - 1,
+                  (child.children && child.children.length > 0) || false
+                )
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="w-full max-w-3xl mx-auto">
       {/* Parent casts (if any) */}
@@ -196,23 +334,27 @@ export function CastThread({ castHash, viewerFid }: CastThreadProps) {
       </div>
 
       {/* Replies */}
-      {aboveFoldReplies.length > 0 && (
+      {threadedReplies.length > 0 && (
         <div className="mt-6">
           {/* Above the fold - high quality replies */}
-          {aboveFoldReplies.map((reply: Cast) => (
-            <div key={reply.hash} className="pl-8 border-l-2 border-gray-200 dark:border-gray-800">
-              <CastCard cast={reply} showThread onUpdate={() => fetchConversation()} />
-            </div>
-          ))}
+          {threadedReplies.map((reply, index) => 
+            renderThreadedReply(
+              reply, 
+              1, 
+              index === threadedReplies.length - 1, 
+              index < threadedReplies.length - 1,
+              (reply.children && reply.children.length > 0) || false
+            )
+          )}
 
           {/* Below the fold toggle */}
           {hasBelowFoldReplies && (
-            <div className="px-4 py-3">
+            <div className="px-4 py-3 mt-4">
               {!showBelowFold ? (
                 <button
                   onClick={handleShowBelowFold}
                   disabled={loadingBelowFold}
-                  className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 underline disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 underline disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {loadingBelowFold 
                     ? "Loading..." 
@@ -221,10 +363,10 @@ export function CastThread({ castHash, viewerFid }: CastThreadProps) {
                 </button>
               ) : (
                 <>
-                  <div className="border-t border-gray-200 dark:border-gray-800 my-2"></div>
+                  <div className="border-t border-gray-200 dark:border-gray-800 my-3"></div>
                   <button
                     onClick={() => setShowBelowFold(false)}
-                    className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 underline mb-2"
+                    className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 underline mb-3 transition-colors"
                   >
                     Hide lower quality replies
                   </button>
@@ -233,11 +375,17 @@ export function CastThread({ castHash, viewerFid }: CastThreadProps) {
                       Loading lower quality replies...
                     </div>
                   ) : (
-                    filteredBelowFoldReplies.map((reply: Cast) => (
-                      <div key={reply.hash} className="pl-8 border-l-2 border-gray-200 dark:border-gray-800 opacity-75">
-                        <CastCard cast={reply} showThread onUpdate={() => fetchConversation()} />
-                      </div>
-                    ))
+                    <div className="opacity-75">
+                      {threadedBelowFoldReplies.map((reply, index) => 
+                        renderThreadedReply(
+                          reply, 
+                          1, 
+                          index === threadedBelowFoldReplies.length - 1, 
+                          index < threadedBelowFoldReplies.length - 1,
+                          (reply.children && reply.children.length > 0) || false
+                        )
+                      )}
+                    </div>
                   )}
                 </>
               )}

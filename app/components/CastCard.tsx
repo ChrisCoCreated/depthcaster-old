@@ -12,7 +12,6 @@ import { CastComposer } from "./CastComposer";
 import { MessageCircle, Heart, Repeat2, Star, Share2, RefreshCw, Tag } from "lucide-react";
 import { shouldHideImages } from "./FeedSettings";
 import { convertBaseAppLinksInline, isFarcasterLink, extractCastHashFromUrl } from "@/lib/link-converter";
-import { useRouter } from "next/navigation";
 
 // Helper function to convert URLs in text to clickable links
 function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>) {
@@ -2199,16 +2198,129 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
             </div>
             {topReplies && topReplies.length > 0 ? (
               <>
-                <div className="space-y-2">
-                  {topReplies.map((reply: any) => (
-                    <MinimalReplyCard
-                      key={reply.hash}
-                      reply={reply}
-                      onUpdate={onUpdate}
-                      parentCastHash={cast.hash}
-                    />
-                  ))}
-                </div>
+                {(() => {
+                  // Build threaded tree structure from replies
+                  interface ThreadedReply {
+                    hash: string;
+                    parent_hash?: string;
+                    [key: string]: any;
+                    children?: ThreadedReply[];
+                  }
+
+                  function buildThreadTree(replies: ThreadedReply[], rootHash: string): ThreadedReply[] {
+                    const replyMap = new Map<string, ThreadedReply>();
+                    replies.forEach(reply => {
+                      replyMap.set(reply.hash, { ...reply, children: [] });
+                    });
+
+                    const rootReplies: ThreadedReply[] = [];
+                    replies.forEach(reply => {
+                      const threadedReply = replyMap.get(reply.hash)!;
+                      const parentHash = reply.parent_hash;
+
+                      if (!parentHash || parentHash === rootHash) {
+                        rootReplies.push(threadedReply);
+                      } else {
+                        const parent = replyMap.get(parentHash);
+                        if (parent) {
+                          if (!parent.children) {
+                            parent.children = [];
+                          }
+                          parent.children.push(threadedReply);
+                        } else {
+                          rootReplies.push(threadedReply);
+                        }
+                      }
+                    });
+
+                    // Sort by timestamp
+                    rootReplies.sort((a, b) => {
+                      const aTime = new Date(a.timestamp || a.created_at || 0).getTime();
+                      const bTime = new Date(b.timestamp || b.created_at || 0).getTime();
+                      return aTime - bTime;
+                    });
+
+                    function sortChildren(reply: ThreadedReply) {
+                      if (reply.children && reply.children.length > 0) {
+                        reply.children.sort((a, b) => {
+                          const aTime = new Date(a.timestamp || a.created_at || 0).getTime();
+                          const bTime = new Date(b.timestamp || b.created_at || 0).getTime();
+                          return aTime - bTime;
+                        });
+                        reply.children.forEach(sortChildren);
+                      }
+                    }
+                    rootReplies.forEach(sortChildren);
+
+                    return rootReplies;
+                  }
+
+                  function renderThreadedReply(reply: ThreadedReply, depth: number = 1, isLastChild: boolean = false, parentHasMore: boolean = false, hasChildren: boolean = false) {
+                    const indentPx = depth > 1 ? 48 : 0;
+                    const showVerticalLine = !isLastChild || hasChildren || parentHasMore;
+
+                    return (
+                      <div key={reply.hash} className="relative">
+                        <div className="flex relative">
+                          {/* Thread line area */}
+                          <div className="flex-shrink-0 relative" style={{ width: depth > 1 ? '24px' : '8px' }}>
+                            {depth > 1 && showVerticalLine && (
+                              <div className="absolute top-0 left-0 bottom-0 w-px bg-gray-300 dark:bg-gray-600" />
+                            )}
+                            {depth === 1 && showVerticalLine && (
+                              <div className="absolute top-0 left-0 bottom-0 w-px bg-gray-300 dark:bg-gray-600" />
+                            )}
+                          </div>
+                          
+                          {/* Reply content */}
+                          <div className="flex-1 min-w-0" style={{ marginLeft: `${indentPx}px` }}>
+                            <MinimalReplyCard
+                              reply={reply}
+                              onUpdate={onUpdate}
+                              parentCastHash={cast.hash}
+                            />
+                          </div>
+                        </div>
+                        
+                        {/* Render children */}
+                        {reply.children && reply.children.length > 0 && (
+                          <div className="relative" style={{ marginLeft: depth > 1 ? '24px' : '8px' }}>
+                            {reply.children.length > 0 && (
+                              <div className="absolute left-0 top-0 bottom-0 w-px bg-gray-300 dark:bg-gray-600" />
+                            )}
+                            <div style={{ marginLeft: '24px' }}>
+                              {reply.children.map((child, index) => 
+                                renderThreadedReply(
+                                  child,
+                                  depth + 1,
+                                  index === reply.children!.length - 1,
+                                  index < reply.children!.length - 1,
+                                  (child.children && child.children.length > 0) || false
+                                )
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  const threadedReplies = buildThreadTree(topReplies as ThreadedReply[], cast.hash || '');
+
+                  return (
+                    <div className="space-y-0">
+                      {threadedReplies.map((reply, index) => 
+                        renderThreadedReply(
+                          reply,
+                          1,
+                          index === threadedReplies.length - 1,
+                          index < threadedReplies.length - 1,
+                          (reply.children && reply.children.length > 0) || false
+                        )
+                      )}
+                    </div>
+                  );
+                })()}
                 {cast.hash && (
                   <Link
                     href={`/cast/${cast.hash}`}

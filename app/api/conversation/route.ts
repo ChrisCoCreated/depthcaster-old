@@ -102,12 +102,17 @@ export async function GET(request: NextRequest) {
         });
 
         // Add stored replies/quotes that aren't already in Neynar's response
+        // Include depth information from cast_replies
         const additionalReplies: any[] = [];
         for (const storedReply of storedReplies) {
           if (!neynarReplyHashes.has(storedReply.replyCastHash)) {
             // Cast data is stored as JSONB, extract it
             const castData = storedReply.castData as any;
             if (castData) {
+              // Add depth and parent information for threading
+              castData._replyDepth = storedReply.replyDepth;
+              castData._parentCastHash = storedReply.parentCastHash;
+              castData._isQuoteCast = storedReply.isQuoteCast;
               additionalReplies.push(castData);
             }
           }
