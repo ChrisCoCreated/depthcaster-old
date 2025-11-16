@@ -44,17 +44,50 @@ A Farcaster client focused on deep thoughts, philosophy, art, and meaningful con
    ```
    This will create the necessary tables for user preferences and notification tracking.
 
-4. **Configure curated lists** (optional):
+4. **Run database migrations** (if needed):
+   ```bash
+   # Run specific migrations
+   npx tsx scripts/run-migration-0012.ts
+   npx tsx scripts/run-migration-0013.ts
+   
+   # Or use drizzle-kit
+   npm run db:migrate
+   ```
+   See [Database Migrations](#database-migrations) section for more details.
+
+5. **Configure curated lists** (optional):
    Edit `lib/curated.ts` to add:
    - Curated FIDs of high-quality users
    - Curated channels focused on philosophy/art
 
-5. **Run the development server**:
+6. **Run the development server**:
    ```bash
    npm run dev
    ```
 
-6. Open [http://localhost:3000](http://localhost:3000) in your browser.
+7. Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+## Webhook maintenance
+
+Depthcaster relies on three unified Neynar webhooks:
+
+- `curated-replies-unified` (`01KA47AQSZV42RCY7B399X5PGM`)
+- `curated-quotes-unified` (`01KA47ARX6SMBHJ17V9ZCV10PX`)
+- `user-watches-unified` (`01KA4AEVR22SWJ088DBG0F28N4`)
+
+If Neynar resets or removes any of them, run:
+
+```bash
+npx tsx scripts/sync-unified-webhooks.ts
+```
+
+The script will:
+
+1. Upsert the three webhook records (including secrets) in the `webhooks` table.
+2. Refresh both curated webhooks so their subscriptions include every curated cast plus tracked quote conversations.
+3. Refresh the user-watch webhook with the current set of watched FIDs.
+
+Ensure `WEBHOOK_BASE_URL`, `NEYNAR_API_KEY`, and database credentials are present in your environment before running the script.
 
 ## Deployment
 
@@ -112,20 +145,26 @@ depthcaster/
 │   ├── api/              # API routes
 │   │   ├── feed/         # Feed fetching
 │   │   ├── cast/         # Cast publishing
-│   │   └── conversation/ # Thread fetching
+│   │   ├── conversation/ # Thread fetching
+│   │   ├── build-ideas/  # Build ideas & feedback API
+│   │   └── tags/         # Cast tagging (legacy, not used for build ideas)
 │   ├── components/       # React components
 │   │   ├── AuthProvider.tsx
 │   │   ├── Feed.tsx
 │   │   ├── CastCard.tsx
 │   │   ├── CastThread.tsx
-│   │   └── CastComposer.tsx
+│   │   ├── CastComposer.tsx
+│   │   ├── BuildIdeasManager.tsx
+│   │   └── FeedbackModal.tsx
 │   ├── cast/[hash]/      # Cast detail page
 │   ├── profile/[fid]/    # Profile page
+│   ├── admin/            # Admin panel
 │   └── page.tsx          # Main feed page
 ├── lib/
 │   ├── neynar.ts         # Neynar client setup
 │   ├── filters.ts        # Content filtering logic
-│   └── curated.ts        # Curated lists
+│   ├── curated.ts        # Curated lists
+│   └── schema.ts         # Database schema
 └── package.json
 ```
 
@@ -136,6 +175,8 @@ depthcaster/
 3. **View Threads**: Click "View thread" on any cast to see the full conversation
 4. **Post Casts**: Use the composer at the top of the feed to post new casts
 5. **Reply**: Click on a cast to view its thread and reply
+6. **Submit Feedback**: Click the feedback icon in the header to submit feedback, suggestions, or ideas (optionally linking to a cast)
+7. **Manage Build Ideas** (Admin): Access the admin panel to create and manage build ideas and view user feedback
 
 ## Content Filtering
 
@@ -154,14 +195,72 @@ The app uses a hybrid filtering approach:
 - Modify feed types in `app/components/Feed.tsx`
 - Customize UI styling in components and `app/globals.css`
 
+## Database Migrations
+
+The database schema is managed using Drizzle ORM and migration scripts. Key optimizations include:
+
+### Cast Metadata Extraction (Migration 0012)
+
+To improve query performance and reduce JSONB parsing overhead, frequently queried cast fields are extracted into dedicated columns:
+
+- **Text fields**: `cast_text`, `cast_text_length` - Enable database-level text filtering
+- **Engagement metrics**: `likes_count`, `recasts_count`, `replies_count`, `engagement_score` - Pre-computed for efficient sorting
+- **Author reference**: `author_fid` - Foreign key to users table for joins
+- **Threading**: `parent_hash` - For efficient thread queries
+
+**Benefits:**
+- Database-level filtering (no need to parse JSONB for common queries)
+- Reduced compute usage on Neon DB
+- Faster queries with indexed columns
+- Better scalability for text-based filtering
+
+### Build Ideas & Feedback System (Migration 0013)
+
+The build ideas and feedback system uses a unified table structure:
+
+- **Unified Storage**: Both build ideas and feedback are stored in the `build_ideas` table, distinguished by a `type` field
+- **User Attribution**: All entries include user information showing who created them
+- **Cast Linking**: Feedback entries can optionally link to specific casts via `cast_hash`
+- **Type System**: Entries are typed as either `'build-idea'` (admin-created) or `'feedback'` (user-submitted)
+
+**Running migrations:**
+```bash
+# Run a specific migration
+npx tsx scripts/run-migration-0012.ts
+npx tsx scripts/run-migration-0013.ts
+
+# Or use drizzle-kit
+npm run db:migrate
+```
+
+**Migration files:**
+- `drizzle/0012_extract_cast_metadata.sql` - SQL migration
+- `scripts/run-migration-0012.ts` - TypeScript migration script with backfilling
+- `drizzle/0013_merge_feedback_into_build_ideas.sql` - SQL migration
+- `scripts/run-migration-0013.ts` - TypeScript migration script
+
 ## Tech Stack
 
 - **Next.js 16** - React framework
 - **TypeScript** - Type safety
 - **Tailwind CSS** - Styling
 - **Neynar SDK** - Farcaster API integration
-- **Vercel Postgres** - Database for user preferences and notifications
+- **Neon Postgres** - Serverless PostgreSQL database (via `@neondatabase/serverless`)
+- **Drizzle ORM** - Type-safe database queries and migrations
 - **date-fns** - Date formatting
+
+## Database Architecture
+
+The database uses a hybrid storage approach:
+
+- **JSONB storage**: Full cast data stored in `cast_data` JSONB column for flexibility
+- **Extracted columns**: Frequently queried fields extracted to dedicated columns for performance
+- **Indexes**: Composite indexes on `(cast_text_length, engagement_score)`, `(author_fid, cast_created_at)`, etc.
+
+This approach balances:
+- **Flexibility**: Full cast data available in JSONB
+- **Performance**: Fast queries using extracted columns and indexes
+- **Efficiency**: Reduced JSONB parsing overhead
 
 ## License
 

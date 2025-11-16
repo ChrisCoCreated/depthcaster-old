@@ -70,15 +70,29 @@ export const curatedCasts = pgTable("curated_casts", {
   id: uuid("id").defaultRandom().primaryKey(),
   castHash: text("cast_hash").notNull(),
   castData: jsonb("cast_data").notNull(),
+  castCreatedAt: timestamp("cast_created_at"),
   curatorFid: bigint("curator_fid", { mode: "number" }).references(() => users.fid),
   topReplies: jsonb("top_replies"),
   repliesUpdatedAt: timestamp("replies_updated_at"),
   conversationFetchedAt: timestamp("conversation_fetched_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  // Extracted metadata fields for efficient querying
+  castText: text("cast_text"),
+  castTextLength: integer("cast_text_length").default(0),
+  authorFid: bigint("author_fid", { mode: "number" }).references(() => users.fid, { onDelete: "set null" }),
+  likesCount: integer("likes_count").default(0),
+  recastsCount: integer("recasts_count").default(0),
+  repliesCount: integer("replies_count").default(0),
+  engagementScore: integer("engagement_score").default(0),
+  parentHash: text("parent_hash"),
 }, (table) => ({
   castHashIdx: index("cast_hash_idx").on(table.castHash),
   curatorFidIdx: index("curator_fid_idx").on(table.curatorFid),
   createdAtIdx: index("created_at_idx").on(table.createdAt),
+  castCreatedAtIdx: index("curated_casts_cast_created_at_idx").on(table.castCreatedAt),
+  castTextLengthEngagementScoreIdx: index("curated_casts_cast_text_length_engagement_score_idx").on(table.castTextLength, table.engagementScore),
+  authorFidCastCreatedAtIdx: index("curated_casts_author_fid_cast_created_at_idx").on(table.authorFid, table.castCreatedAt),
+  parentHashIdx: index("curated_casts_parent_hash_idx").on(table.parentHash),
 }));
 
 export const curatorCastCurations = pgTable("curator_cast_curations", {
@@ -90,6 +104,7 @@ export const curatorCastCurations = pgTable("curator_cast_curations", {
   castHashCuratorUnique: uniqueIndex("cast_hash_curator_unique").on(table.castHash, table.curatorFid),
   castHashIdx: index("curator_cast_curations_cast_hash_idx").on(table.castHash),
   curatorFidIdx: index("curator_cast_curations_curator_fid_idx").on(table.curatorFid),
+  castHashCreatedAtIdx: index("curator_cast_curations_cast_hash_created_at_idx").on(table.castHash, table.createdAt),
 }));
 
 export const userWatches = pgTable("user_watches", {
@@ -175,17 +190,48 @@ export const castReplies = pgTable("cast_replies", {
   curatedCastHash: text("curated_cast_hash").notNull().references(() => curatedCasts.castHash, { onDelete: "cascade" }),
   replyCastHash: text("reply_cast_hash").notNull(),
   castData: jsonb("cast_data").notNull(),
+  castCreatedAt: timestamp("cast_created_at"),
   parentCastHash: text("parent_cast_hash"),
   rootCastHash: text("root_cast_hash").notNull(),
   replyDepth: integer("reply_depth").default(0).notNull(),
   isQuoteCast: boolean("is_quote_cast").default(false).notNull(),
   quotedCastHash: text("quoted_cast_hash"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  // Extracted metadata fields for efficient querying
+  castText: text("cast_text"),
+  castTextLength: integer("cast_text_length").default(0),
+  authorFid: bigint("author_fid", { mode: "number" }).references(() => users.fid, { onDelete: "set null" }),
+  likesCount: integer("likes_count").default(0),
+  recastsCount: integer("recasts_count").default(0),
+  repliesCount: integer("replies_count").default(0),
+  engagementScore: integer("engagement_score").default(0),
 }, (table) => ({
   replyCastHashUnique: uniqueIndex("reply_cast_hash_unique").on(table.replyCastHash),
   curatedCastHashIdx: index("cast_replies_curated_cast_hash_idx").on(table.curatedCastHash),
   quotedCastHashIdx: index("cast_replies_quoted_cast_hash_idx").on(table.quotedCastHash),
   curatedCastHashReplyDepthIdx: index("cast_replies_curated_cast_hash_reply_depth_idx").on(table.curatedCastHash, table.replyDepth),
+  curatedCastHashCreatedAtIdx: index("cast_replies_curated_cast_hash_created_at_idx").on(table.curatedCastHash, table.createdAt),
+  curatedCastHashCastCreatedAtIdx: index("cast_replies_curated_cast_hash_cast_created_at_idx").on(table.curatedCastHash, table.castCreatedAt),
+  castTextLengthEngagementScoreIdx: index("cast_replies_cast_text_length_engagement_score_idx").on(table.castTextLength, table.engagementScore),
+  authorFidCastCreatedAtIdx: index("cast_replies_author_fid_cast_created_at_idx").on(table.authorFid, table.castCreatedAt),
+  parentHashIdx: index("cast_replies_parent_hash_idx").on(table.parentCastHash),
+}));
+
+export const buildIdeas = pgTable("build_ideas", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  url: text("url"), // For build ideas
+  castHash: text("cast_hash"), // For feedback - optional cast hash or link
+  type: text("type").notNull().default("build-idea"), // 'build-idea' or 'feedback'
+  userFid: bigint("user_fid", { mode: "number" }).notNull().references(() => users.fid),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  createdAtIdx: index("build_ideas_created_at_idx").on(table.createdAt),
+  userFidIdx: index("build_ideas_user_fid_idx").on(table.userFid),
+  typeIdx: index("build_ideas_type_idx").on(table.type),
+  castHashIdx: index("build_ideas_cast_hash_idx").on(table.castHash),
 }));
 
 export type User = typeof users.$inferSelect;
@@ -218,4 +264,6 @@ export type CastReply = typeof castReplies.$inferSelect;
 export type NewCastReply = typeof castReplies.$inferInsert;
 export type UserRole = typeof userRoles.$inferSelect;
 export type NewUserRole = typeof userRoles.$inferInsert;
+export type BuildIdea = typeof buildIdeas.$inferSelect;
+export type NewBuildIdea = typeof buildIdeas.$inferInsert;
 

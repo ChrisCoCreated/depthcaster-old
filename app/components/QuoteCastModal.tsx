@@ -6,6 +6,7 @@ import { useNeynarContext } from "@neynar/react";
 import { convertBaseAppLinksInline, isFarcasterLink, extractCastHashFromUrl } from "@/lib/link-converter";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { AvatarImage } from "./AvatarImage";
 
 // Helper function to convert URLs in text to clickable links
 function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>) {
@@ -293,9 +294,10 @@ export function QuoteCastModal({ cast, isOpen, onClose, onSuccess }: QuoteCastMo
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-4">
           <div className="flex gap-3">
-            <img
-              src={user?.pfp_url || "/default-avatar.png"}
+            <AvatarImage
+              src={user?.pfp_url}
               alt={user?.username || "You"}
+              size={40}
               className="w-10 h-10 rounded-full"
             />
             <div className="flex-1">
@@ -312,9 +314,10 @@ export function QuoteCastModal({ cast, isOpen, onClose, onSuccess }: QuoteCastMo
               {/* Quoted cast preview - indented below comment */}
               <div className="mt-3 ml-0 pl-4 border-l-2 border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 rounded-r-lg py-3">
                 <div className="flex gap-3">
-                  <img
-                    src={cast.author.pfp_url || "/default-avatar.png"}
+                  <AvatarImage
+                    src={cast.author.pfp_url}
                     alt={cast.author.username}
+                    size={32}
                     className="w-8 h-8 rounded-full"
                   />
                   <div className="flex-1 min-w-0">

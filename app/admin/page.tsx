@@ -5,6 +5,7 @@ import { useNeynarContext } from "@neynar/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useNotificationPermission } from "@/lib/hooks/useNotificationPermission";
+import { BuildIdeasManager } from "@/app/components/BuildIdeasManager";
 
 export default function AdminPage() {
   const { user } = useNeynarContext();
@@ -175,12 +176,22 @@ export default function AdminPage() {
           </h2>
           <div className="space-y-4">
             <Link
+              href="/admin/roles"
+              className="block px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-center"
+            >
+              Manage User Roles
+            </Link>
+            <Link
               href="/admin/tags"
               className="block px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-center"
             >
               View Cast Tags
             </Link>
           </div>
+        </div>
+
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 mb-6">
+          <BuildIdeasManager />
         </div>
 
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">

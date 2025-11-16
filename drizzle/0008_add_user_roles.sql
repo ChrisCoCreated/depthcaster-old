@@ -30,3 +30,5 @@ WHERE "role" IS NOT NULL
     WHERE ur."user_fid" = "users"."fid" AND ur."role" = "users"."role"
   );
 
+
+

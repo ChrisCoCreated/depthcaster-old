@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useNeynarContext } from "@neynar/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { AvatarImage } from "./AvatarImage";
 
 interface Watch {
   id: string;
@@ -107,19 +108,12 @@ export function WatchSettings() {
                 href={`/profile/${watch.watchedFid}`}
                 className="flex items-center gap-3 flex-1 min-w-0"
               >
-                {watch.pfpUrl ? (
-                  <img
-                    src={watch.pfpUrl}
-                    alt={watch.displayName || watch.username || "User"}
-                    className="w-10 h-10 rounded-full flex-shrink-0"
-                  />
-                ) : (
-                  <div className="w-10 h-10 rounded-full bg-gray-300 dark:bg-gray-700 flex-shrink-0 flex items-center justify-center">
-                    <span className="text-gray-600 dark:text-gray-400 text-sm">
-                      {(watch.displayName || watch.username || "?")[0].toUpperCase()}
-                    </span>
-                  </div>
-                )}
+                <AvatarImage
+                  src={watch.pfpUrl}
+                  alt={watch.displayName || watch.username || "User"}
+                  size={40}
+                  className="w-10 h-10 rounded-full flex-shrink-0 object-cover"
+                />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
                     {watch.displayName || watch.username || `User ${watch.watchedFid}`}

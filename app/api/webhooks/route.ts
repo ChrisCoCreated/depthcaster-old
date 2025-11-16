@@ -6,7 +6,9 @@ import { eq, and, sql, or } from "drizzle-orm";
 import { sendPushNotificationToUser } from "@/lib/pushNotifications";
 import { meetsCastQualityThreshold } from "@/lib/cast-quality";
 import { isQuoteCast, extractQuotedCastHashes, getRootCastHash } from "@/lib/conversation";
-import { createReplyWebhookForQuote } from "@/lib/webhooks";
+import { addQuoteCastToUnifiedReplyWebhook, addReplyToUnifiedReplyWebhook } from "@/lib/webhooks-unified";
+import { neynarClient } from "@/lib/neynar";
+import { LookupCastConversationTypeEnum } from "@neynar/nodejs-sdk/build/api";
 
 // Disable body parsing to read raw body for signature verification
 export const runtime = "nodejs";
@@ -158,6 +160,9 @@ export async function POST(request: NextRequest) {
     // Parse the body
     const body = JSON.parse(rawBody);
     
+    // Log full webhook structure for analysis
+    console.log(`[Webhook] Full webhook payload structure:`, JSON.stringify(body, null, 2));
+    
     // Neynar webhook format: { type: "cast.created", data: { hash: "0x...", parent_hash: "0x...", author: { fid: 123 } } }
     const eventType = body.type;
     const castData = body.data;
@@ -189,6 +194,7 @@ export async function POST(request: NextRequest) {
       if (verifiedWebhook) {
         webhookType = verifiedWebhook.type;
         webhookConfig = verifiedWebhook.config;
+        console.log(`[Webhook] Verified hook type: ${webhookType} (${verifiedWebhookId})`);
       }
     }
 
@@ -225,26 +231,75 @@ export async function POST(request: NextRequest) {
               replyDepth = 1;
             }
 
-            // Store quote cast as reply
+            // Store quote cast as reply (quality already checked at top level)
             try {
+              const { extractCastTimestamp } = await import("@/lib/cast-timestamp");
+              const { extractCastMetadata } = await import("@/lib/cast-metadata");
+              const metadata = extractCastMetadata(castData);
               await db.insert(castReplies).values({
                 curatedCastHash: quotedCastHash,
                 replyCastHash: castHash,
                 castData: castData,
+                castCreatedAt: extractCastTimestamp(castData),
                 parentCastHash: parentHash || null,
                 rootCastHash: quotedCastHash,
                 replyDepth,
                 isQuoteCast: true,
                 quotedCastHash: quotedCastHash,
+                castText: metadata.castText,
+                castTextLength: metadata.castTextLength,
+                authorFid: metadata.authorFid,
+                likesCount: metadata.likesCount,
+                recastsCount: metadata.recastsCount,
+                repliesCount: metadata.repliesCount,
+                engagementScore: metadata.engagementScore,
               }).onConflictDoNothing({ target: castReplies.replyCastHash });
 
-              console.log(`[Webhook] Stored quote cast ${castHash} for curated cast ${quotedCastHash}`);
+              console.log(`[Webhook] Stored cast via curated-quote webhook: castHash=${castHash} curatedCastHash=${quotedCastHash}`);
 
-              // Create webhook for replies to the quote cast conversation
+              // Ensure unified reply webhook tracks this quote conversation
               try {
-                await createReplyWebhookForQuote(quotedCastHash, castHash);
+                await addQuoteCastToUnifiedReplyWebhook(castHash);
               } catch (error) {
-                console.error(`[Webhook] Error creating reply webhook for quote cast ${castHash}:`, error);
+                console.error(
+                  `[Webhook] Error updating unified reply webhook for quote cast ${castHash}:`,
+                  error
+                );
+              }
+
+              // Fetch and update the root cast to refresh reactions data
+              try {
+                const rootCastResponse = await neynarClient.lookupCastConversation({
+                  identifier: quotedCastHash,
+                  type: LookupCastConversationTypeEnum.Hash,
+                  replyDepth: 0,
+                  includeChronologicalParentCasts: false,
+                });
+
+                const updatedRootCast = rootCastResponse.conversation?.cast;
+                if (updatedRootCast) {
+                  const { extractCastMetadata } = await import("@/lib/cast-metadata");
+                  const metadata = extractCastMetadata(updatedRootCast);
+                  await db
+                    .update(curatedCasts)
+                    .set({
+                      castData: updatedRootCast,
+                      castText: metadata.castText,
+                      castTextLength: metadata.castTextLength,
+                      authorFid: metadata.authorFid,
+                      likesCount: metadata.likesCount,
+                      recastsCount: metadata.recastsCount,
+                      repliesCount: metadata.repliesCount,
+                      engagementScore: metadata.engagementScore,
+                      parentHash: metadata.parentHash,
+                    })
+                    .where(eq(curatedCasts.castHash, quotedCastHash));
+                  
+                  console.log(`[Webhook] Updated root cast ${quotedCastHash} with fresh reactions data`);
+                }
+              } catch (error) {
+                console.error(`[Webhook] Error updating root cast ${quotedCastHash}:`, error);
+                // Don't fail the webhook processing if root cast update fails
               }
             } catch (error: any) {
               if (error.code !== "23505") { // Ignore duplicate key errors
@@ -304,20 +359,73 @@ export async function POST(request: NextRequest) {
               if (depth >= 10) break;
             }
 
-            // Store reply
+            // Store reply (quality already checked at top level)
             try {
+              const { extractCastTimestamp } = await import("@/lib/cast-timestamp");
+              const { extractCastMetadata } = await import("@/lib/cast-metadata");
+              const metadata = extractCastMetadata(castData);
               await db.insert(castReplies).values({
                 curatedCastHash,
                 replyCastHash: castHash,
                 castData: castData,
+                castCreatedAt: extractCastTimestamp(castData),
                 parentCastHash: parentHash || null,
                 rootCastHash: curatedCastHash,
                 replyDepth,
                 isQuoteCast: false,
                 quotedCastHash: null,
+                castText: metadata.castText,
+                castTextLength: metadata.castTextLength,
+                authorFid: metadata.authorFid,
+                likesCount: metadata.likesCount,
+                recastsCount: metadata.recastsCount,
+                repliesCount: metadata.repliesCount,
+                engagementScore: metadata.engagementScore,
               }).onConflictDoNothing({ target: castReplies.replyCastHash });
 
-              console.log(`[Webhook] Stored reply ${castHash} for curated cast ${curatedCastHash} at depth ${replyDepth}`);
+            console.log(`[Webhook] Stored cast via curated-reply webhook: castHash=${castHash} curatedCastHash=${curatedCastHash} depth=${replyDepth}`);
+            
+            // Add this reply to the unified webhook so nested replies are captured
+            try {
+              await addReplyToUnifiedReplyWebhook(castHash);
+            } catch (error) {
+              console.error(`[Webhook] Error adding reply ${castHash} to unified webhook:`, error);
+            }
+
+            // Fetch and update the root cast to refresh reactions data
+            try {
+              const rootCastResponse = await neynarClient.lookupCastConversation({
+                identifier: curatedCastHash,
+                type: LookupCastConversationTypeEnum.Hash,
+                replyDepth: 0,
+                includeChronologicalParentCasts: false,
+              });
+
+              const updatedRootCast = rootCastResponse.conversation?.cast;
+              if (updatedRootCast) {
+                const { extractCastMetadata } = await import("@/lib/cast-metadata");
+                const metadata = extractCastMetadata(updatedRootCast);
+                await db
+                  .update(curatedCasts)
+                  .set({
+                    castData: updatedRootCast,
+                    castText: metadata.castText,
+                    castTextLength: metadata.castTextLength,
+                    authorFid: metadata.authorFid,
+                    likesCount: metadata.likesCount,
+                    recastsCount: metadata.recastsCount,
+                    repliesCount: metadata.repliesCount,
+                    engagementScore: metadata.engagementScore,
+                    parentHash: metadata.parentHash,
+                  })
+                  .where(eq(curatedCasts.castHash, curatedCastHash));
+                
+                console.log(`[Webhook] Updated root cast ${curatedCastHash} with fresh reactions data`);
+              }
+            } catch (error) {
+              console.error(`[Webhook] Error updating root cast ${curatedCastHash}:`, error);
+              // Don't fail the webhook processing if root cast update fails
+            }
             } catch (error: any) {
               if (error.code !== "23505") { // Ignore duplicate key errors
                 console.error(`[Webhook] Error storing reply ${castHash}:`, error);

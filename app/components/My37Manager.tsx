@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useNeynarContext } from "@neynar/react";
 import { UserSearchInput } from "./UserSearchInput";
+import { AvatarImage } from "./AvatarImage";
 
 interface UserSuggestion {
   username: string;
@@ -540,9 +541,10 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
                           disabled={selectedUsers.length >= MAX_USERS}
                           className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <img
-                            src={user.pfp_url || "/default-avatar.png"}
+                          <AvatarImage
+                            src={user.pfp_url}
                             alt={user.username}
+                            size={24}
                             className="w-6 h-6 rounded-full"
                           />
                           <span className="text-sm text-gray-700 dark:text-gray-300">

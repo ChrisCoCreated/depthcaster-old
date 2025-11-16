@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Check if user has curator/admin/superadmin role
+      // Check if user has curator role
       const user = await db.select().from(users).where(eq(users.fid, curatorFid)).limit(1);
       if (user.length === 0) {
         return NextResponse.json(
@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
       const roles = await getUserRoles(curatorFid);
       if (!hasCuratorOrAdminRole(roles)) {
         return NextResponse.json(
-          { error: "User does not have curator, admin, or superadmin role" },
+          { error: "User does not have curator role" },
           { status: 403 }
         );
       }
@@ -265,13 +265,25 @@ export async function POST(request: NextRequest) {
     if (isFirstCuration) {
       // Insert the cast into curated_casts table (store cast data once)
       // Replies are now stored in cast_replies table, not in topReplies field
+      const { extractCastTimestamp } = await import("@/lib/cast-timestamp");
+      const { extractCastMetadata } = await import("@/lib/cast-metadata");
+      const metadata = extractCastMetadata(finalCastData);
       await db.insert(curatedCasts).values({
         castHash,
         castData: finalCastData,
+        castCreatedAt: extractCastTimestamp(finalCastData),
         curatorFid: curatorFid || null,
         topReplies: null, // No longer storing replies here - they're in cast_replies
         repliesUpdatedAt: null, // No longer storing replies here - they're in cast_replies
         conversationFetchedAt: null,
+        castText: metadata.castText,
+        castTextLength: metadata.castTextLength,
+        authorFid: metadata.authorFid,
+        likesCount: metadata.likesCount,
+        recastsCount: metadata.recastsCount,
+        repliesCount: metadata.repliesCount,
+        engagementScore: metadata.engagementScore,
+        parentHash: metadata.parentHash,
       });
     } else if (isAdditionalCuration) {
       // Additional curation: refetch cast data to update reaction counts
@@ -285,10 +297,22 @@ export async function POST(request: NextRequest) {
         
         const updatedCastData = conversation.conversation?.cast;
         if (updatedCastData) {
+          const { extractCastTimestamp } = await import("@/lib/cast-timestamp");
+          const { extractCastMetadata } = await import("@/lib/cast-metadata");
+          const metadata = extractCastMetadata(updatedCastData);
           await db
             .update(curatedCasts)
             .set({
               castData: updatedCastData,
+              castCreatedAt: extractCastTimestamp(updatedCastData),
+              castText: metadata.castText,
+              castTextLength: metadata.castTextLength,
+              authorFid: metadata.authorFid,
+              likesCount: metadata.likesCount,
+              recastsCount: metadata.recastsCount,
+              repliesCount: metadata.repliesCount,
+              engagementScore: metadata.engagementScore,
+              parentHash: metadata.parentHash,
             })
             .where(eq(curatedCasts.castHash, castHash));
           
@@ -387,7 +411,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Check if user has curator/admin/superadmin role
+    // Check if user has curator role
     const user = await db.select().from(users).where(eq(users.fid, curatorFid)).limit(1);
     if (user.length === 0) {
       return NextResponse.json(
@@ -398,7 +422,7 @@ export async function DELETE(request: NextRequest) {
     const roles = await getUserRoles(curatorFid);
     if (!hasCuratorOrAdminRole(roles)) {
       return NextResponse.json(
-        { error: "User does not have curator, admin, or superadmin role" },
+        { error: "User does not have curator role" },
         { status: 403 }
       );
     }
@@ -454,6 +478,15 @@ export async function DELETE(request: NextRequest) {
       await db
         .delete(curatedCasts)
         .where(eq(curatedCasts.castHash, castHash));
+
+      // Refresh unified webhooks to remove this cast and its children from the webhook
+      try {
+        await refreshUnifiedCuratedWebhooks();
+        console.log(`Refreshed unified webhooks after removing cast ${castHash}`);
+      } catch (webhookError) {
+        console.error(`Error refreshing unified webhooks after removing cast ${castHash}:`, webhookError);
+        // Continue even if webhook refresh fails
+      }
     }
 
     return NextResponse.json({ 

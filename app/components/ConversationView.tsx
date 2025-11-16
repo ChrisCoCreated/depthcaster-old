@@ -5,6 +5,7 @@ import { CastCard } from "./CastCard";
 import { useNeynarContext } from "@neynar/react";
 import { formatDistanceToNow } from "date-fns";
 import { Cast } from "@neynar/nodejs-sdk/build/api";
+import { useRouter } from "next/navigation";
 
 interface ConversationViewProps {
   castHash: string;
@@ -28,7 +29,11 @@ export function ConversationView({ castHash, viewerFid }: ConversationViewProps)
   const [error, setError] = useState<string | null>(null);
   const [conversationFetchedAt, setConversationFetchedAt] = useState<Date | null>(null);
   const [showNoEngagement, setShowNoEngagement] = useState(false);
+  const [sortBy, setSortBy] = useState<"newest" | "engagement" | "quality">("newest");
+  const [fetchedParentCasts, setFetchedParentCasts] = useState<Map<string, ThreadedReply>>(new Map());
+  const [fetchingParents, setFetchingParents] = useState<Set<string>>(new Set());
   const { user } = useNeynarContext();
+  const router = useRouter();
 
   // Check if a reply is a quote cast
   function isQuoteCast(reply: ThreadedReply): boolean {
@@ -65,7 +70,7 @@ export function ConversationView({ castHash, viewerFid }: ConversationViewProps)
   function filterReplies(replies: ThreadedReply[], showAll: boolean): { visible: ThreadedReply[]; hidden: number } {
     const totalCount = countAllReplies(replies);
 
-    function filterRecursive(reply: ThreadedReply): ThreadedReply | null {
+    function filterRecursive(reply: ThreadedReply, isFirstReply: boolean = false, forceInclude: boolean = false): ThreadedReply | null {
       // Filter children first
       const filteredChildren: ThreadedReply[] = [];
       
@@ -89,6 +94,23 @@ export function ConversationView({ castHash, viewerFid }: ConversationViewProps)
         };
       }
 
+      // If forced to include (for minimum reply count), always include
+      if (forceInclude) {
+        return {
+          ...reply,
+          children: filteredChildren.length > 0 ? filteredChildren : undefined,
+        };
+      }
+
+      // When sorting by "newest", always show the first (most recent) reply even if it has no engagement
+      // This ensures the most recent reply is visible when viewing a conversation
+      if (sortBy === "newest" && isFirstReply) {
+        return {
+          ...reply,
+          children: filteredChildren.length > 0 ? filteredChildren : undefined,
+        };
+      }
+
       // If no engagement and no children with engagement, hide it
       // (including quote casts with no engagement)
       if (!hasEng && filteredChildren.length === 0) {
@@ -103,12 +125,30 @@ export function ConversationView({ castHash, viewerFid }: ConversationViewProps)
     }
 
     const visible: ThreadedReply[] = [];
-    replies.forEach((reply) => {
-      const filtered = filterRecursive(reply);
+    const filteredResults: (ThreadedReply | null)[] = [];
+    
+    replies.forEach((reply, index) => {
+      const filtered = filterRecursive(reply, index === 0);
+      filteredResults.push(filtered);
       if (filtered) {
         visible.push(filtered);
       }
     });
+
+    // Always show at least 3 replies if available, even if they have no engagement
+    const minReplies = Math.min(3, replies.length);
+    if (visible.length < minReplies) {
+      // Add replies that were filtered out, up to the minimum
+      for (let i = 0; i < filteredResults.length && visible.length < minReplies; i++) {
+        if (filteredResults[i] === null && replies[i]) {
+          // Force include this reply (bypass engagement filter)
+          const forcedFiltered = filterRecursive(replies[i], i === 0, true);
+          if (forcedFiltered) {
+            visible.push(forcedFiltered);
+          }
+        }
+      }
+    }
 
     const visibleCount = countAllReplies(visible);
     const hiddenCount = totalCount - visibleCount;
@@ -127,7 +167,11 @@ export function ConversationView({ castHash, viewerFid }: ConversationViewProps)
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`/api/conversation/database?castHash=${castHash}`);
+      const params = new URLSearchParams({ castHash });
+      if (sortBy) {
+        params.append("sortBy", sortBy);
+      }
+      const response = await fetch(`/api/conversation/database?${params}`);
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to fetch conversation");
@@ -142,41 +186,231 @@ export function ConversationView({ castHash, viewerFid }: ConversationViewProps)
       setError(err.message || "Failed to load conversation");
       setLoading(false);
     }
-  }, [castHash]);
+  }, [castHash, sortBy]);
 
   useEffect(() => {
     fetchConversation();
   }, [fetchConversation]);
 
-  if (loading) {
-    return (
-      <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-        Loading conversation...
-      </div>
-    );
+  // Find a cast by hash in the replies tree
+  function findCastByHash(replies: ThreadedReply[], hash: string): ThreadedReply | null {
+    for (const reply of replies) {
+      // Case-insensitive comparison
+      if (reply.hash?.toLowerCase() === hash.toLowerCase()) {
+        console.log(`[ConversationView] Found cast in tree: hash=${reply.hash}, author=${reply.author?.username}`);
+        return reply;
+      }
+      if (reply.children && reply.children.length > 0) {
+        const found = findCastByHash(reply.children, hash);
+        if (found) return found;
+      }
+    }
+    return null;
   }
 
-  if (error) {
-    return (
-      <div className="p-4 text-red-600 dark:text-red-400">
-        Error: {error}
-      </div>
-    );
-  }
+  // Fetch a parent cast by hash
+  const fetchParentCast = useCallback(async (parentHash: string) => {
+    // Mark as fetching
+    setFetchingParents(prev => {
+      if (prev.has(parentHash)) {
+        return prev; // Already fetching
+      }
+      return new Set(prev).add(parentHash);
+    });
 
-  if (!rootCast) {
-    return (
-      <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-        Conversation not found
-      </div>
-    );
-  }
+    try {
+      const response = await fetch(
+        `/api/conversation?identifier=${encodeURIComponent(parentHash)}&type=hash&replyDepth=0`
+      );
+      
+      if (!response.ok) {
+        throw new Error("Failed to fetch parent cast");
+      }
+
+      const data = await response.json();
+      const parentCastData = data?.conversation?.cast;
+      
+      console.log(`[ConversationView] Fetched parent cast from API for ${parentHash}:`, {
+        hash: parentCastData?.hash,
+        author: parentCastData?.author?.username,
+        text: parentCastData?.text?.substring(0, 50),
+      });
+      
+      if (parentCastData) {
+        // Save parent cast to database
+        try {
+          const saveResponse = await fetch("/api/conversation/parent-cast", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              parentCastHash: parentHash,
+              parentCastData: parentCastData,
+              rootCastHash: castHash,
+            }),
+          });
+
+          if (!saveResponse.ok) {
+            const errorData = await saveResponse.json();
+            console.error(`Error saving parent cast ${parentHash}:`, errorData.error);
+          }
+        } catch (saveErr) {
+          console.error(`Error saving parent cast ${parentHash}:`, saveErr);
+        }
+
+        const parentCast: ThreadedReply = {
+          ...parentCastData,
+          _parentCastHash: parentCastData.parent_hash,
+          _isQuoteCast: false,
+          children: [],
+        };
+        
+        setFetchedParentCasts(prev => {
+          // Only add if not already present
+          if (prev.has(parentHash)) {
+            return prev;
+          }
+          const newMap = new Map(prev);
+          newMap.set(parentHash, parentCast);
+          return newMap;
+        });
+      }
+    } catch (err) {
+      console.error(`Error fetching parent cast ${parentHash}:`, err);
+    } finally {
+      setFetchingParents(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(parentHash);
+        return newSet;
+      });
+    }
+  }, [castHash]);
+
+  // Collect all parent hashes that need to be fetched
+  useEffect(() => {
+    if (replies.length === 0) return;
+    
+    const parentHashesToFetch: string[] = [];
+    
+    function collectParentHashes(replies: ThreadedReply[]) {
+      for (const reply of replies) {
+        if (isQuoteCast(reply) && reply._parentCastHash && reply._parentCastHash !== castHash) {
+          const parentInTree = findCastByHash(replies, reply._parentCastHash);
+          
+          // If not in tree, check if we need to fetch it
+          if (!parentInTree) {
+            const parentHash = reply._parentCastHash;
+            
+            // Check if already fetched or currently fetching
+            const alreadyFetched = fetchedParentCasts.has(parentHash);
+            const currentlyFetching = fetchingParents.has(parentHash);
+            
+            if (!alreadyFetched && !currentlyFetching && !parentHashesToFetch.includes(parentHash)) {
+              parentHashesToFetch.push(parentHash);
+            }
+          }
+        }
+        
+        if (reply.children && reply.children.length > 0) {
+          collectParentHashes(reply.children);
+        }
+      }
+    }
+    
+    collectParentHashes(replies);
+    
+    // Fetch all missing parent casts
+    parentHashesToFetch.forEach(parentHash => {
+      fetchParentCast(parentHash);
+    });
+  }, [replies, castHash, fetchedParentCasts, fetchingParents, fetchParentCast]);
 
   // Render threaded reply component
   function renderThreadedReply(reply: ThreadedReply, depth: number = 1, isLastChild: boolean = false, parentHasMore: boolean = false, hasChildren: boolean = false) {
     const indentPx = depth > 1 ? 48 : 0;
     const showVerticalLine = !isLastChild || hasChildren || parentHasMore;
     const isQuote = isQuoteCast(reply);
+    
+    // Find parent cast if this is a quote cast with a parent (not root)
+    // IMPORTANT: parent_hash is the cast being replied to, NOT the quoted cast in embeds
+    // The database API should already attach _parentCast to quote casts, so use that first
+    let parentCast: ThreadedReply | null = null;
+    if (isQuote && reply._parentCastHash && reply._parentCastHash !== castHash) {
+      // Get quoted cast hash from embeds to ensure we're not confusing it with parent_hash
+      const quotedCastHashes: string[] = [];
+      if (reply.embeds && Array.isArray(reply.embeds)) {
+        reply.embeds.forEach((embed: any) => {
+          if (embed.cast_id?.hash) {
+            quotedCastHashes.push(embed.cast_id.hash);
+          } else if (embed.cast?.hash) {
+            quotedCastHashes.push(embed.cast.hash);
+          }
+        });
+      }
+      
+      console.log(`[ConversationView] Quote cast ${reply.hash}:`, {
+        parent_hash: reply._parentCastHash,
+        quotedCastHashes,
+        author: reply.author?.username,
+        text: reply.text?.substring(0, 50),
+        hasParentCastFromAPI: !!(reply as any)._parentCast,
+      });
+      
+      // Only use parent_hash if it's different from the quoted cast hash
+      // parent_hash = cast being replied to (what we want to show)
+      // quoted cast = cast being quoted (what's in embeds, NOT what we want to show)
+      const parentHash = reply._parentCastHash;
+      const isParentDifferentFromQuoted = !quotedCastHashes.includes(parentHash);
+      
+      console.log(`[ConversationView] Parent check for ${reply.hash}:`, {
+        parentHash,
+        isParentDifferentFromQuoted,
+        quotedCastHashes,
+      });
+      
+      if (isParentDifferentFromQuoted) {
+        // First, check if parent cast was already attached by the database API
+        if ((reply as any)._parentCast) {
+          parentCast = (reply as any)._parentCast;
+          if (parentCast) {
+            console.log(`[ConversationView] Using parent cast from API for ${reply.hash}:`, {
+              parentHash: parentCast.hash,
+              parentAuthor: parentCast.author?.username,
+              parentText: parentCast.text?.substring(0, 50),
+            });
+          }
+        } else {
+          // Fallback: check in replies tree (but this might find the wrong cast)
+          parentCast = findCastByHash(replies, parentHash);
+          
+          console.log(`[ConversationView] Looking for parent ${parentHash} in replies tree:`, {
+            foundInTree: !!parentCast,
+            foundHash: parentCast?.hash,
+            foundAuthor: parentCast?.author?.username,
+            foundText: parentCast?.text?.substring(0, 50),
+          });
+          
+          // If not found in tree, check fetched parent casts
+          if (!parentCast) {
+            parentCast = fetchedParentCasts.get(parentHash) || null;
+            console.log(`[ConversationView] Checking fetchedParentCasts for ${parentHash}:`, {
+              found: !!parentCast,
+              foundAuthor: parentCast?.author?.username,
+            });
+          }
+        }
+        
+        console.log(`[ConversationView] Final parent cast for ${reply.hash}:`, {
+          found: !!parentCast,
+          parentHash: parentCast?.hash,
+          parentAuthor: parentCast?.author?.username,
+          parentText: parentCast?.text?.substring(0, 50),
+        });
+      } else {
+        console.log(`[ConversationView] Skipping parent cast for ${reply.hash} - parent_hash matches quoted cast`);
+      }
+    }
     
     // Create a modified cast object with embeds filtered out (hide quoted cast embed)
     const castWithoutQuotedEmbed = isQuote && reply.embeds ? {
@@ -186,7 +420,17 @@ export function ConversationView({ castHash, viewerFid }: ConversationViewProps)
         return !embed.cast_id && !(embed.cast && embed.cast.hash);
       }),
       _isQuoteCast: true, // Keep flag for indicator
+      _parentCast: parentCast ? parentCast as Cast : undefined, // Pass parent cast data
     } : reply;
+    
+    // Log what we're passing to CastCard
+    if (isQuote && parentCast) {
+      console.log(`[ConversationView] Passing parent cast to CastCard for ${reply.hash}:`, {
+        parentHash: parentCast.hash,
+        parentAuthor: parentCast.author?.username,
+        parentText: parentCast.text?.substring(0, 50),
+      });
+    }
     
     return (
       <div key={reply.hash} className="relative">
@@ -203,7 +447,7 @@ export function ConversationView({ castHash, viewerFid }: ConversationViewProps)
           
           {/* Reply content */}
           <div className="flex-1 min-w-0" style={{ marginLeft: `${indentPx}px` }}>
-            <CastCard cast={castWithoutQuotedEmbed as Cast} showThread={false} onUpdate={fetchConversation} />
+            <CastCard cast={castWithoutQuotedEmbed as Cast} showThread={false} onUpdate={fetchConversation} isReply={true} rootCastHash={rootCast?.hash || castHash} />
           </div>
         </div>
         
@@ -230,12 +474,75 @@ export function ConversationView({ castHash, viewerFid }: ConversationViewProps)
     );
   }
 
+  if (loading) {
+    return (
+      <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+        Loading conversation...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 text-red-600 dark:text-red-400">
+        Error: {error}
+      </div>
+    );
+  }
+
+  if (!rootCast) {
+    return (
+      <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+        Conversation not found
+      </div>
+    );
+  }
+
   return (
     <div className="w-full max-w-3xl mx-auto">
       {/* Main cast */}
       <div className="border-b border-gray-100 dark:border-gray-800">
-        <CastCard cast={rootCast} showThread={false} onUpdate={fetchConversation} />
+        <CastCard cast={rootCast} showThread={false} onUpdate={fetchConversation} disableClick={true} rootCastHash={rootCast?.hash || castHash} />
       </div>
+
+      {/* Sort options */}
+      {replies.length > 0 && (
+        <div className="mt-4 px-4 py-2 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+          <span className="text-sm text-gray-600 dark:text-gray-400">Sort replies:</span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setSortBy("newest")}
+              className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                sortBy === "newest"
+                  ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-medium"
+                  : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+              }`}
+            >
+              Newest
+            </button>
+            <button
+              onClick={() => setSortBy("engagement")}
+              className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                sortBy === "engagement"
+                  ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-medium"
+                  : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+              }`}
+            >
+              Most Engagement
+            </button>
+            <button
+              onClick={() => setSortBy("quality")}
+              className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                sortBy === "quality"
+                  ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-medium"
+                  : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+              }`}
+            >
+              Quality
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Replies */}
       {replies.length > 0 && (() => {
@@ -289,6 +596,16 @@ export function ConversationView({ castHash, viewerFid }: ConversationViewProps)
           No replies stored in database yet
         </div>
       )}
+
+      {/* View full thread in algo mode button */}
+      <div className="mt-6 px-4 py-3 border-t border-gray-200 dark:border-gray-800">
+        <button
+          onClick={() => router.push(`/cast/${castHash}`)}
+          className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline transition-colors"
+        >
+          View full thread in algo mode
+        </button>
+      </div>
     </div>
   );
 }

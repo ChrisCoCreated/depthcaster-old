@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNeynarContext } from "@neynar/react";
 import { useRouter } from "next/navigation";
+import { AvatarImage } from "./AvatarImage";
 
 interface UserSuggestion {
   username: string;
@@ -257,9 +258,10 @@ export function HeaderUserSearch() {
                   : "hover:bg-gray-50 dark:hover:bg-gray-700"
               }`}
             >
-              <img
-                src={resultUser.pfp_url || "/default-avatar.png"}
+              <AvatarImage
+                src={resultUser.pfp_url}
                 alt={resultUser.username}
+                size={40}
                 className="w-10 h-10 rounded-full flex-shrink-0"
               />
               <div className="flex-1 text-left min-w-0">

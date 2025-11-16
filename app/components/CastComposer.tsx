@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useNeynarContext } from "@neynar/react";
+import { AvatarImage } from "./AvatarImage";
 
 interface CastComposerProps {
   parentHash?: string;
@@ -87,9 +88,10 @@ export function CastComposer({ parentHash, onSuccess }: CastComposerProps) {
     <form onSubmit={handleSubmit} className={`${parentHash ? '' : 'border-b border-gray-200 dark:border-gray-800'} p-2 sm:p-4`}>
       <div className="flex gap-2 sm:gap-3">
         {/* Avatar */}
-        <img
-          src={user.pfp_url || "/default-avatar.png"}
+        <AvatarImage
+          src={user.pfp_url}
           alt={user.username}
+          size={48}
           className="w-10 h-10 sm:w-12 sm:h-12 rounded-full flex-shrink-0"
         />
 

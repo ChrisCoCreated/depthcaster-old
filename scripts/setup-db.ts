@@ -225,6 +225,27 @@ async function setupDatabase() {
       CREATE INDEX IF NOT EXISTS cast_tags_admin_fid_idx ON cast_tags(admin_fid);
     `);
 
+    // Create build_ideas table
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS build_ideas (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT,
+        url TEXT,
+        admin_fid BIGINT NOT NULL REFERENCES users(fid),
+        created_at TIMESTAMP DEFAULT now() NOT NULL,
+        updated_at TIMESTAMP DEFAULT now() NOT NULL
+      );
+    `);
+
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS build_ideas_created_at_idx ON build_ideas(created_at);
+    `);
+
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS build_ideas_admin_fid_idx ON build_ideas(admin_fid);
+    `);
+
     console.log("Database tables created successfully!");
   } catch (error) {
     console.error("Error setting up database:", error);

@@ -1,18 +1,24 @@
 import { Cast } from "@neynar/nodejs-sdk/build/api";
 
-const DEFAULT_HIDDEN_BOTS = ["betonbangers", "deepbot", "bracky"];
+const DEFAULT_HIDDEN_BOTS = ["betonbangers", "deepbot", "bracky", "hunttown.eth"];
 
 /**
  * Check if a cast should be hidden based on bot filtering preferences
  * Checks both author username and mentioned profiles
+ * Default bots are ALWAYS hidden, regardless of user preferences
  */
 export async function shouldHideBotCast(
   cast: Cast,
   viewerFid?: number
 ): Promise<boolean> {
+  // ALWAYS hide default bots, regardless of user preferences
+  if (checkBotMatch(cast, DEFAULT_HIDDEN_BOTS)) {
+    return true;
+  }
+
   if (!viewerFid) {
-    // Default behavior: hide default bots if no viewer
-    return checkBotMatch(cast, DEFAULT_HIDDEN_BOTS);
+    // No viewer, only check default bots (already checked above)
+    return false;
   }
 
   try {
@@ -21,7 +27,7 @@ export async function shouldHideBotCast(
     const user = await getUser(viewerFid);
     const preferences = (user?.preferences || {}) as { hideBots?: boolean; hiddenBots?: string[] };
     
-    // If hideBots is false, don't hide anything
+    // If hideBots is false, don't hide anything (except default bots, already handled)
     if (preferences.hideBots === false) {
       return false;
     }
@@ -32,12 +38,13 @@ export async function shouldHideBotCast(
       return false;
     }
 
-    const hiddenBots = preferences.hiddenBots || DEFAULT_HIDDEN_BOTS;
-    return checkBotMatch(cast, hiddenBots);
+    // Check user's custom bot list (excluding default bots which are already checked)
+    const userHiddenBots = preferences.hiddenBots || [];
+    return checkBotMatch(cast, userHiddenBots);
   } catch (error) {
     console.error("Error checking bot preferences:", error);
-    // Fallback to default behavior
-    return checkBotMatch(cast, DEFAULT_HIDDEN_BOTS);
+    // Fallback: only default bots are hidden (already checked above)
+    return false;
   }
 }
 
@@ -78,19 +85,26 @@ function checkBotMatch(cast: Cast, hiddenBots: string[]): boolean {
 /**
  * Client-side version that uses cached preferences
  * For use in client components where we can't easily access user preferences
+ * Default bots are ALWAYS hidden, regardless of user preferences
  */
 export function shouldHideBotCastClient(
   cast: Cast,
   hiddenBots?: string[],
   hideBots?: boolean
 ): boolean {
-  // If hideBots is explicitly false, don't hide
+  // ALWAYS hide default bots, regardless of user preferences
+  if (checkBotMatch(cast, DEFAULT_HIDDEN_BOTS)) {
+    return true;
+  }
+
+  // If hideBots is explicitly false, don't hide anything else (except default bots, already handled)
   if (hideBots === false) {
     return false;
   }
 
   // Default to hiding if not specified (undefined or true)
-  const botsToCheck = hiddenBots || DEFAULT_HIDDEN_BOTS;
-  return checkBotMatch(cast, botsToCheck);
+  // Check user's custom bot list (excluding default bots which are already checked)
+  const userHiddenBots = hiddenBots || [];
+  return checkBotMatch(cast, userHiddenBots);
 }
 

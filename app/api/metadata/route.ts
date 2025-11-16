@@ -26,13 +26,10 @@ export async function GET(request: NextRequest) {
 
     const isXEmbed = targetUrl.hostname === 'x.com' || targetUrl.hostname === 'twitter.com' || targetUrl.hostname === 'www.twitter.com' || targetUrl.hostname === 'www.x.com';
 
-    console.log(`[Metadata API] Processing URL: ${targetUrl.toString()}, isXEmbed: ${isXEmbed}`);
-
     // Use Twitter oEmbed API for Twitter/X links (unfurl.js doesn't handle oEmbed directly)
     if (isXEmbed) {
       try {
         const oembedUrl = `https://publish.twitter.com/oembed?url=${encodeURIComponent(targetUrl.toString())}`;
-        console.log(`[Metadata API] Fetching Twitter oEmbed from: ${oembedUrl}`);
         
         const oembedResponse = await fetch(oembedUrl, {
           headers: {
@@ -40,11 +37,8 @@ export async function GET(request: NextRequest) {
           },
         });
 
-        console.log(`[Metadata API] Twitter oEmbed response status: ${oembedResponse.status}`);
-
         if (oembedResponse.ok) {
           const oembedData = await oembedResponse.json();
-          console.log(`[Metadata API] Twitter oEmbed data:`, JSON.stringify(oembedData, null, 2));
           
           // Filter out Twitter emoji SVGs (warning triangle placeholder)
           const thumbnailUrl = oembedData.thumbnail_url;
@@ -93,22 +87,15 @@ export async function GET(request: NextRequest) {
             author_url: oembedData.author_url || null,
           };
           
-          console.log(`[Metadata API] Returning Twitter metadata:`, JSON.stringify(result, null, 2));
           return NextResponse.json(result);
-        } else {
-          const errorText = await oembedResponse.text();
-          console.error(`[Metadata API] Twitter oEmbed API error response: ${errorText}`);
         }
       } catch (error) {
-        console.error("[Metadata API] Twitter oEmbed API error:", error);
         // Fall through to unfurl.js
       }
     }
 
     // Use unfurl.js for all other URLs
-    console.log(`[Metadata API] Using unfurl.js for URL: ${targetUrl.toString()}`);
     const result = await unfurl(targetUrl.toString());
-    console.log(`[Metadata API] Unfurl result:`, JSON.stringify(result, null, 2));
     
     // Filter out Twitter emoji SVGs if present
     let imageUrl = result.open_graph?.images?.[0]?.url || result.twitter_card?.images?.[0]?.url || null;
@@ -123,7 +110,6 @@ export async function GET(request: NextRequest) {
       image: imageUrl,
     };
     
-    console.log(`[Metadata API] Returning metadata:`, JSON.stringify(response, null, 2));
     return NextResponse.json(response);
   } catch (error: any) {
     console.error("[Metadata API] Metadata fetch error:", error);

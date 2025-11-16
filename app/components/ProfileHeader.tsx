@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useNeynarContext } from "@neynar/react";
+import { AvatarImage } from "./AvatarImage";
 
 interface ProfileHeaderProps {
   fid: number;
@@ -169,10 +170,11 @@ export function ProfileHeader({
       <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
         {/* Avatar */}
         <div className="flex-shrink-0">
-          <img
-            src={pfpUrl || "/default-avatar.png"}
+          <AvatarImage
+            src={pfpUrl}
             alt={displayName || username || `User ${fid}`}
-            className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-2 border-gray-200 dark:border-gray-700"
+            size={96}
+            className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-2 border-gray-200 dark:border-gray-700 object-cover"
           />
         </div>
 
@@ -316,6 +318,8 @@ export function ProfileHeader({
     </div>
   );
 }
+
+
 
 
 

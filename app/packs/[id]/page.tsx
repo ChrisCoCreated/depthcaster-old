@@ -5,6 +5,7 @@ import { useNeynarContext } from "@neynar/react";
 import Link from "next/link";
 import { CuratorPackCard } from "@/app/components/CuratorPackCard";
 import { UserSearchInput } from "@/app/components/UserSearchInput";
+import { AvatarImage } from "@/app/components/AvatarImage";
 
 interface UserSuggestion {
   username: string;
@@ -316,13 +317,12 @@ export default function PackDetailPage({ params }: { params: Promise<{ id: strin
                   href={`/profile/${packUser.fid}`}
                   className="flex items-center gap-3 p-3 border border-gray-200 dark:border-gray-800 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
                 >
-                  {packUser.pfpUrl && (
-                    <img
-                      src={packUser.pfpUrl}
-                      alt={packUser.username || `FID ${packUser.fid}`}
-                      className="w-10 h-10 rounded-full"
-                    />
-                  )}
+                  <AvatarImage
+                    src={packUser.pfpUrl || undefined}
+                    alt={packUser.username || `FID ${packUser.fid}`}
+                    size={40}
+                    className="w-10 h-10 rounded-full"
+                  />
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-gray-900 dark:text-gray-100 truncate">
                       {packUser.displayName || packUser.username || `@user_${packUser.fid}`}

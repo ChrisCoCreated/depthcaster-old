@@ -10,12 +10,14 @@ import { useNeynarContext } from "@neynar/react";
 import { QuoteCastModal } from "./QuoteCastModal";
 import { CastComposer } from "./CastComposer";
 import { AutoLikeNotification } from "./AutoLikeNotification";
-import { MessageCircle, Heart, Repeat2, Star, Share2, RefreshCw, Tag } from "lucide-react";
+import { MessageCircle, Heart, Repeat2, Star, Share2, Tag, Trash2 } from "lucide-react";
 import { shouldHideImages } from "./FeedSettings";
 import { convertBaseAppLinksInline, isFarcasterLink, extractCastHashFromUrl } from "@/lib/link-converter";
+import { calculateEngagementScore } from "@/lib/engagement";
+import { AvatarImage } from "./AvatarImage";
 
 // Helper function to convert URLs in text to clickable links
-function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>) {
+function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>, insideLink: boolean = false) {
   // First, convert base.app links inline
   const textWithConvertedBaseLinks = convertBaseAppLinksInline(text);
   
@@ -42,98 +44,199 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>)
     let url = match[1] || match[2] || match[3] || match[4];
     let displayText = match[0];
     
-    // Check if it's a Depthcaster link (already converted base.app link)
-    if (url && url.startsWith('/cast/')) {
-      parts.push(
-        <Link
-          key={match.index}
-          href={url}
-          className="text-blue-600 dark:text-blue-400 hover:underline break-all"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {displayText}
-        </Link>
-      );
-    }
-    // Handle external URLs
-    else {
-      // Ensure URL is absolute for external links
-      if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        url = 'https://' + url;
+    // If inside a link, render as span with click handler instead of <a> tag
+    if (insideLink) {
+      // Check if it's a Depthcaster link (already converted base.app link)
+      if (url && url.startsWith('/cast/')) {
+        parts.push(
+          <span
+            key={match.index}
+            className="text-blue-600 dark:text-blue-400 hover:underline break-all cursor-pointer"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              router.push(url);
+            }}
+          >
+            {displayText}
+          </span>
+        );
       }
-      
-      // Check if it's a Farcaster link (farcaster.xyz, warpcast.com) - convert on click
-      if (isFarcasterLink(url)) {
-        const hash = extractCastHashFromUrl(url);
-        // Full cast hash is 0x + 64 hex chars = 66 chars total
-        if (hash && hash.length === 66) {
-          // Full hash found - convert directly
+      // Handle external URLs
+      else {
+        // Ensure URL is absolute for external links
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+          url = 'https://' + url;
+        }
+        
+        // Check if it's a Farcaster link (farcaster.xyz, warpcast.com) - convert on click
+        if (isFarcasterLink(url)) {
+          const hash = extractCastHashFromUrl(url);
+          // Full cast hash is 0x + 64 hex chars = 66 chars total
+          if (hash && hash.length === 66) {
+            // Full hash found - convert directly
+            parts.push(
+              <span
+                key={match.index}
+                className="text-blue-600 dark:text-blue-400 hover:underline break-all cursor-pointer"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  router.push(`/cast/${hash}`);
+                }}
+              >
+                {displayText}
+              </span>
+            );
+          } else {
+            // Hash not found or truncated - resolve via API on click
+            parts.push(
+              <span
+                key={match.index}
+                className="text-blue-600 dark:text-blue-400 hover:underline break-all cursor-pointer"
+                onClick={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  try {
+                    // Resolve the URL to get the cast hash
+                    const response = await fetch(`/api/conversation?identifier=${encodeURIComponent(url)}&type=url&replyDepth=0`);
+                    if (response.ok) {
+                      const data = await response.json();
+                      const castHash = data?.conversation?.cast?.hash;
+                      if (castHash) {
+                        router.push(`/cast/${castHash}`);
+                      } else {
+                        // Fallback to external link
+                        window.open(url, '_blank');
+                      }
+                    } else {
+                      // Fallback to external link on error
+                      window.open(url, '_blank');
+                    }
+                  } catch (error) {
+                    console.error('Failed to resolve Farcaster link:', error);
+                    // Fallback to external link
+                    window.open(url, '_blank');
+                  }
+                }}
+              >
+                {displayText}
+              </span>
+            );
+          }
+        }
+        // Regular external link
+        else {
           parts.push(
-            <a
+            <span
               key={match.index}
-              href={`/cast/${hash}`}
-              className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+              className="text-blue-600 dark:text-blue-400 hover:underline break-all cursor-pointer"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                router.push(`/cast/${hash}`);
+                window.open(url, '_blank', 'noopener,noreferrer');
               }}
             >
               {displayText}
-            </a>
+            </span>
           );
-        } else {
-          // Hash not found or truncated - resolve via API on click
+        }
+      }
+    } else {
+      // Not inside a link - render as normal <a> tags
+      // Check if it's a Depthcaster link (already converted base.app link)
+      if (url && url.startsWith('/cast/')) {
+        parts.push(
+          <Link
+            key={match.index}
+            href={url}
+            className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {displayText}
+          </Link>
+        );
+      }
+      // Handle external URLs
+      else {
+        // Ensure URL is absolute for external links
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+          url = 'https://' + url;
+        }
+        
+        // Check if it's a Farcaster link (farcaster.xyz, warpcast.com) - convert on click
+        if (isFarcasterLink(url)) {
+          const hash = extractCastHashFromUrl(url);
+          // Full cast hash is 0x + 64 hex chars = 66 chars total
+          if (hash && hash.length === 66) {
+            // Full hash found - convert directly
+            parts.push(
+              <a
+                key={match.index}
+                href={`/cast/${hash}`}
+                className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  router.push(`/cast/${hash}`);
+                }}
+              >
+                {displayText}
+              </a>
+            );
+          } else {
+            // Hash not found or truncated - resolve via API on click
+            parts.push(
+              <a
+                key={match.index}
+                href={url}
+                className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+                onClick={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  try {
+                    // Resolve the URL to get the cast hash
+                    const response = await fetch(`/api/conversation?identifier=${encodeURIComponent(url)}&type=url&replyDepth=0`);
+                    if (response.ok) {
+                      const data = await response.json();
+                      const castHash = data?.conversation?.cast?.hash;
+                      if (castHash) {
+                        router.push(`/cast/${castHash}`);
+                      } else {
+                        // Fallback to external link
+                        window.open(url, '_blank');
+                      }
+                    } else {
+                      // Fallback to external link on error
+                      window.open(url, '_blank');
+                    }
+                  } catch (error) {
+                    console.error('Failed to resolve Farcaster link:', error);
+                    // Fallback to external link
+                    window.open(url, '_blank');
+                  }
+                }}
+              >
+                {displayText}
+              </a>
+            );
+          }
+        }
+        // Regular external link
+        else {
           parts.push(
             <a
               key={match.index}
               href={url}
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-blue-600 dark:text-blue-400 hover:underline break-all"
-              onClick={async (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                try {
-                  // Resolve the URL to get the cast hash
-                  const response = await fetch(`/api/conversation?identifier=${encodeURIComponent(url)}&type=url&replyDepth=0`);
-                  if (response.ok) {
-                    const data = await response.json();
-                    const castHash = data?.conversation?.cast?.hash;
-                    if (castHash) {
-                      router.push(`/cast/${castHash}`);
-                    } else {
-                      // Fallback to external link
-                      window.open(url, '_blank');
-                    }
-                  } else {
-                    // Fallback to external link on error
-                    window.open(url, '_blank');
-                  }
-                } catch (error) {
-                  console.error('Failed to resolve Farcaster link:', error);
-                  // Fallback to external link
-                  window.open(url, '_blank');
-                }
-              }}
+              onClick={(e) => e.stopPropagation()}
             >
               {displayText}
             </a>
           );
         }
-      }
-      // Regular external link
-      else {
-        parts.push(
-          <a
-            key={match.index}
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-600 dark:text-blue-400 hover:underline break-all"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {displayText}
-          </a>
-        );
       }
     }
     
@@ -271,19 +374,79 @@ function MinimalReplyCard({ reply, onUpdate, parentCastHash }: MinimalReplyCardP
     router.push(`/cast/${parentCastHash}?reply=true`);
   };
 
+  // Check if this is a quote cast with a parent
+  const isQuote = reply._isQuoteCast || (reply.embeds && Array.isArray(reply.embeds) && reply.embeds.some((embed: any) => embed.cast_id || (embed.cast && embed.cast.hash)));
+  const parentCast = (reply as any)._parentCast;
+  
+  // Check if the quote cast is quoting the parent cast it's replying to
+  let isQuotingParent = false;
+  if (isQuote && parentCast && reply.embeds && Array.isArray(reply.embeds)) {
+    const quotedCastHashes: string[] = [];
+    reply.embeds.forEach((embed: any) => {
+      if (embed.cast_id?.hash) {
+        quotedCastHashes.push(embed.cast_id.hash);
+      } else if (embed.cast?.hash) {
+        quotedCastHashes.push(embed.cast.hash);
+      }
+    });
+    isQuotingParent = quotedCastHashes.includes(parentCast.hash);
+  }
+  
+  // If quoting parent, show only first line; otherwise use truncated text
+  const displayText = isQuotingParent 
+    ? (replyText.split('\n')[0] || replyText.substring(0, 150))
+    : truncatedText;
+  
   return (
-    <div className="p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors border border-gray-100 dark:border-gray-800">
+    <div className={`p-2 rounded-lg transition-colors border ${isQuote && parentCast ? 'border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 hover:bg-gray-50 dark:hover:bg-gray-800/50' : 'border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50'}`}>
+      {/* Mini parent cast display for quote casts */}
+      {isQuote && parentCast && (
+        <div className="mb-1.5 -mx-1.5 px-1.5">
+          <div className="mb-0.5">
+            <span className="text-[9px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+              Replying to
+            </span>
+          </div>
+          <Link 
+            href={`/cast/${parentCast.hash}`}
+            onClick={(e) => e.stopPropagation()}
+            className="flex items-start gap-1.5 hover:opacity-80 transition-opacity bg-gray-50 dark:bg-gray-800/50 rounded px-1.5 py-1 border border-gray-200 dark:border-gray-700 group/parent"
+          >
+            <AvatarImage
+              src={parentCast.author?.pfp_url}
+              alt={parentCast.author?.username || "parent"}
+              size={16}
+              className="w-4 h-4 rounded-full flex-shrink-0"
+            />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1 mb-0.5">
+                <span className="text-[10px] font-medium text-gray-700 dark:text-gray-300 truncate">
+                  {parentCast.author?.display_name || parentCast.author?.username}
+                </span>
+                <span className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
+                  @{parentCast.author?.username}
+                </span>
+              </div>
+              <div className="text-[10px] text-gray-600 dark:text-gray-400 line-clamp-1">
+                {renderTextWithLinks(parentCast.text || "", router, true)}
+              </div>
+            </div>
+          </Link>
+        </div>
+      )}
+      
       <div className="flex items-start gap-2">
         {/* Profile picture */}
-        {replyAuthor?.pfp_url && (
+        {replyAuthor && (
           <Link
             href={`/profile/${replyAuthor.fid}`}
             onClick={(e) => e.stopPropagation()}
             className="flex-shrink-0"
           >
-            <img
+            <AvatarImage
               src={replyAuthor.pfp_url}
               alt={replyAuthor.display_name || replyAuthor.username || "User"}
+              size={24}
               className="w-6 h-6 rounded-full"
             />
           </Link>
@@ -341,8 +504,8 @@ function MinimalReplyCard({ reply, onUpdate, parentCastHash }: MinimalReplyCardP
             onClick={(e) => e.stopPropagation()}
             className="block"
           >
-            <p className="text-xs text-gray-700 dark:text-gray-300 line-clamp-2">
-              {renderTextWithLinks(truncatedText, router)}
+            <p className={`text-xs text-gray-700 dark:text-gray-300 ${isQuotingParent ? 'line-clamp-1' : 'line-clamp-2'}`}>
+              {renderTextWithLinks(displayText, router, true)}
             </p>
           </Link>
         </div>
@@ -667,15 +830,20 @@ interface CastCardProps {
     _curatorInfo?: { fid: number; username?: string; display_name?: string; pfp_url?: string };
     _topReplies?: any[];
     _repliesUpdatedAt?: Date | string;
+    _parentCast?: Cast; // Parent cast for quote casts that are not root
   };
   showThread?: boolean;
   showTopReplies?: boolean;
   onUpdate?: () => void;
   feedType?: string; // 'curated' or other feed types
+  isReply?: boolean; // Whether this is a reply (for delete functionality)
   curatorInfo?: { fid: number; username?: string; display_name?: string; pfp_url?: string };
+  sortBy?: "recently-curated" | "time-of-cast" | "recent-reply";
+  disableClick?: boolean; // Disable click navigation (e.g., when in conversation view)
+  rootCastHash?: string; // Root cast hash for the current page/view
 }
 
-export function CastCard({ cast, showThread = false, showTopReplies = true, onUpdate, feedType, curatorInfo }: CastCardProps) {
+export function CastCard({ cast, showThread = false, showTopReplies = true, onUpdate, feedType, curatorInfo, sortBy, isReply = false, disableClick = false, rootCastHash }: CastCardProps) {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showRecastMenu, setShowRecastMenu] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
@@ -690,14 +858,15 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
   const [isCurated, setIsCurated] = useState(false);
   const [curators, setCurators] = useState<Array<{ fid: number; username?: string; display_name?: string; pfp_url?: string }>>([]);
   const [showUncurateConfirm, setShowUncurateConfirm] = useState(false);
-  const [isRefreshingReplies, setIsRefreshingReplies] = useState(false);
   const [topReplies, setTopReplies] = useState<any[]>(cast._topReplies || []);
-  const [repliesUpdatedAt, setRepliesUpdatedAt] = useState<Date | string | null>(cast._repliesUpdatedAt || null);
+  const [repliesLoading, setRepliesLoading] = useState(false);
+  const [repliesLoaded, setRepliesLoaded] = useState(!!cast._topReplies?.length);
   const [embedMetadata, setEmbedMetadata] = useState<Map<string, { title: string | null; description: string | null; image: string | null; author_name?: string | null; author_url?: string | null }>>(new Map());
   const fetchedUrlsRef = useRef<Set<string>>(new Set());
   const recastMenuRef = useRef<HTMLDivElement>(null);
   const shareMenuRef = useRef<HTMLDivElement>(null);
   const tagMenuRef = useRef<HTMLDivElement>(null);
+  const castCardRef = useRef<HTMLDivElement>(null);
   const { user } = useNeynarContext();
   const router = useRouter();
   const [preferencesVersion, setPreferencesVersion] = useState(0);
@@ -706,6 +875,8 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
   const [showTagMenu, setShowTagMenu] = useState(false);
   const [isTagging, setIsTagging] = useState(false);
   const [showAutoLikeNotification, setShowAutoLikeNotification] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Listen for preference changes to trigger re-render
   useEffect(() => {
@@ -804,15 +975,68 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
     fetchMetadataForEmbeds();
   }, [cast.embeds]);
 
-  // Sync top replies and updated timestamp when cast prop changes
+  // Sync top replies when cast prop changes
   useEffect(() => {
-    if (cast._topReplies) {
+    if (cast._topReplies && cast._topReplies.length > 0) {
       setTopReplies(cast._topReplies);
+      setRepliesLoaded(true);
     }
-    if (cast._repliesUpdatedAt) {
-      setRepliesUpdatedAt(cast._repliesUpdatedAt);
+  }, [cast._topReplies]);
+
+  // Lazy load replies when cast comes into viewport
+  useEffect(() => {
+    // Skip if replies already loaded or not in curated feed
+    if (repliesLoaded || !cast.hash || (feedType !== "curated" && !cast._curatorFid)) {
+      return;
     }
-  }, [cast._topReplies, cast._repliesUpdatedAt]);
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && !repliesLoaded && !repliesLoading) {
+            // Load replies when cast comes into viewport
+            setRepliesLoading(true);
+            const params = new URLSearchParams({
+              castHash: cast.hash!,
+              sortBy: sortBy || "recent-reply",
+            });
+            if (user?.fid) {
+              params.append("viewerFid", user.fid.toString());
+            }
+
+            fetch(`/api/feed/replies?${params}`)
+              .then((res) => res.json())
+              .then((data) => {
+                if (data.replies) {
+                  setTopReplies(data.replies);
+                  setRepliesLoaded(true);
+                }
+              })
+              .catch((error) => {
+                console.error("Error loading replies:", error);
+              })
+              .finally(() => {
+                setRepliesLoading(false);
+              });
+          }
+        });
+      },
+      {
+        rootMargin: "200px", // Start loading 200px before cast enters viewport
+      }
+    );
+
+    const currentRef = castCardRef.current;
+    if (currentRef) {
+      observer.observe(currentRef);
+    }
+
+    return () => {
+      if (currentRef) {
+        observer.unobserve(currentRef);
+      }
+    };
+  }, [cast.hash, repliesLoaded, repliesLoading, feedType, cast._curatorFid, sortBy, user?.fid]);
 
   // Check if cast is already curated on mount (check regardless of user login status)
   useEffect(() => {
@@ -875,7 +1099,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
 
   // Prevent body scroll when confirmation modal is open
   useEffect(() => {
-    if (showUncurateConfirm) {
+    if (showUncurateConfirm || showDeleteConfirm) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "unset";
@@ -884,7 +1108,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
     return () => {
       document.body.style.overflow = "unset";
     };
-  }, [showUncurateConfirm]);
+  }, [showUncurateConfirm, showDeleteConfirm]);
 
   // Close recast menu when clicking outside
   useEffect(() => {
@@ -1059,6 +1283,86 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
       document.execCommand('copy');
       document.body.removeChild(textArea);
       setShowShareMenu(false);
+    }
+  };
+
+  const handleCopyCastHash = async () => {
+    if (!cast.hash) return;
+    try {
+      await navigator.clipboard.writeText(cast.hash);
+      setShowShareMenu(false);
+    } catch (error) {
+      console.error('Failed to copy cast hash:', error);
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = cast.hash;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setShowShareMenu(false);
+    }
+  };
+
+  const handleCopyShareLink = async () => {
+    if (!cast.hash) return;
+    const shareLink = `${window.location.origin}/cast/${cast.hash}`;
+    try {
+      await navigator.clipboard.writeText(shareLink);
+      setShowShareMenu(false);
+    } catch (error) {
+      console.error('Failed to copy share link:', error);
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = shareLink;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setShowShareMenu(false);
+    }
+  };
+
+  const deleteModalTitle = isReply ? "Remove Reply from Depthcaster" : "Remove Curation";
+  const deleteModalDescription = isReply
+    ? "Are you sure you want to remove this reply from Depthcaster? This action cannot be undone."
+    : "Are you sure you want to remove this curation? This action cannot be undone.";
+
+  const handleDelete = async () => {
+    if (!user?.fid) {
+      return;
+    }
+
+    setShowDeleteConfirm(false);
+
+    try {
+      setIsDeleting(true);
+      
+      const endpoint = isReply 
+        ? `/api/cast/reply/${cast.hash}?fid=${user.fid}`
+        : `/api/cast/${cast.hash}?fid=${user.fid}`;
+      
+      const response = await fetch(endpoint, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to delete");
+      }
+
+      // Refresh the view
+      if (onUpdate) {
+        onUpdate();
+      } else {
+        // If no onUpdate callback, navigate away or reload
+        router.push("/");
+      }
+    } catch (error: any) {
+      console.error("Delete error:", error);
+      alert(error.message || "Failed to delete. Please try again.");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -1287,6 +1591,11 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
   const timeAgo = formatDistanceToNow(timestamp, { addSuffix: true });
 
   const handleCardClick = (e: React.MouseEvent) => {
+    // Don't navigate if clicks are disabled
+    if (disableClick) {
+      return;
+    }
+    
     // Don't navigate if clicking on interactive elements
     const target = e.target as HTMLElement;
     if (
@@ -1301,7 +1610,8 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
     }
     
     if (cast.hash) {
-      // Navigate to conversation view for curated casts, regular cast view otherwise
+      // Navigate to conversation view for curated casts in feed view, regular cast view otherwise
+      // In the curated feed, all casts should go to conversation view
       const isCurated = feedType === "curated" || cast._curatorFid;
       router.push(isCurated ? `/conversation/${cast.hash}` : `/cast/${cast.hash}`);
     }
@@ -1310,7 +1620,8 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
   return (
     <>
       <div 
-        className="border-b border-gray-200 dark:border-gray-800 py-4 sm:py-6 px-2 sm:px-4 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors relative cursor-pointer"
+        ref={castCardRef}
+        className={`border-b border-gray-200 dark:border-gray-800 py-4 sm:py-6 px-2 sm:px-4 transition-colors relative ${disableClick ? '' : 'hover:bg-gray-50 dark:hover:bg-gray-900 cursor-pointer'}`}
         onClick={handleCardClick}
       >
         {/* Share menu and Curator badge - top right corner */}
@@ -1349,6 +1660,24 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                 >
                   Copy text
                 </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCopyCastHash();
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border-t border-gray-200 dark:border-gray-700"
+                >
+                  Copy cast hash
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCopyShareLink();
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border-t border-gray-200 dark:border-gray-700"
+                >
+                  Copy share link
+                </button>
               </div>
             )}
           </div>
@@ -1376,16 +1705,17 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
               </span>
               
               {/* First curator PFP - always show if available */}
-              {curators[0]?.pfp_url && (
+              {curators[0] && (
                 <Link
                   href={`/profile/${curators[0].fid}`}
                   onClick={(e) => e.stopPropagation()}
                   className="relative"
                 >
-                  <img
+                  <AvatarImage
                     src={curators[0].pfp_url}
                     alt={curators[0].username || "Curator"}
-                    className="w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 border-white dark:border-gray-900"
+                    size={24}
+                    className="w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 border-white dark:border-gray-900 object-cover"
                   />
                 </Link>
               )}
@@ -1400,10 +1730,11 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                       onClick={(e) => e.stopPropagation()}
                       className="relative"
                     >
-                      <img
-                        src={curator.pfp_url || "/default-avatar.png"}
+                      <AvatarImage
+                        src={curator.pfp_url}
                         alt={curator.username || `Curator ${curator.fid}`}
-                        className="w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 border-white dark:border-gray-900"
+                        size={24}
+                        className="w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 border-white dark:border-gray-900 object-cover"
                       />
                     </Link>
                   ))}
@@ -1424,15 +1755,62 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
         <div className="flex gap-2 sm:gap-3">
           {/* Avatar */}
           <Link href={`/profile/${author.fid}`} onClick={(e) => e.stopPropagation()}>
-            <img
-              src={author.pfp_url || "/default-avatar.png"}
+            <AvatarImage
+              src={author.pfp_url}
               alt={author.username}
-              className="w-10 h-10 sm:w-12 sm:h-12 rounded-full cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+              size={48}
+              className="w-10 h-10 sm:w-12 sm:h-12 rounded-full cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0 object-cover"
             />
           </Link>
 
           {/* Content */}
           <div className="flex-1 min-w-0">
+            {/* Parent cast display for quote casts that are not root */}
+            {(cast as any)._isQuoteCast && (cast as any)._parentCast && (() => {
+              const parentCast = (cast as any)._parentCast;
+              console.log(`[CastCard] Rendering parent cast for ${cast.hash}:`, {
+                parentHash: parentCast.hash,
+                parentAuthor: parentCast.author?.username,
+                parentText: parentCast.text?.substring(0, 50),
+                quoteCastAuthor: cast.author?.username,
+                quoteCastText: cast.text?.substring(0, 50),
+              });
+              return (
+                <div className="mb-2 -mx-2 px-2">
+                  <div className="mb-1.5">
+                    <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                      Replying to
+                    </span>
+                  </div>
+                  <Link 
+                    href={`/cast/${parentCast.hash}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex items-start gap-2 hover:opacity-80 transition-opacity bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700 group/parent"
+                  >
+                  <AvatarImage
+                    src={parentCast.author?.pfp_url}
+                    alt={parentCast.author?.username || "parent"}
+                    size={24}
+                    className="w-6 h-6 rounded-full flex-shrink-0"
+                  />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                          {parentCast.author?.display_name || parentCast.author?.username}
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          @{parentCast.author?.username}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
+                        {renderTextWithLinks(parentCast.text || "", router, true)}
+                      </div>
+                    </div>
+                  </Link>
+                </div>
+              );
+            })()}
+            
             {/* Author info */}
             <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 flex-wrap">
               <Link href={`/profile/${author.fid}`} onClick={(e) => e.stopPropagation()}>
@@ -1874,6 +2252,16 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                     const quotedCastHash = embed.cast?.hash || 
                                          (embed.cast_id && typeof embed.cast_id === 'object' && 'hash' in embed.cast_id ? embed.cast_id.hash : null);
                     
+                    // Check if this cast is a quote cast and if the quoted cast matches the root cast being shown
+                    const isQuoteCast = (cast as any)._isQuoteCast;
+                    const isQuotingRoot = isQuoteCast && rootCastHash && quotedCastHash === rootCastHash;
+                    
+                    // If quoting root cast, show only first line; otherwise show full text
+                    const quotedCastText = embed.cast?.text || "";
+                    const displayQuotedText = isQuotingRoot 
+                      ? (quotedCastText.split('\n')[0] || quotedCastText)
+                      : quotedCastText;
+                    
                     return (
                       <div 
                         key={index} 
@@ -1893,8 +2281,8 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                             <div className="text-xs text-gray-500 dark:text-gray-500 mb-1">
                               @{embed.cast.author?.username || "unknown"}
                             </div>
-                            <div className="text-sm text-gray-900 dark:text-gray-100 mb-2">
-                              {embed.cast.text}
+                            <div className={`text-sm text-gray-900 dark:text-gray-100 mb-2 ${isQuotingRoot ? 'line-clamp-1' : ''}`}>
+                              {renderTextWithLinks(displayQuotedText, router, true)}
                             </div>
                             
                             {/* Show embeds from quoted cast in smaller format */}
@@ -2096,7 +2484,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                   href={`/cast/${cast.hash}`}
                   className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 hover:underline hidden sm:inline"
                 >
-                  View thread →
+                  View Neynar algo thread →
                 </Link>
               )}
 
@@ -2197,6 +2585,21 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                     )}
                   </div>
                 )}
+
+                {/* Delete button - only visible to admins */}
+                {user && isAdmin && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowDeleteConfirm(true);
+                    }}
+                    disabled={isDeleting}
+                    className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm transition-colors py-1 px-1 sm:px-0 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={isReply ? "Delete reply" : "Delete cast"}
+                  >
+                    <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -2204,73 +2607,14 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
 
         {/* Top Replies Section */}
         {showTopReplies && (feedType === "curated" || cast._curatorFid) && (
-          <div className="mt-3 border-t border-gray-200 dark:border-gray-800 pt-3" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-2 px-1">
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500 dark:text-gray-400">Top replies</span>
-                {repliesUpdatedAt && (
-                  <span className="text-xs text-gray-400 dark:text-gray-500">
-                    Updated {formatDistanceToNow(new Date(repliesUpdatedAt), { addSuffix: true })}
-                  </span>
-                )}
-                {!repliesUpdatedAt && (
-                  <span className="text-xs text-gray-400 dark:text-gray-500">
-                    Not loaded yet
-                  </span>
-                )}
-              </div>
-              <button
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  if (!cast.hash || isRefreshingReplies) return;
-                  
-                  setIsRefreshingReplies(true);
-                  try {
-                    const response = await fetch("/api/curate/refresh-replies", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ castHash: cast.hash }),
-                    });
-                    
-                    if (response.ok) {
-                      const data = await response.json();
-                      setTopReplies(data.replies || []);
-                      setRepliesUpdatedAt(data.updatedAt || new Date());
-                      
-                      // Update cast data with refreshed values (likes, replies count, etc.)
-                      if (data.cast) {
-                        // Update reaction counts
-                        if (data.cast.reactions) {
-                          setLikesCount(data.cast.reactions.likes_count || 0);
-                          setRecastsCount(data.cast.reactions.recasts_count || 0);
-                        }
-                        // Update replies count
-                        if (data.cast.replies) {
-                          // The replies count is in the cast object
-                        }
-                        // Update viewer context (liked/recasted status)
-                        if (data.cast.viewer_context) {
-                          setIsLiked(data.cast.viewer_context.liked || false);
-                          setIsRecasted(data.cast.viewer_context.recasted || false);
-                        }
-                      }
-                      
-                      if (onUpdate) {
-                        onUpdate();
-                      }
-                    }
-                  } catch (error) {
-                    console.error("Error refreshing replies:", error);
-                  } finally {
-                    setIsRefreshingReplies(false);
-                  }
-                }}
-                disabled={isRefreshingReplies}
-                className="p-1 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors disabled:opacity-50"
-                title="Refresh replies"
-              >
-                <RefreshCw className={`w-3 h-3 ${isRefreshingReplies ? "animate-spin" : ""}`} />
-              </button>
+          <div className={`mt-3 border-t ${(cast as any)._isQuoteCast && (cast as any)._parentCast ? 'border-gray-200 dark:border-gray-700 bg-gray-50/30 dark:bg-gray-800/20' : 'border-gray-200 dark:border-gray-800'} pt-3 rounded-b-lg transition-colors group/replies hover:bg-gray-50 dark:hover:bg-gray-800/30`} onClick={(e) => e.stopPropagation()}>
+            <div className="mb-2 px-1">
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                {sortBy === "recent-reply" ? "Most Recent Replies" : "Highest Engagement Replies"}
+              </span>
+              {repliesLoading && (
+                <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">Loading...</span>
+              )}
             </div>
             {topReplies && topReplies.length > 0 ? (
               <>
@@ -2284,18 +2628,44 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                   }
 
                   function buildThreadTree(replies: ThreadedReply[], rootHash: string): ThreadedReply[] {
+                    // Log incoming replies order and timestamps for recent-reply mode
+                    if (sortBy === "recent-reply") {
+                      console.log(`[CastCard] Building thread tree for cast ${cast.hash}, sortBy: ${sortBy}`);
+                      console.log(`[CastCard] Incoming replies order (${replies.length}):`, replies.map((r, idx) => ({
+                        index: idx,
+                        hash: r.hash?.substring(0, 10),
+                        author: r.author?.username,
+                        timestamp: r.timestamp || r.created_at,
+                        timestampMs: r.timestamp ? new Date(r.timestamp).getTime() : (r.created_at ? new Date(r.created_at).getTime() : 0),
+                      })));
+                    }
+                    
                     const replyMap = new Map<string, ThreadedReply>();
                     replies.forEach(reply => {
                       replyMap.set(reply.hash, { ...reply, children: [] });
                     });
 
                     const rootReplies: ThreadedReply[] = [];
+                    const rootReplyHashes = new Set<string>();
+                    
+                    // First pass: identify root replies and build map
+                    replies.forEach(reply => {
+                      const parentHash = reply.parent_hash;
+                      if (!parentHash || parentHash === rootHash) {
+                        rootReplyHashes.add(reply.hash);
+                      }
+                    });
+                    
+                    // Second pass: build tree structure preserving order
                     replies.forEach(reply => {
                       const threadedReply = replyMap.get(reply.hash)!;
                       const parentHash = reply.parent_hash;
 
                       if (!parentHash || parentHash === rootHash) {
-                        rootReplies.push(threadedReply);
+                        // This is a root reply - add in the order it appears in replies array
+                        if (!rootReplies.find(r => r.hash === reply.hash)) {
+                          rootReplies.push(threadedReply);
+                        }
                       } else {
                         const parent = replyMap.get(parentHash);
                         if (parent) {
@@ -2304,20 +2674,42 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                           }
                           parent.children.push(threadedReply);
                         } else {
-                          rootReplies.push(threadedReply);
+                          // Orphaned reply (parent not found) - treat as root
+                          if (!rootReplies.find(r => r.hash === reply.hash)) {
+                            rootReplies.push(threadedReply);
+                          }
                         }
                       }
                     });
 
-                    // Sort by timestamp
-                    rootReplies.sort((a, b) => {
-                      const aTime = new Date(a.timestamp || a.created_at || 0).getTime();
-                      const bTime = new Date(b.timestamp || b.created_at || 0).getTime();
-                      return aTime - bTime;
-                    });
+                    // For recent-reply mode, ensure root replies are sorted by timestamp (most recent first)
+                    // Backend already sorted them, but we need to preserve that order
+                    if (sortBy === "recent-reply") {
+                      // Create a map of reply hash to its original index in the replies array
+                      const replyOrderMap = new Map<string, number>();
+                      replies.forEach((reply, idx) => {
+                        replyOrderMap.set(reply.hash, idx);
+                      });
+                      
+                      // Sort root replies by their original order in the replies array
+                      rootReplies.sort((a, b) => {
+                        const aOrder = replyOrderMap.get(a.hash) ?? Infinity;
+                        const bOrder = replyOrderMap.get(b.hash) ?? Infinity;
+                        return aOrder - bOrder;
+                      });
+                    }
+                    
+                    console.log(`[CastCard] Root replies after building tree (${rootReplies.length}):`, rootReplies.map((r, idx) => ({
+                      index: idx,
+                      hash: r.hash?.substring(0, 10),
+                      author: r.author?.username,
+                      timestamp: r.timestamp || r.created_at,
+                      timestampMs: r.timestamp ? new Date(r.timestamp).getTime() : (r.created_at ? new Date(r.created_at).getTime() : 0),
+                    })));
 
                     function sortChildren(reply: ThreadedReply) {
                       if (reply.children && reply.children.length > 0) {
+                        // Sort children by timestamp to maintain chronological thread order
                         reply.children.sort((a, b) => {
                           const aTime = new Date(a.timestamp || a.created_at || 0).getTime();
                           const bTime = new Date(b.timestamp || b.created_at || 0).getTime();
@@ -2327,6 +2719,12 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                       }
                     }
                     rootReplies.forEach(sortChildren);
+
+                    console.log(`[CastCard] Root replies after building tree (${rootReplies.length}):`, rootReplies.map(r => ({
+                      hash: r.hash?.substring(0, 10),
+                      author: r.author?.username,
+                      engagementScore: calculateEngagementScore(r as any),
+                    })));
 
                     return rootReplies;
                   }
@@ -2409,14 +2807,14 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
             ) : (
               <div className="py-2 text-center">
                 <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">
-                  {repliesUpdatedAt ? "No replies yet" : "Click refresh to load replies"}
+                  No replies yet
                 </p>
                 {cast.hash && (
                   <Link
                     href={feedType === "curated" || cast._curatorFid ? `/conversation/${cast.hash}` : `/cast/${cast.hash}`}
                     className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
                   >
-                    View thread →
+                    View Neynar algo thread →
                   </Link>
                 )}
               </div>
@@ -2493,6 +2891,41 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                 className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isCurating ? "Removing..." : "Remove"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={() => setShowDeleteConfirm(false)}
+        >
+          <div
+            className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-sm w-full p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+              {deleteModalTitle}
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              {deleteModalDescription}
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDeleting ? "Removing..." : "Remove"}
               </button>
             </div>
           </div>

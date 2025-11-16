@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUser, updateUserPreferences } from "@/lib/users";
 import { neynarClient } from "@/lib/neynar";
 
-const DEFAULT_HIDDEN_BOTS = ["betonbangers", "deepbot", "bracky"];
+const DEFAULT_HIDDEN_BOTS = ["betonbangers", "deepbot", "bracky", "hunttown.eth"];
 
 export async function GET(request: NextRequest) {
   try {

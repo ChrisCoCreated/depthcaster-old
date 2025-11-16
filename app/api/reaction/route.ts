@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { neynarClient } from "@/lib/neynar";
-import { ReactionType, LookupCastConversationTypeEnum } from "@neynar/nodejs-sdk/build/api";
+import { ReactionType } from "@neynar/nodejs-sdk/build/api";
 import { trackCuratedCastInteraction } from "@/lib/interactions";
 import { db } from "@/lib/db";
 import { curatedCasts } from "@/lib/schema";
 import { eq } from "drizzle-orm";
-import { getRootCastHash } from "@/lib/conversation";
+import { fetchAndStoreConversation, getRootCastHash } from "@/lib/conversation";
 
 export async function POST(request: NextRequest) {
   try {
@@ -60,20 +60,25 @@ export async function POST(request: NextRequest) {
             .limit(1);
 
           if (curatedCast.length > 0) {
-            // Fetch updated cast data from Neynar (includes updated reaction counts)
-            const updatedCast = await neynarClient.lookupCastConversation({
-              identifier: rootHash,
-              type: LookupCastConversationTypeEnum.Hash,
-              replyDepth: 0,
-              includeChronologicalParentCasts: false,
-            });
-            
-            const castData = updatedCast.conversation?.cast;
+            const conversationResult = await fetchAndStoreConversation(rootHash, 5, 50);
+            const castData = conversationResult.rootCast;
             if (castData) {
+              const { extractCastTimestamp } = await import("@/lib/cast-timestamp");
+              const { extractCastMetadata } = await import("@/lib/cast-metadata");
+              const metadata = extractCastMetadata(castData);
               await db
                 .update(curatedCasts)
                 .set({
                   castData: castData,
+                  castCreatedAt: extractCastTimestamp(castData),
+                  castText: metadata.castText,
+                  castTextLength: metadata.castTextLength,
+                  authorFid: metadata.authorFid,
+                  likesCount: metadata.likesCount,
+                  recastsCount: metadata.recastsCount,
+                  repliesCount: metadata.repliesCount,
+                  engagementScore: metadata.engagementScore,
+                  parentHash: metadata.parentHash,
                 })
                 .where(eq(curatedCasts.castHash, rootHash));
               
@@ -132,20 +137,25 @@ export async function DELETE(request: NextRequest) {
             .limit(1);
 
           if (curatedCast.length > 0) {
-            // Fetch updated cast data from Neynar (includes updated reaction counts)
-            const updatedCast = await neynarClient.lookupCastConversation({
-              identifier: rootHash,
-              type: LookupCastConversationTypeEnum.Hash,
-              replyDepth: 0,
-              includeChronologicalParentCasts: false,
-            });
-            
-            const castData = updatedCast.conversation?.cast;
+            const conversationResult = await fetchAndStoreConversation(rootHash, 5, 50);
+            const castData = conversationResult.rootCast;
             if (castData) {
+              const { extractCastTimestamp } = await import("@/lib/cast-timestamp");
+              const { extractCastMetadata } = await import("@/lib/cast-metadata");
+              const metadata = extractCastMetadata(castData);
               await db
                 .update(curatedCasts)
                 .set({
                   castData: castData,
+                  castCreatedAt: extractCastTimestamp(castData),
+                  castText: metadata.castText,
+                  castTextLength: metadata.castTextLength,
+                  authorFid: metadata.authorFid,
+                  likesCount: metadata.likesCount,
+                  recastsCount: metadata.recastsCount,
+                  repliesCount: metadata.repliesCount,
+                  engagementScore: metadata.engagementScore,
+                  parentHash: metadata.parentHash,
                 })
                 .where(eq(curatedCasts.castHash, rootHash));
               

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useNeynarContext } from "@neynar/react";
 
-const DEFAULT_HIDDEN_BOTS = ["betonbangers", "deepbot", "bracky"];
+const DEFAULT_HIDDEN_BOTS = ["betonbangers", "deepbot", "bracky", "hunttown.eth"];
 
 interface BotSettingsProps {}
 

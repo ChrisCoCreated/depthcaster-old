@@ -62,7 +62,7 @@ export async function createUnifiedUserWatchWebhook() {
     .limit(1);
   
   // If no webhook found by type, check if we have a specific webhook ID to use
-  const SPECIFIC_WEBHOOK_ID = "01K9ZAVSDN1XWTT90B6PMR0T18";
+  const SPECIFIC_WEBHOOK_ID = "01KA4AEVR22SWJ088DBG0F28N4";
   if (existingWebhook.length === 0) {
     // Try to find webhook by the specific ID
     const specificWebhook = await db

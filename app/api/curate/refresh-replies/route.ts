@@ -8,7 +8,7 @@ import { sql, and, inArray } from "drizzle-orm";
 import { curatedCastInteractions } from "@/lib/schema";
 import { shouldHideBotCastClient } from "@/lib/bot-filter";
 
-const DEFAULT_HIDDEN_BOTS = ["betonbangers", "deepbot", "bracky"];
+const DEFAULT_HIDDEN_BOTS = ["betonbangers", "deepbot", "bracky", "hunttown.eth"];
 
 /**
  * Fetch and sort top replies for a curated cast
@@ -140,12 +140,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Update the cast with new replies and refreshed cast data
+    const { extractCastTimestamp } = await import("@/lib/cast-timestamp");
+    const { extractCastMetadata } = await import("@/lib/cast-metadata");
+    const metadata = extractCastMetadata(topRepliesResult.castData);
     await db
       .update(curatedCasts)
       .set({
         castData: topRepliesResult.castData,
+        castCreatedAt: extractCastTimestamp(topRepliesResult.castData),
         topReplies: topRepliesResult.replies,
         repliesUpdatedAt: topRepliesResult.updatedAt,
+        castText: metadata.castText,
+        castTextLength: metadata.castTextLength,
+        authorFid: metadata.authorFid,
+        likesCount: metadata.likesCount,
+        recastsCount: metadata.recastsCount,
+        repliesCount: metadata.repliesCount,
+        engagementScore: metadata.engagementScore,
+        parentHash: metadata.parentHash,
       })
       .where(eq(curatedCasts.castHash, castHash));
 

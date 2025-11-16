@@ -5,7 +5,7 @@ import { cacheConversation } from "@/lib/cache";
 import { deduplicateRequest } from "@/lib/neynar-batch";
 import { db } from "@/lib/db";
 import { castReplies, curatedCasts } from "@/lib/schema";
-import { eq, or } from "drizzle-orm";
+import { eq, or, sql } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
   try {
@@ -49,48 +49,168 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(cachedResult);
     }
 
+    // Normalize identifier (trim and handle case)
+    const trimmedIdentifier = identifier.trim();
+    
+    // First, check if this is a curated cast or a reply in our database
+    let actualIdentifier = trimmedIdentifier;
+    let castHash: string | null = null;
+    let finalCacheKey = cacheKey; // Use original cache key by default
+    
+    if (type === LookupCastConversationTypeEnum.Hash) {
+      castHash = trimmedIdentifier;
+      
+      // First check if it's a curated cast
+      const curatedCheck = await db
+        .select()
+        .from(curatedCasts)
+        .where(
+          sql`LOWER(${curatedCasts.castHash}) = LOWER(${trimmedIdentifier})`
+        )
+        .limit(1);
+      
+      if (curatedCheck.length === 0) {
+        // Not a curated cast, check if it's a reply
+        const replyCheck = await db
+          .select()
+          .from(castReplies)
+          .where(
+            sql`LOWER(${castReplies.replyCastHash}) = LOWER(${trimmedIdentifier})`
+          )
+          .limit(1);
+        
+        if (replyCheck.length > 0) {
+          // This is a reply - get the root cast hash
+          const rootCastHash = replyCheck[0].rootCastHash;
+          if (rootCastHash) {
+            actualIdentifier = rootCastHash;
+            castHash = rootCastHash;
+            console.log(`[Conversation] Cast ${trimmedIdentifier} is a reply, fetching root cast ${rootCastHash} instead`);
+            // Update cache key to use root cast hash for deduplication
+            finalCacheKey = cacheConversation.generateKey({
+              identifier: rootCastHash,
+              type: typeParam,
+              replyDepth,
+              viewerFid,
+              fold: foldParam,
+            });
+            const rootCachedResult = cacheConversation.get(finalCacheKey);
+            if (rootCachedResult) {
+              // Cache under both keys for future requests
+              cacheConversation.set(cacheKey, rootCachedResult);
+              return NextResponse.json(rootCachedResult);
+            }
+          }
+        }
+      }
+    }
+
     // Use deduplication to prevent concurrent duplicate requests
-    const conversation = await deduplicateRequest(cacheKey, async () => {
-      return await neynarClient.lookupCastConversation({
-        identifier,
-        type,
-        replyDepth,
-        viewerFid,
-        sortType: LookupCastConversationSortTypeEnum.Algorithmic, // Rank by quality
-        fold: foldEnum, // Use Neynar's fold to separate high/low quality replies
-        includeChronologicalParentCasts: true,
+    let conversation;
+    try {
+      conversation = await deduplicateRequest(finalCacheKey, async () => {
+        return await neynarClient.lookupCastConversation({
+          identifier: actualIdentifier,
+          type,
+          replyDepth,
+          viewerFid,
+          sortType: LookupCastConversationSortTypeEnum.Algorithmic, // Rank by quality
+          fold: foldEnum, // Use Neynar's fold to separate high/low quality replies
+          includeChronologicalParentCasts: true,
+        });
       });
-    });
+    } catch (error: any) {
+      // If Neynar fails and we have the cast in our database, try to construct from DB
+      console.error(`[Conversation] Neynar lookup failed for ${actualIdentifier}:`, error);
+      
+      // Check if we have it in our database
+      const dbCast = await db
+        .select()
+        .from(curatedCasts)
+        .where(
+          sql`LOWER(${curatedCasts.castHash}) = LOWER(${actualIdentifier})`
+        )
+        .limit(1);
+      
+      if (dbCast.length > 0) {
+        // We have it in DB, return error with helpful message
+        return NextResponse.json(
+          { error: "Cast not found in Neynar API" },
+          { status: 404 }
+        );
+      }
+      
+      // Re-throw the original error
+      throw error;
+    }
 
     // Get cast hash from conversation or identifier
-    let castHash: string | null = null;
-    if (type === LookupCastConversationTypeEnum.Hash) {
-      castHash = identifier;
-    } else {
-      castHash = conversation.conversation?.cast?.hash || null;
+    if (!castHash) {
+      if (type === LookupCastConversationTypeEnum.Hash) {
+        castHash = actualIdentifier;
+      } else {
+        castHash = conversation.conversation?.cast?.hash || null;
+      }
     }
 
     // Merge stored replies/quotes if this is a curated cast
     if (castHash) {
-      // Check if cast is curated
+      // Check if cast is curated (case-insensitive)
       const curatedCast = await db
         .select()
         .from(curatedCasts)
-        .where(eq(curatedCasts.castHash, castHash))
+        .where(
+          sql`LOWER(${curatedCasts.castHash}) = LOWER(${castHash})`
+        )
         .limit(1);
 
       if (curatedCast.length > 0) {
-        // Fetch stored replies/quotes
+        // Update the root curated cast with fresh data (includes updated reactions)
+        const rootCast = conversation.conversation?.cast;
+        if (rootCast) {
+          try {
+            const { extractCastMetadata } = await import("@/lib/cast-metadata");
+            const metadata = extractCastMetadata(rootCast);
+            await db
+              .update(curatedCasts)
+              .set({
+                castData: rootCast,
+                castText: metadata.castText,
+                castTextLength: metadata.castTextLength,
+                authorFid: metadata.authorFid,
+                likesCount: metadata.likesCount,
+                recastsCount: metadata.recastsCount,
+                repliesCount: metadata.repliesCount,
+                engagementScore: metadata.engagementScore,
+                parentHash: metadata.parentHash,
+              })
+              .where(
+                sql`LOWER(${curatedCasts.castHash}) = LOWER(${castHash})`
+              );
+            console.log(`[Conversation] Updated root cast ${castHash} with fresh reactions data`);
+          } catch (error) {
+            console.error(`[Conversation] Error updating root cast ${castHash}:`, error);
+          }
+        }
+
+        // Fetch stored replies/quotes (case-insensitive)
+        // Exclude parent casts saved for display only (they use placeholder hash 0x0000...)
+        const PARENT_CAST_PLACEHOLDER_HASH = "0x0000000000000000000000000000000000000000";
         const storedReplies = await db
           .select()
           .from(castReplies)
           .where(
             or(
-              eq(castReplies.curatedCastHash, castHash),
-              eq(castReplies.quotedCastHash, castHash)
+              sql`LOWER(${castReplies.curatedCastHash}) = LOWER(${castHash})`,
+              sql`LOWER(${castReplies.quotedCastHash}) = LOWER(${castHash})`
             )
           )
           .orderBy(castReplies.createdAt);
+        
+        // Filter out parent casts that use the placeholder hash (metadata-only entries)
+        const filteredReplies = storedReplies.filter(
+          reply => reply.curatedCastHash?.toLowerCase() !== PARENT_CAST_PLACEHOLDER_HASH.toLowerCase()
+        );
 
         // Create a map of cast hashes from Neynar replies to avoid duplicates
         const neynarReplyHashes = new Set<string>();
@@ -101,10 +221,49 @@ export async function GET(request: NextRequest) {
           }
         });
 
+        // Update stored replies with fresh data from Neynar
+        const updateReplyData = async (reply: any) => {
+          if (!reply.hash) return;
+          
+          try {
+            await db
+              .update(castReplies)
+              .set({
+                castData: reply,
+              })
+              .where(
+                sql`LOWER(${castReplies.replyCastHash}) = LOWER(${reply.hash})`
+              );
+          } catch (error) {
+            console.error(`[Conversation] Error updating reply ${reply.hash}:`, error);
+          }
+        };
+
+        // Recursively update nested replies
+        const updateNestedReplies = async (replies: any[]) => {
+          for (const nestedReply of replies) {
+            if (nestedReply.hash) {
+              await updateReplyData(nestedReply);
+              if (nestedReply.direct_replies && nestedReply.direct_replies.length > 0) {
+                await updateNestedReplies(nestedReply.direct_replies);
+              }
+            }
+          }
+        };
+
+        // Update all replies found in Neynar's response
+        for (const reply of neynarReplies) {
+          await updateReplyData(reply);
+          
+          if (reply.direct_replies && reply.direct_replies.length > 0) {
+            await updateNestedReplies(reply.direct_replies);
+          }
+        }
+
         // Add stored replies/quotes that aren't already in Neynar's response
         // Include depth information from cast_replies
         const additionalReplies: any[] = [];
-        for (const storedReply of storedReplies) {
+        for (const storedReply of filteredReplies) {
           if (!neynarReplyHashes.has(storedReply.replyCastHash)) {
             // Cast data is stored as JSONB, extract it
             const castData = storedReply.castData as any;
@@ -132,8 +291,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Cache the response
-    cacheConversation.set(cacheKey, conversation);
+    // Cache the response under both keys if we redirected
+    cacheConversation.set(finalCacheKey, conversation);
+    if (finalCacheKey !== cacheKey) {
+      // Also cache under original key for reply hash requests
+      cacheConversation.set(cacheKey, conversation);
+    }
 
     return NextResponse.json(conversation);
   } catch (error: any) {

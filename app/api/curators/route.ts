@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ curators });
     }
 
-    // Default: Get curators with any curator role (curator, admin, superadmin) and all users who have curated
+    // Default: Get curators with curator role and all users who have curated
     // First, get all unique curator FIDs from curated casts
     const curatorResults = await db
       .select({
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ curators: [], allCurators: [] });
     }
 
-    // Get users with any curator role from database (curator, admin, superadmin)
+    // Get users with curator role from database
     const curatorRoleUsers = await db
       .selectDistinct({ fid: users.fid })
       .from(users)

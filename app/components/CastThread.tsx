@@ -11,7 +11,7 @@ interface CastThreadProps {
   viewerFid?: number;
 }
 
-const DEFAULT_HIDDEN_BOTS = ["betonbangers", "deepbot", "bracky"];
+const DEFAULT_HIDDEN_BOTS = ["betonbangers", "deepbot", "bracky", "hunttown.eth"];
 
 export function CastThread({ castHash, viewerFid }: CastThreadProps) {
   const [conversation, setConversation] = useState<any>(null);
@@ -160,6 +160,9 @@ export function CastThread({ castHash, viewerFid }: CastThreadProps) {
   const mainCast = conversation.conversation.cast;
   const parentCasts = conversation.chronological_parent_casts || [];
   
+  // Calculate the actual root cast hash (first parent in chronological order, or mainCast if no parents)
+  const actualRootCastHash = parentCasts.length > 0 ? parentCasts[0].hash : mainCast.hash;
+  
   // Above-fold replies are in direct_replies when fold=Above
   const allAboveFoldReplies = mainCast.direct_replies || [];
   const totalRepliesCount = mainCast.replies?.count || 0;
@@ -285,7 +288,7 @@ export function CastThread({ castHash, viewerFid }: CastThreadProps) {
           
           {/* Reply content */}
           <div className="flex-1 min-w-0" style={{ marginLeft: `${indentPx}px` }}>
-            <CastCard cast={reply} showThread={false} onUpdate={() => fetchConversation()} />
+            <CastCard cast={reply} showThread={false} onUpdate={() => fetchConversation()} isReply={true} rootCastHash={actualRootCastHash} />
           </div>
         </div>
         
@@ -330,7 +333,7 @@ export function CastThread({ castHash, viewerFid }: CastThreadProps) {
 
       {/* Main cast */}
       <div className="border-b border-gray-100 dark:border-gray-800">
-        <CastCard cast={mainCast} showThread={false} onUpdate={fetchConversation} />
+        <CastCard cast={mainCast} showThread={false} onUpdate={fetchConversation} rootCastHash={actualRootCastHash} />
       </div>
 
       {/* Replies */}

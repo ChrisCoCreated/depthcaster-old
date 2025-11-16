@@ -1,17 +1,20 @@
 /**
  * Utility functions for managing feed state persistence
- * Saves scroll position, cursor, and cast hashes per feed type
+ * Saves scroll position, cursor, cast hashes, and cast objects per feed type
  */
 
 export interface FeedState {
   scrollY: number;
   cursor: string | null;
   castHashes: string[];
+  casts?: any[]; // Full cast objects for instant restoration
   timestamp: number;
 }
 
 const STORAGE_KEY_PREFIX = "feedScrollState:";
 const MAX_STATE_AGE_MS = 30 * 60 * 1000; // 30 minutes
+const MAX_CASTS_TO_SAVE = 30; // Limit saved casts to prevent storage bloat
+const STALE_STATE_AGE_MS = 2 * 60 * 1000; // 2 minutes - refresh in background if older
 
 /**
  * Get storage key for a feed type
@@ -28,10 +31,16 @@ export function saveFeedState(feedType: string, state: Partial<FeedState>): void
 
   try {
     const existingState = getFeedState(feedType);
+    // Limit casts to save to prevent storage bloat
+    const castsToSave = state.casts 
+      ? state.casts.slice(0, MAX_CASTS_TO_SAVE)
+      : existingState?.casts;
+    
     const newState: FeedState = {
       scrollY: state.scrollY ?? existingState?.scrollY ?? 0,
       cursor: state.cursor ?? existingState?.cursor ?? null,
       castHashes: state.castHashes ?? existingState?.castHashes ?? [],
+      casts: castsToSave,
       timestamp: Date.now(),
     };
 
@@ -67,6 +76,17 @@ export function getFeedState(feedType: string): FeedState | null {
     console.error("Failed to get feed state:", error);
     return null;
   }
+}
+
+/**
+ * Check if saved state is stale (should refresh in background)
+ */
+export function isStateStale(feedType: string): boolean {
+  const state = getFeedState(feedType);
+  if (!state) return true;
+  
+  const age = Date.now() - state.timestamp;
+  return age > STALE_STATE_AGE_MS;
 }
 
 /**
@@ -127,6 +147,8 @@ export function throttle<T extends (...args: any[]) => void>(
     }
   };
 }
+
+
 
 
 

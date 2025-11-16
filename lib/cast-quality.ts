@@ -3,14 +3,14 @@ import { Cast } from "@neynar/nodejs-sdk/build/api";
 /**
  * Unified constants for cast quality thresholds
  */
-export const MIN_USER_SCORE_THRESHOLD = 0.5;
-export const MIN_CAST_LENGTH_THRESHOLD = 150;
-export const MIN_BOT_CAST_LENGTH_THRESHOLD = 100;
+export const MIN_USER_SCORE_THRESHOLD = 0.7;
+export const MIN_CAST_LENGTH_THRESHOLD = 500;
+//export const MIN_BOT_CAST_LENGTH_THRESHOLD = 100;
 
 /**
  * Default hidden bots list
  */
-const DEFAULT_HIDDEN_BOTS = ["betonbangers", "deepbot", "bracky"];
+const DEFAULT_HIDDEN_BOTS = ["betonbangers", "deepbot", "bracky", "hunttown.eth"];
 
 /**
  * Check if a cast is from a bot in the default hidden bots list
@@ -43,20 +43,21 @@ function isBotCast(cast: Cast): boolean {
 
 /**
  * Check if a cast meets the quality threshold
- * Cast meets threshold if: user score > 0.5 OR cast length > 150 characters
- * Exception: If cast is from a bot AND length < 100 characters, it's considered low quality
+ * Cast meets threshold if: user score > 0.7 OR cast length > 150 characters
+ * Bot casts ALWAYS fail the quality test, regardless of length or score
  * 
  * @param cast - The cast to check
  * @returns true if cast meets quality threshold, false otherwise
  */
 export function meetsCastQualityThreshold(cast: Cast): boolean {
-  const castLength = cast.text?.length || 0;
   const isBot = isBotCast(cast);
 
-  // Bot casts with less than 100 characters are considered low quality
-  if (isBot && castLength < MIN_BOT_CAST_LENGTH_THRESHOLD) {
+  // Bot casts ALWAYS fail the quality test
+  if (isBot) {
     return false;
   }
+
+  const castLength = cast.text?.length || 0;
 
   // Check user score (using cast.author.score, deprecated: cast.author.experimental?.neynar_user_score)
   const userScore = cast.author.score;

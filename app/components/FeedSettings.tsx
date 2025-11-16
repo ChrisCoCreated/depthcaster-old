@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { AvatarImage } from "./AvatarImage";
 
 interface FeedPreferences {
   hideDollarCasts: boolean;
@@ -570,13 +571,12 @@ function CuratorFilter({ selectedCuratorFids, onCuratorFidsChange }: CuratorFilt
                   onChange={() => toggleCurator(curator.fid)}
                   className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
                 />
-                {curator.pfpUrl && (
-                  <img
-                    src={curator.pfpUrl}
-                    alt={displayName}
-                    className="w-5 h-5 rounded-full"
-                  />
-                )}
+                <AvatarImage
+                  src={curator.pfpUrl || undefined}
+                  alt={displayName}
+                  size={20}
+                  className="w-5 h-5 rounded-full"
+                />
                 <span className="text-xs text-gray-700 dark:text-gray-300 flex-1">
                   {displayName}
                 </span>
@@ -1042,13 +1042,12 @@ export function CuratorFilterInline({
                           : "cursor-pointer"
                       }`}
                     >
-                      {curator.pfpUrl && (
-                        <img
-                          src={curator.pfpUrl}
-                          alt={displayName}
-                          className="w-5 h-5 rounded-full"
-                        />
-                      )}
+                      <AvatarImage
+                        src={curator.pfpUrl || undefined}
+                        alt={displayName}
+                        size={20}
+                        className="w-5 h-5 rounded-full"
+                      />
                       <span className="flex-1 text-left text-gray-700 dark:text-gray-300">
                         {displayName}
                       </span>
@@ -1087,13 +1086,12 @@ export function CuratorFilterInline({
                           : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
                       }`}
                     >
-                      {curator.pfpUrl && (
-                        <img
-                          src={curator.pfpUrl}
-                          alt={displayName}
-                          className="w-4 h-4 rounded-full"
-                        />
-                      )}
+                      <AvatarImage
+                        src={curator.pfpUrl || undefined}
+                        alt={displayName}
+                        size={16}
+                        className="w-4 h-4 rounded-full"
+                      />
                       <span>{displayName}</span>
                       {isSelected && (
                         <span className="ml-0.5">×</span>
@@ -1121,13 +1119,12 @@ export function CuratorFilterInline({
                           : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
                       }`}
                     >
-                      {curator.pfpUrl && (
-                        <img
-                          src={curator.pfpUrl}
-                          alt={displayName}
-                          className="w-4 h-4 rounded-full"
-                        />
-                      )}
+                      <AvatarImage
+                        src={curator.pfpUrl || undefined}
+                        alt={displayName}
+                        size={16}
+                        className="w-4 h-4 rounded-full"
+                      />
                       <span>{displayName}</span>
                       {isSelected && (
                         <span className="ml-0.5">×</span>

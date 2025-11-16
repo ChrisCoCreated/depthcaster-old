@@ -203,3 +203,57 @@ export async function getUserPreferences(fid: number) {
   };
 }
 
+/**
+ * Get the last curated feed view timestamp for a user
+ * @param fid - User FID
+ * @returns Last session timestamp or null if not set
+ */
+export async function getLastCuratedFeedView(fid: number): Promise<Date | null> {
+  const user = await getUser(fid);
+  if (!user) return null;
+  
+  const usageStats = (user.usageStats || {}) as {
+    lastCuratedFeedView?: string | Date;
+  };
+  
+  if (!usageStats.lastCuratedFeedView) return null;
+  
+  // Handle both string and Date formats
+  if (usageStats.lastCuratedFeedView instanceof Date) {
+    return usageStats.lastCuratedFeedView;
+  }
+  
+  if (typeof usageStats.lastCuratedFeedView === 'string') {
+    return new Date(usageStats.lastCuratedFeedView);
+  }
+  
+  return null;
+}
+
+/**
+ * Update the last curated feed view timestamp for a user
+ * @param fid - User FID
+ * @param timestamp - Timestamp to set (defaults to now)
+ */
+export async function updateLastCuratedFeedView(fid: number, timestamp?: Date): Promise<void> {
+  const user = await getUser(fid);
+  if (!user) {
+    // User doesn't exist, create them first
+    await upsertUser(fid);
+  }
+  
+  const currentUsageStats = (user?.usageStats || {}) as Record<string, any>;
+  const newUsageStats = {
+    ...currentUsageStats,
+    lastCuratedFeedView: (timestamp || new Date()).toISOString(),
+  };
+  
+  await db
+    .update(users)
+    .set({
+      usageStats: newUsageStats,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.fid, fid));
+}
+

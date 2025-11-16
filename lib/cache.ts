@@ -41,6 +41,11 @@ const searchCache = new LRUCache<string, any>({
   ttl: CACHE_TTLS.SEARCH,
 });
 
+const curatorRoleUsersCache = new LRUCache<string, any>({
+  max: 1, // Only one entry for curator role users
+  ttl: 5 * 60 * 1000, // 5 minutes
+});
+
 /**
  * Generate a cache key from request parameters
  */
@@ -131,6 +136,15 @@ export const cacheSearch = {
 };
 
 /**
+ * Cache for curator role users (changes infrequently)
+ */
+export const cacheCuratorRoleUsers = {
+  get: () => curatorRoleUsersCache.get("curator-role-users"),
+  set: (value: any) => curatorRoleUsersCache.set("curator-role-users", value),
+  clear: () => curatorRoleUsersCache.clear(),
+};
+
+/**
  * Clear all caches (useful for testing or cache invalidation)
  */
 export function clearAllCaches() {
@@ -140,6 +154,7 @@ export function clearAllCaches() {
   notificationCache.clear();
   notificationCountCache.clear();
   searchCache.clear();
+  curatorRoleUsersCache.clear();
 }
 
 /**

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { castTags, users, curatedCasts } from "@/lib/schema";
-import { eq, and, sql, inArray } from "drizzle-orm";
+import { castTags, users, curatedCasts, buildIdeas } from "@/lib/schema";
+import { eq, and, sql, inArray, desc } from "drizzle-orm";
 import { isAdmin, getUserRoles } from "@/lib/roles";
 import { neynarClient } from "@/lib/neynar";
 
@@ -77,8 +77,38 @@ export async function GET(request: NextRequest) {
         ...neynarCasts,
       ];
 
+      // If tag is "build-idea", also include non-cast entries
+      let nonCastEntries: any[] = [];
+      if (tag === "build-idea") {
+        const buildIdeasEntries = await db
+          .select()
+          .from(buildIdeas)
+          .orderBy(desc(buildIdeas.createdAt));
+        
+        // Format non-cast entries to look like casts for compatibility
+        nonCastEntries = buildIdeasEntries.map(idea => ({
+          hash: `build-idea-${idea.id}`, // Use a unique identifier
+          text: idea.description || idea.title,
+          author: {
+            fid: idea.adminFid,
+            username: "admin",
+            display_name: "Admin",
+          },
+          _isNonCastEntry: true, // Flag to identify non-cast entries
+          _buildIdea: {
+            id: idea.id,
+            title: idea.title,
+            description: idea.description,
+            url: idea.url,
+            createdAt: idea.createdAt,
+          },
+          timestamp: idea.createdAt,
+        }));
+      }
+
       return NextResponse.json({ 
         casts: allCasts,
+        nonCastEntries: nonCastEntries,
         tagInfo: tagResults,
       });
     }

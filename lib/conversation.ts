@@ -4,6 +4,7 @@ import { castReplies } from "./schema";
 import { LookupCastConversationTypeEnum, FetchCastQuotesTypeEnum } from "@neynar/nodejs-sdk/build/api";
 import { meetsCastQualityThreshold } from "./cast-quality";
 import { Cast } from "@neynar/nodejs-sdk/build/api";
+import { sql } from "drizzle-orm";
 
 /**
  * Recursively traverse conversation tree and collect all replies
@@ -66,7 +67,7 @@ export async function fetchAndStoreConversation(
   castHash: string,
   maxDepth: number = 5,
   maxReplies: number = 50
-): Promise<{ stored: number; total: number }> {
+): Promise<{ stored: number; total: number; rootCast?: Cast }> {
   try {
     // Fetch conversation with maximum depth
     const conversation = await neynarClient.lookupCastConversation({
@@ -76,9 +77,9 @@ export async function fetchAndStoreConversation(
       includeChronologicalParentCasts: false,
     });
 
-    const rootCast = conversation.conversation?.cast;
+    const rootCast = conversation.conversation?.cast as Cast | undefined;
     if (!rootCast) {
-      return { stored: 0, total: 0 };
+      return { stored: 0, total: 0, rootCast };
     }
 
     // Collect all replies recursively
@@ -102,24 +103,68 @@ export async function fetchAndStoreConversation(
     // Limit to maxReplies
     const repliesToStore = replies.slice(0, maxReplies);
 
+    // Filter replies by quality threshold before storing
+    const { meetsCastQualityThreshold } = await import("./cast-quality");
+    const qualityReplies = repliesToStore.filter((reply) => {
+      const meetsThreshold = meetsCastQualityThreshold(reply.cast);
+      if (!meetsThreshold && reply.cast.hash) {
+        console.log(`[fetchAndStoreConversation] Reply cast ${reply.cast.hash} does not meet quality threshold (score: ${reply.cast.author?.score}, length: ${reply.cast.text?.length || 0})`);
+      }
+      return meetsThreshold;
+    });
+
+    console.log(`[fetchAndStoreConversation] ${qualityReplies.length} out of ${repliesToStore.length} replies meet quality threshold`);
+
     // Store replies in database
-    const storedReplies = repliesToStore.map((reply) => ({
-      curatedCastHash: castHash,
-      replyCastHash: reply.cast.hash,
-      castData: reply.cast,
-      parentCastHash: reply.parentHash,
-      rootCastHash: castHash,
-      replyDepth: reply.depth,
-      isQuoteCast: false,
-      quotedCastHash: null,
-    }));
+    const { extractCastTimestamp } = await import("./cast-timestamp");
+    const { extractCastMetadata } = await import("./cast-metadata");
+    const storedReplies = qualityReplies.map((reply) => {
+      const metadata = extractCastMetadata(reply.cast);
+      return {
+        curatedCastHash: castHash,
+        replyCastHash: reply.cast.hash,
+        castData: reply.cast,
+        castCreatedAt: extractCastTimestamp(reply.cast),
+        parentCastHash: reply.parentHash,
+        rootCastHash: castHash,
+        replyDepth: reply.depth,
+        isQuoteCast: false,
+        quotedCastHash: null,
+        castText: metadata.castText,
+        castTextLength: metadata.castTextLength,
+        authorFid: metadata.authorFid,
+        likesCount: metadata.likesCount,
+        recastsCount: metadata.recastsCount,
+        repliesCount: metadata.repliesCount,
+        engagementScore: metadata.engagementScore,
+      };
+    });
 
     // Insert replies (use onConflictDoNothing to handle duplicates)
     if (storedReplies.length > 0) {
       await db
         .insert(castReplies)
         .values(storedReplies)
-        .onConflictDoNothing({ target: castReplies.replyCastHash });
+        .onConflictDoUpdate({
+          target: castReplies.replyCastHash,
+          set: {
+            curatedCastHash: sql`excluded.curated_cast_hash`,
+            castData: sql`excluded.cast_data`,
+            castCreatedAt: sql`excluded.cast_created_at`,
+            parentCastHash: sql`excluded.parent_cast_hash`,
+            rootCastHash: sql`excluded.root_cast_hash`,
+            replyDepth: sql`excluded.reply_depth`,
+            isQuoteCast: sql`excluded.is_quote_cast`,
+            quotedCastHash: sql`excluded.quoted_cast_hash`,
+            castText: sql`excluded.cast_text`,
+            castTextLength: sql`excluded.cast_text_length`,
+            authorFid: sql`excluded.author_fid`,
+            likesCount: sql`excluded.likes_count`,
+            recastsCount: sql`excluded.recasts_count`,
+            repliesCount: sql`excluded.replies_count`,
+            engagementScore: sql`excluded.engagement_score`,
+          },
+        });
     }
 
     // Fetch and store existing quote casts
@@ -166,23 +211,55 @@ export async function fetchAndStoreConversation(
       console.log(`[fetchAndStoreConversation] ${qualityQuotes.length} out of ${quoteCasts.length} quote casts meet quality threshold`);
 
       // Store quote casts as replies
-      const storedQuotes = qualityQuotes.map((quote: any) => ({
-        curatedCastHash: castHash,
-        replyCastHash: quote.hash,
-        castData: quote,
-        parentCastHash: quote.parent_hash || null,
-        rootCastHash: castHash,
-        replyDepth: 0, // Quote casts are top-level, depth 0
-        isQuoteCast: true,
-        quotedCastHash: castHash, // The cast being quoted
-      }));
+      const { extractCastTimestamp } = await import("./cast-timestamp");
+      const { extractCastMetadata } = await import("./cast-metadata");
+      const storedQuotes = qualityQuotes.map((quote: any) => {
+        const metadata = extractCastMetadata(quote);
+        return {
+          curatedCastHash: castHash,
+          replyCastHash: quote.hash,
+          castData: quote,
+          castCreatedAt: extractCastTimestamp(quote),
+          parentCastHash: quote.parent_hash || null,
+          rootCastHash: castHash,
+          replyDepth: 0, // Quote casts are top-level, depth 0
+          isQuoteCast: true,
+          quotedCastHash: castHash, // The cast being quoted
+          castText: metadata.castText,
+          castTextLength: metadata.castTextLength,
+          authorFid: metadata.authorFid,
+          likesCount: metadata.likesCount,
+          recastsCount: metadata.recastsCount,
+          repliesCount: metadata.repliesCount,
+          engagementScore: metadata.engagementScore,
+        };
+      });
 
       if (storedQuotes.length > 0) {
         console.log(`[fetchAndStoreConversation] Storing ${storedQuotes.length} quote casts for cast ${castHash}`);
-        const insertResult = await db
+        await db
           .insert(castReplies)
           .values(storedQuotes)
-          .onConflictDoNothing({ target: castReplies.replyCastHash });
+          .onConflictDoUpdate({
+            target: castReplies.replyCastHash,
+            set: {
+              curatedCastHash: sql`excluded.curated_cast_hash`,
+              castData: sql`excluded.cast_data`,
+              castCreatedAt: sql`excluded.cast_created_at`,
+              parentCastHash: sql`excluded.parent_cast_hash`,
+              rootCastHash: sql`excluded.root_cast_hash`,
+              replyDepth: sql`excluded.reply_depth`,
+              isQuoteCast: sql`excluded.is_quote_cast`,
+              quotedCastHash: sql`excluded.quoted_cast_hash`,
+              castText: sql`excluded.cast_text`,
+              castTextLength: sql`excluded.cast_text_length`,
+              authorFid: sql`excluded.author_fid`,
+              likesCount: sql`excluded.likes_count`,
+              recastsCount: sql`excluded.recasts_count`,
+              repliesCount: sql`excluded.replies_count`,
+              engagementScore: sql`excluded.engagement_score`,
+            },
+          });
         quotesStored = storedQuotes.length;
         console.log(`[fetchAndStoreConversation] Successfully stored ${quotesStored} quote casts for cast ${castHash}`);
 
@@ -225,23 +302,66 @@ export async function fetchAndStoreConversation(
             // Limit to maxReplies per quote cast
             const quoteRepliesToStore = quoteReplies.slice(0, maxReplies);
 
+            // Filter replies to quote cast by quality threshold before storing
+            const qualityQuoteReplies = quoteRepliesToStore.filter((reply) => {
+              const meetsThreshold = meetsCastQualityThreshold(reply.cast);
+              if (!meetsThreshold && reply.cast.hash) {
+                console.log(`[fetchAndStoreConversation] Reply to quote cast ${reply.cast.hash} does not meet quality threshold (score: ${reply.cast.author?.score}, length: ${reply.cast.text?.length || 0})`);
+              }
+              return meetsThreshold;
+            });
+
+            console.log(`[fetchAndStoreConversation] ${qualityQuoteReplies.length} out of ${quoteRepliesToStore.length} replies to quote cast ${quoteCast.hash} meet quality threshold`);
+
             // Store replies to quote cast, but associate them with the original curated cast
-            const storedQuoteReplies = quoteRepliesToStore.map((reply) => ({
-              curatedCastHash: castHash, // Original curated cast hash
-              replyCastHash: reply.cast.hash,
-              castData: reply.cast,
-              parentCastHash: reply.parentHash,
-              rootCastHash: castHash, // Original curated cast hash
-              replyDepth: reply.depth,
-              isQuoteCast: false, // These are regular replies, not quote casts
-              quotedCastHash: null, // Not directly quoting the curated cast
-            }));
+            const { extractCastTimestamp } = await import("./cast-timestamp");
+            const { extractCastMetadata } = await import("./cast-metadata");
+            const storedQuoteReplies = qualityQuoteReplies.map((reply) => {
+              const metadata = extractCastMetadata(reply.cast);
+              return {
+                curatedCastHash: castHash, // Original curated cast hash
+                replyCastHash: reply.cast.hash,
+                castData: reply.cast,
+                castCreatedAt: extractCastTimestamp(reply.cast),
+                parentCastHash: reply.parentHash,
+                rootCastHash: castHash, // Original curated cast hash
+                replyDepth: reply.depth,
+                isQuoteCast: false, // These are regular replies, not quote casts
+                quotedCastHash: null, // Not directly quoting the curated cast
+                castText: metadata.castText,
+                castTextLength: metadata.castTextLength,
+                authorFid: metadata.authorFid,
+                likesCount: metadata.likesCount,
+                recastsCount: metadata.recastsCount,
+                repliesCount: metadata.repliesCount,
+                engagementScore: metadata.engagementScore,
+              };
+            });
 
             if (storedQuoteReplies.length > 0) {
               await db
                 .insert(castReplies)
                 .values(storedQuoteReplies)
-                .onConflictDoNothing({ target: castReplies.replyCastHash });
+                .onConflictDoUpdate({
+                  target: castReplies.replyCastHash,
+                  set: {
+                    curatedCastHash: sql`excluded.curated_cast_hash`,
+                    castData: sql`excluded.cast_data`,
+                    castCreatedAt: sql`excluded.cast_created_at`,
+                    parentCastHash: sql`excluded.parent_cast_hash`,
+                    rootCastHash: sql`excluded.root_cast_hash`,
+                    replyDepth: sql`excluded.reply_depth`,
+                    isQuoteCast: sql`excluded.is_quote_cast`,
+                    quotedCastHash: sql`excluded.quoted_cast_hash`,
+                    castText: sql`excluded.cast_text`,
+                    castTextLength: sql`excluded.cast_text_length`,
+                    authorFid: sql`excluded.author_fid`,
+                    likesCount: sql`excluded.likes_count`,
+                    recastsCount: sql`excluded.recasts_count`,
+                    repliesCount: sql`excluded.replies_count`,
+                    engagementScore: sql`excluded.engagement_score`,
+                  },
+                });
               quoteRepliesStored += storedQuoteReplies.length;
               console.log(`[fetchAndStoreConversation] Stored ${storedQuoteReplies.length} replies to quote cast ${quoteCast.hash}`);
             }
@@ -272,6 +392,7 @@ export async function fetchAndStoreConversation(
     return {
       stored: totalStored,
       total: totalReplies,
+      rootCast,
     };
   } catch (error) {
     console.error(`Error fetching conversation for cast ${castHash}:`, error);

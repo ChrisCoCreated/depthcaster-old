@@ -79,6 +79,19 @@ This guide will help you deploy Depthcaster to GitHub and Vercel.
    - Copy and paste the contents of `lib/db-setup.sql`
    - Run the query
 
+3. **Run database migrations**:
+   After initial setup, run any pending migrations:
+   ```bash
+   # Run specific migrations
+   npx tsx scripts/run-migration-0012.ts
+   npx tsx scripts/run-migration-0013.ts
+   
+   # Or use drizzle-kit
+   npm run db:migrate
+   ```
+   
+   **Important**: Migrations should be run in order. Check the `drizzle/` directory for available migrations.
+
 ## Step 4: Verify Deployment
 
 1. Visit your Vercel deployment URL
@@ -95,10 +108,36 @@ git commit -m "Your commit message"
 git push
 ```
 
+## Database Migrations
+
+When deploying updates that include database schema changes:
+
+1. **Check for new migrations**:
+   - Review `drizzle/` directory for new migration files
+   - Check `scripts/` for migration scripts
+
+2. **Run migrations**:
+   ```bash
+   # Pull latest environment variables
+   vercel env pull .env.local
+   
+   # Run specific migrations
+   npx tsx scripts/run-migration-0012.ts
+   npx tsx scripts/run-migration-0013.ts
+   ```
+
+3. **Verify migration success**:
+   - Check migration script output for success messages
+   - Verify new columns/indexes exist in database
+   - Test application functionality
+
+**Note**: Migrations are idempotent - safe to run multiple times. They use `IF NOT EXISTS` checks where possible.
+
 ## Troubleshooting
 
 - **Database connection errors**: Ensure `POSTGRES_URL` is set in Vercel environment variables
 - **API errors**: Verify your Neynar API keys are correct
 - **Build failures**: Check the build logs in Vercel dashboard
 - **Environment variables not working**: Make sure to redeploy after adding new variables
+- **Migration errors**: Check that all previous migrations have been run. Foreign key constraints may fail if referenced data doesn't exist
 

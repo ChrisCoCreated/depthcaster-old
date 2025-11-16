@@ -43,6 +43,13 @@
       "when": 1763097524878,
       "tag": "0005_add_webhook_secret",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1763446086833,
+      "tag": "0006_slimy_johnny_storm",
+      "breakpoints": true
     }
   ]
 }

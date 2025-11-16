@@ -3,13 +3,16 @@
 import { useNeynarContext, NeynarAuthButton } from "@neynar/react";
 import { NotificationBell } from "./NotificationBell";
 import { HeaderUserSearch } from "./HeaderUserSearch";
+import { FeedbackModal } from "./FeedbackModal";
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { AvatarImage } from "./AvatarImage";
 
 export function Header() {
   const { user } = useNeynarContext();
   const [isPasting, setIsPasting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "error" | "success" } | null>(null);
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
 
   useEffect(() => {
     if (toast) {
@@ -266,6 +269,26 @@ export function Header() {
                 <HeaderUserSearch />
                 <NotificationBell />
                 <button
+                  onClick={() => setIsFeedbackModalOpen(true)}
+                  className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+                  aria-label="Submit feedback"
+                  title="Submit feedback"
+                >
+                  <svg
+                    className="w-5 h-5 sm:w-6 sm:h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                    />
+                  </svg>
+                </button>
+                <button
                   onClick={handlePasteToCurate}
                   disabled={isPasting}
                   className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -331,10 +354,11 @@ export function Header() {
                   href={`/profile/${user.fid}`}
                   className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors"
                 >
-                  <img
-                    src={user.pfp_url || "/default-avatar.png"}
+                  <AvatarImage
+                    src={user.pfp_url}
                     alt={user.username}
-                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-full"
+                    size={32}
+                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover"
                   />
                   <span className="text-sm font-medium hidden sm:inline">{user.username}</span>
                 </Link>
@@ -345,6 +369,7 @@ export function Header() {
           </div>
         </div>
       </header>
+      <FeedbackModal isOpen={isFeedbackModalOpen} onClose={() => setIsFeedbackModalOpen(false)} />
     </>
   );
 }

@@ -4,8 +4,8 @@ import { trackCuratedCastInteraction } from "@/lib/interactions";
 import { LookupCastConversationTypeEnum } from "@neynar/nodejs-sdk/build/api";
 import { db } from "@/lib/db";
 import { curatedCasts, castReplies } from "@/lib/schema";
-import { eq } from "drizzle-orm";
-import { isQuoteCast, extractQuotedCastHashes, getRootCastHash } from "@/lib/conversation";
+import { eq, sql } from "drizzle-orm";
+import { isQuoteCast, extractQuotedCastHashes, getRootCastHash, fetchAndStoreConversation } from "@/lib/conversation";
 import { meetsCastQualityThreshold } from "@/lib/cast-quality";
 
 export async function POST(request: NextRequest) {
@@ -95,34 +95,73 @@ export async function POST(request: NextRequest) {
               // Check quality threshold
               if (meetsCastQualityThreshold(fullCastData)) {
                 // Store quote cast as reply
-                await db.insert(castReplies).values({
-                  curatedCastHash: quotedCastHash,
-                  replyCastHash: fullCastData.hash,
-                  castData: fullCastData,
-                  parentCastHash: fullCastData.parent_hash || null,
-                  rootCastHash: quotedCastHash,
-                  replyDepth: 0, // Quote casts are top-level
-                  isQuoteCast: true,
-                  quotedCastHash: quotedCastHash,
-                }).onConflictDoNothing({ target: castReplies.replyCastHash });
+                const { extractCastTimestamp } = await import("@/lib/cast-timestamp");
+                const { extractCastMetadata } = await import("@/lib/cast-metadata");
+                const metadata = extractCastMetadata(fullCastData);
+                await db
+                  .insert(castReplies)
+                  .values({
+                    curatedCastHash: quotedCastHash,
+                    replyCastHash: fullCastData.hash,
+                    castData: fullCastData,
+                    castCreatedAt: extractCastTimestamp(fullCastData),
+                    parentCastHash: fullCastData.parent_hash || null,
+                    rootCastHash: quotedCastHash,
+                    replyDepth: 0, // Quote casts are top-level
+                    isQuoteCast: true,
+                    quotedCastHash: quotedCastHash,
+                    castText: metadata.castText,
+                    castTextLength: metadata.castTextLength,
+                    authorFid: metadata.authorFid,
+                    likesCount: metadata.likesCount,
+                    recastsCount: metadata.recastsCount,
+                    repliesCount: metadata.repliesCount,
+                    engagementScore: metadata.engagementScore,
+                  })
+                  .onConflictDoUpdate({
+                    target: castReplies.replyCastHash,
+                    set: {
+                      curatedCastHash: sql`excluded.curated_cast_hash`,
+                      castData: sql`excluded.cast_data`,
+                      castCreatedAt: sql`excluded.cast_created_at`,
+                      parentCastHash: sql`excluded.parent_cast_hash`,
+                      rootCastHash: sql`excluded.root_cast_hash`,
+                      replyDepth: sql`excluded.reply_depth`,
+                      isQuoteCast: sql`excluded.is_quote_cast`,
+                      quotedCastHash: sql`excluded.quoted_cast_hash`,
+                      castText: sql`excluded.cast_text`,
+                      castTextLength: sql`excluded.cast_text_length`,
+                      authorFid: sql`excluded.author_fid`,
+                      likesCount: sql`excluded.likes_count`,
+                      recastsCount: sql`excluded.recasts_count`,
+                      repliesCount: sql`excluded.replies_count`,
+                      engagementScore: sql`excluded.engagement_score`,
+                    },
+                  });
 
                 console.log(`[Cast API] Stored quote cast ${fullCastData.hash} for curated cast ${quotedCastHash}`);
               }
 
-              // Update quoted cast data (reaction counts, etc.)
-              const updatedQuotedCast = await neynarClient.lookupCastConversation({
-                identifier: quotedCastHash,
-                type: LookupCastConversationTypeEnum.Hash,
-                replyDepth: 0,
-                includeChronologicalParentCasts: false,
-              });
-              
-              const quotedCastData = updatedQuotedCast.conversation?.cast;
+              // Refresh quoted cast data and replies to capture updated reactions
+              const conversationResult = await fetchAndStoreConversation(quotedCastHash, 5, 50);
+              const quotedCastData = conversationResult.rootCast;
               if (quotedCastData) {
+                const { extractCastTimestamp } = await import("@/lib/cast-timestamp");
+                const { extractCastMetadata } = await import("@/lib/cast-metadata");
+                const metadata = extractCastMetadata(quotedCastData);
                 await db
                   .update(curatedCasts)
                   .set({
                     castData: quotedCastData,
+                    castCreatedAt: extractCastTimestamp(quotedCastData),
+                    castText: metadata.castText,
+                    castTextLength: metadata.castTextLength,
+                    authorFid: metadata.authorFid,
+                    likesCount: metadata.likesCount,
+                    recastsCount: metadata.recastsCount,
+                    repliesCount: metadata.repliesCount,
+                    engagementScore: metadata.engagementScore,
+                    parentHash: metadata.parentHash,
                   })
                   .where(eq(curatedCasts.castHash, quotedCastHash));
               }
@@ -177,34 +216,73 @@ export async function POST(request: NextRequest) {
                 }
 
                 // Store reply
-                await db.insert(castReplies).values({
-                  curatedCastHash: rootHash,
-                  replyCastHash: fullCastData.hash,
-                  castData: fullCastData,
-                  parentCastHash: parent,
-                  rootCastHash: rootHash,
-                  replyDepth,
-                  isQuoteCast: false,
-                  quotedCastHash: null,
-                }).onConflictDoNothing({ target: castReplies.replyCastHash });
+                const { extractCastTimestamp } = await import("@/lib/cast-timestamp");
+                const { extractCastMetadata } = await import("@/lib/cast-metadata");
+                const metadata = extractCastMetadata(fullCastData);
+                await db
+                  .insert(castReplies)
+                  .values({
+                    curatedCastHash: rootHash,
+                    replyCastHash: fullCastData.hash,
+                    castData: fullCastData,
+                    castCreatedAt: extractCastTimestamp(fullCastData),
+                    parentCastHash: parent,
+                    rootCastHash: rootHash,
+                    replyDepth,
+                    isQuoteCast: false,
+                    quotedCastHash: null,
+                    castText: metadata.castText,
+                    castTextLength: metadata.castTextLength,
+                    authorFid: metadata.authorFid,
+                    likesCount: metadata.likesCount,
+                    recastsCount: metadata.recastsCount,
+                    repliesCount: metadata.repliesCount,
+                    engagementScore: metadata.engagementScore,
+                  })
+                  .onConflictDoUpdate({
+                    target: castReplies.replyCastHash,
+                    set: {
+                      curatedCastHash: sql`excluded.curated_cast_hash`,
+                      castData: sql`excluded.cast_data`,
+                      castCreatedAt: sql`excluded.cast_created_at`,
+                      parentCastHash: sql`excluded.parent_cast_hash`,
+                      rootCastHash: sql`excluded.root_cast_hash`,
+                      replyDepth: sql`excluded.reply_depth`,
+                      isQuoteCast: sql`excluded.is_quote_cast`,
+                      quotedCastHash: sql`excluded.quoted_cast_hash`,
+                      castText: sql`excluded.cast_text`,
+                      castTextLength: sql`excluded.cast_text_length`,
+                      authorFid: sql`excluded.author_fid`,
+                      likesCount: sql`excluded.likes_count`,
+                      recastsCount: sql`excluded.recasts_count`,
+                      repliesCount: sql`excluded.replies_count`,
+                      engagementScore: sql`excluded.engagement_score`,
+                    },
+                  });
 
                 console.log(`[Cast API] Stored reply ${fullCastData.hash} for curated cast ${rootHash} at depth ${replyDepth}`);
               }
 
-              // Update parent cast data (reaction counts, reply counts, etc.)
-              const updatedRootCast = await neynarClient.lookupCastConversation({
-                identifier: rootHash,
-                type: LookupCastConversationTypeEnum.Hash,
-                replyDepth: 0,
-                includeChronologicalParentCasts: false,
-              });
-              
-              const rootCastData = updatedRootCast.conversation?.cast;
+              // Refresh root cast data and replies after posting reply
+              const conversationResult = await fetchAndStoreConversation(rootHash, 5, 50);
+              const rootCastData = conversationResult.rootCast;
               if (rootCastData) {
+                const { extractCastTimestamp } = await import("@/lib/cast-timestamp");
+                const { extractCastMetadata } = await import("@/lib/cast-metadata");
+                const metadata = extractCastMetadata(rootCastData);
                 await db
                   .update(curatedCasts)
                   .set({
                     castData: rootCastData,
+                    castCreatedAt: extractCastTimestamp(rootCastData),
+                    castText: metadata.castText,
+                    castTextLength: metadata.castTextLength,
+                    authorFid: metadata.authorFid,
+                    likesCount: metadata.likesCount,
+                    recastsCount: metadata.recastsCount,
+                    repliesCount: metadata.repliesCount,
+                    engagementScore: metadata.engagementScore,
+                    parentHash: metadata.parentHash,
                   })
                   .where(eq(curatedCasts.castHash, rootHash));
               }

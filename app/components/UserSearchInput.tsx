@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useNeynarContext } from "@neynar/react";
+import { AvatarImage } from "./AvatarImage";
 
 interface UserSuggestion {
   username: string;
@@ -145,9 +146,10 @@ export function UserSearchInput({
                 disabled={isSelected}
                 className="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-b border-gray-100 dark:border-gray-700 last:border-b-0"
               >
-                <img
-                  src={resultUser.pfp_url || "/default-avatar.png"}
+                <AvatarImage
+                  src={resultUser.pfp_url}
                   alt={resultUser.username}
+                  size={40}
                   className="w-10 h-10 rounded-full flex-shrink-0"
                 />
                 <div className="flex-1 text-left min-w-0">
@@ -189,9 +191,10 @@ export function UserSearchInput({
               key={selectedUser.fid}
               className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-full"
             >
-              <img
-                src={selectedUser.pfp_url || "/default-avatar.png"}
+              <AvatarImage
+                src={selectedUser.pfp_url}
                 alt={selectedUser.username}
+                size={20}
                 className="w-5 h-5 rounded-full"
               />
               <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
