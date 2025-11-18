@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useNeynarContext } from "@neynar/react";
 import { CuratorPackCard } from "./CuratorPackCard";
 import { UserSearchInput } from "./UserSearchInput";
+import { analytics } from "@/lib/analytics";
 
 interface UserSuggestion {
   username: string;
@@ -126,6 +127,15 @@ export function CuratorPackManager() {
 
       if (!response.ok) throw new Error("Failed to create pack");
       
+      const data = await response.json();
+      const packId = data.pack?.id || data.id;
+      const userCount = fids.length;
+      
+      // Track analytics
+      if (packId) {
+        analytics.trackPackCreate(packId, formData.name, userCount);
+      }
+      
       setShowCreateForm(false);
       setFormData({ name: "", description: "", isPublic: true });
       setSelectedUsers([]);
@@ -169,6 +179,11 @@ export function CuratorPackManager() {
 
       if (!response.ok) throw new Error("Failed to update pack");
       
+      const userCount = fids.length;
+      
+      // Track analytics
+      analytics.trackPackUpdate(editingPack.id, formData.name, userCount);
+      
       setEditingPack(null);
       setFormData({ name: "", description: "", isPublic: true });
       setSelectedUsers([]);
@@ -182,12 +197,19 @@ export function CuratorPackManager() {
   const handleDelete = async (packId: string) => {
     if (!user?.fid || !confirm("Are you sure you want to delete this pack?")) return;
 
+    const pack = packs.find(p => p.id === packId);
+    const packName = pack?.name || "";
+
     try {
       const response = await fetch(`/api/curator-packs/${packId}?creatorFid=${user.fid}`, {
         method: "DELETE",
       });
 
       if (!response.ok) throw new Error("Failed to delete pack");
+      
+      // Track analytics
+      analytics.trackPackDelete(packId, packName);
+      
       fetchUserPacks();
     } catch (error) {
       console.error("Error deleting pack:", error);

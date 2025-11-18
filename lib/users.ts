@@ -4,7 +4,7 @@ import { eq, inArray } from "drizzle-orm";
 import { neynarClient } from "./neynar";
 import { cacheUser } from "./cache";
 
-export async function upsertUser(fid: number, userData?: { username?: string; displayName?: string; pfpUrl?: string }) {
+export async function upsertUser(fid: number, userData?: { username?: string; displayName?: string; pfpUrl?: string }, signerUuid?: string) {
   // Try to fetch user data from Neynar if not provided
   if (!userData) {
     try {
@@ -42,14 +42,27 @@ export async function upsertUser(fid: number, userData?: { username?: string; di
 
   if (existingUser.length > 0) {
     // Update existing user
+    const updateData: {
+      username?: string | null;
+      displayName?: string | null;
+      pfpUrl?: string | null;
+      signerUuid?: string | null;
+      updatedAt: Date;
+    } = {
+      username: userData?.username ?? existingUser[0].username,
+      displayName: userData?.displayName ?? existingUser[0].displayName,
+      pfpUrl: userData?.pfpUrl ?? existingUser[0].pfpUrl,
+      updatedAt: new Date(),
+    };
+
+    // Update signerUuid if provided (always update to new one per option 2a)
+    if (signerUuid !== undefined) {
+      updateData.signerUuid = signerUuid;
+    }
+
     const [updated] = await db
       .update(users)
-      .set({
-        username: userData?.username ?? existingUser[0].username,
-        displayName: userData?.displayName ?? existingUser[0].displayName,
-        pfpUrl: userData?.pfpUrl ?? existingUser[0].pfpUrl,
-        updatedAt: new Date(),
-      })
+      .set(updateData)
       .where(eq(users.fid, fid))
       .returning();
     return updated;
@@ -62,6 +75,7 @@ export async function upsertUser(fid: number, userData?: { username?: string; di
         username: userData?.username ?? null,
         displayName: userData?.displayName ?? null,
         pfpUrl: userData?.pfpUrl ?? null,
+        signerUuid: signerUuid ?? null,
       })
       .returning();
     return newUser;
@@ -255,5 +269,15 @@ export async function updateLastCuratedFeedView(fid: number, timestamp?: Date): 
       updatedAt: new Date(),
     })
     .where(eq(users.fid, fid));
+}
+
+/**
+ * Get the stored signer UUID for a user
+ * @param fid - User FID
+ * @returns The stored signer UUID or null if not set
+ */
+export async function getUserSignerUuid(fid: number): Promise<string | null> {
+  const user = await getUser(fid);
+  return user?.signerUuid ?? null;
 }
 

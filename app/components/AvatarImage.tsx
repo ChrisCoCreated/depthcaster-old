@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Image, { ImageProps } from "next/image";
-import { buildProxiedImageUrl, sanitizeImageUrl, shouldProxyImageUrl, isExternalUrl } from "@/lib/imageProxy";
+import { buildProxiedImageUrl, sanitizeImageUrl, shouldProxyImageUrl, isExternalUrl, getAlternativeImgurUrl } from "@/lib/imageProxy";
 
 const DEFAULT_AVATAR = "/default-avatar.png";
 
@@ -34,6 +34,7 @@ export function AvatarImage({
 
   const [currentSrc, setCurrentSrc] = useState<string>(proxiedSrc || sanitizedSrc || DEFAULT_AVATAR);
   const [triedOriginal, setTriedOriginal] = useState<boolean>(!proxiedSrc);
+  const [triedAlternative, setTriedAlternative] = useState<boolean>(false);
 
   useEffect(() => {
     const nextSanitized = sanitizeImageUrl(src);
@@ -41,19 +42,34 @@ export function AvatarImage({
 
     setCurrentSrc(nextProxied || nextSanitized || DEFAULT_AVATAR);
     setTriedOriginal(!nextProxied);
+    setTriedAlternative(false);
   }, [src]);
 
   const handleError = () => {
-    if (!triedOriginal && sanitizedSrc) {
+    // If proxy failed and we haven't tried the original URL yet, try it
+    if (!triedOriginal && sanitizedSrc && proxiedSrc && currentSrc === proxiedSrc) {
       setTriedOriginal(true);
       setCurrentSrc(sanitizedSrc);
       return;
     }
 
+    // If original URL failed and we haven't tried an alternative Imgur URL, try it
+    if (!triedAlternative && sanitizedSrc && currentSrc === sanitizedSrc) {
+      const alternative = getAlternativeImgurUrl(sanitizedSrc);
+      if (alternative) {
+        setTriedAlternative(true);
+        const altProxied = shouldProxyImageUrl(alternative) ? buildProxiedImageUrl(alternative) : alternative;
+        setCurrentSrc(altProxied);
+        return;
+      }
+    }
+
+    // If everything failed, fall back to default immediately
     if (currentSrc !== DEFAULT_AVATAR) {
       setCurrentSrc(DEFAULT_AVATAR);
     }
   };
+
 
   const resolvedWidth = width ?? size;
   const resolvedHeight = height ?? size;
@@ -73,4 +89,5 @@ export function AvatarImage({
     />
   );
 }
+
 

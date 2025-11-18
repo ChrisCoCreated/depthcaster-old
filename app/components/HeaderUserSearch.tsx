@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNeynarContext } from "@neynar/react";
 import { useRouter } from "next/navigation";
 import { AvatarImage } from "./AvatarImage";
+import { analytics } from "@/lib/analytics";
 
 interface UserSuggestion {
   username: string;
@@ -81,6 +82,11 @@ export function HeaderUserSearch() {
           setSearchResults(data.users || []);
           setShowDropdown(true);
           setHighlightedIndex(-1); // Reset highlight when new results come in
+          
+          // Track analytics
+          if (searchTerm.length >= 2) {
+            analytics.trackUserSearch(searchTerm);
+          }
         }
       } catch (error) {
         console.error("Error searching users:", error);

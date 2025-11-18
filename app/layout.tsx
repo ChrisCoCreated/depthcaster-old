@@ -1,11 +1,13 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { Analytics } from "@vercel/analytics/next";
 import { AuthProvider } from "./components/AuthProvider";
 import { Header } from "./components/Header";
 import { ServiceWorkerRegistration } from "./components/ServiceWorkerRegistration";
 import { OnboardingFlow } from "./components/OnboardingFlow";
 import { PushSubscriptionManager } from "./components/PushSubscriptionManager";
+import { SessionTracker } from "./components/SessionTracker";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,9 +31,49 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "Depthcaster - Deep Thoughts on Farcaster",
   description: "A Farcaster client focused on philosophy, art, and meaningful conversations",
+  keywords: ["Farcaster", "social media", "philosophy", "art", "conversations", "web3", "decentralized"],
+  authors: [{ name: "Depthcaster" }],
+  creator: "Depthcaster",
+  publisher: "Depthcaster",
   manifest: "/manifest.json",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://depthcaster.vercel.app"),
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "/",
+    siteName: "Depthcaster",
+    title: "Depthcaster - Deep Thoughts on Farcaster",
+    description: "A Farcaster client focused on philosophy, art, and meaningful conversations",
+    images: [
+      {
+        url: "/icon-512x512.webp",
+        width: 512,
+        height: 512,
+        alt: "Depthcaster",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Depthcaster - Deep Thoughts on Farcaster",
+    description: "A Farcaster client focused on philosophy, art, and meaningful conversations",
+    images: ["/icon-512x512.webp"],
+    creator: "@depthcaster",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
   icons: {
     icon: [
+      { url: "/favicon.ico", sizes: "any" },
       { url: "/icon-48x48.webp", sizes: "48x48", type: "image/webp" },
       { url: "/icon-72x72.webp", sizes: "72x72", type: "image/webp" },
       { url: "/icon-96x96.webp", sizes: "96x96", type: "image/webp" },
@@ -65,7 +107,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white dark:bg-black text-gray-900 dark:text-gray-100`}
       >
+        <Analytics />
         <ServiceWorkerRegistration />
+        <SessionTracker />
         <AuthProvider>
           <PushSubscriptionManager />
           <OnboardingFlow />

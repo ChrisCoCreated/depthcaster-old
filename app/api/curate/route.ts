@@ -9,6 +9,8 @@ import { hasCuratorOrAdminRole, getUserRoles } from "@/lib/roles";
 import { fetchAndStoreConversation } from "@/lib/conversation";
 import { deleteCuratedCastWebhooks } from "@/lib/webhooks";
 import { refreshUnifiedCuratedWebhooks } from "@/lib/webhooks-unified";
+import { sendPushNotificationToUser } from "@/lib/pushNotifications";
+import { upsertUser } from "@/lib/users";
 
 // Disable body parsing to read raw body for signature verification
 export const runtime = "nodejs";
@@ -268,23 +270,116 @@ export async function POST(request: NextRequest) {
       const { extractCastTimestamp } = await import("@/lib/cast-timestamp");
       const { extractCastMetadata } = await import("@/lib/cast-metadata");
       const metadata = extractCastMetadata(finalCastData);
-      await db.insert(curatedCasts).values({
-        castHash,
-        castData: finalCastData,
-        castCreatedAt: extractCastTimestamp(finalCastData),
-        curatorFid: curatorFid || null,
-        topReplies: null, // No longer storing replies here - they're in cast_replies
-        repliesUpdatedAt: null, // No longer storing replies here - they're in cast_replies
-        conversationFetchedAt: null,
-        castText: metadata.castText,
-        castTextLength: metadata.castTextLength,
-        authorFid: metadata.authorFid,
-        likesCount: metadata.likesCount,
-        recastsCount: metadata.recastsCount,
-        repliesCount: metadata.repliesCount,
-        engagementScore: metadata.engagementScore,
-        parentHash: metadata.parentHash,
-      });
+      
+      // Ensure the author exists in the users table before inserting the cast
+      if (metadata.authorFid) {
+        const authorData = (finalCastData as any)?.author;
+        await upsertUser(metadata.authorFid, {
+          username: authorData?.username,
+          displayName: authorData?.display_name,
+          pfpUrl: authorData?.pfp_url,
+        }).catch((error) => {
+          console.error(`[Curate] Failed to upsert author ${metadata.authorFid}:`, error);
+          // Continue anyway - we'll handle the foreign key error if it occurs
+        });
+      }
+      
+      try {
+        await db.insert(curatedCasts).values({
+          castHash,
+          castData: finalCastData,
+          castCreatedAt: extractCastTimestamp(finalCastData),
+          curatorFid: curatorFid || null,
+          topReplies: null, // No longer storing replies here - they're in cast_replies
+          repliesUpdatedAt: null, // No longer storing replies here - they're in cast_replies
+          conversationFetchedAt: null,
+          castText: metadata.castText,
+          castTextLength: metadata.castTextLength,
+          authorFid: metadata.authorFid,
+          likesCount: metadata.likesCount,
+          recastsCount: metadata.recastsCount,
+          repliesCount: metadata.repliesCount,
+          engagementScore: metadata.engagementScore,
+          parentHash: metadata.parentHash,
+        });
+      } catch (insertError: any) {
+        // Handle case where cast was inserted by another request (race condition)
+        // or if there are orphaned curator_cast_curations rows
+        if (insertError.code === "23505" || insertError.code === "23503" || insertError.message?.includes("unique") || insertError.message?.includes("foreign key")) {
+          console.error(`[Curate] Insert error for cast ${castHash}:`, {
+            code: insertError.code,
+            message: insertError.message,
+            detail: insertError.detail,
+            constraint: insertError.constraint,
+          });
+          
+          // Re-check if cast now exists (might have been inserted by another request)
+          const recheckCast = await db.select().from(curatedCasts).where(eq(curatedCasts.castHash, castHash)).limit(1);
+          if (recheckCast.length > 0) {
+            // Cast now exists, continue with the flow (it was a race condition)
+            console.log(`[Curate] Cast ${castHash} now exists after race condition, continuing...`);
+          } else {
+            // Cast still doesn't exist, check what the actual error was
+            if (insertError.constraint === "curated_casts_author_fid_fkey" && metadata.authorFid) {
+              // Author doesn't exist, try to create them and retry
+              console.log(`[Curate] Author ${metadata.authorFid} doesn't exist, creating user...`);
+              const authorData = (finalCastData as any)?.author;
+              try {
+                await upsertUser(metadata.authorFid, {
+                  username: authorData?.username,
+                  displayName: authorData?.display_name,
+                  pfpUrl: authorData?.pfp_url,
+                });
+                console.log(`[Curate] Created author ${metadata.authorFid}, retrying insert...`);
+              } catch (userError) {
+                console.error(`[Curate] Failed to create author ${metadata.authorFid}:`, userError);
+                // If we can't create the user, set authorFid to null
+                metadata.authorFid = null;
+              }
+            }
+            
+            // Check if there are orphaned curator_cast_curations rows
+            const orphanedCurations = await db
+              .select()
+              .from(curatorCastCurations)
+              .where(eq(curatorCastCurations.castHash, castHash))
+              .limit(1);
+            
+            if (orphanedCurations.length > 0) {
+              console.log(`[Curate] Found orphaned curator_cast_curations rows for ${castHash}, cleaning up...`);
+              // Clean up orphaned rows and retry
+              await db.delete(curatorCastCurations).where(eq(curatorCastCurations.castHash, castHash));
+            }
+            
+            // Retry insert
+            try {
+              await db.insert(curatedCasts).values({
+                castHash,
+                castData: finalCastData,
+                castCreatedAt: extractCastTimestamp(finalCastData),
+                curatorFid: curatorFid || null,
+                topReplies: null,
+                repliesUpdatedAt: null,
+                conversationFetchedAt: null,
+                castText: metadata.castText,
+                castTextLength: metadata.castTextLength,
+                authorFid: metadata.authorFid,
+                likesCount: metadata.likesCount,
+                recastsCount: metadata.recastsCount,
+                repliesCount: metadata.repliesCount,
+                engagementScore: metadata.engagementScore,
+                parentHash: metadata.parentHash,
+              });
+              console.log(`[Curate] Successfully inserted cast ${castHash} after cleanup/retry`);
+            } catch (retryError: any) {
+              console.error(`[Curate] Retry insert also failed for ${castHash}:`, retryError);
+              throw retryError;
+            }
+          }
+        } else {
+          throw insertError;
+        }
+      }
     } else if (isAdditionalCuration) {
       // Additional curation: refetch cast data to update reaction counts
       try {
@@ -357,6 +452,40 @@ export async function POST(request: NextRequest) {
         curatorFid,
       }).returning();
 
+      // Send notification to admin user 5701 when a cast is curated
+      const ADMIN_FID = 5701;
+      if (curatorFid !== ADMIN_FID) {
+        // Get curator's name for the notification
+        // Try database first, then castData, then fallback to FID
+        let curatorName = `User ${curatorFid}`;
+        
+        const curatorUser = await db.select().from(users).where(eq(users.fid, curatorFid)).limit(1);
+        if (curatorUser[0]) {
+          curatorName = curatorUser[0].displayName || curatorUser[0].username || curatorName;
+        } else if (finalCastData && typeof finalCastData === 'object' && 'author' in finalCastData) {
+          // Try to get name from cast data (for webhook curations)
+          const author = (finalCastData as any).author;
+          curatorName = author?.display_name || author?.username || curatorName;
+        }
+        
+        // Send notification asynchronously (don't block the response)
+        sendPushNotificationToUser(ADMIN_FID, {
+          title: "New Cast Curated",
+          body: `${curatorName} curated a cast`,
+          icon: "/icon-192x192.webp",
+          badge: "/icon-96x96.webp",
+          data: { 
+            type: "cast_curated",
+            castHash,
+            curatorFid,
+            url: `/cast/${castHash}`
+          },
+        }).catch((error) => {
+          console.error(`[Curate] Error sending notification to admin for curation by ${curatorFid}:`, error);
+          // Don't fail curation if notification fails
+        });
+      }
+
       return NextResponse.json({ 
         success: true, 
         curation: curationResult[0] 
@@ -374,7 +503,17 @@ export async function POST(request: NextRequest) {
   } catch (error: unknown) {
     console.error("Curate API error:", error);
     
-    const err = error as { code?: string; message?: string };
+    const err = error as { code?: string; message?: string; detail?: string; constraint?: string };
+    
+    // Log detailed error information for debugging
+    if (err.code || err.message || err.detail) {
+      console.error("Database error details:", {
+        code: err.code,
+        message: err.message,
+        detail: err.detail,
+        constraint: err.constraint,
+      });
+    }
     
     // Handle unique constraint violation (cast already curated)
     if (err.code === "23505" || err.message?.includes("unique")) {
@@ -383,9 +522,17 @@ export async function POST(request: NextRequest) {
         { status: 409 }
       );
     }
+    
+    // Handle foreign key constraint violation
+    if (err.code === "23503" || err.message?.includes("foreign key")) {
+      return NextResponse.json(
+        { error: "Database constraint violation. Please try again." },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json(
-      { error: err.message || "Failed to curate cast" },
+      { error: err.message || err.detail || "Failed to curate cast" },
       { status: 500 }
     );
   }

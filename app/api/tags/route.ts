@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
           hash: `build-idea-${idea.id}`, // Use a unique identifier
           text: idea.description || idea.title,
           author: {
-            fid: idea.adminFid,
+            fid: idea.userFid,
             username: "admin",
             display_name: "Admin",
           },

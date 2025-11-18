@@ -5,14 +5,169 @@ import { NotificationBell } from "./NotificationBell";
 import { HeaderUserSearch } from "./HeaderUserSearch";
 import { FeedbackModal } from "./FeedbackModal";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { AvatarImage } from "./AvatarImage";
+import { analytics } from "@/lib/analytics";
 
 export function Header() {
   const { user } = useNeynarContext();
   const [isPasting, setIsPasting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "error" | "success" } | null>(null);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
+  const [environment, setEnvironment] = useState<"local" | "preview" | null>(null);
+  const [hasPreviewAccess, setHasPreviewAccess] = useState(false);
+
+  const checkPreviewAccess = useCallback(async (fid: number) => {
+    try {
+      const response = await fetch(`/api/admin/check?fid=${fid}`);
+      if (response.ok) {
+        const data = await response.json();
+        // Check if user has admin, superadmin, or tester role
+        const hasAccess = data.isAdmin || data.roles?.includes("tester");
+        setHasPreviewAccess(hasAccess);
+      } else {
+        setHasPreviewAccess(false);
+      }
+    } catch (error) {
+      console.error("Failed to check preview access:", error);
+      setHasPreviewAccess(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const hostname = window.location.hostname;
+      if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.startsWith("192.168.") || hostname.startsWith("10.")) {
+        setEnvironment("local");
+      } else if (hostname === "preview.depthcaster.com") {
+        setEnvironment("preview");
+        // Check if user has admin or tester role for preview access
+        if (user?.fid) {
+          checkPreviewAccess(user.fid);
+        } else {
+          setHasPreviewAccess(false);
+        }
+      } else {
+        setEnvironment(null);
+      }
+    }
+  }, [user, checkPreviewAccess]);
+
+  // Update browser tab title and favicon based on environment
+  useEffect(() => {
+    if (typeof document === "undefined" || typeof window === "undefined") {
+      return;
+    }
+
+    const originalTitle = "Depthcaster - Deep Thoughts on Farcaster";
+    
+    const createFavicon = (color: string, letter: string): string => {
+      // Create a canvas-based favicon for better browser compatibility
+      const canvas = document.createElement("canvas");
+      canvas.width = 32;
+      canvas.height = 32;
+      const ctx = canvas.getContext("2d");
+      
+      if (!ctx) {
+        // Fallback to SVG if canvas not available
+        return `data:image/svg+xml,${encodeURIComponent(
+          `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="${color}"/><text x="16" y="22" font-size="20" font-weight="bold" text-anchor="middle" fill="#000" font-family="Arial, sans-serif">${letter}</text></svg>`
+        )}`;
+      }
+      
+      // Draw circle background
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(16, 16, 16, 0, 2 * Math.PI);
+      ctx.fill();
+      
+      // Draw letter
+      ctx.fillStyle = "#000";
+      ctx.font = "bold 20px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(letter, 16, 16);
+      
+      return canvas.toDataURL("image/png");
+    };
+    
+    const updateFavicon = (href: string) => {
+      // Remove ALL existing dynamic favicons
+      const existingDynamic = document.querySelectorAll("link[data-dynamic-favicon]");
+      existingDynamic.forEach(link => {
+        link.remove();
+      });
+
+      // Remove all existing icon links to ensure our new one takes precedence
+      const allIconLinks = document.querySelectorAll("link[rel*='icon']");
+      allIconLinks.forEach(link => {
+        const rel = (link as HTMLLinkElement).rel;
+        if (rel === "icon" || rel === "shortcut icon") {
+          link.remove();
+        }
+      });
+
+      // Create a new favicon link that takes precedence
+      const newLink = document.createElement("link");
+      newLink.rel = "icon";
+      newLink.type = "image/png";
+      newLink.href = href;
+      newLink.setAttribute("data-dynamic-favicon", "true");
+      
+      // Insert at the very beginning of head to take precedence
+      if (document.head.firstChild) {
+        document.head.insertBefore(newLink, document.head.firstChild);
+      } else {
+        document.head.appendChild(newLink);
+      }
+    };
+
+    // Use setInterval to continuously update title (in case Next.js overwrites it)
+    let titleInterval: NodeJS.Timeout | null = null;
+
+    if (environment === "local") {
+      const newTitle = "🧪 LOCAL - " + originalTitle;
+      document.title = newTitle;
+      
+      // Keep updating title in case Next.js overwrites it
+      titleInterval = setInterval(() => {
+        if (document.title !== newTitle) {
+          document.title = newTitle;
+        }
+      }, 100);
+      
+      const yellowFavicon = createFavicon("#eab308", "L");
+      updateFavicon(yellowFavicon);
+    } else if (environment === "preview" && hasPreviewAccess) {
+      const newTitle = "🔍 PREVIEW - " + originalTitle;
+      document.title = newTitle;
+      
+      // Keep updating title in case Next.js overwrites it
+      titleInterval = setInterval(() => {
+        if (document.title !== newTitle) {
+          document.title = newTitle;
+        }
+      }, 100);
+      
+      const orangeFavicon = createFavicon("#f97316", "P");
+      updateFavicon(orangeFavicon);
+    } else {
+      // Reset to original
+      document.title = originalTitle;
+      // Remove dynamic favicon to restore original
+      const dynamicFavicon = document.querySelectorAll("link[data-dynamic-favicon]");
+      dynamicFavicon.forEach(link => {
+        link.remove();
+      });
+    }
+    
+    // Cleanup interval on unmount or environment change
+    return () => {
+      if (titleInterval) {
+        clearInterval(titleInterval);
+      }
+    };
+  }, [environment, hasPreviewAccess]);
 
   useEffect(() => {
     if (toast) {
@@ -136,6 +291,9 @@ export function Header() {
       // Success - show success message
       showToast("Cast curated successfully!", "success");
 
+      // Track analytics
+      analytics.trackCuratePaste(castHash, user.fid);
+
       // Check if auto-like is enabled and handle auto-like
       if (user?.fid && user?.signer_uuid) {
         try {
@@ -252,12 +410,39 @@ export function Header() {
           </div>
         </div>
       )}
-      <header className="sticky top-0 z-[200] bg-white/80 dark:bg-black/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+      {environment === "local" && (
+        <div
+          className="sticky top-0 z-[300] w-full text-center py-2 px-4 text-sm font-semibold bg-yellow-500 text-yellow-900 dark:bg-yellow-600 dark:text-yellow-100"
+          style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+        >
+          🧪 LOCAL TESTING
+        </div>
+      )}
+      {environment === "preview" && hasPreviewAccess && (
+        <div
+          className="sticky top-0 z-[300] w-full text-center py-2 px-4 text-sm font-semibold bg-orange-500 text-orange-900 dark:bg-orange-600 dark:text-orange-100"
+          style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+        >
+          🔍 PREVIEW ENVIRONMENT
+        </div>
+      )}
+      <header 
+        className="sticky z-[200] bg-white/80 dark:bg-black/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800" 
+        style={{ 
+          top: (environment === "local" || (environment === "preview" && hasPreviewAccess)) ? '40px' : '0px',
+          paddingTop: 'env(safe-area-inset-top, 0px)' 
+        }}
+      >
         <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between">
           <div className="flex flex-col">
-            <Link href="/" className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
-              Depthcaster
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link href="/" className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
+                Depthcaster
+              </Link>
+              <span className="text-[10px] sm:text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                Alpha
+              </span>
+            </div>
             <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-0.5 hidden sm:block">
               Depth is a sharp insight, a strong contribution to a topic, a display of intellect and thoughtfulness
             </p>
@@ -269,7 +454,10 @@ export function Header() {
                 <HeaderUserSearch />
                 <NotificationBell />
                 <button
-                  onClick={() => setIsFeedbackModalOpen(true)}
+                  onClick={() => {
+                    analytics.trackFeedbackModalOpen();
+                    setIsFeedbackModalOpen(true);
+                  }}
                   className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
                   aria-label="Submit feedback"
                   title="Submit feedback"
@@ -327,6 +515,7 @@ export function Header() {
                 </button>
                 <Link
                   href="/settings"
+                  onClick={() => analytics.trackNavSettings()}
                   className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
                   aria-label="Settings"
                 >
@@ -352,6 +541,7 @@ export function Header() {
                 </Link>
                 <Link
                   href={`/profile/${user.fid}`}
+                  onClick={() => analytics.trackNavProfile(user.fid)}
                   className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors"
                 >
                   <AvatarImage

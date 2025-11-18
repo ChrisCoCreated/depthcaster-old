@@ -7,6 +7,7 @@ import { convertBaseAppLinksInline, isFarcasterLink, extractCastHashFromUrl } fr
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AvatarImage } from "./AvatarImage";
+import { analytics } from "@/lib/analytics";
 
 // Helper function to convert URLs in text to clickable links
 function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>) {
@@ -233,7 +234,13 @@ export function QuoteCastModal({ cast, isOpen, onClose, onSuccess }: QuoteCastMo
         throw new Error(errorData.error || "Failed to quote cast");
       }
 
-      // Quote interaction is tracked automatically in the cast API
+      const data = await response.json();
+      const castHash = data.cast?.hash || data.hash;
+
+      // Track analytics
+      if (castHash) {
+        analytics.trackCastQuotePost(castHash, cast.hash);
+      }
 
       setText("");
       if (onSuccess) {

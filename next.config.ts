@@ -8,6 +8,14 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async rewrites() {
+    return [
+      {
+        source: "/favicon.png",
+        destination: "/favicon.ico",
+      },
+    ];
+  },
   async headers() {
     return [
       {

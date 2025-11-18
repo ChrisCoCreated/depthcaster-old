@@ -5,6 +5,7 @@ import { useNeynarContext } from "@neynar/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AvatarImage } from "./AvatarImage";
+import { analytics } from "@/lib/analytics";
 
 interface Watch {
   id: string;
@@ -64,6 +65,9 @@ export function WatchSettings() {
       const data = await response.json();
 
       if (data.success) {
+        // Track analytics
+        analytics.trackSettingsWatchChange("remove", watch.watchedFid);
+        
         // Remove from local state
         setWatches((prev) => prev.filter((w) => w.id !== watch.id));
       } else {

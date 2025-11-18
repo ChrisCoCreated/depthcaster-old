@@ -10,6 +10,7 @@ import { shouldHideCast, getFeedPreferences, FeedSettingsInline, CuratorFilterIn
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { saveFeedState, getFeedState, isStateStale, throttle } from "@/lib/feedState";
 import { NeynarAuthButton } from "@neynar/react";
+import { analytics } from "@/lib/analytics";
 
 interface Curator {
   fid: number;
@@ -106,6 +107,8 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   const isRestoringScrollRef = useRef<boolean>(false);
   const scrollRestoredRef = useRef<boolean>(false);
   const castsRestoredRef = useRef<boolean>(false);
+  const feedViewStartTimeRef = useRef<number | null>(null);
+  const feedViewIntervalRef = useRef<NodeJS.Timeout | null>(null);
   // Rate limiting: minimum 2 seconds between API calls
   const MIN_FETCH_INTERVAL = 2000;
 
@@ -257,6 +260,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   const handlePackSelect = (packIds: string[]) => {
     setSelectedPackIds(packIds);
     localStorage.setItem("selectedPackIds", JSON.stringify(packIds));
+    analytics.trackFeedPackSelect(feedType, packIds);
     if (packIds.length > 0) {
       fetchSelectedPacks(packIds);
     } else {
@@ -344,38 +348,27 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
         }
       }
 
-      const requestStartTime = performance.now();
-      console.log(`[Feed Frontend] ${isInitialLoad ? 'Initial' : 'Loading more'} - feedType: ${feedType}, sortBy: ${sortBy || 'default'}`);
-      
       const response = await fetch(`/api/feed?${params}`);
-      
-      const requestTime = performance.now() - requestStartTime;
-      console.log(`[Feed Frontend] Network request: ${requestTime.toFixed(2)}ms`);
       
       if (!response.ok) {
         throw new Error("Failed to fetch feed");
       }
 
-      const parseStartTime = performance.now();
       const data = await response.json();
-      const parseTime = performance.now() - parseStartTime;
-      console.log(`[Feed Frontend] JSON parse: ${parseTime.toFixed(2)}ms, received ${data.casts?.length || 0} casts`);
       
       if (newCursor) {
         setCasts((prev) => [...prev, ...data.casts]);
       } else {
         setCasts(data.casts);
+        // Mark that we've fetched new casts, so restore effect won't overwrite them
+        castsRestoredRef.current = true;
       }
 
       setCursor(data.next?.cursor || null);
       setHasMore(!!data.next?.cursor);
-      
-      const totalTime = performance.now() - fetchStartTime;
-      console.log(`[Feed Frontend] Total fetch time: ${totalTime.toFixed(2)}ms (${(totalTime / 1000).toFixed(2)}s)`);
     } catch (err: unknown) {
       const error = err as { message?: string };
-      const totalTime = performance.now() - fetchStartTime;
-      console.error(`[Feed Frontend] Error after ${totalTime.toFixed(2)}ms:`, error.message || "Failed to load feed");
+      console.error(`[Feed] Error:`, error.message || "Failed to load feed");
       setError(error.message || "Failed to load feed");
     } finally {
       setLoading(false);
@@ -536,6 +529,17 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
     // Only restore if we're on the home page and haven't restored casts yet
     if (pathname !== "/" || castsRestoredRef.current) return;
     
+    // Don't restore if we're currently loading or if casts are empty (we're switching feeds)
+    if (loading || casts.length === 0) {
+      // If feed type changed, mark that we've checked and shouldn't restore
+      const feedTypeChanged = prevFeedTypeRef.current !== feedType;
+      const sortByChanged = prevSortByRef.current !== sortBy;
+      if (feedTypeChanged || (sortByChanged && feedType === "curated")) {
+        castsRestoredRef.current = false; // Reset for new feed type
+      }
+      return;
+    }
+    
     // Don't restore if feed type changed or sortBy changed (for curated)
     const feedTypeChanged = prevFeedTypeRef.current !== feedType;
     const sortByChanged = prevSortByRef.current !== sortBy;
@@ -546,7 +550,6 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
     
     const savedState = getFeedState(feedType);
     if (savedState?.casts && savedState.casts.length > 0) {
-      console.log(`[Feed] Restoring ${savedState.casts.length} casts from saved state`);
       setCasts(savedState.casts);
       setCursor(savedState.cursor);
       setHasMore(!!savedState.cursor);
@@ -557,14 +560,13 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       
       // If state is stale, refresh in background
       if (isStateStale(feedType)) {
-        console.log(`[Feed] State is stale, refreshing in background`);
         // Refresh in background without showing loading state
         fetchFeed().catch(console.error);
       }
     } else {
       castsRestoredRef.current = true; // Mark as checked even if no saved state
     }
-  }, [pathname, feedType, sortBy, fetchFeed]);
+  }, [pathname, feedType, sortBy, fetchFeed, loading, casts.length]);
 
   // Separate effect for feed type changes and other dependencies
   useEffect(() => {
@@ -583,7 +585,11 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
     }
     
     // Handle feed type changes - clear state when switching
-    if (feedTypeChanged) {
+    // Check if feed type actually changed by comparing with lastFetchedFeedTypeRef instead of prevFeedTypeRef
+    // This is more reliable because prevFeedTypeRef might be updated by other effects
+    const actualFeedTypeChanged = lastFetchedFeedTypeRef.current !== feedType && lastFetchedFeedTypeRef.current !== "";
+    
+    if (feedTypeChanged || actualFeedTypeChanged) {
       setCasts([]);
       setCursor(null);
       setHasMore(false);
@@ -591,9 +597,9 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       fetchingRef.current = false;
       scrollRestoredRef.current = false; // Allow restoration for new feed type
       castsRestoredRef.current = false; // Reset casts restoration for new feed type
-      prevFeedTypeRef.current = feedType;
       // Reset last fetched ref to ensure we fetch the new feed type
       lastFetchedFeedTypeRef.current = "";
+      // Don't update prevFeedTypeRef here - update it after we've checked shouldFetch
     }
     
     // Clear feed when sortBy changes (for curated feed)
@@ -611,29 +617,46 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
     // Only fetch if not my-37 feed, or if my-37 feed has saved pack with users
     if (feedType !== "my-37" || (my37PackId && my37HasUsers)) {
       // Check if we already restored casts from saved state
+      // If feed type changed, we should always fetch, so don't check hasRestoredCasts
       const hasRestoredCasts = castsRestoredRef.current && casts.length > 0;
+      const isStateStaleResult = isStateStale(feedType);
+      
+      // Check if feed type actually changed by comparing with lastFetchedFeedTypeRef
+      const actualFeedTypeChanged = lastFetchedFeedTypeRef.current !== feedType && lastFetchedFeedTypeRef.current !== "";
       
       // Always fetch when feed type changes, or on initial mount, or when sortBy changes for curated
       // Also check if we haven't fetched this feed type yet (defensive check)
-      // Skip fetch if we just restored casts and state is not stale
-      const shouldFetch = (isInitialMount || 
-                         feedTypeChanged || 
-                         (sortByChanged && feedType === "curated" && !isInitialMount) ||
-                         (lastFetchedFeedTypeRef.current !== feedType && !fetchingRef.current)) &&
-                         !(hasRestoredCasts && !isStateStale(feedType));
+      // Skip fetch if we just restored casts and state is not stale, BUT only if feed type hasn't changed
+      const condition1 = isInitialMount;
+      const condition2 = feedTypeChanged || actualFeedTypeChanged;
+      const condition3 = (sortByChanged && feedType === "curated" && !isInitialMount);
+      const condition4 = (lastFetchedFeedTypeRef.current !== feedType && !fetchingRef.current);
+      const fetchCondition = condition1 || condition2 || condition3 || condition4;
+      // Only skip if we have restored casts AND state is not stale AND feed type hasn't actually changed
+      const skipCondition = hasRestoredCasts && !isStateStaleResult && !actualFeedTypeChanged;
+      const shouldFetch = fetchCondition && !skipCondition;
       
       if (shouldFetch && !fetchingRef.current) {
-        console.log(`[Feed] Fetching feed: ${feedType} (changed: ${feedTypeChanged}, initial: ${isInitialMount}, lastFetched: ${lastFetchedFeedTypeRef.current}, restored: ${hasRestoredCasts})`);
         fetchingRef.current = true;
         hasInitialFetchRef.current = true;
         // Update the last fetched ref BEFORE fetching to prevent duplicate fetches
         lastFetchedFeedTypeRef.current = feedType;
+        // Update prevFeedTypeRef after we've determined we need to fetch
+        if (feedTypeChanged) {
+          prevFeedTypeRef.current = feedType;
+        }
         // Fetch the feed - fetchFeed already has the correct feedType in its closure
         fetchFeed();
         setTimeout(() => {
           fetchingRef.current = false;
         }, 1000);
+      } else if (feedTypeChanged) {
+        // If we didn't fetch but feed type changed, still update the ref
+        prevFeedTypeRef.current = feedType;
       }
+    } else if (feedTypeChanged) {
+      // Update ref even if we can't fetch (e.g., my-37 without pack)
+      prevFeedTypeRef.current = feedType;
     }
   }, [feedType, selectedCuratorFids, preferencesVersion, fetchFeed, my37PackId, my37HasUsers, viewerFid, fetchMy37PackId, sortBy, casts.length]);
   
@@ -669,8 +692,9 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
     
     lastFetchTimeRef.current = now;
     consecutiveLoadsRef.current += 1;
+    analytics.trackFeedLoadMore(feedType);
     fetchFeed(cursor);
-  }, [loading, hasMore, cursor, fetchFeed]);
+  }, [loading, hasMore, cursor, feedType, fetchFeed]);
 
   // Intersection Observer for infinite scroll
   useEffect(() => {
@@ -731,6 +755,68 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
     lastFetchTimeRef.current = 0;
   }, [feedType]);
 
+  // Track feed view time
+  useEffect(() => {
+    // End previous feed view if exists
+    if (feedViewStartTimeRef.current !== null) {
+      const duration = Math.floor((Date.now() - feedViewStartTimeRef.current) / 1000);
+      if (duration > 0) {
+        const prevFeedType = prevFeedTypeRef.current || feedType;
+        analytics.trackFeedViewTime(
+          prevFeedType,
+          duration,
+          sortBy,
+          selectedCuratorFids,
+          selectedPackIds
+        );
+      }
+    }
+
+    // Clear previous interval
+    if (feedViewIntervalRef.current) {
+      clearInterval(feedViewIntervalRef.current);
+    }
+
+    // Start tracking new feed view
+    feedViewStartTimeRef.current = Date.now();
+
+    // Send periodic updates every 30 seconds
+    feedViewIntervalRef.current = setInterval(() => {
+      if (feedViewStartTimeRef.current !== null) {
+        const duration = Math.floor((Date.now() - feedViewStartTimeRef.current) / 1000);
+        if (duration > 0) {
+          analytics.trackFeedViewTime(
+            feedType,
+            duration,
+            sortBy,
+            selectedCuratorFids,
+            selectedPackIds
+          );
+        }
+      }
+    }, 30000);
+
+    // Cleanup on unmount or feed change
+    return () => {
+      if (feedViewIntervalRef.current) {
+        clearInterval(feedViewIntervalRef.current);
+      }
+      if (feedViewStartTimeRef.current !== null) {
+        const duration = Math.floor((Date.now() - feedViewStartTimeRef.current) / 1000);
+        if (duration > 0) {
+          analytics.trackFeedViewTime(
+            feedType,
+            duration,
+            sortBy,
+            selectedCuratorFids,
+            selectedPackIds
+          );
+        }
+        feedViewStartTimeRef.current = null;
+      }
+    };
+  }, [feedType, sortBy, selectedCuratorFids, selectedPackIds]);
+
   // Close login prompt when user logs in
   useEffect(() => {
     if (viewerFid && showLoginPrompt) {
@@ -740,6 +826,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
+    analytics.trackFeedScrollToTop(feedType);
   };
 
   // Memoize the onPackReady callback to prevent My37Manager from re-rendering
@@ -821,6 +908,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
             onCuratorFidsChange={(fids) => {
               setSelectedCuratorFids(fids);
               localStorage.setItem("selectedCuratorFids", JSON.stringify(fids));
+              analytics.trackFeedCuratorFilter(feedType, fids);
             }}
           />
         )}
@@ -840,8 +928,10 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
                     key={option.value}
                     type="button"
                     onClick={() => {
-                      setSortBy(option.value as typeof sortBy);
+                      const newSortBy = option.value as typeof sortBy;
+                      setSortBy(newSortBy);
                       localStorage.setItem("curatedFeedSortBy", option.value);
+                      analytics.trackFeedSortChange(feedType, newSortBy);
                     }}
                     className={`px-2.5 py-1 text-xs rounded transition-colors ${
                       sortBy === option.value

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useNeynarContext } from "@neynar/react";
 import { AvatarImage } from "./AvatarImage";
+import { analytics } from "@/lib/analytics";
 
 interface CastComposerProps {
   parentHash?: string;
@@ -53,6 +54,18 @@ export function CastComposer({ parentHash, onSuccess }: CastComposerProps) {
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to post cast");
+      }
+
+      const data = await response.json();
+      const castHash = data.cast?.hash || data.hash;
+
+      // Track analytics
+      if (castHash) {
+        if (parentHash) {
+          analytics.trackCastReplyPost(castHash, parentHash);
+        } else {
+          analytics.trackCastPost(castHash);
+        }
       }
 
       setText("");

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useNeynarContext } from "@neynar/react";
 import { X, MessageSquare, Send } from "lucide-react";
+import { analytics } from "@/lib/analytics";
 
 interface FeedbackModalProps {
   isOpen: boolean;
@@ -57,6 +58,14 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
       }
 
       setSuccess(true);
+      
+      // Track analytics
+      analytics.trackFeedbackSubmit(
+        formData.title,
+        !!formData.description,
+        formData.castHash.trim() || undefined
+      );
+      
       setFormData({ title: "", description: "", castHash: "" });
       
       // Close modal after 2 seconds
