@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useNeynarContext } from "@neynar/react";
 import { NotificationsPanel } from "./NotificationsPanel";
 import { useNotificationPermission } from "@/lib/hooks/useNotificationPermission";
+import { useActivityMonitor } from "@/lib/hooks/useActivityMonitor";
 
 export function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0);
@@ -106,6 +107,17 @@ export function NotificationBell() {
     }
   }, []);
 
+  // Use shared activity monitor
+  const { isUserActive, isTabVisible } = useActivityMonitor({
+    inactivityThreshold: 3 * 60 * 1000, // 3 minutes
+  });
+
+  const timeoutIdRef = useRef<NodeJS.Timeout | null>(null);
+  const lastPollTimeRef = useRef(0);
+  const backoffDelayRef = useRef(5 * 60 * 1000); // 5 minutes
+  const wasActiveRef = useRef(true);
+  const wasVisibleRef = useRef(true);
+
   useEffect(() => {
     if (!user?.fid) {
       // Use refs to avoid setState in effect cleanup
@@ -116,32 +128,24 @@ export function NotificationBell() {
       return;
     }
 
-    const intervalId: NodeJS.Timeout | null = null;
-    let timeoutId: NodeJS.Timeout | null = null;
-    let inactivityTimeoutId: NodeJS.Timeout | null = null;
     const POLL_INTERVAL = 5 * 60 * 1000; // 5 minutes - NEVER poll more frequently than this
-    const INACTIVITY_THRESHOLD = 3 * 60 * 1000; // 3 minutes of inactivity before pausing
-    let backoffDelay = POLL_INTERVAL;
-    let lastPollTime = 0; // Track when we last polled to enforce 5-minute minimum
-    let isActive = true; // Track if user is currently active
-    let isPaused = false; // Track if polling is paused due to inactivity
 
     const fetchUnreadCount = async () => {
       // Enforce minimum 5-minute interval - never poll more frequently
       const now = Date.now();
-      const timeSinceLastPoll = now - lastPollTime;
-      if (timeSinceLastPoll < POLL_INTERVAL && lastPollTime > 0) {
+      const timeSinceLastPoll = now - lastPollTimeRef.current;
+      if (timeSinceLastPoll < POLL_INTERVAL && lastPollTimeRef.current > 0) {
         // Too soon since last poll, reschedule for the remaining time
         const remainingTime = POLL_INTERVAL - timeSinceLastPoll;
-        if (timeoutId) clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => {
+        if (timeoutIdRef.current) clearTimeout(timeoutIdRef.current);
+        timeoutIdRef.current = setTimeout(() => {
           fetchUnreadCount();
           scheduleNextFetch();
         }, remainingTime);
         return;
       }
       
-      lastPollTime = now;
+      lastPollTimeRef.current = now;
       try {
         // Use lightweight count endpoint instead of full notifications
         const response = await fetch(`/api/notifications/count?fid=${user.fid}`);
@@ -191,131 +195,106 @@ export function NotificationBell() {
           previousUnreadCountRef.current = unread;
           
           // Reset backoff on success
-          backoffDelay = POLL_INTERVAL;
+          backoffDelayRef.current = POLL_INTERVAL;
         } else {
           // On error, use exponential backoff (but don't exceed 10 minutes)
-          backoffDelay = Math.min(backoffDelay * 2, 10 * 60 * 1000); // Max 10 minutes
+          backoffDelayRef.current = Math.min(backoffDelayRef.current * 2, 10 * 60 * 1000); // Max 10 minutes
         }
       } catch (err) {
         console.error("Failed to fetch unread count", err);
         // Use exponential backoff on error (but don't exceed 10 minutes)
-        backoffDelay = Math.min(backoffDelay * 2, 10 * 60 * 1000); // Max 10 minutes
+        backoffDelayRef.current = Math.min(backoffDelayRef.current * 2, 10 * 60 * 1000); // Max 10 minutes
       }
     };
 
     const scheduleNextFetch = () => {
-      // Don't schedule if paused due to inactivity
-      if (isPaused) {
+      // Don't schedule if user is inactive or tab is hidden
+      if (!isUserActive || !isTabVisible) {
         return;
       }
       
-      if (timeoutId) clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        // Only fetch if still active and not paused
-        if (isActive && !isPaused) {
+      if (timeoutIdRef.current) clearTimeout(timeoutIdRef.current);
+      timeoutIdRef.current = setTimeout(() => {
+        // Only fetch if still active and tab is visible
+        if (isUserActive && isTabVisible) {
           fetchUnreadCount();
           scheduleNextFetch();
         }
-      }, backoffDelay);
+      }, backoffDelayRef.current);
     };
-
-    // Track user activity
-    const markActivity = () => {
-      const wasPaused = isPaused;
-      isActive = true;
-      
-      // Clear inactivity timeout
-      if (inactivityTimeoutId) {
-        clearTimeout(inactivityTimeoutId);
-        inactivityTimeoutId = null;
-      }
-      
-      // If we were paused and user became active, resume polling
-      if (wasPaused) {
-        isPaused = false;
-        // Check if enough time has passed since last poll (enforce 5-minute minimum)
-        const now = Date.now();
-        const timeSinceLastPoll = now - lastPollTime;
-        if (timeSinceLastPoll >= POLL_INTERVAL || lastPollTime === 0) {
-          // Enough time has passed, fetch immediately
-          fetchUnreadCount();
-        }
-        // Schedule next fetch
-        scheduleNextFetch();
-      }
-      
-      // Set inactivity timeout - if no activity for threshold, pause polling
-      inactivityTimeoutId = setTimeout(() => {
-        if (isActive && !document.hidden) {
-          isPaused = true;
-          if (timeoutId) {
-            clearTimeout(timeoutId);
-            timeoutId = null;
-          }
-        }
-      }, INACTIVITY_THRESHOLD);
-    };
-
-    // Activity event handlers
-    const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
-    activityEvents.forEach((event) => {
-      document.addEventListener(event, markActivity, { passive: true });
-    });
 
     // Immediate fetch on new session (when component mounts)
-    lastPollTime = 0; // Reset to allow immediate fetch
+    lastPollTimeRef.current = 0; // Reset to allow immediate fetch
     fetchUnreadCount();
     
     // Schedule recurring fetches every 5 minutes
     scheduleNextFetch();
-    
-    // Start activity tracking
-    markActivity();
-
-    // Handle visibility change - pause when tab is hidden, resume when visible
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        // Tab is hidden, pause polling
-        isActive = false;
-        isPaused = true;
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-          timeoutId = null;
-        }
-        if (inactivityTimeoutId) {
-          clearTimeout(inactivityTimeoutId);
-          inactivityTimeoutId = null;
-        }
-      } else {
-        // Tab is visible, resume polling if user is active
-        isActive = true;
-        isPaused = false;
-        // Check if enough time has passed since last poll (enforce 5-minute minimum)
-        const now = Date.now();
-        const timeSinceLastPoll = now - lastPollTime;
-        if (timeSinceLastPoll >= POLL_INTERVAL || lastPollTime === 0) {
-          // Enough time has passed, fetch immediately
-          fetchUnreadCount();
-        }
-        scheduleNextFetch();
-        // Restart activity tracking
-        markActivity();
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      if (intervalId) clearInterval(intervalId);
-      if (timeoutId) clearTimeout(timeoutId);
-      if (inactivityTimeoutId) clearTimeout(inactivityTimeoutId);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      // Remove all activity event listeners
-      activityEvents.forEach((event) => {
-        document.removeEventListener(event, markActivity);
-      });
+      if (timeoutIdRef.current) clearTimeout(timeoutIdRef.current);
     };
-  }, [user?.fid, isGranted, showDeviceNotifications, unreadCount]);
+  }, [user?.fid, isGranted, showDeviceNotifications]);
+
+  // Handle activity changes - resume polling when user becomes active
+  useEffect(() => {
+    if (!user?.fid) return;
+
+    const POLL_INTERVAL = 5 * 60 * 1000; // 5 minutes
+
+    if (isUserActive && !wasActiveRef.current && isTabVisible) {
+      // User became active, check if enough time has passed since last poll
+      const now = Date.now();
+      const timeSinceLastPoll = now - lastPollTimeRef.current;
+      if (timeSinceLastPoll >= POLL_INTERVAL || lastPollTimeRef.current === 0) {
+        // Enough time has passed, fetch immediately
+        const fetchUnreadCount = async () => {
+          try {
+            const response = await fetch(`/api/notifications/count?fid=${user.fid}`);
+            if (response.ok) {
+              const data = await response.json();
+              setUnreadCount(data.unreadCount || 0);
+              previousUnreadCountRef.current = data.unreadCount || 0;
+            }
+          } catch (err) {
+            console.error("Failed to fetch unread count", err);
+          }
+        };
+        fetchUnreadCount();
+        lastPollTimeRef.current = now;
+      }
+    }
+    wasActiveRef.current = isUserActive;
+  }, [isUserActive, isTabVisible, user?.fid]);
+
+  // Handle visibility changes - resume polling when tab becomes visible
+  useEffect(() => {
+    if (!user?.fid) return;
+
+    const POLL_INTERVAL = 5 * 60 * 1000; // 5 minutes
+
+    if (isTabVisible && !wasVisibleRef.current && isUserActive) {
+      // Tab became visible and user is active, check if enough time has passed
+      const now = Date.now();
+      const timeSinceLastPoll = now - lastPollTimeRef.current;
+      if (timeSinceLastPoll >= POLL_INTERVAL || lastPollTimeRef.current === 0) {
+        const fetchUnreadCount = async () => {
+          try {
+            const response = await fetch(`/api/notifications/count?fid=${user.fid}`);
+            if (response.ok) {
+              const data = await response.json();
+              setUnreadCount(data.unreadCount || 0);
+              previousUnreadCountRef.current = data.unreadCount || 0;
+            }
+          } catch (err) {
+            console.error("Failed to fetch unread count", err);
+          }
+        };
+        fetchUnreadCount();
+        lastPollTimeRef.current = now;
+      }
+    }
+    wasVisibleRef.current = isTabVisible;
+  }, [isTabVisible, isUserActive, user?.fid]);
 
   if (!user) return null;
 

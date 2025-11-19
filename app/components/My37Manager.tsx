@@ -51,9 +51,15 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
 
   // Track if we've already loaded to prevent re-fetching
   const hasLoadedRef = useRef<boolean>(false);
+  // Track debounce timer for auto-save
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Track if there's a pending auto-save or failed save
+  const [autoSaveError, setAutoSaveError] = useState<string | null>(null);
   
-  // Check if there are unsaved changes
-  const hasUnsavedChanges = useMemo(() => {
+  // Check if there are pending changes (pending save or failed save)
+  const hasPendingChanges = useMemo(() => {
+    if (saving) return true; // Currently saving
+    if (autoSaveError) return true; // Last auto-save failed
     if (!pack) return false; // No pack means nothing saved yet
     if (selectedUsers.length !== savedUsers.length) return true;
     
@@ -67,7 +73,7 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
     }
     
     return false;
-  }, [selectedUsers, savedUsers, pack]);
+  }, [selectedUsers, savedUsers, pack, saving, autoSaveError]);
   
   // Fetch My 37 pack and load local state
   const fetchOrCreatePack = useCallback(async () => {
@@ -137,7 +143,7 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
   }, [user?.fid, onPackReady]);
 
   // Create new My 37 pack
-  const createPack = async (initialUsers: UserSuggestion[]) => {
+  const createPack = useCallback(async (initialUsers: UserSuggestion[], isAutoSave = false) => {
     if (!user?.fid) return;
     
     // Don't create pack if no users
@@ -147,7 +153,11 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
 
     try {
       setSaving(true);
-      setError(null);
+      if (isAutoSave) {
+        setAutoSaveError(null);
+      } else {
+        setError(null);
+      }
       
       const fids = initialUsers.map((u) => u.fid!).filter((fid) => fid !== undefined);
       
@@ -188,25 +198,40 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
       setPack(data.pack);
       setSelectedUsers(initialUsers);
       setSavedUsers(initialUsers); // Update saved state after save
-      setError(null); // Clear any previous errors
       const hasUsers = initialUsers.length > 0;
-      setIsCollapsed(hasUsers); // Collapse after successful save
+      if (isAutoSave) {
+        setAutoSaveError(null);
+      } else {
+        setError(null); // Clear any previous errors
+        // Only collapse on manual save, not auto-save
+        setIsCollapsed(hasUsers);
+      }
       onPackReady?.(data.pack.id, hasUsers);
     } catch (err: any) {
       console.error("Error creating pack:", err);
-      setError(err.message || "Failed to create pack");
+      const errorMessage = err.message || "Failed to create pack";
+      if (isAutoSave) {
+        setAutoSaveError(errorMessage);
+      } else {
+        setError(errorMessage);
+      }
+      throw err; // Re-throw so caller can handle if needed
     } finally {
       setSaving(false);
     }
-  };
+  }, [user?.fid, onPackReady]);
 
   // Update pack with new users
-  const updatePack = useCallback(async (newUsers: UserSuggestion[]) => {
+  const updatePack = useCallback(async (newUsers: UserSuggestion[], isAutoSave = false) => {
     if (!pack || !user?.fid || saving) return;
 
     try {
       setSaving(true);
-      setError(null);
+      if (isAutoSave) {
+        setAutoSaveError(null);
+      } else {
+        setError(null);
+      }
 
       const fids = newUsers.map((u) => u.fid!).filter((fid) => fid !== undefined);
       
@@ -242,17 +267,28 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
       setPack(data.pack);
       setSelectedUsers(newUsers);
       setSavedUsers(newUsers); // Update saved state after save
-      setError(null); // Clear any previous errors
       const hasUsers = newUsers.length > 0;
-      setIsCollapsed(hasUsers); // Collapse after successful save
+      if (isAutoSave) {
+        setAutoSaveError(null);
+      } else {
+        setError(null); // Clear any previous errors
+        // Only collapse on manual save, not auto-save
+        setIsCollapsed(hasUsers);
+      }
       onPackReady?.(data.pack.id, hasUsers);
     } catch (err: any) {
       console.error("Error updating pack:", err);
-      setError(err.message || "Failed to update pack");
+      const errorMessage = err.message || "Failed to update pack";
+      if (isAutoSave) {
+        setAutoSaveError(errorMessage);
+      } else {
+        setError(errorMessage);
+      }
+      throw err; // Re-throw so caller can handle if needed
     } finally {
       setSaving(false);
     }
-  }, [pack, user?.fid, saving, onPackReady]);
+  }, [pack, user?.fid, onPackReady]);
 
   // Fetch suggested users from bestfriends
   const fetchSuggestedUsers = useCallback(async () => {
@@ -276,8 +312,57 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
     }
   }, [user?.fid, fetchOrCreatePack, fetchSuggestedUsers]);
 
-  // Handle user selection - only update local state, don't save to DB
-  const handleUsersChange = (newUsers: UserSuggestion[]) => {
+  // Cleanup auto-save timer on unmount
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  // Debounced auto-save function
+  const triggerAutoSave = useCallback((usersToSave: UserSuggestion[]) => {
+    // Clear any existing timer
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+
+    // Skip auto-save if:
+    // - No user authenticated
+    // - Currently saving (manual save in progress)
+    // - Still loading initial data
+    if (!user?.fid || saving || loading) {
+      return;
+    }
+
+    // Set up debounced auto-save (1 second delay)
+    autoSaveTimerRef.current = setTimeout(async () => {
+      // Double-check we're not saving before executing
+      if (saving) return;
+      
+      // Skip if no users and no pack exists
+      if (usersToSave.length === 0 && !pack) {
+        return;
+      }
+
+      try {
+        if (pack) {
+          await updatePack(usersToSave, true);
+        } else if (usersToSave.length > 0) {
+          await createPack(usersToSave, true);
+        }
+      } catch (err) {
+        // Error already handled in createPack/updatePack with autoSaveError state
+        console.error("Auto-save failed:", err);
+      }
+    }, 1000);
+  }, [user?.fid, pack, saving, loading, updatePack, createPack]);
+
+  // Handle user selection - update local state and trigger auto-save
+  const handleUsersChange = useCallback((newUsers: UserSuggestion[]) => {
     // Enforce maximum limit
     const limitedUsers = newUsers.slice(0, MAX_USERS);
     if (newUsers.length > MAX_USERS) {
@@ -290,22 +375,32 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
         display_name: u.display_name,
         pfp_url: u.pfp_url,
       }))));
+      // Trigger auto-save
+      triggerAutoSave(limitedUsers);
       return;
     }
     setError(null);
     setSelectedUsers(newUsers);
-    // Save to localStorage only
+    // Save to localStorage
     localStorage.setItem("my37SelectedUsers", JSON.stringify(newUsers.map(u => ({
       fid: u.fid,
       username: u.username,
       display_name: u.display_name,
       pfp_url: u.pfp_url,
     }))));
-  };
+    // Trigger auto-save
+    triggerAutoSave(newUsers);
+  }, [triggerAutoSave]);
 
   // Save to database when user clicks save button
   const handleSave = async () => {
     if (!user?.fid || saving) return;
+    
+    // Cancel any pending auto-save
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
     
     if (selectedUsers.length === 0) {
       setError("Please select at least one user");
@@ -320,11 +415,12 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
     try {
       setSaving(true);
       setError(null);
+      setAutoSaveError(null); // Clear auto-save errors on manual save
 
       if (pack) {
-        await updatePack(selectedUsers);
+        await updatePack(selectedUsers, false);
       } else {
-        await createPack(selectedUsers);
+        await createPack(selectedUsers, false);
       }
     } catch (err: any) {
       console.error("Error saving pack:", err);
@@ -368,9 +464,9 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
                     <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full">
                       {selectedUsers.length}
                     </span>
-                    {hasUnsavedChanges && (
+                    {hasPendingChanges && (
                       <span className="px-1.5 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
-                        unsaved
+                        {autoSaveError ? "error" : saving ? "saving" : "pending"}
                       </span>
                     )}
                   </div>
@@ -481,22 +577,30 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
               </div>
             )}
 
-            {saving && (
-              <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-sm text-blue-600 dark:text-blue-400">
-                Saving...
+            {autoSaveError && (
+              <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-sm text-amber-600 dark:text-amber-400">
+                Auto-save failed: {autoSaveError}. Click Save to retry.
               </div>
             )}
 
             {/* Save button */}
             <div className="mb-4 flex items-center justify-between">
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                {pack ? "Changes saved locally. Click Save to update your feed." : "Select users and click Save to create your feed."}
+              <div className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
+                {saving && (
+                  <svg className="animate-spin h-4 w-4 text-blue-600 dark:text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                )}
+                <span>
+                  {pack ? "Changes are saved automatically" : "Select users and click Save to create your feed."}
+                </span>
               </div>
               <button
                 onClick={handleSave}
                 disabled={saving || selectedUsers.length === 0 || selectedUsers.length > MAX_USERS}
                 className={`px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium ${
-                  hasUnsavedChanges
+                  hasPendingChanges
                     ? "bg-amber-600 text-white hover:bg-amber-700 dark:bg-amber-600 dark:hover:bg-amber-700"
                     : "bg-blue-600 text-white hover:bg-blue-700"
                 }`}

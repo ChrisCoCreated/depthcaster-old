@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       try {
         const userResponse = await neynarClient.fetchBulkUsers({ fids: [userFid] });
         const fetchedUser = userResponse.users?.[0];
-        isProUser = hasActiveProSubscription(fetchedUser);
+        isProUser = hasActiveProSubscription(fetchedUser as any);
       } catch (error) {
         console.error("Error verifying pro status:", error);
       }

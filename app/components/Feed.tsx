@@ -11,6 +11,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { saveFeedState, getFeedState, isStateStale, throttle } from "@/lib/feedState";
 import { NeynarAuthButton } from "@neynar/react";
 import { analytics } from "@/lib/analytics";
+import { useActivityMonitor } from "@/lib/hooks/useActivityMonitor";
 
 interface Curator {
   fid: number;
@@ -90,6 +91,12 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [sortBy, setSortBy] = useState<"recently-curated" | "time-of-cast" | "recent-reply">("recent-reply");
   const sortByInitializedRef = useRef(false);
+  const [hasNewCuratedCasts, setHasNewCuratedCasts] = useState(false);
+  
+  // Use shared activity monitor for curated feed refresh
+  const { isUserActive, isTabVisible } = useActivityMonitor({
+    inactivityThreshold: 3 * 60 * 1000, // 3 minutes
+  });
   
   // Load sortBy from localStorage after hydration (only once)
   useEffect(() => {
@@ -845,12 +852,198 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
     }, 50);
   }, []);
 
+  // Check for new curated casts without updating the UI
+  const checkForNewCuratedCasts = useCallback(async () => {
+    if (feedType !== "curated" || loading || casts.length === 0) {
+      return;
+    }
+
+    try {
+      const preferences = getFeedPreferences();
+      const params = new URLSearchParams({
+        feedType: "curated",
+        limit: "30",
+      });
+
+      if (viewerFid) {
+        params.append("viewerFid", viewerFid.toString());
+      }
+
+      if (preferences.hideDollarCasts) {
+        params.append("hideDollarCasts", "true");
+      }
+      if (preferences.hideShortCasts) {
+        params.append("hideShortCasts", "true");
+        params.append("minCastLength", preferences.minCastLength.toString());
+      }
+      if (preferences.hideTradingWords && preferences.tradingWords.length > 0) {
+        params.append("hideTradingWords", "true");
+        params.append("tradingWords", preferences.tradingWords.join(","));
+      }
+
+      params.append("curatorFids", selectedCuratorFids.join(","));
+      params.append("sortBy", sortBy);
+
+      const response = await fetch(`/api/feed?${params}`);
+      if (!response.ok) {
+        return;
+      }
+
+      const data = await response.json();
+      const newCasts = data.casts || [];
+
+      // Compare first cast hash to detect if feed has new content
+      if (newCasts.length > 0 && casts.length > 0) {
+        const currentFirstHash = casts[0]?.hash;
+        const newFirstHash = newCasts[0]?.hash;
+        
+        // Check if there are any new casts (different first cast or new casts at the top)
+        if (newFirstHash !== currentFirstHash) {
+          // Check if any of the new top casts are not in current casts
+          const currentHashes = new Set(casts.map(c => c.hash));
+          const hasNewContent = newCasts.some((cast: Cast) => !currentHashes.has(cast.hash));
+          
+          if (hasNewContent) {
+            setHasNewCuratedCasts(true);
+          }
+        } else {
+          setHasNewCuratedCasts(false);
+        }
+      }
+    } catch (err) {
+      // Silently fail - don't show errors for background checks
+      console.error("[Feed] Error checking for new curated casts:", err);
+    }
+  }, [feedType, loading, casts, viewerFid, selectedCuratorFids, sortBy]);
+
+  // Activity-aware polling for curated feed
+  const lastCheckTimeRef = useRef(0);
+  const checkTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const wasActiveRef = useRef(true);
+  const wasVisibleRef = useRef(true);
+
+  useEffect(() => {
+    if (feedType !== "curated") {
+      setHasNewCuratedCasts(false);
+      if (checkTimeoutRef.current) {
+        clearTimeout(checkTimeoutRef.current);
+        checkTimeoutRef.current = null;
+      }
+      return;
+    }
+
+    const ACTIVE_POLL_INTERVAL = 60 * 1000; // 1 minute when active
+    const INACTIVE_POLL_INTERVAL = 10 * 60 * 1000; // 10 minutes when inactive
+
+    const scheduleNextCheck = () => {
+      if (checkTimeoutRef.current) {
+        clearTimeout(checkTimeoutRef.current);
+      }
+
+      // Determine poll interval based on activity state
+      const pollInterval = isUserActive && isTabVisible 
+        ? ACTIVE_POLL_INTERVAL 
+        : INACTIVE_POLL_INTERVAL;
+
+      checkTimeoutRef.current = setTimeout(() => {
+        if (feedType === "curated" && !loading) {
+          checkForNewCuratedCasts();
+          scheduleNextCheck();
+        }
+      }, pollInterval);
+    };
+
+    // Initial check and schedule
+    const now = Date.now();
+    const timeSinceLastCheck = now - lastCheckTimeRef.current;
+    
+    // Check immediately if enough time has passed or on first check
+    if (timeSinceLastCheck >= ACTIVE_POLL_INTERVAL || lastCheckTimeRef.current === 0) {
+      checkForNewCuratedCasts();
+      lastCheckTimeRef.current = now;
+    }
+    
+    scheduleNextCheck();
+
+    return () => {
+      if (checkTimeoutRef.current) {
+        clearTimeout(checkTimeoutRef.current);
+      }
+    };
+  }, [feedType, isUserActive, isTabVisible, checkForNewCuratedCasts, loading]);
+
+  // Handle activity changes - check immediately when user becomes active
+  useEffect(() => {
+    if (feedType !== "curated" || loading) return;
+
+    if (isUserActive && !wasActiveRef.current && isTabVisible) {
+      // User became active, check immediately
+      checkForNewCuratedCasts();
+      lastCheckTimeRef.current = Date.now();
+    }
+    wasActiveRef.current = isUserActive;
+  }, [isUserActive, isTabVisible, feedType, checkForNewCuratedCasts, loading]);
+
+  // Handle visibility changes - check immediately when tab becomes visible
+  useEffect(() => {
+    if (feedType !== "curated" || loading) return;
+
+    if (isTabVisible && !wasVisibleRef.current && isUserActive) {
+      // Tab became visible and user is active, check immediately
+      checkForNewCuratedCasts();
+      lastCheckTimeRef.current = Date.now();
+    }
+    wasVisibleRef.current = isTabVisible;
+  }, [isTabVisible, isUserActive, feedType, checkForNewCuratedCasts, loading]);
+
+  // Clear new casts indicator when feed is refreshed
+  useEffect(() => {
+    if (feedType === "curated" && casts.length > 0) {
+      setHasNewCuratedCasts(false);
+    }
+  }, [casts, feedType]);
+
   return (
     <div className="w-full max-w-4xl mx-auto overflow-x-hidden">
       {/* Close Friends Prompt - shown at top of curated feed */}
       {feedType === "curated" && viewerFid && (
         <div className="mb-4">
           <CloseFriendsPrompt />
+        </div>
+      )}
+
+      {/* New curated casts available banner */}
+      {feedType === "curated" && hasNewCuratedCasts && (
+        <div className="mb-4 mx-2 sm:mx-4">
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <svg
+                className="w-5 h-5 text-blue-600 dark:text-blue-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                New curated casts available
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                setHasNewCuratedCasts(false);
+                fetchFeed();
+              }}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 rounded-lg transition-colors"
+            >
+              Refresh
+            </button>
+          </div>
         </div>
       )}
 

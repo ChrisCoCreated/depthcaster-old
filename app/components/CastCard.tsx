@@ -16,6 +16,8 @@ import { convertBaseAppLinksInline, isFarcasterLink, extractCastHashFromUrl } fr
 import { calculateEngagementScore } from "@/lib/engagement";
 import { AvatarImage } from "./AvatarImage";
 import { analytics } from "@/lib/analytics";
+import { hasActiveProSubscription } from "@/lib/castLimits";
+import { VideoPlayer } from "./VideoPlayer";
 
 // Helper function to convert URLs in text to clickable links
 function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>, insideLink: boolean = false) {
@@ -1876,8 +1878,8 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
               <span className="text-gray-500 dark:text-gray-400 text-xs sm:text-sm">
                 @{author.username}
               </span>
-              {author.power_badge && (
-                <span className="text-blue-500 text-sm" title="Power Badge">
+              {hasActiveProSubscription(author as any) && (
+                <span className="text-blue-500 text-sm" title="Pro User">
                   ⚡
                 </span>
               )}
@@ -2246,13 +2248,23 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                       return null;
                     }
                     
-                    // Video embed
-                    if (metadata?.video) {
-                      const videoMeta = metadata.video;
+                    // Video embed - check metadata.video first, then check if URL is a video file
+                    const isVideoUrl = embed.url && (
+                      embed.url.includes('.m3u8') ||
+                      embed.url.includes('.mp4') ||
+                      embed.url.includes('.webm') ||
+                      embed.url.includes('.mov') ||
+                      embed.url.includes('stream.farcaster.xyz/v1/video') ||
+                      metadata?.content_type?.startsWith('video/')
+                    );
+                    
+                    if (metadata?.video || isVideoUrl) {
+                      const videoMeta = metadata?.video;
+                      const videoUrl = videoMeta?.url || embed.url;
                       return (
                         <div key={index} className="rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800">
-                          <video
-                            src={videoMeta.url || embed.url}
+                          <VideoPlayer
+                            src={videoUrl}
                             controls
                             className="w-full max-h-96"
                           />

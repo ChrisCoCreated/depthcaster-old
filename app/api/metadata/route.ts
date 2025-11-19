@@ -112,6 +112,19 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json(response);
   } catch (error: any) {
+    // Check if it's an HTTP status error (expected for inaccessible URLs)
+    const isHttpStatusError = error.message?.includes('BAD_HTTP_STATUS') || 
+                              error.message?.includes('http status not OK');
+    
+    if (isHttpStatusError) {
+      // Don't log expected HTTP errors - they're normal for inaccessible URLs
+      return NextResponse.json(
+        { error: "URL is not accessible" },
+        { status: 404 }
+      );
+    }
+    
+    // Only log unexpected errors
     console.error("[Metadata API] Metadata fetch error:", error);
     console.error("[Metadata API] Error stack:", error.stack);
     return NextResponse.json(

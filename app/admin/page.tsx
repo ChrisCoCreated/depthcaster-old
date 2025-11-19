@@ -191,6 +191,23 @@ export default function AdminPage() {
         </div>
 
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 mb-6">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+            Experimental Features
+          </h2>
+          <div className="space-y-4">
+            <Link
+              href="/admin/art-feed"
+              className="block px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-center"
+            >
+              Art Feed
+            </Link>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              View images from any user's casts in a horizontal scrolling gallery
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 mb-6">
           <BuildIdeasManager />
         </div>
 

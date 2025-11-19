@@ -5,6 +5,7 @@ import { LookupCastConversationTypeEnum, FetchCastQuotesTypeEnum } from "@neynar
 import { meetsCastQualityThreshold } from "./cast-quality";
 import { Cast } from "@neynar/nodejs-sdk/build/api";
 import { sql } from "drizzle-orm";
+import { upsertBulkUsers } from "./users";
 
 /**
  * Recursively traverse conversation tree and collect all replies
@@ -55,6 +56,31 @@ async function collectReplies(
       }
     }
   }
+}
+
+/**
+ * Extract author data from casts and build a user data map for bulk upsertion
+ * @param casts - Array of cast objects
+ * @returns Map of fid to user data
+ */
+function extractAuthorDataFromCasts(casts: any[]): Map<number, { username?: string; displayName?: string; pfpUrl?: string }> {
+  const userDataMap = new Map<number, { username?: string; displayName?: string; pfpUrl?: string }>();
+  
+  for (const cast of casts) {
+    const author = cast?.author;
+    if (author?.fid) {
+      const fid = author.fid;
+      if (!userDataMap.has(fid)) {
+        userDataMap.set(fid, {
+          username: author.username,
+          displayName: author.display_name,
+          pfpUrl: author.pfp_url,
+        });
+      }
+    }
+  }
+  
+  return userDataMap;
 }
 
 /**
@@ -142,6 +168,17 @@ export async function fetchAndStoreConversation(
 
     // Insert replies (use onConflictDoNothing to handle duplicates)
     if (storedReplies.length > 0) {
+      // Ensure all authors exist in users table before inserting replies
+      const authorDataMap = extractAuthorDataFromCasts(qualityReplies.map(r => r.cast));
+      if (authorDataMap.size > 0) {
+        try {
+          await upsertBulkUsers(authorDataMap);
+        } catch (error) {
+          console.error(`[fetchAndStoreConversation] Error upserting authors before regular replies:`, error);
+          // Continue anyway - individual inserts may still work if some users exist
+        }
+      }
+      
       await db
         .insert(castReplies)
         .values(storedReplies)
@@ -237,6 +274,18 @@ export async function fetchAndStoreConversation(
 
       if (storedQuotes.length > 0) {
         console.log(`[fetchAndStoreConversation] Storing ${storedQuotes.length} quote casts for cast ${castHash}`);
+        
+        // Ensure all authors exist in users table before inserting quote casts
+        const quoteAuthorDataMap = extractAuthorDataFromCasts(qualityQuotes);
+        if (quoteAuthorDataMap.size > 0) {
+          try {
+            await upsertBulkUsers(quoteAuthorDataMap);
+          } catch (error) {
+            console.error(`[fetchAndStoreConversation] Error upserting authors before quote casts:`, error);
+            // Continue anyway - individual inserts may still work if some users exist
+          }
+        }
+        
         await db
           .insert(castReplies)
           .values(storedQuotes)
@@ -339,6 +388,17 @@ export async function fetchAndStoreConversation(
             });
 
             if (storedQuoteReplies.length > 0) {
+              // Ensure all authors exist in users table before inserting replies to quote casts
+              const quoteReplyAuthorDataMap = extractAuthorDataFromCasts(qualityQuoteReplies.map(r => r.cast));
+              if (quoteReplyAuthorDataMap.size > 0) {
+                try {
+                  await upsertBulkUsers(quoteReplyAuthorDataMap);
+                } catch (error) {
+                  console.error(`[fetchAndStoreConversation] Error upserting authors before quote cast replies:`, error);
+                  // Continue anyway - individual inserts may still work if some users exist
+                }
+              }
+              
               await db
                 .insert(castReplies)
                 .values(storedQuoteReplies)

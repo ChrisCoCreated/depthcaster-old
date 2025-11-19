@@ -6,3 +6,5 @@ ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "signer_uuid" text;
 CREATE INDEX IF NOT EXISTS "signer_uuid_idx" ON "users" USING btree ("signer_uuid");
 
 
+
+
