@@ -21,8 +21,6 @@ export function OnboardingFlow() {
   const [currentStep, setCurrentStep] = useState(0);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
 
-  if (!showOnboarding) return null;
-
   const handleRequestNotificationPermission = async () => {
     setIsRequestingPermission(true);
     try {
@@ -137,6 +135,8 @@ export function OnboardingFlow() {
       analytics.trackOnboardingStep("start");
     }
   }, [showOnboarding, currentStep]);
+
+  if (!showOnboarding) return null;
 
   return (
     <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
