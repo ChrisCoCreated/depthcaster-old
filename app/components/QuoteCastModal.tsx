@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, type ReactElement } from "react";
+import { useState, useEffect, useMemo, type ReactElement } from "react";
 import { Cast } from "@neynar/nodejs-sdk/build/api";
 import { useNeynarContext } from "@neynar/react";
 import { convertBaseAppLinksInline, isFarcasterLink, extractCastHashFromUrl } from "@/lib/link-converter";
@@ -8,6 +8,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AvatarImage } from "./AvatarImage";
 import { analytics } from "@/lib/analytics";
+import {
+  PRO_CAST_BYTE_LIMIT,
+  ProSubscriptionLike,
+  getMaxCastBytes,
+  getUtf8ByteLength,
+  hasActiveProSubscription,
+} from "@/lib/castLimits";
 
 // Helper function to convert URLs in text to clickable links
 function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>) {
@@ -156,6 +163,15 @@ export function QuoteCastModal({ cast, isOpen, onClose, onSuccess }: QuoteCastMo
   const [error, setError] = useState<string | null>(null);
   const { user } = useNeynarContext();
   const router = useRouter();
+  const userWithPro = user as (typeof user) & ProSubscriptionLike;
+  const isProUser = hasActiveProSubscription(userWithPro);
+  const maxBytes = getMaxCastBytes(isProUser);
+  const byteLength = useMemo(() => getUtf8ByteLength(text), [text]);
+  const isOverLimit = byteLength > maxBytes;
+  const proLimitLabel = PRO_CAST_BYTE_LIMIT.toLocaleString();
+  const lengthWarning = isOverLimit
+    ? `Cast exceeds the ${maxBytes} byte limit${isProUser ? "" : `. Upgrade to Pro for up to ${proLimitLabel} bytes.`}`
+    : null;
 
   useEffect(() => {
     if (isOpen) {
@@ -199,6 +215,13 @@ export function QuoteCastModal({ cast, isOpen, onClose, onSuccess }: QuoteCastMo
 
     if (!text.trim()) {
       setError("Quote text cannot be empty");
+      return;
+    }
+
+    if (isOverLimit) {
+      setError(
+        `Cast exceeds the ${maxBytes} byte limit${isProUser ? "" : ". Upgrade to Pro for longer casts."}`
+      );
       return;
     }
 
@@ -251,6 +274,13 @@ export function QuoteCastModal({ cast, isOpen, onClose, onSuccess }: QuoteCastMo
       setError(err.message || "Failed to quote cast");
     } finally {
       setIsPosting(false);
+    }
+  };
+
+  const handleTextChange = (value: string) => {
+    setText(value);
+    if (error) {
+      setError(null);
     }
   };
 
@@ -310,12 +340,11 @@ export function QuoteCastModal({ cast, isOpen, onClose, onSuccess }: QuoteCastMo
             <div className="flex-1">
               <textarea
                 value={text}
-                onChange={(e) => setText(e.target.value)}
+                onChange={(e) => handleTextChange(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Add a comment..."
                 className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-black text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 resize-none"
                 rows={4}
-                maxLength={320}
               />
 
               {/* Quoted cast preview - indented below comment */}
@@ -343,6 +372,12 @@ export function QuoteCastModal({ cast, isOpen, onClose, onSuccess }: QuoteCastMo
                 </div>
               </div>
 
+              {lengthWarning && (
+                <div className="mt-2 text-sm text-red-600 dark:text-red-400">
+                  {lengthWarning}
+                </div>
+              )}
+
               {error && (
                 <div className="mt-2 text-sm text-red-600 dark:text-red-400">
                   {error}
@@ -350,8 +385,8 @@ export function QuoteCastModal({ cast, isOpen, onClose, onSuccess }: QuoteCastMo
               )}
 
               <div className="flex items-center justify-between mt-4">
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {text.length}/320
+                <span className={`text-xs ${isOverLimit ? "text-red-600 dark:text-red-400" : "text-gray-500 dark:text-gray-400"}`}>
+                  {byteLength}/{maxBytes}
                 </span>
                 <div className="flex gap-2">
                   <button
@@ -363,7 +398,7 @@ export function QuoteCastModal({ cast, isOpen, onClose, onSuccess }: QuoteCastMo
                   </button>
                   <button
                     type="submit"
-                    disabled={isPosting || !text.trim()}
+                    disabled={isPosting || !text.trim() || isOverLimit}
                     className="px-6 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 rounded-full hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {isPosting ? "Quoting..." : "Quote Cast"}

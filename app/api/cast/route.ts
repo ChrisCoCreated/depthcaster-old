@@ -7,6 +7,13 @@ import { curatedCasts, castReplies } from "@/lib/schema";
 import { eq, sql } from "drizzle-orm";
 import { isQuoteCast, extractQuotedCastHashes, getRootCastHash, fetchAndStoreConversation } from "@/lib/conversation";
 import { meetsCastQualityThreshold } from "@/lib/cast-quality";
+import {
+  PRO_CAST_BYTE_LIMIT,
+  STANDARD_CAST_BYTE_LIMIT,
+  getMaxCastBytes,
+  getUtf8ByteLength,
+  hasActiveProSubscription,
+} from "@/lib/castLimits";
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,16 +27,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const cast = await neynarClient.publishCast({
-      signerUuid,
-      text: text || "",
-      parent,
-      embeds,
-      channelId,
-      parentAuthorFid,
-    });
+    const normalizedText = typeof text === "string" ? text : "";
+    const trimmedText = normalizedText.trim();
 
-    // Get user FID from signer
+    if (!trimmedText) {
+      return NextResponse.json(
+        { error: "Cast text cannot be empty" },
+        { status: 400 }
+      );
+    }
+
+    // Get user FID from signer before publishing (needed for pro checks)
     let userFid: number | undefined;
     try {
       const signer = await neynarClient.lookupSigner({ signerUuid });
@@ -37,6 +45,36 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       console.error("Error fetching signer:", error);
     }
+
+    const textByteLength = getUtf8ByteLength(trimmedText);
+    let isProUser = false;
+
+    if (textByteLength > STANDARD_CAST_BYTE_LIMIT && userFid) {
+      try {
+        const userResponse = await neynarClient.fetchBulkUsers({ fids: [userFid] });
+        const fetchedUser = userResponse.users?.[0];
+        isProUser = hasActiveProSubscription(fetchedUser);
+      } catch (error) {
+        console.error("Error verifying pro status:", error);
+      }
+    }
+
+    const maxBytesAllowed = getMaxCastBytes(isProUser);
+    if (textByteLength > maxBytesAllowed) {
+      const errorMessage = isProUser
+        ? `Pro casts are limited to ${PRO_CAST_BYTE_LIMIT} bytes.`
+        : `Standard casts are limited to ${STANDARD_CAST_BYTE_LIMIT} bytes. Upgrade to Pro to post up to ${PRO_CAST_BYTE_LIMIT} bytes.`;
+      return NextResponse.json({ error: errorMessage }, { status: 400 });
+    }
+
+    const cast = await neynarClient.publishCast({
+      signerUuid,
+      text: trimmedText,
+      parent,
+      embeds,
+      channelId,
+      parentAuthorFid,
+    });
 
     // Track interaction if this is a reply or quote to a curated cast thread
     if (userFid) {
