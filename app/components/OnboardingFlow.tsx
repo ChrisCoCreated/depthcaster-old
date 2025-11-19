@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNotificationPermission } from "@/lib/hooks/useNotificationPermission";
 import { useOnboarding } from "@/lib/hooks/useOnboarding";
+import { analytics } from "@/lib/analytics";
 
 interface OnboardingStep {
   title: string;
@@ -19,8 +20,6 @@ export function OnboardingFlow() {
   const { isGranted, requestPermission } = useNotificationPermission();
   const [currentStep, setCurrentStep] = useState(0);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
-
-  if (!showOnboarding) return null;
 
   const handleRequestNotificationPermission = async () => {
     setIsRequestingPermission(true);
@@ -116,15 +115,28 @@ export function OnboardingFlow() {
 
   const handleNext = () => {
     if (isLastStep) {
+      analytics.trackOnboardingStep("complete");
       completeOnboarding();
     } else {
-      setCurrentStep((prev) => prev + 1);
+      const nextStep = currentStep + 1;
+      setCurrentStep(nextStep);
+      analytics.trackOnboardingStep(`step_${nextStep}`);
     }
   };
 
   const handleSkip = () => {
+    analytics.trackOnboardingStep("skip");
     skipOnboarding();
   };
+
+  // Track initial step
+  useEffect(() => {
+    if (showOnboarding && currentStep === 0) {
+      analytics.trackOnboardingStep("start");
+    }
+  }, [showOnboarding, currentStep]);
+
+  if (!showOnboarding) return null;
 
   return (
     <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useNeynarContext } from "@neynar/react";
+import { analytics } from "@/lib/analytics";
 
 const DEFAULT_HIDDEN_BOTS = ["betonbangers", "deepbot", "bracky", "hunttown.eth"];
 
@@ -61,9 +62,11 @@ export function BotSettings({}: BotSettingsProps) {
         const data = await response.json();
         if (updatedHideBots !== undefined) {
           setHideBots(data.hideBots);
+          analytics.trackSettingsBotChange("hideBots", data.hideBots);
         }
         if (updatedHiddenBots) {
           setHiddenBots(data.hiddenBots);
+          analytics.trackSettingsBotChange("hiddenBots", data.hiddenBots);
         }
       }
     } catch (error) {

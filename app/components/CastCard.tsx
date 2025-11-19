@@ -15,6 +15,7 @@ import { shouldHideImages } from "./FeedSettings";
 import { convertBaseAppLinksInline, isFarcasterLink, extractCastHashFromUrl } from "@/lib/link-converter";
 import { calculateEngagementScore } from "@/lib/engagement";
 import { AvatarImage } from "./AvatarImage";
+import { analytics } from "@/lib/analytics";
 
 // Helper function to convert URLs in text to clickable links
 function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>, insideLink: boolean = false) {
@@ -531,27 +532,51 @@ function DynamicImageGrid({ embeds, indices, embedMetadata, onImageClick }: Dyna
     let imageUrl = embed.url;
     const linkUrl = embed.url;
     
+    // Check if this is an X/Twitter link
+    let isXEmbed = false;
+    try {
+      if (embed.url) {
+        const urlObj = new URL(embed.url);
+        isXEmbed = urlObj.hostname === 'x.com' || urlObj.hostname === 'twitter.com' || urlObj.hostname === 'www.twitter.com' || urlObj.hostname === 'www.x.com';
+      }
+    } catch {
+      // Invalid URL, skip
+    }
+    
     if (embed.metadata) {
       const metadata = embed.metadata;
       if (metadata.image || (metadata.content_type && metadata.content_type.startsWith('image/'))) {
         imageUrl = embed.url;
+        // Check if it's a Twitter emoji SVG (only for X/Twitter links)
+        if (isXEmbed && imageUrl && (imageUrl.includes('twimg.com/emoji') || imageUrl.includes('/svg/'))) {
+          imageUrl = null;
+        }
       } else {
         if (metadata.html?.ogImage) {
           const ogImages = Array.isArray(metadata.html.ogImage) ? metadata.html.ogImage : [metadata.html.ogImage];
           const nonEmojiImage = ogImages.find((img: any) => {
             if (!img.url) return false;
             if (img.type === 'svg') return false;
-            if (img.url.includes('twimg.com/emoji') || img.url.includes('/svg/')) return false;
+            // Only filter emoji for X/Twitter links
+            if (isXEmbed && (img.url.includes('twimg.com/emoji') || img.url.includes('/svg/'))) return false;
             return true;
           });
           if (nonEmojiImage) imageUrl = nonEmojiImage.url;
         }
         if (!imageUrl && metadata.image) {
-          imageUrl = typeof metadata.image === 'string' ? metadata.image : metadata.image?.url || null;
+          const img = typeof metadata.image === 'string' ? metadata.image : metadata.image?.url || null;
+          // Filter out Twitter emoji SVGs (only for X/Twitter links)
+          if (img && (!isXEmbed || (!img.includes('twimg.com/emoji') && !img.includes('/svg/')))) {
+            imageUrl = img;
+          }
         }
         if (!imageUrl && metadata.ogImage) {
           const ogImg = Array.isArray(metadata.ogImage) ? metadata.ogImage[0] : metadata.ogImage;
-          imageUrl = typeof ogImg === 'string' ? ogImg : ogImg?.url || null;
+          const img = typeof ogImg === 'string' ? ogImg : ogImg?.url || null;
+          // Filter out Twitter emoji SVGs (only for X/Twitter links)
+          if (img && (!isXEmbed || (!img.includes('twimg.com/emoji') && !img.includes('/svg/')))) {
+            imageUrl = img;
+          }
         }
         if (!imageUrl) {
           const fetchedMeta = embedMetadata.get(embed.url);
@@ -560,6 +585,11 @@ function DynamicImageGrid({ embeds, indices, embedMetadata, onImageClick }: Dyna
           }
         }
       }
+    }
+    
+    // Final check: filter out Twitter emoji SVGs (only for X/Twitter links)
+    if (isXEmbed && imageUrl && (imageUrl.includes('twimg.com/emoji') || imageUrl.includes('/svg/'))) {
+      imageUrl = null;
     }
     
     return { imageUrl, linkUrl };
@@ -877,6 +907,17 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
   const [showAutoLikeNotification, setShowAutoLikeNotification] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Track cast view and conversation view
+  useEffect(() => {
+    if (cast.hash && cast.author?.fid) {
+      if (showThread) {
+        analytics.trackConversationView(cast.hash, cast.author.fid);
+      } else {
+        analytics.trackCastView(cast.hash, cast.author.fid, feedType);
+      }
+    }
+  }, [cast.hash, cast.author?.fid, showThread, feedType]);
 
   // Listen for preference changes to trigger re-render
   useEffect(() => {
@@ -1196,6 +1237,13 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to toggle like");
       }
+
+      // Track analytics
+      if (wasLiked) {
+        analytics.trackCastUnlike(cast.hash, cast.author.fid, feedType);
+      } else {
+        analytics.trackCastLike(cast.hash, cast.author.fid, feedType);
+      }
     } catch (error: any) {
       console.error("Like error:", error);
       alert(error.message || "Failed to toggle like");
@@ -1241,6 +1289,13 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
         throw new Error(errorData.error || "Failed to toggle recast");
       }
 
+      // Track analytics
+      if (wasRecasted) {
+        analytics.trackCastUnrecast(cast.hash, cast.author.fid, feedType);
+      } else {
+        analytics.trackCastRecast(cast.hash, cast.author.fid, feedType);
+      }
+
       if (onUpdate) {
         onUpdate();
       }
@@ -1259,6 +1314,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
     }
     setShowRecastMenu(false);
     setShowQuoteModal(true);
+    analytics.trackCastQuote(cast.hash, cast.author.fid, feedType);
   };
 
   const handleOpenInFarcaster = () => {
@@ -1400,6 +1456,9 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
               setCurators(data.curatorInfo || []);
             }
 
+      // Track analytics
+      analytics.trackUncurateCast(cast.hash, user.fid);
+
       if (onUpdate) {
         onUpdate();
       }
@@ -1470,6 +1529,9 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
         updatedCurators = data.curatorInfo || [];
         setCurators(updatedCurators);
       }
+
+      // Track analytics
+      analytics.trackCurateCast(cast.hash, user.fid);
 
       // Check if auto-like is enabled and handle auto-like
       if (user?.fid && user?.signer_uuid) {
@@ -1768,13 +1830,6 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
             {/* Parent cast display for quote casts that are not root */}
             {(cast as any)._isQuoteCast && (cast as any)._parentCast && (() => {
               const parentCast = (cast as any)._parentCast;
-              console.log(`[CastCard] Rendering parent cast for ${cast.hash}:`, {
-                parentHash: parentCast.hash,
-                parentAuthor: parentCast.author?.username,
-                parentText: parentCast.text?.substring(0, 50),
-                quoteCastAuthor: cast.author?.username,
-                quoteCastText: cast.text?.substring(0, 50),
-              });
               return (
                 <div className="mb-2 -mx-2 px-2">
                   <div className="mb-1.5">
@@ -2069,6 +2124,14 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                       if (!authorName && fetchedMeta.author_name) authorName = fetchedMeta.author_name;
                     }
                     
+                    // Final check: filter out Twitter emoji SVGs before rendering (only for X/Twitter links)
+                    if (imageUrl && isXEmbed) {
+                      const isTwitterEmoji = imageUrl.includes('twimg.com/emoji') || imageUrl.includes('/svg/');
+                      if (isTwitterEmoji) {
+                        imageUrl = null;
+                      }
+                    }
+                    
                     // Show card layout if we have any metadata OR if it's a YouTube/X link (even without metadata)
                     if (metadata?.html || title || description || imageUrl || isXEmbed || isYouTube) {
                       
@@ -2087,7 +2150,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                           >
                             <div className="flex">
                               {/* Image on the left - small, full height */}
-                              {imageUrl && !hideImages && (
+                              {imageUrl && !hideImages ? (
                                 <div className="flex-shrink-0 w-32 sm:w-40 h-32 sm:h-40">
                                   <img
                                     src={imageUrl}
@@ -2104,7 +2167,14 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                                     }}
                                   />
                                 </div>
-                              )}
+                              ) : isXEmbed && !hideImages ? (
+                                // Show X icon placeholder for X/Twitter links without valid image
+                                <div className="flex-shrink-0 w-32 sm:w-40 h-32 sm:h-40 bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                                  <svg className="w-8 h-8 text-gray-900 dark:text-gray-100" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                                  </svg>
+                                </div>
+                              ) : null}
                               
                               {/* Content on the right */}
                               <div className={`flex-1 min-w-0 p-3 sm:p-4 ${imageUrl ? '' : 'flex flex-col justify-between'}`}>
@@ -2439,6 +2509,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
               <div className="relative recast-menu" ref={recastMenuRef}>
                 <button
                   onClick={(e) => {
+                    e.preventDefault();
                     e.stopPropagation();
                     setShowRecastMenu(!showRecastMenu);
                   }}
@@ -2458,6 +2529,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                   <div className="absolute left-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10 min-w-[160px]">
                     <button
                       onClick={(e) => {
+                        e.preventDefault();
                         e.stopPropagation();
                         handleRecast();
                       }}
@@ -2467,6 +2539,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                     </button>
                     <button
                       onClick={(e) => {
+                        e.preventDefault();
                         e.stopPropagation();
                         handleQuote();
                       }}
@@ -2493,12 +2566,13 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                 {user && (
                   <button
                     onClick={(e) => {
+                      e.preventDefault();
                       e.stopPropagation();
                       handleCurate();
                     }}
                     onTouchEnd={(e) => {
-                      e.stopPropagation();
                       e.preventDefault();
+                      e.stopPropagation();
                       handleCurate();
                     }}
                     disabled={isCurating}
@@ -2628,17 +2702,6 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                   }
 
                   function buildThreadTree(replies: ThreadedReply[], rootHash: string): ThreadedReply[] {
-                    // Log incoming replies order and timestamps for recent-reply mode
-                    if (sortBy === "recent-reply") {
-                      console.log(`[CastCard] Building thread tree for cast ${cast.hash}, sortBy: ${sortBy}`);
-                      console.log(`[CastCard] Incoming replies order (${replies.length}):`, replies.map((r, idx) => ({
-                        index: idx,
-                        hash: r.hash?.substring(0, 10),
-                        author: r.author?.username,
-                        timestamp: r.timestamp || r.created_at,
-                        timestampMs: r.timestamp ? new Date(r.timestamp).getTime() : (r.created_at ? new Date(r.created_at).getTime() : 0),
-                      })));
-                    }
                     
                     const replyMap = new Map<string, ThreadedReply>();
                     replies.forEach(reply => {
@@ -2698,14 +2761,6 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                         return aOrder - bOrder;
                       });
                     }
-                    
-                    console.log(`[CastCard] Root replies after building tree (${rootReplies.length}):`, rootReplies.map((r, idx) => ({
-                      index: idx,
-                      hash: r.hash?.substring(0, 10),
-                      author: r.author?.username,
-                      timestamp: r.timestamp || r.created_at,
-                      timestampMs: r.timestamp ? new Date(r.timestamp).getTime() : (r.created_at ? new Date(r.created_at).getTime() : 0),
-                    })));
 
                     function sortChildren(reply: ThreadedReply) {
                       if (reply.children && reply.children.length > 0) {
@@ -2719,12 +2774,6 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                       }
                     }
                     rootReplies.forEach(sortChildren);
-
-                    console.log(`[CastCard] Root replies after building tree (${rootReplies.length}):`, rootReplies.map(r => ({
-                      hash: r.hash?.substring(0, 10),
-                      author: r.author?.username,
-                      engagementScore: calculateEngagementScore(r as any),
-                    })));
 
                     return rootReplies;
                   }

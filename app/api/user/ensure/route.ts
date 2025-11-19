@@ -4,7 +4,7 @@ import { upsertUser } from "@/lib/users";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { fid } = body;
+    const { fid, signer_uuid } = body;
 
     if (!fid || typeof fid !== "number") {
       return NextResponse.json(
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Upsert the user - this will create the record if it doesn't exist
-    await upsertUser(fid);
+    await upsertUser(fid, undefined, signer_uuid);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
 
 
 

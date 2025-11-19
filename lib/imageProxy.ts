@@ -46,6 +46,33 @@ export function buildProxiedImageUrl(url: string) {
   return `/api/image-proxy?url=${encodeURIComponent(url)}`;
 }
 
+/**
+ * Try to convert Imgur URLs to alternative formats that might work better
+ * e.g., i.imgur.com/ID.jpg -> imgur.com/ID.jpg or vice versa
+ */
+export function getAlternativeImgurUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.toLowerCase();
+    
+    // If it's an i.imgur.com URL, try imgur.com instead
+    if (hostname === "i.imgur.com") {
+      parsed.hostname = "imgur.com";
+      return parsed.toString();
+    }
+    
+    // If it's imgur.com, try i.imgur.com
+    if (hostname === "imgur.com" && parsed.pathname.match(/^\/[a-zA-Z0-9]+\.(jpg|jpeg|png|gif|webp)$/i)) {
+      parsed.hostname = "i.imgur.com";
+      return parsed.toString();
+    }
+    
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export function isExternalUrl(url: string) {
   return /^https?:\/\//i.test(url);
 }
@@ -63,4 +90,5 @@ export async function proxyRemoteImage(url: string) {
 }
 
 export { PROXY_ALLOWLIST };
+
 

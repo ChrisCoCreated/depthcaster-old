@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { analytics } from "@/lib/analytics";
 
 interface CuratorPackCardProps {
   pack: {
@@ -50,6 +51,10 @@ export function CuratorPackCard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userFid: viewerFid }),
       });
+      
+      // Track analytics
+      analytics.trackPackSubscribe(pack.id, pack.name);
+      
       onSubscribe(pack.id);
     } catch (error) {
       console.error("Failed to subscribe:", error);
@@ -69,6 +74,9 @@ export function CuratorPackCard({
         });
         setIsFavorited(false);
         onFavoriteChange?.(pack.id, false);
+        
+        // Track analytics
+        analytics.trackPackUnfavorite(pack.id, pack.name);
       } else {
         await fetch(`/api/curator-packs/${pack.id}/favorite`, {
           method: "POST",
@@ -77,6 +85,9 @@ export function CuratorPackCard({
         });
         setIsFavorited(true);
         onFavoriteChange?.(pack.id, true);
+        
+        // Track analytics
+        analytics.trackPackFavorite(pack.id, pack.name);
       }
     } catch (error) {
       console.error("Failed to toggle favorite:", error);
@@ -146,7 +157,10 @@ export function CuratorPackCard({
             <>
               {onUse && (
                 <button
-                  onClick={() => onUse(pack.id)}
+                  onClick={() => {
+                    analytics.trackPackUse(pack.id, pack.name);
+                    onUse(pack.id);
+                  }}
                   className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
                 >
                   Use

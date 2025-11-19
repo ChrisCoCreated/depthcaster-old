@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { AvatarImage } from "./AvatarImage";
+import { analytics } from "@/lib/analytics";
 
 interface FeedPreferences {
   hideDollarCasts: boolean;
@@ -85,6 +86,10 @@ export function FeedSettings() {
     const newPreferences = { ...preferences, [key]: value };
     setPreferences(newPreferences);
     localStorage.setItem("feedPreferences", JSON.stringify(newPreferences));
+    
+    // Track analytics
+    analytics.trackSettingsFeedChange(key, value);
+    
     // Dispatch event to notify other components
     window.dispatchEvent(new CustomEvent(PREFERENCES_CHANGED_EVENT));
   };
@@ -640,6 +645,10 @@ export function FeedSettingsInline({ feedType }: { feedType?: string }) {
     const newPreferences = { ...preferences, [key]: value };
     setPreferences(newPreferences);
     localStorage.setItem("feedPreferences", JSON.stringify(newPreferences));
+    
+    // Track analytics
+    analytics.trackSettingsFeedChange(key, value);
+    
     // Dispatch event to notify other components
     window.dispatchEvent(new CustomEvent(PREFERENCES_CHANGED_EVENT));
   };

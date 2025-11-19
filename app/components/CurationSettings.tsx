@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useNeynarContext } from "@neynar/react";
+import { analytics } from "@/lib/analytics";
 
 export function CurationSettings() {
   const { user } = useNeynarContext();
@@ -52,6 +53,9 @@ export function CurationSettings() {
       if (response.ok) {
         const data = await response.json();
         setAutoLikeOnCurate(data.autoLikeOnCurate);
+        
+        // Track analytics
+        analytics.trackCurationSettingsAutoLike(data.autoLikeOnCurate);
       }
     } catch (error) {
       console.error("Failed to save curation preferences:", error);
@@ -100,6 +104,7 @@ export function CurationSettings() {
     </div>
   );
 }
+
 
 
 

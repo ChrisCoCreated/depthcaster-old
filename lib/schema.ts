@@ -5,12 +5,14 @@ export const users = pgTable("users", {
   username: text("username"),
   displayName: text("display_name"),
   pfpUrl: text("pfp_url"),
+  signerUuid: text("signer_uuid"),
   preferences: jsonb("preferences"),
   usageStats: jsonb("usage_stats"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   usernameIdx: index("username_idx").on(table.username),
+  signerUuidIdx: index("signer_uuid_idx").on(table.signerUuid),
 }));
 
 export const userRoles = pgTable("user_roles", {

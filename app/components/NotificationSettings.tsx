@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useNotificationPermission } from "@/lib/hooks/useNotificationPermission";
+import { analytics } from "@/lib/analytics";
 
 interface NotificationPreferences {
   follows: boolean;
@@ -49,6 +50,9 @@ export function NotificationSettings() {
     const newPreferences = { ...preferences, [key]: value };
     setPreferences(newPreferences);
     localStorage.setItem("notificationPreferences", JSON.stringify(newPreferences));
+    
+    // Track analytics
+    analytics.trackSettingsNotificationChange(key, value);
   };
 
   const handleDeviceNotificationsToggle = async (enabled: boolean) => {
@@ -140,6 +144,7 @@ export function NotificationSettings() {
     </div>
   );
 }
+
 
 
 

@@ -50,6 +50,7 @@ export async function GET(request: NextRequest) {
         username: users.username,
         displayName: users.displayName,
         pfpUrl: users.pfpUrl,
+        usageStats: users.usageStats,
         role: userRoles.role,
         roleCreatedAt: userRoles.createdAt,
       })
@@ -75,16 +76,32 @@ export async function GET(request: NextRequest) {
       displayName: string | null;
       pfpUrl: string | null;
       roles: string[];
+      lastActivity: Date | null;
     }>();
 
     for (const row of results) {
       if (!userMap.has(row.fid)) {
+        // Only use lastCuratedFeedView - this indicates actual app usage (viewing the curated feed)
+        // Don't use updatedAt as it can be updated for many reasons (user added to DB, preferences changed, etc.)
+        let lastActivity: Date | null = null;
+        if (row.usageStats) {
+          const usageStats = row.usageStats as { lastCuratedFeedView?: string | Date };
+          if (usageStats.lastCuratedFeedView) {
+            if (usageStats.lastCuratedFeedView instanceof Date) {
+              lastActivity = usageStats.lastCuratedFeedView;
+            } else if (typeof usageStats.lastCuratedFeedView === 'string') {
+              lastActivity = new Date(usageStats.lastCuratedFeedView);
+            }
+          }
+        }
+
         userMap.set(row.fid, {
           fid: row.fid,
           username: row.username,
           displayName: row.displayName,
           pfpUrl: row.pfpUrl,
           roles: [],
+          lastActivity,
         });
       }
       if (row.role) {
@@ -93,14 +110,41 @@ export async function GET(request: NextRequest) {
     }
 
     const usersWithRoles = Array.from(userMap.values())
+      .map(user => ({
+        ...user,
+        lastActivity: user.lastActivity ? user.lastActivity.toISOString() : null,
+      }))
       .sort((a, b) => {
-        // Sort by number of roles (users with roles first), then by username
-        if (a.roles.length !== b.roles.length) {
-          return b.roles.length - a.roles.length;
+        // First sort by role: users with roles come first
+        // Among users with roles, prioritize by role hierarchy (superadmin > admin > curator)
+        const rolePriority = (roles: string[]) => {
+          if (roles.includes("superadmin")) return 3;
+          if (roles.includes("admin")) return 2;
+          if (roles.includes("curator")) return 1;
+          return 0;
+        };
+        
+        const aRolePriority = rolePriority(a.roles);
+        const bRolePriority = rolePriority(b.roles);
+        
+        if (aRolePriority !== bRolePriority) {
+          return bRolePriority - aRolePriority;
         }
-        const aUsername = a.username || "";
-        const bUsername = b.username || "";
-        return aUsername.localeCompare(bUsername);
+        
+        // If same role priority, sort by last activity (most recent first)
+        // Users with no activity go to the end
+        if (!a.lastActivity && !b.lastActivity) {
+          // Both have no activity, sort by username
+          const aUsername = a.username || "";
+          const bUsername = b.username || "";
+          return aUsername.localeCompare(bUsername);
+        }
+        if (!a.lastActivity) return 1; // a goes after b
+        if (!b.lastActivity) return -1; // b goes after a
+        
+        const aTime = new Date(a.lastActivity).getTime();
+        const bTime = new Date(b.lastActivity).getTime();
+        return bTime - aTime; // Most recent first
       });
 
     return NextResponse.json({ users: usersWithRoles });
@@ -138,7 +182,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate role
-    const validRoles = ["curator", "admin", "superadmin"];
+    const validRoles = ["curator", "admin", "superadmin", "tester"];
     if (!validRoles.includes(role)) {
       return NextResponse.json(
         { error: `Invalid role. Must be one of: ${validRoles.join(", ")}` },

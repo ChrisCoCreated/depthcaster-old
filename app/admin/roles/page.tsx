@@ -12,9 +12,10 @@ interface UserWithRoles {
   displayName: string | null;
   pfpUrl: string | null;
   roles: string[];
+  lastActivity: string | null;
 }
 
-const VALID_ROLES = ["curator", "admin", "superadmin"] as const;
+const VALID_ROLES = ["tester", "curator", "admin", "superadmin"] as const;
 type ValidRole = typeof VALID_ROLES[number];
 
 export default function AdminRolesPage() {
@@ -285,8 +286,37 @@ export default function AdminRolesPage() {
         return "bg-purple-100 dark:bg-purple-900/20 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700";
       case "curator":
         return "bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700";
+      case "tester":
+        return "bg-orange-100 dark:bg-orange-900/20 text-orange-800 dark:text-orange-200 border-orange-300 dark:border-orange-700";
       default:
         return "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-700";
+    }
+  };
+
+  const formatLastActivity = (lastActivity: string | null): string => {
+    if (!lastActivity) return "Never";
+    
+    try {
+      const date = new Date(lastActivity);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
+      
+      if (diffMins < 1) return "Just now";
+      if (diffMins < 60) return `${diffMins}m ago`;
+      if (diffHours < 24) return `${diffHours}h ago`;
+      if (diffDays < 7) return `${diffDays}d ago`;
+      
+      // For older dates, show the date
+      return date.toLocaleDateString(undefined, { 
+        month: 'short', 
+        day: 'numeric',
+        year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+      });
+    } catch {
+      return "Unknown";
     }
   };
 
@@ -320,7 +350,7 @@ export default function AdminRolesPage() {
             User Roles Management
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Manage user roles: curator, admin, and superadmin
+            Manage user roles: curator, admin, superadmin, and tester
           </p>
         </div>
 
@@ -407,24 +437,37 @@ export default function AdminRolesPage() {
                       >
                         <div className="flex items-center justify-between gap-4">
                           <div className="flex items-center gap-3 flex-1">
-                            <AvatarImage
-                              src={result.pfp_url}
-                              alt={result.username || "User"}
-                              size={40}
-                              className="w-10 h-10 rounded-full"
-                            />
+                            <Link href={`/profile/${result.fid}`} className="flex-shrink-0">
+                              <AvatarImage
+                                src={result.pfp_url}
+                                alt={result.username || "User"}
+                                size={40}
+                                className="w-10 h-10 rounded-full hover:opacity-80 transition-opacity cursor-pointer"
+                              />
+                            </Link>
                             <div className="flex-1">
-                              <div className="font-semibold text-gray-900 dark:text-gray-100">
+                              <Link 
+                                href={`/profile/${result.fid}`}
+                                className="font-semibold text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 hover:underline"
+                              >
                                 {result.display_name || result.username || `FID: ${result.fid}`}
-                              </div>
+                              </Link>
                               {result.username && (
-                                <div className="text-sm text-gray-600 dark:text-gray-400">
+                                <Link 
+                                  href={`/profile/${result.fid}`}
+                                  className="text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:underline block"
+                                >
                                   @{result.username}
-                                </div>
+                                </Link>
                               )}
                               <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
                                 FID: {result.fid}
                               </div>
+                              {existingUser?.lastActivity && (
+                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                  Last active: {formatLastActivity(existingUser.lastActivity)}
+                                </div>
+                              )}
                               {existingRoles.length > 0 && (
                                 <div className="flex flex-wrap gap-1 mt-2">
                                   {existingRoles.map((role) => (
@@ -501,24 +544,37 @@ export default function AdminRolesPage() {
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-start gap-3 flex-1">
-                      <AvatarImage
-                        src={userWithRoles.pfpUrl}
-                        alt={userWithRoles.username || "User"}
-                        size={40}
-                        className="w-10 h-10 rounded-full"
-                      />
+                      <Link href={`/profile/${userWithRoles.fid}`} className="flex-shrink-0">
+                        <AvatarImage
+                          src={userWithRoles.pfpUrl}
+                          alt={userWithRoles.username || "User"}
+                          size={40}
+                          className="w-10 h-10 rounded-full hover:opacity-80 transition-opacity cursor-pointer"
+                        />
+                      </Link>
                       <div className="flex-1">
-                        <div className="font-semibold text-gray-900 dark:text-gray-100">
+                        <Link 
+                          href={`/profile/${userWithRoles.fid}`}
+                          className="font-semibold text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 hover:underline"
+                        >
                           {userWithRoles.displayName || userWithRoles.username || `FID: ${userWithRoles.fid}`}
-                        </div>
+                        </Link>
                         {userWithRoles.username && (
-                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                          <Link 
+                            href={`/profile/${userWithRoles.fid}`}
+                            className="text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:underline block"
+                          >
                             @{userWithRoles.username}
-                          </div>
+                          </Link>
                         )}
                         <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
                           FID: {userWithRoles.fid}
                         </div>
+                        {userWithRoles.lastActivity && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            Last active: {formatLastActivity(userWithRoles.lastActivity)}
+                          </div>
+                        )}
                       </div>
                     </div>
 
