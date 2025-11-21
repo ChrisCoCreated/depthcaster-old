@@ -412,7 +412,7 @@ export function Header() {
       )}
       {environment === "local" && (
         <div
-          className="sticky top-0 z-[300] w-full text-center py-2 px-4 text-sm font-semibold bg-yellow-500 text-yellow-900 dark:bg-yellow-600 dark:text-yellow-100"
+          className="fixed top-0 left-0 right-0 z-[300] w-full text-center py-2 px-4 text-sm font-semibold bg-yellow-500 text-yellow-900 dark:bg-yellow-600 dark:text-yellow-100"
           style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
         >
           🧪 LOCAL TESTING
@@ -420,16 +420,15 @@ export function Header() {
       )}
       {environment === "preview" && hasPreviewAccess && (
         <div
-          className="sticky top-0 z-[300] w-full text-center py-2 px-4 text-sm font-semibold bg-orange-500 text-orange-900 dark:bg-orange-600 dark:text-orange-100"
+          className="fixed top-0 left-0 right-0 z-[300] w-full text-center py-2 px-4 text-sm font-semibold bg-orange-500 text-orange-900 dark:bg-orange-600 dark:text-orange-100"
           style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
         >
           🔍 PREVIEW ENVIRONMENT
         </div>
       )}
       <header 
-        className="sticky z-[200] bg-white/80 dark:bg-black/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800" 
+        className="sticky top-0 z-[200] bg-white/80 dark:bg-black/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800" 
         style={{ 
-          top: (environment === "local" || (environment === "preview" && hasPreviewAccess)) ? '40px' : '0px',
           paddingTop: 'env(safe-area-inset-top, 0px)' 
         }}
       >

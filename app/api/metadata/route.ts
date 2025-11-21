@@ -112,14 +112,18 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json(response);
   } catch (error: any) {
-    // Check if it's an HTTP status error (expected for inaccessible URLs)
+    // Check if it's an expected error from unfurl.js
     const isHttpStatusError = error.message?.includes('BAD_HTTP_STATUS') || 
                               error.message?.includes('http status not OK');
+    const isContentTypeError = error.message?.includes('WRONG_CONTENT_TYPE') ||
+                               error.message?.includes('Wrong content type header');
     
-    if (isHttpStatusError) {
-      // Don't log expected HTTP errors - they're normal for inaccessible URLs
+    if (isHttpStatusError || isContentTypeError) {
+      // Don't log expected errors - they're normal for:
+      // - Inaccessible URLs (404, 403, etc.)
+      // - Non-HTML content (JSON, XML, PDF, images, etc.)
       return NextResponse.json(
-        { error: "URL is not accessible" },
+        { error: "URL is not accessible or does not contain HTML content" },
         { status: 404 }
       );
     }

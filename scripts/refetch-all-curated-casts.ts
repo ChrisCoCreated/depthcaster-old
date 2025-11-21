@@ -72,6 +72,9 @@ async function createWebhooksForAllCuratedCasts() {
 async function refetchAllCuratedCasts() {
   console.log("Starting refetch of all curated casts...\n");
 
+  // Special placeholder hash for parent casts - skip this
+  const PARENT_CAST_PLACEHOLDER_HASH = "0x0000000000000000000000000000000000000000";
+
   try {
     // Get all curated casts
     const allCuratedCasts = await db
@@ -81,10 +84,17 @@ async function refetchAllCuratedCasts() {
       })
       .from(curatedCasts);
 
-    console.log(`Found ${allCuratedCasts.length} curated cast(s) to refetch\n`);
+    // Filter out the placeholder hash
+    const castsToRefetch = allCuratedCasts.filter(
+      (cast) => cast.castHash.toLowerCase() !== PARENT_CAST_PLACEHOLDER_HASH.toLowerCase()
+    );
 
-    if (allCuratedCasts.length === 0) {
-      console.log("No curated casts found. Exiting.");
+    console.log(`Found ${allCuratedCasts.length} curated cast(s) total`);
+    console.log(`Skipping ${allCuratedCasts.length - castsToRefetch.length} placeholder cast(s)`);
+    console.log(`Refetching ${castsToRefetch.length} cast(s)\n`);
+
+    if (castsToRefetch.length === 0) {
+      console.log("No curated casts to refetch. Exiting.");
       return;
     }
 
@@ -93,11 +103,11 @@ async function refetchAllCuratedCasts() {
     const errors: Array<{ castHash: string; error: string }> = [];
 
     // Process each cast
-    for (let i = 0; i < allCuratedCasts.length; i++) {
-      const curatedCast = allCuratedCasts[i];
+    for (let i = 0; i < castsToRefetch.length; i++) {
+      const curatedCast = castsToRefetch[i];
       const castHash = curatedCast.castHash;
       
-      console.log(`[${i + 1}/${allCuratedCasts.length}] Processing cast ${castHash}...`);
+      console.log(`[${i + 1}/${castsToRefetch.length}] Processing cast ${castHash}...`);
 
       try {
         // Step 1: Refetch cast data to update reaction counts
@@ -148,7 +158,7 @@ async function refetchAllCuratedCasts() {
       }
 
       // Add a small delay to avoid rate limiting
-      if (i < allCuratedCasts.length - 1) {
+      if (i < castsToRefetch.length - 1) {
         await new Promise((resolve) => setTimeout(resolve, 500));
       }
     }
@@ -158,6 +168,8 @@ async function refetchAllCuratedCasts() {
     console.log("REFETCH SUMMARY");
     console.log("=".repeat(60));
     console.log(`Total casts: ${allCuratedCasts.length}`);
+    console.log(`Placeholder casts skipped: ${allCuratedCasts.length - castsToRefetch.length}`);
+    console.log(`Casts processed: ${castsToRefetch.length}`);
     console.log(`Successful: ${successCount}`);
     console.log(`Errors: ${errorCount}`);
 

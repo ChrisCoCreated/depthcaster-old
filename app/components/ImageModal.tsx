@@ -53,22 +53,33 @@ export function ImageModal({
   }, [isOpen, onClose]);
 
   useEffect(() => {
+    if (!isOpen) return;
+    
+    let lastWheelTime = 0;
+    const cooldown = 800; // 800ms cooldown between navigations - strict to prevent double navigation
+
     const handleWheel = (e: WheelEvent) => {
-      if (!isOpen) return;
       if (!onPrevious && !onNext) return;
+      
       const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-      if (delta > 0 && onNext) {
+      const now = Date.now();
+      
+      // Only allow navigation if enough time has passed since last navigation
+      // We removed the direction change exception to prevent double navigation
+      const timeSinceLastNav = now - lastWheelTime;
+      
+      if (timeSinceLastNav >= cooldown) {
         e.preventDefault();
-        onNext();
-      } else if (delta < 0 && onPrevious) {
-        e.preventDefault();
-        onPrevious();
+        if (delta > 0 && onNext) {
+          onNext();
+        } else if (delta < 0 && onPrevious) {
+          onPrevious();
+        }
+        lastWheelTime = now;
       }
     };
 
-    if (isOpen) {
-      window.addEventListener("wheel", handleWheel, { passive: false });
-    }
+    window.addEventListener("wheel", handleWheel, { passive: false });
     return () => {
       window.removeEventListener("wheel", handleWheel);
     };
@@ -77,7 +88,7 @@ export function ImageModal({
   if (!isOpen || !imageUrl) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black">
+    <div className="fixed inset-0 flex items-center justify-center bg-black" style={{ zIndex: 9999 }}>
       {/* Close button */}
       <button
         onClick={onClose}
@@ -140,7 +151,12 @@ export function ImageModal({
         <img
           src={imageUrl}
           alt="Full screen"
-          className="w-full h-full max-w-full max-h-full object-contain"
+          className="w-full h-full max-w-full max-h-full object-contain transition-opacity duration-300"
+          key={imageUrl}
+          style={{ opacity: 0 }}
+          onLoad={(e) => {
+            (e.target as HTMLImageElement).style.opacity = "1";
+          }}
         />
       </div>
 

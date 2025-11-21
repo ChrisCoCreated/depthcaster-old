@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef, memo } from "react";
 import Image, { ImageProps } from "next/image";
 import { buildProxiedImageUrl, sanitizeImageUrl, shouldProxyImageUrl, isExternalUrl, getAlternativeImgurUrl } from "@/lib/imageProxy";
 
@@ -15,7 +15,7 @@ type AvatarImageProps = {
   className?: string;
 } & Omit<ImageProps, "src" | "alt" | "width" | "height" | "onError">;
 
-export function AvatarImage({
+function AvatarImageComponent({
   src,
   alt,
   size = 40,
@@ -32,18 +32,34 @@ export function AvatarImage({
     [sanitizedSrc]
   );
 
-  const [currentSrc, setCurrentSrc] = useState<string>(proxiedSrc || sanitizedSrc || DEFAULT_AVATAR);
+  const targetSrc = proxiedSrc || sanitizedSrc || DEFAULT_AVATAR;
+  
+  const [currentSrc, setCurrentSrc] = useState<string>(targetSrc);
   const [triedOriginal, setTriedOriginal] = useState<boolean>(!proxiedSrc);
   const [triedAlternative, setTriedAlternative] = useState<boolean>(false);
+  const prevTargetSrcRef = useRef<string>(targetSrc);
+  const currentSrcRef = useRef<string>(targetSrc);
+
+  // Update ref when currentSrc changes
+  useEffect(() => {
+    currentSrcRef.current = currentSrc;
+  }, [currentSrc]);
 
   useEffect(() => {
-    const nextSanitized = sanitizeImageUrl(src);
-    const nextProxied = nextSanitized && shouldProxyImageUrl(nextSanitized) ? buildProxiedImageUrl(nextSanitized) : null;
-
-    setCurrentSrc(nextProxied || nextSanitized || DEFAULT_AVATAR);
-    setTriedOriginal(!nextProxied);
-    setTriedAlternative(false);
-  }, [src]);
+    // Only update if the target source actually changed
+    // This prevents flickering during scroll when components re-render with the same src
+    if (prevTargetSrcRef.current !== targetSrc) {
+      prevTargetSrcRef.current = targetSrc;
+      // Only update currentSrc if it's different from the current value
+      // This prevents unnecessary Image component re-renders
+      const current = currentSrcRef.current;
+      if (current !== targetSrc && current !== sanitizedSrc && current !== proxiedSrc) {
+        setCurrentSrc(targetSrc);
+        setTriedOriginal(!proxiedSrc);
+        setTriedAlternative(false);
+      }
+    }
+  }, [targetSrc, proxiedSrc, sanitizedSrc]);
 
   const handleError = () => {
     // If proxy failed and we haven't tried the original URL yet, try it
@@ -85,9 +101,26 @@ export function AvatarImage({
       onError={handleError}
       priority={priority}
       unoptimized={isExternalUrl(currentSrc)}
+      loading={priority ? undefined : "lazy"}
+      placeholder="empty"
+      style={{ display: 'block' }}
       {...rest}
     />
   );
 }
+
+// Memoize the component to prevent unnecessary re-renders during scroll
+export const AvatarImage = memo(AvatarImageComponent, (prevProps, nextProps) => {
+  // Only re-render if these props actually changed
+  return (
+    prevProps.src === nextProps.src &&
+    prevProps.alt === nextProps.alt &&
+    prevProps.size === nextProps.size &&
+    prevProps.width === nextProps.width &&
+    prevProps.height === nextProps.height &&
+    prevProps.className === nextProps.className &&
+    prevProps.priority === nextProps.priority
+  );
+});
 
 

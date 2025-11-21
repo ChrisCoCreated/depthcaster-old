@@ -42,17 +42,16 @@ function ArtFeedContent() {
   const loadingImagesRef = useRef<boolean>(false);
   const loadingFidRef = useRef<number | null>(null);
   const [pendingIndex, setPendingIndex] = useState<number | null>(null);
-  const lastWheelTimeRef = useRef(0);
-  const lastWheelDirectionRef = useRef(0);
+  const currentIndexRef = useRef(0);
+  const isNavigatingRef = useRef(false);
+  const activeRequestIdRef = useRef<string | null>(null);
 
   // Sync refs with state
   useEffect(() => {
     cursorRef.current = cursor;
   }, [cursor]);
 
-  useEffect(() => {
-    loadingImagesRef.current = loadingImages;
-  }, [loadingImages]);
+  // loadingImagesRef is now managed directly in loadImages function
 
   // Handle user selection - defined early so it can be used in other hooks
   const handleSelectUser = useCallback((userResult: any) => {
@@ -80,13 +79,23 @@ function ArtFeedContent() {
     if (!fid) return;
     if (!user?.fid) return;
     
-    // Prevent concurrent loads for the same FID
+    // Generate a unique request ID for this call
+    const requestId = `${fid}-${reset ? 'reset' : 'append'}-${Date.now()}-${Math.random()}`;
+    
+    // Prevent concurrent loads for the same FID - check and set synchronously
     if (loadingImagesRef.current && loadingFidRef.current === fid) {
+      console.log('[loadImages] BLOCKED - already loading for fid:', fid, 'active request:', activeRequestIdRef.current);
       return;
     }
     
+    // Set refs synchronously before async operation
     loadingFidRef.current = fid;
+    loadingImagesRef.current = true;
+    activeRequestIdRef.current = requestId;
     setLoadingImages(true);
+    
+    console.log('[loadImages] Starting load for fid:', fid, 'reset:', reset, 'requestId:', requestId);
+    
     try {
       const params = new URLSearchParams({
         adminFid: user.fid.toString(),
@@ -101,18 +110,33 @@ function ArtFeedContent() {
       }
 
       const response = await fetch(`/api/admin/art-feed?${params}`);
+      
+      // Check if this request is still the active one (prevent race conditions)
+      if (activeRequestIdRef.current !== requestId) {
+        console.log('[loadImages] Request superseded, ignoring response for requestId:', requestId);
+        return;
+      }
       if (!response.ok) {
         throw new Error("Failed to fetch images");
       }
 
       const data = await response.json();
+      const newImages = data.images || [];
+      
       if (reset) {
-        setImages(data.images || []);
+        // When resetting, just set the new images (they should be fresh)
+        setImages(newImages);
         setCurrentIndex(0);
         setCursor(data.next?.cursor || null);
         cursorRef.current = data.next?.cursor || null;
       } else {
-        setImages((prev) => [...prev, ...(data.images || [])]);
+        // Deduplicate by castHash to prevent duplicate images when appending
+        setImages((prev) => {
+          const existingHashes = new Set(prev.map(img => img.castHash));
+          const uniqueNewImages = newImages.filter((img: ArtFeedImage) => !existingHashes.has(img.castHash));
+          console.log('[loadImages] Appending', uniqueNewImages.length, 'new images (filtered from', newImages.length, 'total)');
+          return [...prev, ...uniqueNewImages];
+        });
         setCursor(data.next?.cursor || null);
         cursorRef.current = data.next?.cursor || null;
       }
@@ -120,9 +144,14 @@ function ArtFeedContent() {
     } catch (error) {
       console.error("Error loading images:", error);
     } finally {
-      setLoadingImages(false);
-      if (loadingFidRef.current === fid) {
-        loadingFidRef.current = null;
+      // Only clear if this is still the active request
+      if (activeRequestIdRef.current === requestId) {
+        setLoadingImages(false);
+        loadingImagesRef.current = false;
+        if (loadingFidRef.current === fid) {
+          loadingFidRef.current = null;
+        }
+        activeRequestIdRef.current = null;
       }
     }
   }, [user?.fid]);
@@ -153,10 +182,9 @@ function ArtFeedContent() {
   // Load images when selectedFid changes
   useEffect(() => {
     if (selectedFid && user?.fid && !loadingImagesRef.current && loadingFidRef.current !== selectedFid) {
-      // Only clear if we're switching to a different user
-      if (loadingFidRef.current !== null && loadingFidRef.current !== selectedFid) {
-        setImages([]);
-      }
+      console.log('[useEffect] Loading images for selectedFid:', selectedFid, 'current loadingFid:', loadingFidRef.current);
+      // Clear images and reset state when loading a new user
+      setImages([]);
       setCursor(null);
       cursorRef.current = null;
       setCurrentIndex(0);
@@ -251,22 +279,78 @@ function ArtFeedContent() {
 
   // Scroll to image
   const goToPreviousImage = useCallback(() => {
-    if (currentIndex > 0) {
-      setCurrentIndex((prev) => Math.max(0, prev - 1));
+    // Prevent concurrent navigations
+    if (isNavigatingRef.current) {
+      console.log('[goToPreviousImage] BLOCKED - navigation in progress');
+      return;
     }
-  }, [currentIndex]);
+    
+    isNavigatingRef.current = true;
+    const currentIdx = currentIndexRef.current;
+    console.log('[goToPreviousImage] currentIndex:', currentIdx, 'images.length:', images.length);
+    
+    if (currentIdx > 0) {
+      setCurrentIndex((prev) => {
+        const newIndex = Math.max(0, prev - 1);
+        console.log('[goToPreviousImage] setting index from', prev, 'to', newIndex);
+        setTimeout(() => {
+          isNavigatingRef.current = false;
+        }, 100);
+        return newIndex;
+      });
+    } else {
+      isNavigatingRef.current = false;
+    }
+  }, [images.length]);
 
   const goToNextImage = useCallback(() => {
-    if (currentIndex < images.length - 1) {
-      setCurrentIndex((prev) => Math.min(images.length - 1, prev + 1));
-    } else if (hasMore && selectedFid) {
-      setPendingIndex(currentIndex + 1);
-      loadImages(selectedFid);
+    // Prevent concurrent navigations
+    if (isNavigatingRef.current) {
+      console.log('[goToNextImage] BLOCKED - navigation in progress');
+      return;
     }
-  }, [currentIndex, images.length, hasMore, selectedFid, loadImages]);
+    
+    isNavigatingRef.current = true;
+    const currentIdx = currentIndexRef.current;
+    console.log('[goToNextImage] currentIndex:', currentIdx, 'images.length:', images.length, 'hasMore:', hasMore);
+    
+    if (currentIdx < images.length - 1) {
+      setCurrentIndex((prev) => {
+        const newIndex = Math.min(images.length - 1, prev + 1);
+        console.log('[goToNextImage] setting index from', prev, 'to', newIndex);
+        setTimeout(() => {
+          isNavigatingRef.current = false;
+        }, 100);
+        return newIndex;
+      });
+    } else if (hasMore && selectedFid) {
+      console.log('[goToNextImage] loading more images, pendingIndex:', currentIdx + 1);
+      setPendingIndex(currentIdx + 1);
+      loadImages(selectedFid);
+      setTimeout(() => {
+        isNavigatingRef.current = false;
+      }, 100);
+    } else {
+      isNavigatingRef.current = false;
+    }
+  }, [images.length, hasMore, selectedFid, loadImages]);
 
   const canGoPrevious = currentIndex > 0;
   const canGoNext = currentIndex < images.length - 1 || hasMore;
+
+  // Sync ref with state
+  useEffect(() => {
+    currentIndexRef.current = currentIndex;
+  }, [currentIndex]);
+
+  // Update modal image when index changes (if modal is open)
+  useEffect(() => {
+    console.log('[currentIndex changed]', currentIndex, 'images.length:', images.length, 'isModalOpen:', isModalOpen);
+    if (isModalOpen && images.length > 0 && currentIndex >= 0 && currentIndex < images.length) {
+      console.log('[currentIndex] updating modal image to index', currentIndex);
+      setModalImageUrl(images[currentIndex].imageUrl);
+    }
+  }, [currentIndex, images, isModalOpen]);
 
   useEffect(() => {
     if (pendingIndex !== null && pendingIndex < images.length) {
@@ -294,32 +378,7 @@ function ArtFeedContent() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [currentIndex, images.length, hasMore, selectedFid, loadingImages, goToPreviousImage, goToNextImage, loadImages]);
 
-  // Handle wheel event (convert vertical scroll to image-by-image navigation)
-  useEffect(() => {
-    const handleWheel = (e: WheelEvent) => {
-      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-        e.preventDefault();
-        const now = Date.now();
-        const direction = Math.sign(e.deltaY);
-        const cooldown = 350;
-        if (
-          direction !== 0 &&
-          (now - lastWheelTimeRef.current > cooldown || direction !== lastWheelDirectionRef.current)
-        ) {
-          if (direction > 0) {
-            goToNextImage();
-          } else {
-            goToPreviousImage();
-          }
-          lastWheelTimeRef.current = now;
-          lastWheelDirectionRef.current = direction;
-        }
-      }
-    };
-
-    window.addEventListener("wheel", handleWheel, { passive: false });
-    return () => window.removeEventListener("wheel", handleWheel);
-  }, [goToNextImage, goToPreviousImage]);
+  // Wheel navigation is handled in the ImageModal component only
 
 
   // Load more when scrolling near the end
