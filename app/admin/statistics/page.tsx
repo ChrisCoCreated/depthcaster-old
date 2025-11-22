@@ -11,6 +11,12 @@ interface Statistics {
     total: number;
     new: number;
     withRoles: number;
+    uniqueActiveUsers: number;
+  };
+  analytics: {
+    pageViews: { authenticated: number; anonymous: number; total: number };
+    feedSessions: { authenticated: number; anonymous: number; total: number };
+    castViews: { authenticated: number; anonymous: number; total: number };
   };
   content: {
     curatedCasts: { total: number; new: number };
@@ -201,7 +207,7 @@ export default function AdminStatisticsPage() {
             {/* Overview Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Users</h3>
+                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Authenticated Users</h3>
                 <p className="text-3xl font-bold text-gray-900 dark:text-gray-100 mt-2">
                   {formatNumber(statistics.users.total)}
                 </p>
@@ -210,6 +216,9 @@ export default function AdminStatisticsPage() {
                     +{formatNumber(statistics.users.new)} new
                   </p>
                 )}
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {formatNumber(statistics.users.uniqueActiveUsers)} active
+                </p>
               </div>
 
               <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
@@ -460,6 +469,84 @@ export default function AdminStatisticsPage() {
                         </span>
                       </div>
                     ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Analytics Breakdown */}
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                Analytics: Authenticated vs Anonymous
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Page Views</h3>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Authenticated</span>
+                      <span className="font-medium text-gray-900 dark:text-gray-100">
+                        {formatNumber(statistics.analytics.pageViews.authenticated)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Anonymous</span>
+                      <span className="font-medium text-gray-900 dark:text-gray-100">
+                        {formatNumber(statistics.analytics.pageViews.anonymous)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between border-t border-gray-200 dark:border-gray-700 pt-1">
+                      <span className="text-gray-900 dark:text-gray-100 font-medium">Total</span>
+                      <span className="font-bold text-gray-900 dark:text-gray-100">
+                        {formatNumber(statistics.analytics.pageViews.total)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Feed Sessions</h3>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Authenticated</span>
+                      <span className="font-medium text-gray-900 dark:text-gray-100">
+                        {formatNumber(statistics.analytics.feedSessions.authenticated)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Anonymous</span>
+                      <span className="font-medium text-gray-900 dark:text-gray-100">
+                        {formatNumber(statistics.analytics.feedSessions.anonymous)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between border-t border-gray-200 dark:border-gray-700 pt-1">
+                      <span className="text-gray-900 dark:text-gray-100 font-medium">Total</span>
+                      <span className="font-bold text-gray-900 dark:text-gray-100">
+                        {formatNumber(statistics.analytics.feedSessions.total)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Cast Views</h3>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Authenticated</span>
+                      <span className="font-medium text-gray-900 dark:text-gray-100">
+                        {formatNumber(statistics.analytics.castViews.authenticated)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Anonymous</span>
+                      <span className="font-medium text-gray-900 dark:text-gray-100">
+                        {formatNumber(statistics.analytics.castViews.anonymous)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between border-t border-gray-200 dark:border-gray-700 pt-1">
+                      <span className="text-gray-900 dark:text-gray-100 font-medium">Total</span>
+                      <span className="font-bold text-gray-900 dark:text-gray-100">
+                        {formatNumber(statistics.analytics.castViews.total)}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>

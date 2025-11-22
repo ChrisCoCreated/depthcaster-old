@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
       ? sql`AND created_at >= ${timeFilter.toISOString()}`
       : sql``;
 
-    // User Statistics
+    // User Statistics (only authenticated users - users table only contains logged-in users)
     const totalUsers = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(users);
@@ -86,6 +86,43 @@ export async function GET(request: NextRequest) {
     const usersWithRoles = await db
       .select({ count: sql<number>`count(distinct user_fid)::int` })
       .from(userRoles);
+
+    // Anonymous vs Authenticated analytics
+    const authenticatedPageViewsQuery = timeFilter
+      ? db.select({ count: sql<number>`count(*)::int` }).from(pageViews).where(sql`user_fid IS NOT NULL AND created_at >= ${timeFilter.toISOString()}`)
+      : db.select({ count: sql<number>`count(*)::int` }).from(pageViews).where(sql`user_fid IS NOT NULL`);
+    const authenticatedPageViews = await authenticatedPageViewsQuery;
+
+    const anonymousPageViewsQuery = timeFilter
+      ? db.select({ count: sql<number>`count(*)::int` }).from(pageViews).where(sql`user_fid IS NULL AND created_at >= ${timeFilter.toISOString()}`)
+      : db.select({ count: sql<number>`count(*)::int` }).from(pageViews).where(sql`user_fid IS NULL`);
+    const anonymousPageViews = await anonymousPageViewsQuery;
+
+    const authenticatedFeedSessionsQuery = timeFilter
+      ? db.select({ count: sql<number>`count(*)::int` }).from(feedViewSessions).where(sql`user_fid IS NOT NULL AND created_at >= ${timeFilter.toISOString()}`)
+      : db.select({ count: sql<number>`count(*)::int` }).from(feedViewSessions).where(sql`user_fid IS NOT NULL`);
+    const authenticatedFeedSessions = await authenticatedFeedSessionsQuery;
+
+    const anonymousFeedSessionsQuery = timeFilter
+      ? db.select({ count: sql<number>`count(*)::int` }).from(feedViewSessions).where(sql`user_fid IS NULL AND created_at >= ${timeFilter.toISOString()}`)
+      : db.select({ count: sql<number>`count(*)::int` }).from(feedViewSessions).where(sql`user_fid IS NULL`);
+    const anonymousFeedSessions = await anonymousFeedSessionsQuery;
+
+    const authenticatedCastViewsQuery = timeFilter
+      ? db.select({ count: sql<number>`count(*)::int` }).from(castViews).where(sql`user_fid IS NOT NULL AND created_at >= ${timeFilter.toISOString()}`)
+      : db.select({ count: sql<number>`count(*)::int` }).from(castViews).where(sql`user_fid IS NOT NULL`);
+    const authenticatedCastViews = await authenticatedCastViewsQuery;
+
+    const anonymousCastViewsQuery = timeFilter
+      ? db.select({ count: sql<number>`count(*)::int` }).from(castViews).where(sql`user_fid IS NULL AND created_at >= ${timeFilter.toISOString()}`)
+      : db.select({ count: sql<number>`count(*)::int` }).from(castViews).where(sql`user_fid IS NULL`);
+    const anonymousCastViews = await anonymousCastViewsQuery;
+
+    // Unique authenticated users in analytics
+    const uniqueAuthenticatedUsersQuery = timeFilter
+      ? db.select({ count: sql<number>`count(distinct user_fid)::int` }).from(pageViews).where(sql`user_fid IS NOT NULL AND created_at >= ${timeFilter.toISOString()}`)
+      : db.select({ count: sql<number>`count(distinct user_fid)::int` }).from(pageViews).where(sql`user_fid IS NOT NULL`);
+    const uniqueAuthenticatedUsers = await uniqueAuthenticatedUsersQuery;
 
     // Content Statistics
     const totalCuratedCasts = await db
@@ -272,9 +309,27 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       period,
       users: {
-        total: totalUsers[0]?.count || 0,
+        total: totalUsers[0]?.count || 0, // All authenticated users (users table only contains logged-in users)
         new: newUsers[0]?.count || 0,
         withRoles: usersWithRoles[0]?.count || 0,
+        uniqueActiveUsers: uniqueAuthenticatedUsers[0]?.count || 0, // Unique authenticated users with analytics activity
+      },
+      analytics: {
+        pageViews: {
+          authenticated: authenticatedPageViews[0]?.count || 0,
+          anonymous: anonymousPageViews[0]?.count || 0,
+          total: (authenticatedPageViews[0]?.count || 0) + (anonymousPageViews[0]?.count || 0),
+        },
+        feedSessions: {
+          authenticated: authenticatedFeedSessions[0]?.count || 0,
+          anonymous: anonymousFeedSessions[0]?.count || 0,
+          total: (authenticatedFeedSessions[0]?.count || 0) + (anonymousFeedSessions[0]?.count || 0),
+        },
+        castViews: {
+          authenticated: authenticatedCastViews[0]?.count || 0,
+          anonymous: anonymousCastViews[0]?.count || 0,
+          total: (authenticatedCastViews[0]?.count || 0) + (anonymousCastViews[0]?.count || 0),
+        },
       },
       content: {
         curatedCasts: {
