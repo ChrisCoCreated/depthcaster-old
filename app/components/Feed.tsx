@@ -187,6 +187,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   // }, []);
 
   // Load selected curator FIDs from localStorage on mount, or default to curators with role
+  // Automatically includes new curators, only excludes those explicitly removed
   useEffect(() => {
     // Only initialize when on curated feed
     if (feedType !== "curated") {
@@ -195,46 +196,52 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       return;
     }
     
-    // If already initialized, don't re-initialize (respects user selections)
-    if (curatorFilterInitializedRef.current) {
-      return;
-    }
-    
-    curatorFilterInitializedRef.current = true;
-    
-    // Check if user has a saved selection
-    const saved = localStorage.getItem("selectedCuratorFids");
-    if (saved) {
-      try {
-        const fids = JSON.parse(saved);
-        if (Array.isArray(fids) && fids.length > 0) {
-          // User has a saved selection, use it
-          setSelectedCuratorFids(fids);
-          return;
+    // Get excluded curators (those explicitly removed by user)
+    const getExcludedCurators = (): number[] => {
+      const saved = localStorage.getItem("excludedCuratorFids");
+      if (saved) {
+        try {
+          const fids = JSON.parse(saved);
+          if (Array.isArray(fids)) {
+            return fids;
+          }
+        } catch (e) {
+          // Ignore parse errors
         }
-      } catch (e) {
-        // Ignore parse errors, fall through to default
       }
-    }
+      return [];
+    };
     
-    // Default: fetch and select all curators with curator role on initial load
-    const fetchDefaultCurators = async () => {
+    // Fetch all curators and select all except excluded ones
+    const updateCuratorSelection = async () => {
       try {
         const response = await fetch("/api/curators");
         if (response.ok) {
           const data = await response.json();
-          const curatorFids = (data.curators || []).map((c: Curator) => c.fid);
-          if (curatorFids.length > 0) {
-            setSelectedCuratorFids(curatorFids);
-            localStorage.setItem("selectedCuratorFids", JSON.stringify(curatorFids));
+          const allCuratorFids = (data.curators || []).map((c: Curator) => c.fid);
+          const excludedFids = getExcludedCurators();
+          
+          // Select all curators except excluded ones
+          const selectedFids = allCuratorFids.filter(fid => !excludedFids.includes(fid));
+          
+          if (allCuratorFids.length > 0) {
+            setSelectedCuratorFids(selectedFids);
+            // Also update selectedCuratorFids in localStorage for backward compatibility
+            localStorage.setItem("selectedCuratorFids", JSON.stringify(selectedFids));
           }
         }
       } catch (error) {
-        console.error("Failed to fetch default curators:", error);
+        console.error("Failed to fetch curators:", error);
       }
     };
     
-      fetchDefaultCurators();
+    // Update selection to include new curators when switching to curated feed
+    // This ensures new curators are automatically included
+    updateCuratorSelection();
+    
+    if (!curatorFilterInitializedRef.current) {
+      curatorFilterInitializedRef.current = true;
+    }
   }, [feedType]);
 
   const fetchSelectedPacks = async (packIds: string[]) => {
@@ -1143,6 +1150,17 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
             onCuratorFidsChange={(fids) => {
               setSelectedCuratorFids(fids);
               localStorage.setItem("selectedCuratorFids", JSON.stringify(fids));
+              
+              // Track excluded curators (fetch all curators to determine which are excluded)
+              fetch("/api/curators")
+                .then(res => res.json())
+                .then(data => {
+                  const allCuratorFids = (data.curators || []).map((c: Curator) => c.fid);
+                  const excludedFids = allCuratorFids.filter((fid: number) => !fids.includes(fid));
+                  localStorage.setItem("excludedCuratorFids", JSON.stringify(excludedFids));
+                })
+                .catch(err => console.error("Failed to update excluded curators:", err));
+              
               analytics.trackFeedCuratorFilter(feedType, fids);
             }}
           />
