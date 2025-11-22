@@ -222,7 +222,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
           const excludedFids = getExcludedCurators();
           
           // Select all curators except excluded ones
-          const selectedFids = allCuratorFids.filter(fid => !excludedFids.includes(fid));
+          const selectedFids = allCuratorFids.filter((fid: number) => !excludedFids.includes(fid));
           
           if (allCuratorFids.length > 0) {
             setSelectedCuratorFids(selectedFids);
