@@ -6,6 +6,7 @@ import { calculateEngagementScore } from "@/lib/engagement";
 import { CURATED_FIDS, CURATED_CHANNELS } from "@/lib/curated";
 import { db } from "@/lib/db";
 import { curatorPackUsers, curatedCasts, curatedCastInteractions, curatorPacks, users, curatorCastCurations, castReplies, userRoles } from "@/lib/schema";
+import { enrichCastsWithViewerContext } from "@/lib/interactions";
 import { eq, inArray, desc, lt, and, sql, asc, or } from "drizzle-orm";
 import { cacheFeed, cacheCuratorRoleUsers } from "@/lib/cache";
 import { deduplicateRequest } from "@/lib/neynar-batch";
@@ -859,7 +860,13 @@ export async function GET(request: NextRequest) {
 
     // Use Neynar's cursor if available, otherwise use last cast hash from filtered results
     // Only set cursor if we have results and there might be more
-    const finalCasts = sortedCasts.slice(0, limit);
+    let finalCasts = sortedCasts.slice(0, limit);
+    
+    // Enrich casts with viewer context from database (for all feed types)
+    if (viewerFid) {
+      finalCasts = await enrichCastsWithViewerContext(finalCasts, viewerFid);
+    }
+    
     let nextCursor: string | null = null;
     
     if (feedType === "curated") {

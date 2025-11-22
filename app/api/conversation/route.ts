@@ -6,6 +6,7 @@ import { deduplicateRequest } from "@/lib/neynar-batch";
 import { db } from "@/lib/db";
 import { castReplies, curatedCasts } from "@/lib/schema";
 import { eq, or, sql } from "drizzle-orm";
+import { enrichCastsWithViewerContext } from "@/lib/interactions";
 
 export async function GET(request: NextRequest) {
   try {
@@ -288,6 +289,55 @@ export async function GET(request: NextRequest) {
             ...additionalReplies,
           ];
         }
+      }
+    }
+
+    // Enrich conversation with viewer context from database
+    if (viewerFid && conversation.conversation?.cast) {
+      // Collect all casts (root + nested replies) for enrichment
+      const allCasts: any[] = [conversation.conversation.cast];
+      
+      // Recursively collect nested replies
+      const collectReplies = (replies: any[]) => {
+        replies.forEach((reply: any) => {
+          if (reply.hash) {
+            allCasts.push(reply);
+          }
+          if (reply.direct_replies && reply.direct_replies.length > 0) {
+            collectReplies(reply.direct_replies);
+          }
+        });
+      };
+      
+      if (conversation.conversation.cast.direct_replies) {
+        collectReplies(conversation.conversation.cast.direct_replies);
+      }
+      
+      // Enrich all casts
+      const enrichedCasts = await enrichCastsWithViewerContext(allCasts, viewerFid);
+      
+      // Create a map for quick lookup
+      const enrichedMap = new Map(enrichedCasts.map(cast => [cast.hash, cast]));
+      
+      // Replace casts in conversation with enriched versions
+      if (enrichedMap.has(conversation.conversation.cast.hash)) {
+        conversation.conversation.cast = enrichedMap.get(conversation.conversation.cast.hash)!;
+      }
+      
+      // Recursively replace nested replies
+      const replaceReplies = (replies: any[]) => {
+        replies.forEach((reply: any, index: number) => {
+          if (reply.hash && enrichedMap.has(reply.hash)) {
+            replies[index] = enrichedMap.get(reply.hash)!;
+          }
+          if (reply.direct_replies && reply.direct_replies.length > 0) {
+            replaceReplies(reply.direct_replies);
+          }
+        });
+      };
+      
+      if (conversation.conversation.cast.direct_replies) {
+        replaceReplies(conversation.conversation.cast.direct_replies);
       }
     }
 

@@ -234,7 +234,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       }
     };
     
-    fetchDefaultCurators();
+      fetchDefaultCurators();
   }, [feedType]);
 
   const fetchSelectedPacks = async (packIds: string[]) => {

@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { curatedCasts, curatedCastInteractions } from "./schema";
-import { eq } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { neynarClient } from "./neynar";
 import { LookupCastConversationTypeEnum } from "@neynar/nodejs-sdk/build/api";
 
@@ -84,5 +84,69 @@ export async function trackCuratedCastInteraction(
     console.error("Error tracking curated cast interaction:", error);
     // Don't throw - this is a non-critical operation
   }
+}
+
+/**
+ * Enrich casts with viewer context (liked/recasted status) from database
+ * This avoids expensive Neynar API calls by using our tracked interactions
+ */
+export async function enrichCastsWithViewerContext(
+  casts: any[],
+  viewerFid: number | undefined
+): Promise<any[]> {
+  if (!viewerFid || casts.length === 0) {
+    return casts;
+  }
+
+  // Extract all cast hashes
+  const castHashes = casts.map(cast => cast.hash).filter(Boolean);
+  if (castHashes.length === 0) {
+    return casts;
+  }
+
+  // Query database for viewer's interactions with these casts
+  const interactions = await db
+    .select({
+      targetCastHash: curatedCastInteractions.targetCastHash,
+      interactionType: curatedCastInteractions.interactionType,
+    })
+    .from(curatedCastInteractions)
+    .where(
+      and(
+        inArray(curatedCastInteractions.targetCastHash, castHashes),
+        eq(curatedCastInteractions.userFid, viewerFid),
+        inArray(curatedCastInteractions.interactionType, ["like", "recast"])
+      )
+    );
+
+  // Build maps for efficient lookup
+  const likedHashes = new Set<string>();
+  const recastedHashes = new Set<string>();
+  
+  interactions.forEach(interaction => {
+    if (interaction.interactionType === "like") {
+      likedHashes.add(interaction.targetCastHash);
+    } else if (interaction.interactionType === "recast") {
+      recastedHashes.add(interaction.targetCastHash);
+    }
+  });
+
+  // Enrich casts with viewer context
+  return casts.map(cast => {
+    if (!cast.hash) return cast;
+    
+    const liked = likedHashes.has(cast.hash);
+    const recasted = recastedHashes.has(cast.hash);
+    
+    // Merge viewer context into cast
+    return {
+      ...cast,
+      viewer_context: {
+        ...cast.viewer_context,
+        liked,
+        recasted,
+      },
+    };
+  });
 }
 

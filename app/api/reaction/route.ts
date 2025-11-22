@@ -3,8 +3,8 @@ import { neynarClient } from "@/lib/neynar";
 import { ReactionType } from "@neynar/nodejs-sdk/build/api";
 import { trackCuratedCastInteraction } from "@/lib/interactions";
 import { db } from "@/lib/db";
-import { curatedCasts } from "@/lib/schema";
-import { eq } from "drizzle-orm";
+import { curatedCasts, curatedCastInteractions } from "@/lib/schema";
+import { eq, and } from "drizzle-orm";
 import { fetchAndStoreConversation, getRootCastHash } from "@/lib/conversation";
 
 export async function POST(request: NextRequest) {
@@ -114,13 +114,51 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Note: We don't track deletion of interactions - only additions count for bumping
+    // Get user FID from signer
+    let userFid: number | undefined;
+    try {
+      const signer = await neynarClient.lookupSigner({ signerUuid });
+      userFid = signer.fid;
+    } catch (error) {
+      console.error("Error fetching signer:", error);
+    }
+
     const reaction = await neynarClient.deleteReaction({
       signerUuid,
       reactionType: reactionType as ReactionType,
       target,
       targetAuthorFid,
     });
+
+    // Remove interaction from database if this is a reaction to a curated cast thread
+    if (target && userFid) {
+      const interactionType = reactionType === "like" ? "like" : reactionType === "recast" ? "recast" : null;
+      if (interactionType) {
+        try {
+          // Find the original curated cast
+          const { findOriginalCuratedCast } = await import("@/lib/interactions");
+          const curatedCastHash = await findOriginalCuratedCast(target);
+          
+          if (curatedCastHash) {
+            // Remove the interaction
+            await db
+              .delete(curatedCastInteractions)
+              .where(
+                and(
+                  eq(curatedCastInteractions.curatedCastHash, curatedCastHash),
+                  eq(curatedCastInteractions.targetCastHash, target),
+                  eq(curatedCastInteractions.interactionType, interactionType),
+                  eq(curatedCastInteractions.userFid, userFid)
+                )
+              );
+            console.log(`[Reaction API] Removed ${interactionType} interaction for cast ${target} by user ${userFid}`);
+          }
+        } catch (error) {
+          console.error("Error removing reaction interaction:", error);
+          // Don't fail the reaction deletion if database update fails
+        }
+      }
+    }
 
     // Update database if this is a reaction removal from a curated cast
     if (target) {

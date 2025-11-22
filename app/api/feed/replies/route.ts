@@ -5,6 +5,7 @@ import { eq, or, inArray, desc } from "drizzle-orm";
 import { calculateEngagementScore } from "@/lib/engagement";
 import { getLastCuratedFeedView } from "@/lib/users";
 import { isQuoteCast } from "@/lib/conversation";
+import { enrichCastsWithViewerContext } from "@/lib/interactions";
 
 /**
  * Lightweight endpoint to fetch top replies for a curated cast
@@ -225,6 +226,11 @@ export async function GET(request: NextRequest) {
         }
         return cast;
       });
+    }
+
+    // Enrich replies with viewer context from database
+    if (viewerFid) {
+      finalReplies = await enrichCastsWithViewerContext(finalReplies, viewerFid);
     }
 
     return NextResponse.json({ replies: finalReplies });

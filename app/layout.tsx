@@ -111,8 +111,8 @@ export default function RootLayout({
       >
         <Analytics />
         <ServiceWorkerRegistration />
-        <SessionTracker />
         <AuthProvider>
+          <SessionTracker />
           <PushSubscriptionManager />
           <OnboardingFlow />
           <Header />
