@@ -260,6 +260,14 @@ export async function POST(request: NextRequest) {
       )
       .limit(1);
     
+    // Early return if this curator has already curated this cast
+    if (existingCuration.length > 0) {
+      return NextResponse.json(
+        { error: "Cast is already curated by this user" },
+        { status: 409 }
+      );
+    }
+    
     const isFirstCuration = existingCast.length === 0;
     const isAdditionalCuration = existingCast.length > 0 && existingCuration.length === 0;
     const conversationNotFetched = !existingCast[0]?.conversationFetchedAt;
