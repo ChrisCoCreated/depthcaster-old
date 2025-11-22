@@ -43,11 +43,6 @@ export function ServiceWorkerRegistration() {
     };
 
     registerServiceWorker();
-
-    // Handle service worker controller changes
-    navigator.serviceWorker.addEventListener("controllerchange", () => {
-      window.location.reload();
-    });
   }, []);
 
   // Request notification permission when service worker is ready

@@ -6,6 +6,7 @@ import { AuthProvider } from "./components/AuthProvider";
 import { Header } from "./components/Header";
 import { ServiceWorkerRegistration } from "./components/ServiceWorkerRegistration";
 import { OnboardingFlow } from "./components/OnboardingFlow";
+import { UpdateNotification } from "./components/UpdateNotification";
 import { PushSubscriptionManager } from "./components/PushSubscriptionManager";
 import { SessionTracker } from "./components/SessionTracker";
 
@@ -115,6 +116,7 @@ export default function RootLayout({
           <SessionTracker />
           <PushSubscriptionManager />
           <OnboardingFlow />
+          <UpdateNotification />
           <Header />
           {children}
         </AuthProvider>

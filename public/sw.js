@@ -2,8 +2,9 @@
 const CACHE_NAME = 'depthcaster-v1';
 
 // Install event - cache static assets
+// Don't skip waiting - let the new service worker wait until user confirms update
 self.addEventListener('install', (event) => {
-  self.skipWaiting();
+  // Service worker will wait until SKIP_WAITING message is received
 });
 
 // Activate event - clean up old caches
@@ -20,11 +21,16 @@ self.addEventListener('activate', (event) => {
   return self.clients.claim();
 });
 
-// Handle notification display requests from main app
+// Handle messages from main app
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
     const { notification } = event.data;
     showNotification(notification);
+  }
+  
+  // Handle skip waiting request (when user clicks refresh)
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
   }
 });
 

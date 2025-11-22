@@ -193,6 +193,12 @@ export default function AdminPage() {
             >
               View Cast Tags
             </Link>
+            <Link
+              href="/admin/curators-leaderboard"
+              className="block px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-center"
+            >
+              Curators Leaderboard
+            </Link>
           </div>
         </div>
 

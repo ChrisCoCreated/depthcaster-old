@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { curatedCasts, users, userRoles } from "@/lib/schema";
+import { curatorCastCurations, users, userRoles } from "@/lib/schema";
 import { neynarClient } from "@/lib/neynar";
 import { getUser } from "@/lib/users";
 import { sql, eq, inArray } from "drizzle-orm";
@@ -13,19 +13,14 @@ export async function GET(request: NextRequest) {
 
     // If searching, return users who have curated anything
     if (searchQuery && searchQuery.length >= 2) {
-      // Get all unique curator FIDs from curated casts
+      // Get all unique curator FIDs from curator_cast_curations
       const curatorResults = await db
-        .select({
-          curatorFid: curatedCasts.curatorFid,
+        .selectDistinct({
+          curatorFid: curatorCastCurations.curatorFid,
         })
-        .from(curatedCasts)
-        .where(sql`${curatedCasts.curatorFid} IS NOT NULL`);
+        .from(curatorCastCurations);
 
-      const curatorFids = [...new Set(
-        curatorResults
-          .map((r) => r.curatorFid)
-          .filter((fid): fid is number => fid !== null)
-      )];
+      const curatorFids = curatorResults.map((r) => r.curatorFid);
 
       if (curatorFids.length === 0) {
         return NextResponse.json({ curators: [] });
@@ -52,19 +47,14 @@ export async function GET(request: NextRequest) {
     }
 
     // Default: Get curators with curator role and all users who have curated
-    // First, get all unique curator FIDs from curated casts
+    // First, get all unique curator FIDs from curator_cast_curations
     const curatorResults = await db
-      .select({
-        curatorFid: curatedCasts.curatorFid,
+      .selectDistinct({
+        curatorFid: curatorCastCurations.curatorFid,
       })
-      .from(curatedCasts)
-      .where(sql`${curatedCasts.curatorFid} IS NOT NULL`);
+      .from(curatorCastCurations);
 
-    const curatorFids = [...new Set(
-      curatorResults
-        .map((r) => r.curatorFid)
-        .filter((fid): fid is number => fid !== null)
-    )];
+    const curatorFids = curatorResults.map((r) => r.curatorFid);
 
     if (curatorFids.length === 0) {
       return NextResponse.json({ curators: [], allCurators: [] });
