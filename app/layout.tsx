@@ -28,6 +28,8 @@ export const viewport: Viewport = {
   themeColor: "#000000",
 };
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: "Depthcaster - Deep Thoughts on Farcaster",
   description: "A Farcaster client focused on philosophy, art, and meaningful conversations",

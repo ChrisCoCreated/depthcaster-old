@@ -45,18 +45,21 @@ function AvatarImageComponent({
     currentSrcRef.current = currentSrc;
   }, [currentSrc]);
 
+  // Sync currentSrc when targetSrc changes (but only if actually different)
+  // This prevents flickering during scroll when components re-render with the same src
   useEffect(() => {
-    // Only update if the target source actually changed
-    // This prevents flickering during scroll when components re-render with the same src
     if (prevTargetSrcRef.current !== targetSrc) {
       prevTargetSrcRef.current = targetSrc;
       // Only update currentSrc if it's different from the current value
       // This prevents unnecessary Image component re-renders
       const current = currentSrcRef.current;
       if (current !== targetSrc && current !== sanitizedSrc && current !== proxiedSrc) {
-        setCurrentSrc(targetSrc);
-        setTriedOriginal(!proxiedSrc);
-        setTriedAlternative(false);
+        // Defer setState to avoid synchronous state update in effect
+        setTimeout(() => {
+          setCurrentSrc(targetSrc);
+          setTriedOriginal(!proxiedSrc);
+          setTriedAlternative(false);
+        }, 0);
       }
     }
   }, [targetSrc, proxiedSrc, sanitizedSrc]);

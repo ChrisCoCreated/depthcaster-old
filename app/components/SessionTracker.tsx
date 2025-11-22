@@ -2,12 +2,14 @@
 
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
+import { useNeynarContext } from "@neynar/react";
 import { startSession, endSession, trackSessionTime, shouldStartNewSession, analytics } from "@/lib/analytics";
 
 let previousPath: string | null = null;
 
 export function SessionTracker() {
   const pathname = usePathname();
+  const { user } = useNeynarContext();
 
   useEffect(() => {
     // Initialize session tracking
@@ -17,6 +19,25 @@ export function SessionTracker() {
 
     // Track page view
     analytics.trackPageView(pathname, previousPath || undefined);
+    
+    // Also track to database
+    const trackPageView = async () => {
+      try {
+        await fetch("/api/analytics/page-view", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            pagePath: pathname,
+            userFid: user?.fid || null,
+          }),
+        });
+      } catch (error) {
+        // Silently fail - analytics shouldn't break the app
+        console.error("Failed to track page view:", error);
+      }
+    };
+    trackPageView();
+    
     previousPath = pathname;
 
     // Track session time periodically (every 30 seconds)

@@ -92,6 +92,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   const [sortBy, setSortBy] = useState<"recently-curated" | "time-of-cast" | "recent-reply">("recent-reply");
   const sortByInitializedRef = useRef(false);
   const [hasNewCuratedCasts, setHasNewCuratedCasts] = useState(false);
+  const curatorFilterInitializedRef = useRef(false);
   
   // Use shared activity monitor for curated feed refresh
   const { isUserActive, isTabVisible } = useActivityMonitor({
@@ -187,20 +188,36 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
 
   // Load selected curator FIDs from localStorage on mount, or default to curators with role
   useEffect(() => {
+    // Only initialize when on curated feed
+    if (feedType !== "curated") {
+      // Reset initialization flag when switching away from curated feed
+      curatorFilterInitializedRef.current = false;
+      return;
+    }
+    
+    // If already initialized, don't re-initialize (respects user selections)
+    if (curatorFilterInitializedRef.current) {
+      return;
+    }
+    
+    curatorFilterInitializedRef.current = true;
+    
+    // Check if user has a saved selection
     const saved = localStorage.getItem("selectedCuratorFids");
     if (saved) {
       try {
         const fids = JSON.parse(saved);
         if (Array.isArray(fids) && fids.length > 0) {
+          // User has a saved selection, use it
           setSelectedCuratorFids(fids);
           return;
         }
       } catch (e) {
-        // Ignore parse errors
+        // Ignore parse errors, fall through to default
       }
     }
     
-    // Default: fetch curators with role and select them
+    // Default: fetch and select all curators with curator role on initial load
     const fetchDefaultCurators = async () => {
       try {
         const response = await fetch("/api/curators");
@@ -217,9 +234,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       }
     };
     
-    if (feedType === "curated") {
-      fetchDefaultCurators();
-    }
+    fetchDefaultCurators();
   }, [feedType]);
 
   const fetchSelectedPacks = async (packIds: string[]) => {
@@ -764,6 +779,27 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
 
   // Track feed view time
   useEffect(() => {
+    // Helper to track feed view to database
+    const trackFeedViewToDB = async (feedTypeToTrack: string, duration: number) => {
+      try {
+        await fetch("/api/analytics/feed-view", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            feedType: feedTypeToTrack,
+            durationSeconds: duration,
+            userFid: viewerFid || null,
+            sortBy: sortBy || null,
+            curatorFids: selectedCuratorFids.length > 0 ? selectedCuratorFids : null,
+            packIds: selectedPackIds.length > 0 ? selectedPackIds : null,
+          }),
+        });
+      } catch (error) {
+        // Silently fail - analytics shouldn't break the app
+        console.error("Failed to track feed view:", error);
+      }
+    };
+
     // End previous feed view if exists
     if (feedViewStartTimeRef.current !== null) {
       const duration = Math.floor((Date.now() - feedViewStartTimeRef.current) / 1000);
@@ -776,6 +812,8 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
           selectedCuratorFids,
           selectedPackIds
         );
+        // Also track to database
+        trackFeedViewToDB(prevFeedType, duration);
       }
     }
 
@@ -799,6 +837,8 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
             selectedCuratorFids,
             selectedPackIds
           );
+          // Also track to database
+          trackFeedViewToDB(feedType, duration);
         }
       }
     }, 30000);
@@ -818,11 +858,13 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
             selectedCuratorFids,
             selectedPackIds
           );
+          // Also track to database
+          trackFeedViewToDB(feedType, duration);
         }
         feedViewStartTimeRef.current = null;
       }
     };
-  }, [feedType, sortBy, selectedCuratorFids, selectedPackIds]);
+  }, [feedType, sortBy, selectedCuratorFids, selectedPackIds, viewerFid]);
 
   // Close login prompt when user logs in
   useEffect(() => {

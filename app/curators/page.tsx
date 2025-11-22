@@ -5,6 +5,8 @@ import { useNeynarContext } from "@neynar/react";
 import Link from "next/link";
 import { FeedbackModal } from "../components/FeedbackModal";
 
+export const dynamic = 'force-dynamic';
+
 const ADMIN_FID = 5701;
 
 export default function CuratorsPage() {

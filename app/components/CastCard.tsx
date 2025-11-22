@@ -917,9 +917,28 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
         analytics.trackConversationView(cast.hash, cast.author.fid);
       } else {
         analytics.trackCastView(cast.hash, cast.author.fid, feedType);
+        // Also track to database
+        const trackCastViewToDB = async () => {
+          try {
+            await fetch("/api/analytics/cast-view", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                castHash: cast.hash,
+                authorFid: cast.author.fid,
+                feedType: feedType || null,
+                userFid: user?.fid || null,
+              }),
+            });
+          } catch (error) {
+            // Silently fail - analytics shouldn't break the app
+            console.error("Failed to track cast view:", error);
+          }
+        };
+        trackCastViewToDB();
       }
     }
-  }, [cast.hash, cast.author?.fid, showThread, feedType]);
+  }, [cast.hash, cast.author?.fid, showThread, feedType, user?.fid]);
 
   // Listen for preference changes to trigger re-render
   useEffect(() => {

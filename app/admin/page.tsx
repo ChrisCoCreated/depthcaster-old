@@ -176,6 +176,12 @@ export default function AdminPage() {
           </h2>
           <div className="space-y-4">
             <Link
+              href="/admin/statistics"
+              className="block px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-center"
+            >
+              Statistics Dashboard
+            </Link>
+            <Link
               href="/admin/roles"
               className="block px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-center"
             >
