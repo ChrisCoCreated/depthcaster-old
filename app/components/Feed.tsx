@@ -226,6 +226,8 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
           
           if (allCuratorFids.length > 0) {
             setSelectedCuratorFids(selectedFids);
+            // Initialize the ref to track changes
+            prevSelectedCuratorFidsRef.current = [...selectedFids];
             // Also update selectedCuratorFids in localStorage for backward compatibility
             localStorage.setItem("selectedCuratorFids", JSON.stringify(selectedFids));
           }
@@ -435,6 +437,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   const lastFetchedFeedTypeRef = useRef<string>(""); // Track what we actually fetched
   const prevSortByRef = useRef<string>("");
   const prevMy37PackIdRef = useRef<string | null>(null);
+  const prevSelectedCuratorFidsRef = useRef<number[]>([]);
   const fetchingRef = useRef<boolean>(false);
   const hasInitialFetchRef = useRef<boolean>(false);
 
@@ -601,6 +604,11 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   useEffect(() => {
     const feedTypeChanged = prevFeedTypeRef.current !== feedType;
     const sortByChanged = prevSortByRef.current !== sortBy;
+    // Check if curator FIDs changed by comparing arrays
+    // Check if curator FIDs changed by comparing sorted arrays
+    const prevFidsSorted = [...prevSelectedCuratorFidsRef.current].sort();
+    const currentFidsSorted = [...selectedCuratorFids].sort();
+    const curatorFidsChanged = JSON.stringify(prevFidsSorted) !== JSON.stringify(currentFidsSorted);
     const isInitialMount = !hasInitialFetchRef.current;
     // Check if we need to fetch based on what we last fetched, not what we last saw
     const needsFetch = lastFetchedFeedTypeRef.current !== feedType || 
@@ -643,6 +651,18 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       prevSortByRef.current = sortBy;
     }
     
+    // Clear feed when curator FIDs change (for curated feed)
+    if (curatorFidsChanged && feedType === "curated" && !isInitialMount) {
+      setCasts([]);
+      setCursor(null);
+      setHasMore(false);
+      castsRestoredRef.current = false; // Reset casts restoration when curator filter changes
+      prevSelectedCuratorFidsRef.current = [...selectedCuratorFids];
+    } else if (curatorFidsChanged) {
+      // Update curator FIDs ref even if not curated
+      prevSelectedCuratorFidsRef.current = [...selectedCuratorFids];
+    }
+    
     // Only fetch if not my-37 feed, or if my-37 feed has saved pack with users
     if (feedType !== "my-37" || (my37PackId && my37HasUsers)) {
       // Check if we already restored casts from saved state
@@ -654,15 +674,17 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       const actualFeedTypeChanged = lastFetchedFeedTypeRef.current !== feedType && lastFetchedFeedTypeRef.current !== "";
       
       // Always fetch when feed type changes, or on initial mount, or when sortBy changes for curated
+      // or when curator FIDs change for curated feed
       // Also check if we haven't fetched this feed type yet (defensive check)
       // Skip fetch if we just restored casts and state is not stale, BUT only if feed type hasn't changed
       const condition1 = isInitialMount;
       const condition2 = feedTypeChanged || actualFeedTypeChanged;
       const condition3 = (sortByChanged && feedType === "curated" && !isInitialMount);
-      const condition4 = (lastFetchedFeedTypeRef.current !== feedType && !fetchingRef.current);
-      const fetchCondition = condition1 || condition2 || condition3 || condition4;
+      const condition4 = (curatorFidsChanged && feedType === "curated" && !isInitialMount);
+      const condition5 = (lastFetchedFeedTypeRef.current !== feedType && !fetchingRef.current);
+      const fetchCondition = condition1 || condition2 || condition3 || condition4 || condition5;
       // Only skip if we have restored casts AND state is not stale AND feed type hasn't actually changed
-      const skipCondition = hasRestoredCasts && !isStateStaleResult && !actualFeedTypeChanged;
+      const skipCondition = hasRestoredCasts && !isStateStaleResult && !actualFeedTypeChanged && !curatorFidsChanged;
       const shouldFetch = fetchCondition && !skipCondition;
       
       if (shouldFetch && !fetchingRef.current) {
@@ -673,6 +695,10 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
         // Update prevFeedTypeRef after we've determined we need to fetch
         if (feedTypeChanged) {
           prevFeedTypeRef.current = feedType;
+        }
+        // Update curator FIDs ref when fetching due to curator change
+        if (curatorFidsChanged && feedType === "curated") {
+          prevSelectedCuratorFidsRef.current = [...selectedCuratorFids];
         }
         // Fetch the feed - fetchFeed already has the correct feedType in its closure
         fetchFeed();
@@ -1051,6 +1077,56 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       setHasNewCuratedCasts(false);
     }
   }, [casts, feedType]);
+
+  // Listen for scroll-to-cast events (e.g., after successful curation)
+  // Only handle this when on the home page (feed page)
+  useEffect(() => {
+    const handleScrollToCast = (event: Event) => {
+      // Only handle scroll-to-cast when on the home page
+      if (pathname !== "/") {
+        return;
+      }
+
+      const customEvent = event as CustomEvent<string>;
+      const castHash = customEvent.detail;
+      if (!castHash) return;
+
+      // Wait a bit for the feed to potentially refresh and include the new cast
+      setTimeout(() => {
+        // Try to find the cast element by data attribute
+        const castElement = document.querySelector(`[data-cast-hash="${castHash}"]`);
+        if (castElement) {
+          castElement.scrollIntoView({ behavior: "smooth", block: "center" });
+          // Add a highlight effect
+          castElement.classList.add("ring-4", "ring-blue-500", "ring-opacity-50");
+          setTimeout(() => {
+            castElement.classList.remove("ring-4", "ring-blue-500", "ring-opacity-50");
+          }, 2000);
+        } else {
+          // Cast might not be in feed yet, refresh feed and try again
+          if (feedType === "curated") {
+            fetchFeed().then(() => {
+              setTimeout(() => {
+                const castElement = document.querySelector(`[data-cast-hash="${castHash}"]`);
+                if (castElement) {
+                  castElement.scrollIntoView({ behavior: "smooth", block: "center" });
+                  castElement.classList.add("ring-4", "ring-blue-500", "ring-opacity-50");
+                  setTimeout(() => {
+                    castElement.classList.remove("ring-4", "ring-blue-500", "ring-opacity-50");
+                  }, 2000);
+                }
+              }, 500);
+            });
+          }
+        }
+      }, 300);
+    };
+
+    window.addEventListener("scrollToCast", handleScrollToCast);
+    return () => {
+      window.removeEventListener("scrollToCast", handleScrollToCast);
+    };
+  }, [feedType, fetchFeed, pathname]);
 
   return (
     <div className="w-full max-w-4xl mx-auto overflow-x-hidden">

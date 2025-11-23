@@ -7,6 +7,7 @@ import { analytics } from "@/lib/analytics";
 export function CurationSettings() {
   const { user } = useNeynarContext();
   const [autoLikeOnCurate, setAutoLikeOnCurate] = useState(true);
+  const [notifyOnDeepbotCurate, setNotifyOnDeepbotCurate] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -24,6 +25,7 @@ export function CurationSettings() {
         if (response.ok) {
           const data = await response.json();
           setAutoLikeOnCurate(data.autoLikeOnCurate !== undefined ? data.autoLikeOnCurate : true);
+          setNotifyOnDeepbotCurate(data.notifyOnDeepbotCurate !== undefined ? data.notifyOnDeepbotCurate : true);
         }
       } catch (error) {
         console.error("Failed to fetch curation preferences:", error);
@@ -35,7 +37,7 @@ export function CurationSettings() {
     fetchPreferences();
   }, [user]);
 
-  const savePreferences = async (updatedAutoLikeOnCurate: boolean) => {
+  const savePreferences = async (updatedAutoLikeOnCurate?: boolean, updatedNotifyOnDeepbotCurate?: boolean) => {
     if (!user?.fid || !user?.signer_uuid) return;
 
     setSaving(true);
@@ -46,16 +48,20 @@ export function CurationSettings() {
         body: JSON.stringify({
           fid: user.fid,
           signerUuid: user.signer_uuid,
-          autoLikeOnCurate: updatedAutoLikeOnCurate,
+          autoLikeOnCurate: updatedAutoLikeOnCurate !== undefined ? updatedAutoLikeOnCurate : autoLikeOnCurate,
+          notifyOnDeepbotCurate: updatedNotifyOnDeepbotCurate !== undefined ? updatedNotifyOnDeepbotCurate : notifyOnDeepbotCurate,
         }),
       });
 
       if (response.ok) {
         const data = await response.json();
-        setAutoLikeOnCurate(data.autoLikeOnCurate);
-        
-        // Track analytics
-        analytics.trackCurationSettingsAutoLike(data.autoLikeOnCurate);
+        if (updatedAutoLikeOnCurate !== undefined) {
+          setAutoLikeOnCurate(data.autoLikeOnCurate);
+          analytics.trackCurationSettingsAutoLike(data.autoLikeOnCurate);
+        }
+        if (updatedNotifyOnDeepbotCurate !== undefined) {
+          setNotifyOnDeepbotCurate(data.notifyOnDeepbotCurate);
+        }
       }
     } catch (error) {
       console.error("Failed to save curation preferences:", error);
@@ -94,7 +100,33 @@ export function CurationSettings() {
             checked={autoLikeOnCurate}
             onChange={(e) => {
               setAutoLikeOnCurate(e.target.checked);
-              savePreferences(e.target.checked);
+              savePreferences(e.target.checked, undefined);
+            }}
+            disabled={saving}
+            className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 disabled:opacity-50"
+          />
+        </label>
+
+        <label
+          className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-800 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900 cursor-pointer"
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-xl">🔔</span>
+            <div className="flex flex-col">
+              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                Notify when @deepbot curates your cast
+              </span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                Get notified when someone uses @deepbot to curate one of your casts
+              </span>
+            </div>
+          </div>
+          <input
+            type="checkbox"
+            checked={notifyOnDeepbotCurate}
+            onChange={(e) => {
+              setNotifyOnDeepbotCurate(e.target.checked);
+              savePreferences(undefined, e.target.checked);
             }}
             disabled={saving}
             className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 disabled:opacity-50"

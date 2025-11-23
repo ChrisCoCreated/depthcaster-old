@@ -494,6 +494,56 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      // Check if deepbot is a curator and send notification to cast author if enabled
+      try {
+        // Get all curators for this cast to check if deepbot is one of them
+        const allCurations = await db
+          .select({
+            curatorFid: curatorCastCurations.curatorFid,
+            username: users.username,
+          })
+          .from(curatorCastCurations)
+          .leftJoin(users, eq(curatorCastCurations.curatorFid, users.fid))
+          .where(eq(curatorCastCurations.castHash, castHash));
+
+        const isCuratedByDeepbot = allCurations.some(c => c.username?.toLowerCase() === "deepbot");
+
+        if (isCuratedByDeepbot && finalCastData && typeof finalCastData === 'object' && 'author' in finalCastData) {
+          const author = (finalCastData as any).author;
+          const authorFid = author?.fid;
+
+          if (authorFid) {
+            // Get cast author's preferences
+            const authorUser = await db.select().from(users).where(eq(users.fid, authorFid)).limit(1);
+            if (authorUser[0]) {
+              const preferences = (authorUser[0].preferences || {}) as { notifyOnDeepbotCurate?: boolean };
+              const notifyOnDeepbotCurate = preferences.notifyOnDeepbotCurate !== undefined ? preferences.notifyOnDeepbotCurate : true;
+
+              if (notifyOnDeepbotCurate) {
+                // Send notification to cast author
+                sendPushNotificationToUser(authorFid, {
+                  title: "Your cast was curated",
+                  body: "Your cast was curated using @deepbot",
+                  icon: "/icon-192x192.webp",
+                  badge: "/icon-96x96.webp",
+                  data: {
+                    type: "deepbot_curated",
+                    castHash,
+                    url: `/cast/${castHash}`
+                  },
+                }).catch((error) => {
+                  console.error(`[Curate] Error sending deepbot curation notification to author ${authorFid}:`, error);
+                  // Don't fail curation if notification fails
+                });
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`[Curate] Error checking for deepbot curation notification:`, error);
+        // Don't fail curation if notification check fails
+      }
+
       return NextResponse.json({ 
         success: true, 
         curation: curationResult[0] 

@@ -28,7 +28,7 @@ export function ConversationView({ castHash, viewerFid }: ConversationViewProps)
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [conversationFetchedAt, setConversationFetchedAt] = useState<Date | null>(null);
-  const [showNoEngagement, setShowNoEngagement] = useState(false);
+  const [hideNoEngagement, setHideNoEngagement] = useState(false);
   const [sortBy, setSortBy] = useState<"newest" | "engagement" | "quality">("newest");
   const [fetchedParentCasts, setFetchedParentCasts] = useState<Map<string, ThreadedReply>>(new Map());
   const [fetchingParents, setFetchingParents] = useState<Set<string>>(new Set());
@@ -66,11 +66,11 @@ export function ConversationView({ castHash, viewerFid }: ConversationViewProps)
     return count;
   }
 
-  // Recursively filter replies to hide those with no engagement
-  function filterReplies(replies: ThreadedReply[], showAll: boolean): { visible: ThreadedReply[]; hidden: number } {
+  // Recursively filter replies to hide those with no engagement (only when hideNoEngagement is true)
+  function filterReplies(replies: ThreadedReply[], hideNoEngagement: boolean): { visible: ThreadedReply[]; hidden: number } {
     const totalCount = countAllReplies(replies);
 
-    function filterRecursive(reply: ThreadedReply, isFirstReply: boolean = false, forceInclude: boolean = false): ThreadedReply | null {
+    function filterRecursive(reply: ThreadedReply): ThreadedReply | null {
       // Filter children first
       const filteredChildren: ThreadedReply[] = [];
       
@@ -83,36 +83,18 @@ export function ConversationView({ castHash, viewerFid }: ConversationViewProps)
         });
       }
 
-      // Check if this reply has engagement
+      // If not hiding no-engagement replies, show everything
+      if (!hideNoEngagement) {
+        return {
+          ...reply,
+          children: filteredChildren.length > 0 ? filteredChildren : undefined,
+        };
+      }
+
+      // When hiding no-engagement replies, filter based on engagement
       const hasEng = hasEngagement(reply);
       
-      // If showing all, include everything
-      if (showAll) {
-        return {
-          ...reply,
-          children: filteredChildren.length > 0 ? filteredChildren : undefined,
-        };
-      }
-
-      // If forced to include (for minimum reply count), always include
-      if (forceInclude) {
-        return {
-          ...reply,
-          children: filteredChildren.length > 0 ? filteredChildren : undefined,
-        };
-      }
-
-      // When sorting by "newest", always show the first (most recent) reply even if it has no engagement
-      // This ensures the most recent reply is visible when viewing a conversation
-      if (sortBy === "newest" && isFirstReply) {
-        return {
-          ...reply,
-          children: filteredChildren.length > 0 ? filteredChildren : undefined,
-        };
-      }
-
       // If no engagement and no children with engagement, hide it
-      // (including quote casts with no engagement)
       if (!hasEng && filteredChildren.length === 0) {
         return null;
       }
@@ -125,30 +107,13 @@ export function ConversationView({ castHash, viewerFid }: ConversationViewProps)
     }
 
     const visible: ThreadedReply[] = [];
-    const filteredResults: (ThreadedReply | null)[] = [];
     
-    replies.forEach((reply, index) => {
-      const filtered = filterRecursive(reply, index === 0);
-      filteredResults.push(filtered);
+    replies.forEach((reply) => {
+      const filtered = filterRecursive(reply);
       if (filtered) {
         visible.push(filtered);
       }
     });
-
-    // Always show at least 3 replies if available, even if they have no engagement
-    const minReplies = Math.min(3, replies.length);
-    if (visible.length < minReplies) {
-      // Add replies that were filtered out, up to the minimum
-      for (let i = 0; i < filteredResults.length && visible.length < minReplies; i++) {
-        if (filteredResults[i] === null && replies[i]) {
-          // Force include this reply (bypass engagement filter)
-          const forcedFiltered = filterRecursive(replies[i], i === 0, true);
-          if (forcedFiltered) {
-            visible.push(forcedFiltered);
-          }
-        }
-      }
-    }
 
     const visibleCount = countAllReplies(visible);
     const hiddenCount = totalCount - visibleCount;
@@ -156,7 +121,7 @@ export function ConversationView({ castHash, viewerFid }: ConversationViewProps)
     return { visible, hidden: hiddenCount };
   }
 
-  const fetchConversation = useCallback(async () => {
+  const fetchConversation = useCallback(async (isRefresh = false) => {
     if (!castHash) {
       setError("Cast hash is required");
       setLoading(false);
@@ -164,8 +129,14 @@ export function ConversationView({ castHash, viewerFid }: ConversationViewProps)
     }
 
     try {
-      setLoading(true);
+      // Only show loading state on initial load, not on refresh
+      if (!isRefresh) {
+        setLoading(true);
+      }
       setError(null);
+
+      // Preserve scroll position during refresh
+      const scrollY = isRefresh ? window.scrollY : 0;
 
       const params = new URLSearchParams({ castHash });
       if (sortBy) {
@@ -182,6 +153,13 @@ export function ConversationView({ castHash, viewerFid }: ConversationViewProps)
       setReplies(data.replies || []);
       setConversationFetchedAt(data.conversationFetchedAt ? new Date(data.conversationFetchedAt) : null);
       setLoading(false);
+
+      // Restore scroll position after refresh
+      if (isRefresh && scrollY > 0) {
+        requestAnimationFrame(() => {
+          window.scrollTo({ top: scrollY, behavior: "auto" });
+        });
+      }
     } catch (err: any) {
       setError(err.message || "Failed to load conversation");
       setLoading(false);
@@ -447,7 +425,7 @@ export function ConversationView({ castHash, viewerFid }: ConversationViewProps)
           
           {/* Reply content */}
           <div className="flex-1 min-w-0" style={{ marginLeft: `${indentPx}px` }}>
-            <CastCard cast={castWithoutQuotedEmbed as Cast} showThread={false} onUpdate={fetchConversation} isReply={true} rootCastHash={rootCast?.hash || castHash} />
+            <CastCard cast={castWithoutQuotedEmbed as Cast} showThread={false} onUpdate={() => fetchConversation(true)} isReply={true} rootCastHash={rootCast?.hash || castHash} />
           </div>
         </div>
         
@@ -502,7 +480,7 @@ export function ConversationView({ castHash, viewerFid }: ConversationViewProps)
     <div className="w-full max-w-3xl mx-auto">
       {/* Main cast */}
       <div className="border-b border-gray-100 dark:border-gray-800">
-        <CastCard cast={rootCast} showThread={false} onUpdate={fetchConversation} disableClick={true} rootCastHash={rootCast?.hash || castHash} />
+        <CastCard cast={rootCast} showThread={false} onUpdate={() => fetchConversation(true)} disableClick={true} rootCastHash={rootCast?.hash || castHash} />
       </div>
 
       {/* Sort options */}
@@ -546,9 +524,9 @@ export function ConversationView({ castHash, viewerFid }: ConversationViewProps)
 
       {/* Replies */}
       {replies.length > 0 && (() => {
-        const { visible, hidden } = filterReplies(replies, showNoEngagement);
-        // Calculate hidden count when showing all (for the hide button)
-        const hiddenCountWhenShowingAll = showNoEngagement ? filterReplies(replies, false).hidden : hidden;
+        const { visible, hidden } = filterReplies(replies, hideNoEngagement);
+        // Calculate how many replies would be hidden if we filtered (for the button text)
+        const { hidden: hiddenCountWhenFiltering } = filterReplies(replies, true);
         
         return (
           <>
@@ -564,26 +542,17 @@ export function ConversationView({ castHash, viewerFid }: ConversationViewProps)
               )}
             </div>
 
-            {/* Show hidden replies button */}
-            {hidden > 0 && !showNoEngagement && (
+            {/* Toggle button to hide/show no-engagement replies */}
+            {hiddenCountWhenFiltering > 0 && (
               <div className="mt-6 px-4 py-3 text-center border-t border-gray-200 dark:border-gray-800">
                 <button
-                  onClick={() => setShowNoEngagement(true)}
+                  onClick={() => setHideNoEngagement(!hideNoEngagement)}
                   className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 underline transition-colors"
                 >
-                  Show {hidden} {hidden === 1 ? 'reply' : 'replies'} with no engagement
-                </button>
-              </div>
-            )}
-
-            {/* Hide button when showing all */}
-            {showNoEngagement && hiddenCountWhenShowingAll > 0 && (
-              <div className="mt-6 px-4 py-3 text-center border-t border-gray-200 dark:border-gray-800">
-                <button
-                  onClick={() => setShowNoEngagement(false)}
-                  className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 underline transition-colors"
-                >
-                  Hide {hiddenCountWhenShowingAll} {hiddenCountWhenShowingAll === 1 ? 'reply' : 'replies'} with no engagement
+                  {hideNoEngagement 
+                    ? `Show ${hiddenCountWhenFiltering} ${hiddenCountWhenFiltering === 1 ? 'reply' : 'replies'} with no engagement`
+                    : `Hide ${hiddenCountWhenFiltering} ${hiddenCountWhenFiltering === 1 ? 'reply' : 'replies'} with no engagement`
+                  }
                 </button>
               </div>
             )}

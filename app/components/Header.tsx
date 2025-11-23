@@ -176,6 +176,19 @@ export function Header() {
     }
   }, [toast]);
 
+  // Listen for toast events from other components (e.g., CastCard)
+  useEffect(() => {
+    const handleShowToast = (event: Event) => {
+      const customEvent = event as CustomEvent<{ message: string; type: "error" | "success" }>;
+      setToast({ message: customEvent.detail.message, type: customEvent.detail.type });
+    };
+
+    window.addEventListener("showToast", handleShowToast);
+    return () => {
+      window.removeEventListener("showToast", handleShowToast);
+    };
+  }, []);
+
   const showToast = (message: string, type: "error" | "success" = "error") => {
     setToast({ message, type });
   };
@@ -289,10 +302,13 @@ export function Header() {
       }
 
       // Success - show success message
-      showToast("Cast curated successfully!", "success");
+      showToast("Curated", "success");
 
       // Track analytics
       analytics.trackCuratePaste(castHash, user.fid);
+
+      // Scroll to the cast in the feed
+      window.dispatchEvent(new CustomEvent("scrollToCast", { detail: castHash }));
 
       // Check if auto-like is enabled and handle auto-like
       if (user?.fid && user?.signer_uuid) {

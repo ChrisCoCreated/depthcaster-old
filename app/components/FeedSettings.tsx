@@ -817,6 +817,8 @@ export function CuratorFilterInline({
   const [searchResults, setSearchResults] = useState<Curator[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const longPressFidRef = useRef<number | null>(null);
 
   // Load manually added curators from localStorage
   useEffect(() => {
@@ -901,12 +903,61 @@ export function CuratorFilterInline({
     };
   }, [searchTerm]);
 
+  // Cleanup long press timer on unmount
+  useEffect(() => {
+    return () => {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+      }
+    };
+  }, []);
+
   const toggleCurator = (fid: number) => {
     if (selectedCuratorFids.includes(fid)) {
       onCuratorFidsChange(selectedCuratorFids.filter((f) => f !== fid));
     } else {
       onCuratorFidsChange([...selectedCuratorFids, fid]);
     }
+  };
+
+  const selectOnlyCurator = (fid: number) => {
+    // Deselect all others and select only this one
+    onCuratorFidsChange([fid]);
+  };
+
+  const handleCuratorClick = (fid: number, event: React.MouseEvent) => {
+    // Clear any pending long press
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    longPressFidRef.current = null;
+
+    // Check for shift-click
+    if (event.shiftKey) {
+      event.preventDefault();
+      selectOnlyCurator(fid);
+    } else {
+      toggleCurator(fid);
+    }
+  };
+
+  const handleLongPressStart = (fid: number) => {
+    longPressFidRef.current = fid;
+    longPressTimerRef.current = setTimeout(() => {
+      if (longPressFidRef.current === fid) {
+        selectOnlyCurator(fid);
+        longPressFidRef.current = null;
+      }
+    }, 500); // 500ms for long press
+  };
+
+  const handleLongPressEnd = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    longPressFidRef.current = null;
   };
 
   // Combine curators with role and manually added curators
@@ -1072,6 +1123,33 @@ export function CuratorFilterInline({
             )}
           </div>
 
+          {/* Info box */}
+          <div className="mb-2 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded text-xs text-blue-800 dark:text-blue-200">
+            <div className="flex items-start gap-2">
+              <svg
+                className="w-4 h-4 mt-0.5 flex-shrink-0"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <div className="flex-1 space-y-1">
+                <div className="font-medium">How to filter curators:</div>
+                <ul className="list-disc list-inside space-y-0.5 ml-1">
+                  <li>Click to toggle selection</li>
+                  <li>Shift+click to select only this curator</li>
+                  <li>Long press to select only this curator</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
           {/* Curators pills */}
           <div className="flex flex-wrap gap-1.5 p-2 border border-gray-200 dark:border-gray-700 rounded bg-gray-50 dark:bg-gray-900 min-h-[50px] max-h-[200px] overflow-y-auto">
             {allDisplayedCurators.length === 0 ? (
@@ -1088,7 +1166,13 @@ export function CuratorFilterInline({
                     <button
                       key={curator.fid}
                       type="button"
-                      onClick={() => toggleCurator(curator.fid)}
+                      onClick={(e) => handleCuratorClick(curator.fid, e)}
+                      onMouseDown={() => handleLongPressStart(curator.fid)}
+                      onMouseUp={handleLongPressEnd}
+                      onMouseLeave={handleLongPressEnd}
+                      onTouchStart={() => handleLongPressStart(curator.fid)}
+                      onTouchEnd={handleLongPressEnd}
+                      title="Click to toggle, Shift+click or long press to select only this"
                       className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-xs rounded-full transition-colors ${
                         isSelected
                           ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700"
@@ -1116,12 +1200,17 @@ export function CuratorFilterInline({
                     <button
                       key={curator.fid}
                       type="button"
-                      onClick={() => toggleCurator(curator.fid)}
+                      onClick={(e) => handleCuratorClick(curator.fid, e)}
+                      onMouseDown={() => handleLongPressStart(curator.fid)}
+                      onMouseUp={handleLongPressEnd}
+                      onMouseLeave={handleLongPressEnd}
+                      onTouchStart={() => handleLongPressStart(curator.fid)}
+                      onTouchEnd={handleLongPressEnd}
                       onContextMenu={(e) => {
                         e.preventDefault();
                         removeManuallyAddedCurator(curator.fid);
                       }}
-                      title="Right-click to remove"
+                      title="Right-click to remove, Shift+click or long press to select only this"
                       className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-xs rounded-full transition-colors ${
                         isSelected
                           ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700"

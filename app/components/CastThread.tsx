@@ -65,7 +65,7 @@ export function CastThread({ castHash, viewerFid }: CastThreadProps) {
     fetchPreferences();
   }, [user]);
 
-  const fetchConversation = useCallback(async (fold?: "above" | "below") => {
+  const fetchConversation = useCallback(async (fold?: "above" | "below", isRefresh = false) => {
     if (!castHash) {
       setError("Cast hash is required");
       setLoading(false);
@@ -76,9 +76,15 @@ export function CastThread({ castHash, viewerFid }: CastThreadProps) {
       if (fold === "below") {
         setLoadingBelowFold(true);
       } else {
-        setLoading(true);
+        // Only show loading state on initial load, not on refresh
+        if (!isRefresh) {
+          setLoading(true);
+        }
         setError(null);
       }
+
+      // Preserve scroll position during refresh
+      const scrollY = isRefresh && !fold ? window.scrollY : 0;
 
       const params = new URLSearchParams({
         identifier: castHash,
@@ -110,6 +116,13 @@ export function CastThread({ castHash, viewerFid }: CastThreadProps) {
         setBelowFoldReplies([]);
         setShowBelowFold(false);
         setLoading(false);
+
+        // Restore scroll position after refresh
+        if (isRefresh && scrollY > 0) {
+          requestAnimationFrame(() => {
+            window.scrollTo({ top: scrollY, behavior: "auto" });
+          });
+        }
       }
     } catch (err: any) {
       setError(err.message || "Failed to load conversation");
@@ -288,7 +301,7 @@ export function CastThread({ castHash, viewerFid }: CastThreadProps) {
           
           {/* Reply content */}
           <div className="flex-1 min-w-0" style={{ marginLeft: `${indentPx}px` }}>
-            <CastCard cast={reply} showThread={false} onUpdate={() => fetchConversation()} isReply={true} rootCastHash={actualRootCastHash} />
+            <CastCard cast={reply} showThread={false} onUpdate={() => fetchConversation(undefined, true)} isReply={true} rootCastHash={actualRootCastHash} />
           </div>
         </div>
         
@@ -325,7 +338,7 @@ export function CastThread({ castHash, viewerFid }: CastThreadProps) {
         <div className="border-b border-gray-200 dark:border-gray-800">
           {parentCasts.map((parentCast: Cast) => (
             <div key={parentCast.hash} className="opacity-75">
-              <CastCard cast={parentCast} onUpdate={fetchConversation} />
+              <CastCard cast={parentCast} onUpdate={() => fetchConversation(undefined, true)} />
             </div>
           ))}
         </div>
@@ -333,7 +346,7 @@ export function CastThread({ castHash, viewerFid }: CastThreadProps) {
 
       {/* Main cast */}
       <div className="border-b border-gray-100 dark:border-gray-800">
-        <CastCard cast={mainCast} showThread={false} onUpdate={fetchConversation} rootCastHash={actualRootCastHash} />
+        <CastCard cast={mainCast} showThread={false} onUpdate={() => fetchConversation(undefined, true)} rootCastHash={actualRootCastHash} />
       </div>
 
       {/* Replies */}

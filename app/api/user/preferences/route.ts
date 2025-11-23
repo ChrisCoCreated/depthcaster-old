@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
       hiddenBots?: string[];
       autoLikeOnCurate?: boolean;
       hasSeenAutoLikeNotification?: boolean;
+      notifyOnDeepbotCurate?: boolean;
     };
     
     // Ensure hiddenBots exists with defaults
@@ -39,12 +40,14 @@ export async function GET(request: NextRequest) {
     const hideBots = preferences.hideBots !== undefined ? preferences.hideBots : true;
     const autoLikeOnCurate = preferences.autoLikeOnCurate !== undefined ? preferences.autoLikeOnCurate : true;
     const hasSeenAutoLikeNotification = preferences.hasSeenAutoLikeNotification || false;
+    const notifyOnDeepbotCurate = preferences.notifyOnDeepbotCurate !== undefined ? preferences.notifyOnDeepbotCurate : true;
 
     return NextResponse.json({
       hideBots,
       hiddenBots,
       autoLikeOnCurate,
       hasSeenAutoLikeNotification,
+      notifyOnDeepbotCurate,
     });
   } catch (error: any) {
     console.error("Error fetching user preferences:", error);
@@ -58,7 +61,7 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { fid, signerUuid, hideBots, hiddenBots, autoLikeOnCurate, hasSeenAutoLikeNotification } = body;
+    const { fid, signerUuid, hideBots, hiddenBots, autoLikeOnCurate, hasSeenAutoLikeNotification, notifyOnDeepbotCurate } = body;
 
     if (!fid || !signerUuid) {
       return NextResponse.json(
@@ -83,6 +86,7 @@ export async function PUT(request: NextRequest) {
       hiddenBots?: string[];
       autoLikeOnCurate?: boolean;
       hasSeenAutoLikeNotification?: boolean;
+      notifyOnDeepbotCurate?: boolean;
     };
     
     // Update preferences
@@ -92,6 +96,7 @@ export async function PUT(request: NextRequest) {
       hiddenBots: hiddenBots !== undefined ? hiddenBots : existingPreferences.hiddenBots || DEFAULT_HIDDEN_BOTS,
       autoLikeOnCurate: autoLikeOnCurate !== undefined ? autoLikeOnCurate : existingPreferences.autoLikeOnCurate !== undefined ? existingPreferences.autoLikeOnCurate : true,
       hasSeenAutoLikeNotification: hasSeenAutoLikeNotification !== undefined ? hasSeenAutoLikeNotification : existingPreferences.hasSeenAutoLikeNotification,
+      notifyOnDeepbotCurate: notifyOnDeepbotCurate !== undefined ? notifyOnDeepbotCurate : existingPreferences.notifyOnDeepbotCurate !== undefined ? existingPreferences.notifyOnDeepbotCurate : true,
     };
 
     await updateUserPreferences(fid, updatedPreferences);
@@ -101,6 +106,7 @@ export async function PUT(request: NextRequest) {
       hiddenBots: updatedPreferences.hiddenBots,
       autoLikeOnCurate: updatedPreferences.autoLikeOnCurate,
       hasSeenAutoLikeNotification: updatedPreferences.hasSeenAutoLikeNotification,
+      notifyOnDeepbotCurate: updatedPreferences.notifyOnDeepbotCurate,
     });
   } catch (error: any) {
     console.error("Error updating user preferences:", error);

@@ -60,6 +60,39 @@ export async function GET(request: NextRequest) {
     const filteredReplies = storedReplies.filter(
       reply => reply.curatedCastHash !== PARENT_CAST_PLACEHOLDER_HASH
     );
+    
+    console.log(`[ConversationDB] Fetched ${storedReplies.length} stored replies, ${filteredReplies.length} after filtering placeholder hashes for castHash ${castHash}`);
+    
+    // Debug: Check for replies to the specific hash mentioned
+    const targetHash = "0xfa3ecdb33e07f50cd28ed9ecbd1d789230d02f76";
+    const repliesToTarget = await db
+      .select()
+      .from(castReplies)
+      .where(eq(castReplies.parentCastHash, targetHash));
+    
+    if (repliesToTarget.length > 0) {
+      console.log(`[ConversationDB] Found ${repliesToTarget.length} reply/replies to ${targetHash}:`, 
+        repliesToTarget.map(r => ({
+          replyCastHash: r.replyCastHash,
+          curatedCastHash: r.curatedCastHash,
+          parentCastHash: r.parentCastHash,
+          rootCastHash: r.rootCastHash,
+          isInFiltered: filteredReplies.some(fr => fr.replyCastHash === r.replyCastHash)
+        }))
+      );
+      
+      // Check if the parent itself is in stored replies
+      const parentInStored = filteredReplies.some(fr => fr.replyCastHash?.trim().toLowerCase() === targetHash.trim().toLowerCase());
+      console.log(`[ConversationDB] Parent ${targetHash} is in stored replies: ${parentInStored}`);
+      if (!parentInStored) {
+        const parentInDB = await db
+          .select()
+          .from(castReplies)
+          .where(eq(castReplies.replyCastHash, targetHash))
+          .limit(1);
+        console.log(`[ConversationDB] Parent ${targetHash} in database: ${parentInDB.length > 0}, curatedCastHash: ${parentInDB[0]?.curatedCastHash}`);
+      }
+    }
 
     // Build threaded structure
     const replyMap = new Map<string, any>();
@@ -84,9 +117,13 @@ export async function GET(request: NextRequest) {
     });
 
     // Second pass: build tree structure
+    let skippedCount = 0;
     filteredReplies.forEach((storedReply) => {
       const reply = replyMap.get(storedReply.replyCastHash);
-      if (!reply) return;
+      if (!reply) {
+        skippedCount++;
+        return;
+      }
 
       const parentHash = storedReply.parentCastHash;
       
@@ -96,21 +133,30 @@ export async function GET(request: NextRequest) {
       // Filter out parent casts that are not actually replies to the curated cast
       // These are parent casts saved for display purposes only (parents of quote casts)
       // They should not appear in the conversation tree
-      const castData = storedReply.castData as any;
-      const castParentHash = castData?.parent_hash;
-      
-      // If this cast's parent (from castData) is NOT the root cast, and it's not a quote cast,
-      // then it's likely a parent cast saved for display only - skip it
+      // Only filter if:
+      // 1. It's not a quote cast
+      // 2. It has a parent that's not the root cast
+      // 3. The parent is not in our stored replies (meaning it's outside the conversation)
       if (!isQuoteCast && 
-          castParentHash && 
-          castParentHash !== castHash &&
           parentHash && 
           parentHash !== castHash) {
         // Check if the parent is actually in the stored replies (meaning it's part of the thread)
-        const parentInReplies = filteredReplies.some(sr => sr.replyCastHash === parentHash);
+        // Use case-insensitive comparison to match the tree-building logic below
+        const normalizedParentHash = parentHash?.trim().toLowerCase();
+        const parentInReplies = filteredReplies.some(
+          sr => sr.replyCastHash?.trim().toLowerCase() === normalizedParentHash
+        );
         
-        // If parent is not in replies, this is a parent cast saved for display only
-        if (!parentInReplies) {
+        // If parent is not in replies, this might be a parent cast saved for display only
+        // BUT: also check if this reply has the correct curatedCastHash - if it does, include it
+        // (it might be a legitimate reply whose parent wasn't stored yet, or was filtered)
+        const hasCorrectCuratedCastHash = storedReply.curatedCastHash === castHash || 
+                                          storedReply.quotedCastHash === castHash;
+        
+        if (!parentInReplies && !hasCorrectCuratedCastHash) {
+          // Log for debugging - this might be filtering out legitimate replies
+          skippedCount++;
+          console.warn(`[ConversationDB] Filtering out reply ${storedReply.replyCastHash} - parent ${parentHash} not found in filteredReplies and curatedCastHash mismatch (curatedCastHash: ${storedReply.curatedCastHash}, expected: ${castHash})`);
           return; // Skip this cast - it's not an actual reply to the curated cast
         }
       }
@@ -123,49 +169,99 @@ export async function GET(request: NextRequest) {
         // Parent could be:
         // 1. Another reply (nested thread)
         // 2. A quote cast (reply to quote cast)
-        const parent = replyMap.get(parentHash);
-        if (parent && parent.children) {
-          parent.children.push(reply);
-        } else {
-          // Parent not found in direct lookup - try to find it in stored replies
-          // This handles cases where parentHash matches a quote cast or other reply
-          // Use trim() and case-insensitive comparison to handle any formatting differences
-          const normalizedParentHash = parentHash?.trim().toLowerCase();
-          const parentStoredReply = storedReplies.find(
+        // Use case-insensitive lookup to handle formatting differences
+        const normalizedParentHash = parentHash?.trim().toLowerCase();
+        let parent = replyMap.get(parentHash);
+        
+        // Debug logging for the specific case
+        const isTargetReply = storedReply.replyCastHash === "0x10907aac1d118c8929592d6924440f1dac28815e";
+        if (isTargetReply) {
+          console.log(`[ConversationDB] Processing target reply ${storedReply.replyCastHash}, parentHash: ${parentHash}`);
+          console.log(`[ConversationDB] Direct lookup result: ${!!parent}`);
+          console.log(`[ConversationDB] replyMap keys (first 5):`, Array.from(replyMap.keys()).slice(0, 5));
+        }
+        
+        // If direct lookup failed, try case-insensitive search
+        if (!parent) {
+          const parentStoredReply = filteredReplies.find(
             (sr) => sr.replyCastHash?.trim().toLowerCase() === normalizedParentHash
           );
-          
           if (parentStoredReply) {
-            // Found the parent in stored replies, get it from replyMap
-            // Use the actual hash from stored reply (not normalized) to look up in map
-            const parentReply = replyMap.get(parentStoredReply.replyCastHash);
-            if (parentReply && parentReply.children) {
-              parentReply.children.push(reply);
+            if (isTargetReply) {
+              console.log(`[ConversationDB] Found parent via case-insensitive search: ${parentStoredReply.replyCastHash}`);
+            }
+            parent = replyMap.get(parentStoredReply.replyCastHash);
+            if (isTargetReply) {
+              console.log(`[ConversationDB] Parent from map after case-insensitive lookup: ${!!parent}`);
+            }
+          }
+        }
+        
+        if (parent && parent.children) {
+          if (isTargetReply) {
+            console.log(`[ConversationDB] Successfully attaching target reply to parent ${parentHash}`);
+          }
+          parent.children.push(reply);
+        } else {
+          // Parent not found in filtered replies, treat as root-level
+          // This can happen if parent is outside our stored conversation
+          // or if parent was filtered out (shouldn't happen for legitimate nested replies)
+          const parentInStored = filteredReplies.some(sr => sr.replyCastHash?.trim().toLowerCase() === normalizedParentHash);
+          if (isTargetReply || !parentInStored) {
+            console.warn(`[ConversationDB] Parent ${parentHash} not found in replyMap for reply ${storedReply.replyCastHash}, treating as root-level. Parent in stored replies: ${parentInStored}`);
+          }
+          if (parentInStored) {
+            // Parent exists but wasn't in replyMap - this shouldn't happen, but let's try to find it
+            const parentStoredReply = filteredReplies.find(sr => sr.replyCastHash?.trim().toLowerCase() === normalizedParentHash);
+            if (parentStoredReply) {
+              const parentFromMap = replyMap.get(parentStoredReply.replyCastHash);
+              if (parentFromMap && parentFromMap.children) {
+                if (isTargetReply) {
+                  console.log(`[ConversationDB] Found parent ${parentHash} using stored reply lookup, attaching child`);
+                }
+                parentFromMap.children.push(reply);
+              } else {
+                if (isTargetReply) {
+                  console.warn(`[ConversationDB] Parent ${parentHash} in stored replies but not in replyMap - this is a bug!`);
+                }
+                rootReplies.push(reply);
+              }
             } else {
-              // Parent exists in stored replies but not in map - this shouldn't happen
-              // but treat as root-level to be safe
-              console.warn(`Parent ${parentHash} found in stored replies but not in replyMap`);
               rootReplies.push(reply);
             }
           } else {
-            // Parent not found in stored replies, treat as root-level
-            // This can happen if parent is outside our stored conversation
             rootReplies.push(reply);
           }
         }
       }
     });
 
+    // Helper function to get the newest timestamp at any depth in a reply tree
+    function getNewestTimestampInTree(reply: any): number {
+      let newest = 0;
+      
+      function traverse(r: any) {
+        const time = r.castCreatedAt 
+          ? new Date(r.castCreatedAt).getTime() 
+          : (r.timestamp ? new Date(r.timestamp).getTime() : (r.created_at ? new Date(r.created_at).getTime() : 0));
+        if (time > newest) {
+          newest = time;
+        }
+        if (r.children && r.children.length > 0) {
+          r.children.forEach(traverse);
+        }
+      }
+      
+      traverse(reply);
+      return newest;
+    }
+
     // Sort root replies based on sortBy parameter
     if (sortBy === "newest") {
-      // Sort by castCreatedAt (most recent first) - database already sorted, but preserve order
+      // Sort by the newest reply at any depth within each thread (most recent first)
       rootReplies.sort((a, b) => {
-        const aTime = a.castCreatedAt 
-          ? new Date(a.castCreatedAt).getTime() 
-          : (a.timestamp ? new Date(a.timestamp).getTime() : (a.created_at ? new Date(a.created_at).getTime() : 0));
-        const bTime = b.castCreatedAt 
-          ? new Date(b.castCreatedAt).getTime() 
-          : (b.timestamp ? new Date(b.timestamp).getTime() : (b.created_at ? new Date(b.created_at).getTime() : 0));
+        const aTime = getNewestTimestampInTree(a);
+        const bTime = getNewestTimestampInTree(b);
         return bTime - aTime; // Descending (newest first)
       });
     } else if (sortBy === "engagement") {
@@ -318,6 +414,21 @@ export async function GET(request: NextRequest) {
     }
     attachParentCasts(rootReplies);
 
+    // Count total replies in tree (including nested)
+    function countRepliesInTree(replies: any[]): number {
+      let count = 0;
+      for (const reply of replies) {
+        count++;
+        if (reply.children && reply.children.length > 0) {
+          count += countRepliesInTree(reply.children);
+        }
+      }
+      return count;
+    }
+    const repliesInTree = countRepliesInTree(rootReplies);
+    
+    console.log(`[ConversationDB] Built conversation tree: ${rootReplies.length} root replies, ${repliesInTree} total replies in tree (from ${filteredReplies.length} stored replies, ${skippedCount} skipped during tree building)`);
+    
     return NextResponse.json({
       rootCast: rootCastData,
       replies: rootReplies,

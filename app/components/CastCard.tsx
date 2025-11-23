@@ -1554,6 +1554,14 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
       // Track analytics
       analytics.trackCurateCast(cast.hash, user.fid);
 
+      // Show curated toast
+      window.dispatchEvent(new CustomEvent("showToast", { 
+        detail: { message: "Curated", type: "success" } 
+      }));
+
+      // Scroll to the cast in the feed
+      window.dispatchEvent(new CustomEvent("scrollToCast", { detail: cast.hash }));
+
       // Check if auto-like is enabled and handle auto-like
       if (user?.fid && user?.signer_uuid) {
         try {
@@ -1704,6 +1712,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
     <>
       <div 
         ref={castCardRef}
+        data-cast-hash={cast.hash}
         className={`border-b border-gray-200 dark:border-gray-800 py-4 sm:py-6 px-2 sm:px-4 transition-colors relative ${disableClick ? '' : 'hover:bg-gray-50 dark:hover:bg-gray-900 cursor-pointer'}`}
         onClick={handleCardClick}
       >
