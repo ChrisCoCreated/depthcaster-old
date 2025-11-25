@@ -236,32 +236,16 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    // Helper function to get the newest timestamp at any depth in a reply tree
-    function getNewestTimestampInTree(reply: any): number {
-      let newest = 0;
-      
-      function traverse(r: any) {
-        const time = r.castCreatedAt 
-          ? new Date(r.castCreatedAt).getTime() 
-          : (r.timestamp ? new Date(r.timestamp).getTime() : (r.created_at ? new Date(r.created_at).getTime() : 0));
-        if (time > newest) {
-          newest = time;
-        }
-        if (r.children && r.children.length > 0) {
-          r.children.forEach(traverse);
-        }
-      }
-      
-      traverse(reply);
-      return newest;
-    }
-
     // Sort root replies based on sortBy parameter
     if (sortBy === "newest") {
-      // Sort by the newest reply at any depth within each thread (most recent first)
+      // Sort by castCreatedAt (most recent first) - database already sorted, but preserve order
       rootReplies.sort((a, b) => {
-        const aTime = getNewestTimestampInTree(a);
-        const bTime = getNewestTimestampInTree(b);
+        const aTime = a.castCreatedAt 
+          ? new Date(a.castCreatedAt).getTime() 
+          : (a.timestamp ? new Date(a.timestamp).getTime() : (a.created_at ? new Date(a.created_at).getTime() : 0));
+        const bTime = b.castCreatedAt 
+          ? new Date(b.castCreatedAt).getTime() 
+          : (b.timestamp ? new Date(b.timestamp).getTime() : (b.created_at ? new Date(b.created_at).getTime() : 0));
         return bTime - aTime; // Descending (newest first)
       });
     } else if (sortBy === "engagement") {

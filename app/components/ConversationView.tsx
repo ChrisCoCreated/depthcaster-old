@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 interface ConversationViewProps {
   castHash: string;
   viewerFid?: number;
+  focusReplyHash?: string;
 }
 
 interface ThreadedReply {
@@ -22,7 +23,7 @@ interface ThreadedReply {
   [key: string]: any;
 }
 
-export function ConversationView({ castHash, viewerFid }: ConversationViewProps) {
+export function ConversationView({ castHash, viewerFid, focusReplyHash }: ConversationViewProps) {
   const [rootCast, setRootCast] = useState<any>(null);
   const [replies, setReplies] = useState<ThreadedReply[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,6 +35,8 @@ export function ConversationView({ castHash, viewerFid }: ConversationViewProps)
   const [fetchingParents, setFetchingParents] = useState<Set<string>>(new Set());
   const { user } = useNeynarContext();
   const router = useRouter();
+  const [highlightedReply, setHighlightedReply] = useState<string | null>(null);
+  const normalizedFocusHash = focusReplyHash?.toLowerCase() || null;
 
   // Check if a reply is a quote cast
   function isQuoteCast(reply: ThreadedReply): boolean {
@@ -169,6 +172,25 @@ export function ConversationView({ castHash, viewerFid }: ConversationViewProps)
   useEffect(() => {
     fetchConversation();
   }, [fetchConversation]);
+
+  useEffect(() => {
+    if (!normalizedFocusHash || replies.length === 0) return;
+    const element = document.getElementById(`reply-${normalizedFocusHash}`);
+    if (!element) return;
+    const headerOffset = 120;
+    const elementTop = element.getBoundingClientRect().top + window.scrollY;
+    window.scrollTo({
+      top: Math.max(elementTop - headerOffset, 0),
+      behavior: "smooth",
+    });
+    setHighlightedReply(normalizedFocusHash);
+    const timer = window.setTimeout(() => {
+      setHighlightedReply((current) => (current === normalizedFocusHash ? null : current));
+    }, 2000);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [normalizedFocusHash, replies]);
 
   // Find a cast by hash in the replies tree
   function findCastByHash(replies: ThreadedReply[], hash: string): ThreadedReply | null {
@@ -309,6 +331,8 @@ export function ConversationView({ castHash, viewerFid }: ConversationViewProps)
     const indentPx = depth > 1 ? 48 : 0;
     const showVerticalLine = !isLastChild || hasChildren || parentHasMore;
     const isQuote = isQuoteCast(reply);
+    const normalizedHash = reply.hash?.toLowerCase?.();
+    const isHighlighted = normalizedHash && highlightedReply === normalizedHash;
     
     // Find parent cast if this is a quote cast with a parent (not root)
     // IMPORTANT: parent_hash is the cast being replied to, NOT the quoted cast in embeds
@@ -411,7 +435,11 @@ export function ConversationView({ castHash, viewerFid }: ConversationViewProps)
     }
     
     return (
-      <div key={reply.hash} className="relative">
+      <div
+        key={reply.hash}
+        id={normalizedHash ? `reply-${normalizedHash}` : undefined}
+        className={`relative ${isHighlighted ? "ring-2 ring-blue-400 dark:ring-blue-500 rounded-lg" : ""}`}
+      >
         <div className="flex relative">
           {/* Thread line area */}
           <div className="flex-shrink-0 relative" style={{ width: depth > 1 ? '24px' : '8px' }}>

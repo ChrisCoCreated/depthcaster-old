@@ -3,7 +3,6 @@ import { db } from "@/lib/db";
 import { castReplies } from "@/lib/schema";
 import { eq, or, inArray, desc } from "drizzle-orm";
 import { calculateEngagementScore } from "@/lib/engagement";
-import { getLastCuratedFeedView } from "@/lib/users";
 import { isQuoteCast } from "@/lib/conversation";
 import { enrichCastsWithViewerContext } from "@/lib/interactions";
 
@@ -27,16 +26,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get last session timestamp for filtering
-    let lastSessionTimestamp: Date | null = null;
-    if (viewerFid) {
-      try {
-        lastSessionTimestamp = await getLastCuratedFeedView(viewerFid);
-      } catch (error) {
-        // Continue with null
-      }
-    }
-
     // Fetch replies for this cast
     // Exclude parent casts saved for display only (they use placeholder hash 0x0000...)
     const PARENT_CAST_PLACEHOLDER_HASH = "0x0000000000000000000000000000000000000000";
@@ -44,6 +33,9 @@ export async function GET(request: NextRequest) {
       .select({
         curatedCastHash: castReplies.curatedCastHash,
         quotedCastHash: castReplies.quotedCastHash,
+        rootCastHash: castReplies.rootCastHash,
+        parentCastHash: castReplies.parentCastHash,
+        replyCastHash: castReplies.replyCastHash,
         castData: castReplies.castData,
         castCreatedAt: castReplies.castCreatedAt,
         createdAt: castReplies.createdAt,
@@ -60,147 +52,65 @@ export async function GET(request: NextRequest) {
           ? desc(castReplies.castCreatedAt) 
           : desc(castReplies.createdAt)
       )
-      .limit(15); // Fetch up to 15, will filter and limit to 10
+      .limit(40); // Fetch extras so we can deduplicate before slicing
     
     // Filter out parent casts that use the placeholder hash (metadata-only entries)
     const repliesWithoutParentCasts = storedReplies.filter(
       reply => reply.curatedCastHash !== PARENT_CAST_PLACEHOLDER_HASH
     );
 
-    // Group replies by curatedCastHash (primary association)
-    const repliesByHash = new Map<string, Array<{ castData: any; castCreatedAt: Date | null; createdAt: Date }>>();
-    
+    // Filter replies that belong to this curated cast (direct or via quotes)
+    const relevantReplies = [];
+    const seenHashes = new Set<string>();
     for (const reply of repliesWithoutParentCasts) {
-      const castData = reply.castData as any;
-      if (!castData) continue;
-
-      // Group by curatedCastHash (primary association)
-      if (reply.curatedCastHash) {
-        if (!repliesByHash.has(reply.curatedCastHash)) {
-          repliesByHash.set(reply.curatedCastHash, []);
-        }
-        repliesByHash.get(reply.curatedCastHash)!.push({
-          castData,
-          castCreatedAt: reply.castCreatedAt,
-          createdAt: reply.createdAt,
-        });
-      }
-      
-      // Also group quote casts by quotedCastHash if it differs
-      if (reply.quotedCastHash && reply.quotedCastHash !== reply.curatedCastHash) {
-        if (!repliesByHash.has(reply.quotedCastHash)) {
-          repliesByHash.set(reply.quotedCastHash, []);
-        }
-        repliesByHash.get(reply.quotedCastHash)!.push({
-          castData,
-          castCreatedAt: reply.castCreatedAt,
-          createdAt: reply.createdAt,
-        });
+      const matchesCast = reply.curatedCastHash === castHash || reply.quotedCastHash === castHash;
+      if (!matchesCast) continue;
+      if (!reply.replyCastHash || seenHashes.has(reply.replyCastHash)) continue;
+      seenHashes.add(reply.replyCastHash);
+      relevantReplies.push(reply);
+      if (relevantReplies.length >= 40) {
+        break;
       }
     }
-
-    // Get replies for this specific cast
-    const replies = repliesByHash.get(castHash) || [];
     
-    if (replies.length === 0) {
+    if (relevantReplies.length === 0) {
       return NextResponse.json({ replies: [] });
     }
 
     // Sort replies based on sortBy mode
     // Note: Database already sorted by castCreatedAt for recent-reply mode
     // We just need to add metadata and filter
-    let sortedReplies: Array<{ castData: any; castCreatedAt: Date | null; createdAt: Date }>;
+    let sortedReplies: typeof relevantReplies;
     
     if (sortBy === "recent-reply") {
-      // Database already sorted by castCreatedAt DESC, just add metadata
-      const repliesWithMetadata = replies.map((reply, index) => {
-        const engagementScore = calculateEngagementScore(reply.castData);
-        const isNewSinceLastSession = lastSessionTimestamp 
-          ? (reply.castCreatedAt || reply.createdAt) > lastSessionTimestamp 
-          : true;
-        const hasEngagement = engagementScore > 0;
-        
-        // Always show the most recent reply (index 0) even if it has no engagement
-        // This ensures the cast that was sorted to the top actually shows its most recent reply
-        const isMostRecent = index === 0;
-        
-        return {
-          ...reply,
-          engagementScore,
-          shouldShow: isMostRecent || isNewSinceLastSession || hasEngagement,
-        };
-      });
-      
-      // Database already sorted, but preserve order and filter
-      sortedReplies = repliesWithMetadata;
+      sortedReplies = relevantReplies;
     } else {
-      // Sort by engagement
-      const repliesWithScores = replies.map(reply => {
-        const engagementScore = calculateEngagementScore(reply.castData);
-        const isNewSinceLastSession = lastSessionTimestamp 
-          ? reply.createdAt > lastSessionTimestamp 
-          : true;
-        const hasEngagement = engagementScore > 0;
-        
-        return {
-          ...reply,
-          engagementScore,
-          shouldShow: isNewSinceLastSession || hasEngagement,
-        };
+      sortedReplies = [...relevantReplies].sort((a, b) => {
+        const aScore = calculateEngagementScore(a.castData);
+        const bScore = calculateEngagementScore(b.castData);
+        return bScore - aScore;
       });
-      
-      sortedReplies = repliesWithScores.sort((a, b) => {
-        return b.engagementScore - a.engagementScore;
-      });
-    }
-    
-    // Filter replies, but always show at least 3 if available
-    const filteredReplies = sortedReplies
-      .filter((reply) => (reply as any).shouldShow);
-    
-    // If we have fewer than 3 visible replies, include more from the sorted list
-    // to ensure at least 3 are shown (up to the available replies)
-    const minReplies = Math.min(3, sortedReplies.length);
-    if (filteredReplies.length < minReplies) {
-      // Add replies that were filtered out, up to the minimum
-      const additionalReplies = sortedReplies
-        .filter((reply) => !(reply as any).shouldShow)
-        .slice(0, minReplies - filteredReplies.length);
-      filteredReplies.push(...additionalReplies);
     }
     
     // Limit to top 10 and map to cast data
-    let finalReplies = filteredReplies
+    let finalReplies = sortedReplies
       .slice(0, 10)
-      .map(r => r.castData);
+      .map(r => ({
+        entry: r,
+        castData: r.castData as any,
+      }));
     
     // Fetch parent casts for quote casts in replies
-    const quoteCastsWithParents: Array<{ cast: any; parentHash: string }> = [];
-    finalReplies.forEach((cast) => {
-      if (isQuoteCast(cast) && cast.parent_hash && cast.parent_hash !== castHash) {
-        // Get quoted cast hash from embeds
-        const quotedCastHashes: string[] = [];
-        if (cast.embeds && Array.isArray(cast.embeds)) {
-          cast.embeds.forEach((embed: any) => {
-            if (embed.cast_id?.hash) {
-              quotedCastHashes.push(embed.cast_id.hash);
-            } else if (embed.cast?.hash) {
-              quotedCastHashes.push(embed.cast.hash);
-            }
-          });
-        }
-        
-        // Only use parent_hash if it's different from the quoted cast hash
-        if (!quotedCastHashes.includes(cast.parent_hash)) {
-          cast._isQuoteCast = true;
-          quoteCastsWithParents.push({ cast, parentHash: cast.parent_hash });
-        }
-      }
-    });
+    // Collect parent hashes for context (include all replies, not just quote casts)
+    const parentHashes = Array.from(
+      new Set(
+        finalReplies
+          .map(({ castData }) => castData.parent_hash)
+          .filter((hash): hash is string => !!hash && hash !== PARENT_CAST_PLACEHOLDER_HASH)
+      )
+    );
     
-    // Fetch parent casts from database
-    if (quoteCastsWithParents.length > 0) {
-      const parentHashes = Array.from(new Set(quoteCastsWithParents.map(q => q.parentHash)));
+    if (parentHashes.length > 0) {
       const storedParentCasts = await db
         .select({
           replyCastHash: castReplies.replyCastHash,
@@ -219,11 +129,22 @@ export async function GET(request: NextRequest) {
         }
       });
       
-      // Attach parent casts to quote casts
-      finalReplies = finalReplies.map((cast) => {
-        if (cast._isQuoteCast && cast.parent_hash && parentCastsMap.has(cast.parent_hash)) {
+      finalReplies = finalReplies.map(({ entry, castData }) => {
+        const cast = { ...castData };
+        cast._rootCastHash = entry.rootCastHash || entry.curatedCastHash || castHash;
+        cast._parentCastHash = entry.parentCastHash;
+        if (cast.parent_hash && parentCastsMap.has(cast.parent_hash)) {
           cast._parentCast = parentCastsMap.get(cast.parent_hash);
         }
+        cast._topReplyTimestamp = entry.castCreatedAt || entry.createdAt;
+        return cast;
+      });
+    } else {
+      finalReplies = finalReplies.map(({ entry, castData }) => {
+        const cast = { ...castData };
+        cast._rootCastHash = entry.rootCastHash || entry.curatedCastHash || castHash;
+        cast._parentCastHash = entry.parentCastHash;
+        cast._topReplyTimestamp = entry.castCreatedAt || entry.createdAt;
         return cast;
       });
     }

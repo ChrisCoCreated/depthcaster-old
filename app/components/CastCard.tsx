@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, type ReactElement } from "react";
+import { useState, useRef, useEffect, useMemo, type ReactElement } from "react";
 import { Cast } from "@neynar/nodejs-sdk/build/api";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -18,6 +18,8 @@ import { AvatarImage } from "./AvatarImage";
 import { analytics } from "@/lib/analytics";
 import { hasActiveProSubscription } from "@/lib/castLimits";
 import { VideoPlayer } from "./VideoPlayer";
+
+const CURATED_FEED_COLLAPSE_LINE_LIMIT = 12;
 
 // Helper function to convert URLs in text to clickable links
 function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>, insideLink: boolean = false) {
@@ -256,265 +258,163 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>,
 
 interface MinimalReplyCardProps {
   reply: any;
-  onUpdate?: () => void;
-  parentCastHash: string;
+  rootCast: Cast;
 }
 
-function MinimalReplyCard({ reply, onUpdate, parentCastHash }: MinimalReplyCardProps) {
-  const router = useRouter();
-  const { user } = useNeynarContext();
+function MinimalReplyCard({ reply, rootCast }: MinimalReplyCardProps) {
+  return <ClusterReplyRow reply={reply} rootHash={rootCast?.hash} />;
+}
+
+interface ClusterReplyRowProps {
+  reply: any;
+  rootHash?: string;
+}
+
+function ClusterReplyRow({ reply, rootHash }: ClusterReplyRowProps) {
   const replyAuthor = reply.author;
-  const replyTimestamp = new Date(reply.timestamp);
-  const replyTimeAgo = formatDistanceToNow(replyTimestamp, { addSuffix: true });
-  const replyText = reply.text || "";
-  const truncatedText = replyText.length > 150 
-    ? replyText.substring(0, 150) + "..." 
-    : replyText;
-  
-  const [replyLiked, setReplyLiked] = useState(reply.viewer_context?.liked || false);
-  const [replyRecasted, setReplyRecasted] = useState(reply.viewer_context?.recasted || false);
-  const [replyLikesCount, setReplyLikesCount] = useState(reply.reactions?.likes_count || 0);
-  const [replyRecastsCount, setReplyRecastsCount] = useState(reply.reactions?.recasts_count || 0);
-  const [replyReacting, setReplyReacting] = useState(false);
-  
-  const handleReplyLike = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!user?.signer_uuid) {
-      alert("Please sign in to like casts");
-      return;
-    }
+  const replyText = (reply.text || "").trim();
+  const truncatedText = replyText.length > 220 ? `${replyText.slice(0, 220)}…` : replyText;
+  const replyHash = reply.hash;
+  const href = replyHash && rootHash ? `/conversation/${rootHash}?replyHash=${replyHash}` : undefined;
 
-    try {
-      setReplyReacting(true);
-      const wasLiked = replyLiked;
-      const newLikesCount = wasLiked ? replyLikesCount - 1 : replyLikesCount + 1;
-      
-      // Optimistic update
-      setReplyLiked(!wasLiked);
-      setReplyLikesCount(newLikesCount);
-
-      const response = await fetch("/api/reaction", {
-        method: wasLiked ? "DELETE" : "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          signerUuid: user.signer_uuid,
-          reactionType: "like",
-          target: reply.hash,
-          targetAuthorFid: replyAuthor?.fid,
-        }),
-      });
-
-      if (!response.ok) {
-        // Revert optimistic update on error
-        setReplyLiked(wasLiked);
-        setReplyLikesCount(replyLikesCount);
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to toggle like");
-      }
-    } catch (error: any) {
-      console.error("Like error:", error);
-      alert(error.message || "Failed to toggle like");
-    } finally {
-      setReplyReacting(false);
-    }
-  };
-
-  const handleReplyRecast = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!user?.signer_uuid) {
-      alert("Please sign in to recast");
-      return;
-    }
-
-    try {
-      setReplyReacting(true);
-      const wasRecasted = replyRecasted;
-      const newRecastsCount = wasRecasted ? replyRecastsCount - 1 : replyRecastsCount + 1;
-      
-      // Optimistic update
-      setReplyRecasted(!wasRecasted);
-      setReplyRecastsCount(newRecastsCount);
-
-      const response = await fetch("/api/reaction", {
-        method: wasRecasted ? "DELETE" : "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          signerUuid: user.signer_uuid,
-          reactionType: "recast",
-          target: reply.hash,
-          targetAuthorFid: replyAuthor?.fid,
-        }),
-      });
-
-      if (!response.ok) {
-        // Revert optimistic update on error
-        setReplyRecasted(wasRecasted);
-        setReplyRecastsCount(replyRecastsCount);
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to toggle recast");
-      }
-
-      if (onUpdate) {
-        onUpdate();
-      }
-    } catch (error: any) {
-      console.error("Recast error:", error);
-      alert(error.message || "Failed to toggle recast");
-    } finally {
-      setReplyReacting(false);
-    }
-  };
-
-  const handleReplyClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    router.push(`/cast/${parentCastHash}?reply=true`);
-  };
-
-  // Check if this is a quote cast with a parent
-  const isQuote = reply._isQuoteCast || (reply.embeds && Array.isArray(reply.embeds) && reply.embeds.some((embed: any) => embed.cast_id || (embed.cast && embed.cast.hash)));
-  const parentCast = (reply as any)._parentCast;
-  
-  // Check if the quote cast is quoting the parent cast it's replying to
-  let isQuotingParent = false;
-  if (isQuote && parentCast && reply.embeds && Array.isArray(reply.embeds)) {
-    const quotedCastHashes: string[] = [];
-    reply.embeds.forEach((embed: any) => {
-      if (embed.cast_id?.hash) {
-        quotedCastHashes.push(embed.cast_id.hash);
-      } else if (embed.cast?.hash) {
-        quotedCastHashes.push(embed.cast.hash);
-      }
-    });
-    isQuotingParent = quotedCastHashes.includes(parentCast.hash);
-  }
-  
-  // If quoting parent, show only first line; otherwise use truncated text
-  const displayText = isQuotingParent 
-    ? (replyText.split('\n')[0] || replyText.substring(0, 150))
-    : truncatedText;
-  
-  return (
-    <div className={`p-2 rounded-lg transition-colors border ${isQuote && parentCast ? 'border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 hover:bg-gray-50 dark:hover:bg-gray-800/50' : 'border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50'}`}>
-      {/* Mini parent cast display for quote casts */}
-      {isQuote && parentCast && (
-        <div className="mb-1.5 -mx-1.5 px-1.5">
-          <div className="mb-0.5">
-            <span className="text-[9px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-              Replying to
-            </span>
-          </div>
-          <Link 
-            href={`/cast/${parentCast.hash}`}
-            onClick={(e) => e.stopPropagation()}
-            className="flex items-start gap-1.5 hover:opacity-80 transition-opacity bg-gray-50 dark:bg-gray-800/50 rounded px-1.5 py-1 border border-gray-200 dark:border-gray-700 group/parent"
-          >
-            <AvatarImage
-              src={parentCast.author?.pfp_url}
-              alt={parentCast.author?.username || "parent"}
-              size={16}
-              className="w-4 h-4 rounded-full flex-shrink-0"
-            />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1 mb-0.5">
-                <span className="text-[10px] font-medium text-gray-700 dark:text-gray-300 truncate">
-                  {parentCast.author?.display_name || parentCast.author?.username}
-                </span>
-                <span className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
-                  @{parentCast.author?.username}
-                </span>
-              </div>
-              <div className="text-[10px] text-gray-600 dark:text-gray-400 line-clamp-1">
-                {renderTextWithLinks(parentCast.text || "", router, true)}
-              </div>
-            </div>
-          </Link>
-        </div>
+  const content = (
+    <div className="flex items-start gap-2">
+      {replyAuthor && (
+        <AvatarImage
+          src={replyAuthor.pfp_url}
+          alt={replyAuthor.display_name || replyAuthor.username || "User"}
+          size={24}
+          className="w-6 h-6 rounded-full flex-shrink-0"
+        />
       )}
-      
-      <div className="flex items-start gap-2">
-        {/* Profile picture */}
-        {replyAuthor && (
-          <Link
-            href={`/profile/${replyAuthor.fid}`}
-            onClick={(e) => e.stopPropagation()}
-            className="flex-shrink-0"
-          >
-            <AvatarImage
-              src={replyAuthor.pfp_url}
-              alt={replyAuthor.display_name || replyAuthor.username || "User"}
-              size={24}
-              className="w-6 h-6 rounded-full"
-            />
-          </Link>
-        )}
-        <div className="flex-1 min-w-0">
-          {/* Header row with name, timestamp, and action buttons */}
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <Link
-              href={`/cast/${reply.hash}`}
-              onClick={(e) => e.stopPropagation()}
-              className="flex items-center gap-1.5 min-w-0"
-            >
-              <span className="text-xs font-medium text-gray-900 dark:text-gray-100 truncate">
-                {replyAuthor?.display_name || replyAuthor?.username || "Unknown"}
-              </span>
-              <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
-                {replyTimeAgo}
-              </span>
-            </Link>
-            {/* Action buttons */}
-            <div className="flex items-center gap-2 ml-auto" onClick={(e) => e.stopPropagation()}>
-              {/* Like */}
-              <button
-                onClick={handleReplyLike}
-                disabled={replyReacting || !user}
-                className={`flex items-center gap-0.5 text-xs transition-colors ${
-                  replyLiked
-                    ? "text-red-600 dark:text-red-400"
-                    : "text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400"
-                } disabled:opacity-50 disabled:cursor-not-allowed`}
-              >
-                <Heart className={`w-3 h-3 ${replyLiked ? "fill-current" : ""}`} />
-                {replyLikesCount > 0 && <span className="text-[10px]">{replyLikesCount}</span>}
-              </button>
-
-              {/* Recast */}
-              <button
-                onClick={handleReplyRecast}
-                disabled={replyReacting || !user}
-                className={`flex items-center gap-0.5 text-xs transition-colors ${
-                  replyRecasted
-                    ? "text-green-600 dark:text-green-400"
-                    : "text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400"
-                } disabled:opacity-50 disabled:cursor-not-allowed`}
-              >
-                <Repeat2 className={`w-3 h-3 ${replyRecasted ? "stroke-[3]" : "stroke-[2]"}`} />
-                {replyRecastsCount > 0 && <span className="text-[10px]">{replyRecastsCount}</span>}
-              </button>
-
-            </div>
-          </div>
-          {/* Reply text */}
-          <Link
-            href={`/cast/${reply.hash}`}
-            onClick={(e) => e.stopPropagation()}
-            className="block"
-          >
-            <p className={`text-xs text-gray-700 dark:text-gray-300 ${isQuotingParent ? 'line-clamp-1' : 'line-clamp-2'}`}>
-              {renderTextWithLinks(displayText, router, true)}
-            </p>
-          </Link>
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+          {replyAuthor?.display_name || replyAuthor?.username || "Unknown"}
         </div>
+        {truncatedText && (
+          <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2 mt-0.5">
+            {truncatedText}
+          </p>
+        )}
       </div>
     </div>
   );
+
+  if (href) {
+    return (
+      <Link
+        href={href}
+        onClick={(e) => e.stopPropagation()}
+        className="block rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/50 px-1 py-1 transition-colors"
+      >
+        {content}
+      </Link>
+    );
+  }
+
+  return content;
+}
+
+function buildReplyClusters(replies: any[] = [], rootHash?: string) {
+  if (!replies || replies.length === 0) {
+    return [];
+  }
+
+  const repliesWithTimestamp = replies
+    .filter(Boolean)
+    .map((reply) => {
+      const timestamp = new Date(
+        reply._topReplyTimestamp || reply.timestamp || reply.created_at || Date.now()
+      ).getTime();
+      return {
+        ...reply,
+        _clusterTimestamp: Number.isFinite(timestamp) ? timestamp : Date.now(),
+      };
+    });
+
+  const replyMap = new Map<string, any>();
+  const childrenMap = new Map<string, any[]>();
+
+  repliesWithTimestamp.forEach((reply) => {
+    if (reply.hash) {
+      replyMap.set(reply.hash, reply);
+    }
+    const parentHash = reply.parent_hash;
+    if (parentHash) {
+      if (!childrenMap.has(parentHash)) {
+        childrenMap.set(parentHash, []);
+      }
+      childrenMap.get(parentHash)!.push(reply);
+    }
+  });
+
+  childrenMap.forEach((children) => {
+    children.sort(
+      (a, b) => (a._clusterTimestamp ?? 0) - (b._clusterTimestamp ?? 0)
+    );
+  });
+
+  const isRootReply = (reply: any) => {
+    if (!reply.parent_hash) return true;
+    if (rootHash && reply.parent_hash === rootHash) return true;
+    return !replyMap.has(reply.parent_hash);
+  };
+
+  const seenRoots = new Set<string>();
+  const rootReplies = repliesWithTimestamp.filter((reply) => {
+    if (!isRootReply(reply)) return false;
+    const key = reply.hash || `${reply.parent_hash || "root"}-${reply._clusterTimestamp}`;
+    if (seenRoots.has(key)) return false;
+    seenRoots.add(key);
+    return true;
+  });
+
+  const clusters = rootReplies
+    .map((root) => {
+      const thread: any[] = [];
+      const traverse = (node: any) => {
+        thread.push(node);
+        const children = childrenMap.get(node.hash) || [];
+        children.forEach(traverse);
+      };
+      traverse(root);
+      thread.sort(
+        (a, b) => (a._clusterTimestamp ?? 0) - (b._clusterTimestamp ?? 0)
+      );
+      const latestReply = thread.reduce((latest, current) => {
+        if (!latest) return current;
+        return (current._clusterTimestamp ?? 0) >= (latest._clusterTimestamp ?? 0)
+          ? current
+          : latest;
+      }, null as any);
+
+      return {
+        id: root.hash || `${root.parent_hash || "cluster"}-${root._clusterTimestamp}`,
+        displayName: root.author?.display_name || root.author?.username || "Unknown",
+        replies: thread,
+        latestTimestamp: latestReply?._clusterTimestamp ?? root._clusterTimestamp ?? 0,
+        latestReplyHash: latestReply?.hash || root.hash,
+        rootReplyHash: root.hash,
+      };
+    })
+    .filter((cluster) => cluster.replies.length > 0);
+
+  clusters.sort((a, b) => b.latestTimestamp - a.latestTimestamp);
+  return clusters.slice(0, 3);
+}
+
+function buildClusterPreview(replies: any[]) {
+  if (replies.length <= 5) {
+    return replies.map((reply) => ({ type: "reply", reply }));
+  }
+
+  return [
+    { type: "reply", reply: replies[0] },
+    { type: "reply", reply: replies[1] },
+    { type: "gap" },
+    { type: "reply", reply: replies[replies.length - 2] },
+    { type: "reply", reply: replies[replies.length - 1] },
+  ];
 }
 
 interface DynamicImageGridProps {
@@ -909,6 +809,30 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
   const [showAutoLikeNotification, setShowAutoLikeNotification] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isCuratedCastExpanded, setIsCuratedCastExpanded] = useState(false);
+
+  const castTextLines = useMemo(() => (cast.text ? cast.text.split(/\r?\n/) : []), [cast.text]);
+  const shouldCollapseCuratedCastText = useMemo(
+    () => feedType === "curated" && castTextLines.length > CURATED_FEED_COLLAPSE_LINE_LIMIT,
+    [feedType, castTextLines.length]
+  );
+  const collapsedCuratedCastSegments = useMemo(() => {
+    if (!shouldCollapseCuratedCastText) {
+      return null;
+    }
+
+    const topCount = Math.ceil(CURATED_FEED_COLLAPSE_LINE_LIMIT / 2);
+    const bottomCount = CURATED_FEED_COLLAPSE_LINE_LIMIT - topCount;
+    const topLines = castTextLines.slice(0, topCount);
+    const bottomLines = bottomCount > 0 ? castTextLines.slice(-bottomCount) : [];
+    const hiddenCount = Math.max(castTextLines.length - (topLines.length + bottomLines.length), 0);
+
+    return {
+      topText: topLines.join("\n"),
+      bottomText: bottomLines.join("\n"),
+      hiddenCount,
+    };
+  }, [shouldCollapseCuratedCastText, castTextLines]);
 
   // Track cast view and conversation view
   useEffect(() => {
@@ -1036,6 +960,11 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
 
     fetchMetadataForEmbeds();
   }, [cast.embeds]);
+
+  const replyClusters = useMemo(
+    () => buildReplyClusters(topReplies, cast.hash),
+    [topReplies, cast.hash]
+  );
 
   // Sync top replies when cast prop changes
   useEffect(() => {
@@ -1928,9 +1857,44 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
             </div>
 
             {/* Cast text */}
-            <div className="text-gray-900 dark:text-gray-100 mb-2 sm:mb-3 whitespace-pre-wrap break-words text-sm sm:text-base leading-6 sm:leading-7">
-              {renderTextWithLinks(cast.text, router)}
+            <div className="text-gray-900 dark:text-gray-100 mb-2 sm:mb-3 text-sm sm:text-base leading-6 sm:leading-7">
+              {shouldCollapseCuratedCastText && !isCuratedCastExpanded && collapsedCuratedCastSegments ? (
+                <div className="space-y-1 whitespace-pre-wrap break-words">
+                  {collapsedCuratedCastSegments.topText && (
+                    <div>{renderTextWithLinks(collapsedCuratedCastSegments.topText, router)}</div>
+                  )}
+                  <button
+                    type="button"
+                    className="w-full text-left text-blue-600 dark:text-blue-400 hover:underline focus:outline-none"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsCuratedCastExpanded(true);
+                    }}
+                  >
+                    {`… ${collapsedCuratedCastSegments.hiddenCount} line${
+                      collapsedCuratedCastSegments.hiddenCount === 1 ? "" : "s"
+                    } hidden …`}
+                  </button>
+                  {collapsedCuratedCastSegments.bottomText && (
+                    <div>{renderTextWithLinks(collapsedCuratedCastSegments.bottomText, router)}</div>
+                  )}
+                </div>
+              ) : (
+                <div className="whitespace-pre-wrap break-words">{renderTextWithLinks(cast.text || "", router)}</div>
+              )}
             </div>
+            {shouldCollapseCuratedCastText && isCuratedCastExpanded && (
+              <button
+                type="button"
+                className="text-xs sm:text-sm text-blue-600 dark:text-blue-400 hover:underline mb-2 sm:mb-3"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsCuratedCastExpanded(false);
+                }}
+              >
+                Collapse
+              </button>
+            )}
 
             {/* Embeds */}
             {cast.embeds && cast.embeds.length > 0 && (() => {
@@ -2593,12 +2557,20 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
 
               {/* Thread link */}
               {showThread && cast.hash && (
-                <Link
-                  href={`/cast/${cast.hash}`}
-                  className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 hover:underline hidden sm:inline"
-                >
-                  View Neynar algo thread →
-                </Link>
+                <div className="flex items-center gap-3 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                  <Link
+                    href={`/conversation/${cast.hash}`}
+                    className="text-blue-600 dark:text-blue-400 hover:underline hidden sm:inline font-medium"
+                  >
+                    {topReplies.length === 0 && !cast._topReplies?.length ? "Start conversation →" : "View conversation →"}
+                  </Link>
+                  <Link
+                    href={`/cast/${cast.hash}`}
+                    className="hover:underline hidden sm:inline"
+                  >
+                    View Neynar algo thread →
+                  </Link>
+                </div>
               )}
 
               {/* Curate and Tag buttons - positioned on the right */}
@@ -2722,7 +2694,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
         {/* Top Replies Section */}
         {showTopReplies && (feedType === "curated" || cast._curatorFid) && (
           <div className={`mt-3 border-t ${(cast as any)._isQuoteCast && (cast as any)._parentCast ? 'border-gray-200 dark:border-gray-700 bg-gray-50/30 dark:bg-gray-800/20' : 'border-gray-200 dark:border-gray-800'} pt-3 rounded-b-lg transition-colors group/replies hover:bg-gray-50 dark:hover:bg-gray-800/30`} onClick={(e) => e.stopPropagation()}>
-            <div className="mb-2 px-1">
+            <div className="mb-1 px-1">
               <span className="text-xs text-gray-500 dark:text-gray-400">
                 {sortBy === "recent-reply" ? "Most Recent Replies" : "Highest Engagement Replies"}
               </span>
@@ -2730,182 +2702,59 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                 <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">Loading...</span>
               )}
             </div>
-            {topReplies && topReplies.length > 0 ? (
-              <>
-                {(() => {
-                  // Build threaded tree structure from replies
-                  interface ThreadedReply {
-                    hash: string;
-                    parent_hash?: string;
-                    [key: string]: any;
-                    children?: ThreadedReply[];
-                  }
-
-                  function buildThreadTree(replies: ThreadedReply[], rootHash: string): ThreadedReply[] {
-                    
-                    const replyMap = new Map<string, ThreadedReply>();
-                    replies.forEach(reply => {
-                      replyMap.set(reply.hash, { ...reply, children: [] });
-                    });
-
-                    const rootReplies: ThreadedReply[] = [];
-                    const rootReplyHashes = new Set<string>();
-                    
-                    // First pass: identify root replies and build map
-                    replies.forEach(reply => {
-                      const parentHash = reply.parent_hash;
-                      if (!parentHash || parentHash === rootHash) {
-                        rootReplyHashes.add(reply.hash);
-                      }
-                    });
-                    
-                    // Second pass: build tree structure preserving order
-                    replies.forEach(reply => {
-                      const threadedReply = replyMap.get(reply.hash)!;
-                      const parentHash = reply.parent_hash;
-
-                      if (!parentHash || parentHash === rootHash) {
-                        // This is a root reply - add in the order it appears in replies array
-                        if (!rootReplies.find(r => r.hash === reply.hash)) {
-                          rootReplies.push(threadedReply);
-                        }
-                      } else {
-                        const parent = replyMap.get(parentHash);
-                        if (parent) {
-                          if (!parent.children) {
-                            parent.children = [];
-                          }
-                          parent.children.push(threadedReply);
-                        } else {
-                          // Orphaned reply (parent not found) - treat as root
-                          if (!rootReplies.find(r => r.hash === reply.hash)) {
-                            rootReplies.push(threadedReply);
-                          }
-                        }
-                      }
-                    });
-
-                    // For recent-reply mode, ensure root replies are sorted by timestamp (most recent first)
-                    // Backend already sorted them, but we need to preserve that order
-                    if (sortBy === "recent-reply") {
-                      // Create a map of reply hash to its original index in the replies array
-                      const replyOrderMap = new Map<string, number>();
-                      replies.forEach((reply, idx) => {
-                        replyOrderMap.set(reply.hash, idx);
-                      });
-                      
-                      // Sort root replies by their original order in the replies array
-                      rootReplies.sort((a, b) => {
-                        const aOrder = replyOrderMap.get(a.hash) ?? Infinity;
-                        const bOrder = replyOrderMap.get(b.hash) ?? Infinity;
-                        return aOrder - bOrder;
-                      });
-                    }
-
-                    function sortChildren(reply: ThreadedReply) {
-                      if (reply.children && reply.children.length > 0) {
-                        // Sort children by timestamp to maintain chronological thread order
-                        reply.children.sort((a, b) => {
-                          const aTime = new Date(a.timestamp || a.created_at || 0).getTime();
-                          const bTime = new Date(b.timestamp || b.created_at || 0).getTime();
-                          return aTime - bTime;
-                        });
-                        reply.children.forEach(sortChildren);
-                      }
-                    }
-                    rootReplies.forEach(sortChildren);
-
-                    return rootReplies;
-                  }
-
-                  function renderThreadedReply(reply: ThreadedReply, depth: number = 1, isLastChild: boolean = false, parentHasMore: boolean = false, hasChildren: boolean = false) {
-                    const indentPx = depth > 1 ? 48 : 0;
-                    const showVerticalLine = !isLastChild || hasChildren || parentHasMore;
-
+            {replyClusters.length > 0 ? (
+              <div className="space-y-3">
+                {replyClusters.map((cluster) => {
+                  const previewItems = buildClusterPreview(cluster.replies);
+                  const latestLabel =
+                    cluster.latestTimestamp > 0
+                      ? formatDistanceToNow(new Date(cluster.latestTimestamp), { addSuffix: true })
+                      : null;
                     return (
-                      <div key={reply.hash} className="relative">
-                        <div className="flex relative">
-                          {/* Thread line area */}
-                          <div className="flex-shrink-0 relative" style={{ width: depth > 1 ? '24px' : '8px' }}>
-                            {depth > 1 && showVerticalLine && (
-                              <div className="absolute top-0 left-0 bottom-0 w-px bg-gray-300 dark:bg-gray-600" />
-                            )}
-                            {depth === 1 && showVerticalLine && (
-                              <div className="absolute top-0 left-0 bottom-0 w-px bg-gray-300 dark:bg-gray-600" />
-                            )}
+                    <div
+                      key={cluster.id}
+                      className="rounded-lg border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900/30 p-2.5"
+                    >
+                      <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                        <span />
+                        {latestLabel && <span>Latest {latestLabel}</span>}
                           </div>
-                          
-                          {/* Reply content */}
-                          <div className="flex-1 min-w-0" style={{ marginLeft: `${indentPx}px` }}>
-                            <MinimalReplyCard
-                              reply={reply}
-                              onUpdate={onUpdate}
-                              parentCastHash={cast.hash}
+                      <div className="space-y-1.5">
+                        {previewItems.map((item, idx) =>
+                          item.type === "gap" ? (
+                            <div
+                              key={`gap-${cluster.id}-${idx}`}
+                              className="text-center text-xs text-gray-400 dark:text-gray-500"
+                            >
+                              •••
+                          </div>
+                          ) : (
+                            <ClusterReplyRow
+                              key={item.reply.hash || `${cluster.id}-${idx}`}
+                              reply={item.reply}
+                              rootHash={cast.hash}
                             />
-                          </div>
-                        </div>
-                        
-                        {/* Render children */}
-                        {reply.children && reply.children.length > 0 && (
-                          <div className="relative" style={{ marginLeft: depth > 1 ? '24px' : '8px' }}>
-                            {reply.children.length > 0 && (
-                              <div className="absolute left-0 top-0 bottom-0 w-px bg-gray-300 dark:bg-gray-600" />
-                            )}
-                            <div style={{ marginLeft: '24px' }}>
-                              {reply.children.map((child, index) => 
-                                renderThreadedReply(
-                                  child,
-                                  depth + 1,
-                                  index === reply.children!.length - 1,
-                                  index < reply.children!.length - 1,
-                                  (child.children && child.children.length > 0) || false
                                 )
                               )}
                             </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  }
-
-                  const threadedReplies = buildThreadTree(topReplies as ThreadedReply[], cast.hash || '');
-
-                  return (
-                    <div className="space-y-0">
-                      {threadedReplies.map((reply, index) => 
-                        renderThreadedReply(
-                          reply,
-                          1,
-                          index === threadedReplies.length - 1,
-                          index < threadedReplies.length - 1,
-                          (reply.children && reply.children.length > 0) || false
-                        )
+                      {cast.hash && (
+                        <Link
+                          href={`/conversation/${cast.hash}?replyHash=${cluster.rootReplyHash ?? ""}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="mt-3 inline-flex text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                        >
+                          {topReplies.length === 1 ? "Start conversation →" : "View conversation →"}
+                        </Link>
                       )}
                     </div>
                   );
-                })()}
-                {cast.hash && (
-                  <Link
-                    href={feedType === "curated" || cast._curatorFid ? `/conversation/${cast.hash}` : `/cast/${cast.hash}`}
-                    className="block mt-2 text-xs text-blue-600 dark:text-blue-400 hover:underline text-center"
-                  >
-                    View all replies →
-                  </Link>
-                )}
-              </>
+                })}
+              </div>
             ) : (
               <div className="py-2 text-center">
                 <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">
                   No replies yet
                 </p>
-                {cast.hash && (
-                  <Link
-                    href={feedType === "curated" || cast._curatorFid ? `/conversation/${cast.hash}` : `/cast/${cast.hash}`}
-                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                  >
-                    View Neynar algo thread →
-                  </Link>
-                )}
               </div>
             )}
           </div>

@@ -16,6 +16,7 @@ export default function ConversationPage({
   const searchParams = useSearchParams();
   const composerRef = useRef<HTMLDivElement>(null);
   const shouldAutoFocus = searchParams.get("reply") === "true";
+  const focusReplyHash = searchParams.get("replyHash") || undefined;
 
   useEffect(() => {
     if (shouldAutoFocus && composerRef.current && user) {
@@ -33,7 +34,7 @@ export default function ConversationPage({
   return (
     <div className="min-h-screen">
       <main className="max-w-7xl mx-auto px-4 py-8">
-        <ConversationView castHash={hash} viewerFid={user?.fid} />
+        <ConversationView castHash={hash} viewerFid={user?.fid} focusReplyHash={focusReplyHash} />
         
         {user && (
           <div ref={composerRef} className="mt-8">
