@@ -14,7 +14,7 @@ import {
 
 interface CastComposerProps {
   parentHash?: string;
-  onSuccess?: () => void;
+  onSuccess?: (newCast?: any) => void;
 }
 
 export function CastComposer({ parentHash, onSuccess }: CastComposerProps) {
@@ -129,6 +129,7 @@ export function CastComposer({ parentHash, onSuccess }: CastComposerProps) {
 
       const data = await response.json();
       const castHash = data.cast?.hash || data.hash;
+      const newCast = data.cast || data;
 
       // Track analytics
       if (castHash) {
@@ -147,7 +148,7 @@ export function CastComposer({ parentHash, onSuccess }: CastComposerProps) {
         setIsFocused(false);
       }
       if (onSuccess) {
-        onSuccess();
+        onSuccess(newCast);
       }
     } catch (err: any) {
       setError(err.message || "Failed to post cast");

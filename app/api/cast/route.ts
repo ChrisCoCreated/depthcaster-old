@@ -100,6 +100,7 @@ export async function POST(request: NextRequest) {
 
     // Update database if this is a reply or quote to a curated cast
     const castHash = (cast as any).hash;
+    let fullCastData = cast; // Default to the published cast
     if (castHash) {
       try {
         // Fetch the full cast data from Neynar (includes reactions, etc.)
@@ -110,12 +111,12 @@ export async function POST(request: NextRequest) {
           includeChronologicalParentCasts: false,
         });
         
-        const fullCastData = castResponse.conversation?.cast;
-        if (!fullCastData) {
-          throw new Error("Failed to fetch cast data");
+        const fetchedCastData = castResponse.conversation?.cast;
+        if (fetchedCastData) {
+          fullCastData = fetchedCastData;
         }
 
-        const castIsQuote = isQuoteCast(fullCastData);
+        const castIsQuote = isQuoteCast(fullCastData as any);
         
         if (castIsQuote) {
           // Handle quote cast
@@ -131,19 +132,19 @@ export async function POST(request: NextRequest) {
 
             if (curatedCast.length > 0) {
               // Check quality threshold
-              if (meetsCastQualityThreshold(fullCastData)) {
+              if (meetsCastQualityThreshold(fullCastData as any)) {
                 // Store quote cast as reply
                 const { extractCastTimestamp } = await import("@/lib/cast-timestamp");
                 const { extractCastMetadata } = await import("@/lib/cast-metadata");
-                const metadata = extractCastMetadata(fullCastData);
+                const metadata = extractCastMetadata(fullCastData as any);
                 await db
                   .insert(castReplies)
                   .values({
                     curatedCastHash: quotedCastHash,
-                    replyCastHash: fullCastData.hash,
+                    replyCastHash: (fullCastData as any).hash,
                     castData: fullCastData,
-                    castCreatedAt: extractCastTimestamp(fullCastData),
-                    parentCastHash: fullCastData.parent_hash || null,
+                    castCreatedAt: extractCastTimestamp(fullCastData as any),
+                    parentCastHash: (fullCastData as any).parent_hash || null,
                     rootCastHash: quotedCastHash,
                     replyDepth: 0, // Quote casts are top-level
                     isQuoteCast: true,
@@ -177,7 +178,7 @@ export async function POST(request: NextRequest) {
                     },
                   });
 
-                console.log(`[Cast API] Stored quote cast ${fullCastData.hash} for curated cast ${quotedCastHash}`);
+                console.log(`[Cast API] Stored quote cast ${(fullCastData as any).hash} for curated cast ${quotedCastHash}`);
               }
 
               // Refresh quoted cast data and replies to capture updated reactions
@@ -220,7 +221,7 @@ export async function POST(request: NextRequest) {
 
             if (curatedCast.length > 0) {
               // Check quality threshold
-              if (meetsCastQualityThreshold(fullCastData)) {
+              if (meetsCastQualityThreshold(fullCastData as any)) {
                 // Calculate reply depth
                 let replyDepth = 1;
                 let currentParentHash = parent;
@@ -256,14 +257,14 @@ export async function POST(request: NextRequest) {
                 // Store reply
                 const { extractCastTimestamp } = await import("@/lib/cast-timestamp");
                 const { extractCastMetadata } = await import("@/lib/cast-metadata");
-                const metadata = extractCastMetadata(fullCastData);
+                const metadata = extractCastMetadata(fullCastData as any);
                 await db
                   .insert(castReplies)
                   .values({
                     curatedCastHash: rootHash,
-                    replyCastHash: fullCastData.hash,
+                    replyCastHash: (fullCastData as any).hash,
                     castData: fullCastData,
-                    castCreatedAt: extractCastTimestamp(fullCastData),
+                    castCreatedAt: extractCastTimestamp(fullCastData as any),
                     parentCastHash: parent,
                     rootCastHash: rootHash,
                     replyDepth,
@@ -298,7 +299,7 @@ export async function POST(request: NextRequest) {
                     },
                   });
 
-                console.log(`[Cast API] Stored reply ${fullCastData.hash} for curated cast ${rootHash} at depth ${replyDepth}`);
+                console.log(`[Cast API] Stored reply ${(fullCastData as any).hash} for curated cast ${rootHash} at depth ${replyDepth}`);
               }
 
               // Refresh root cast data and replies after posting reply
@@ -333,7 +334,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, cast });
+    // Return the full cast data if we fetched it, otherwise return the published cast
+    return NextResponse.json({ success: true, cast: fullCastData });
   } catch (error: any) {
     console.error("Cast API error:", error);
     return NextResponse.json(

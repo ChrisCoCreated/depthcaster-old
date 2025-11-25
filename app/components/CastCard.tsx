@@ -2765,8 +2765,66 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
           <div className="mt-2 pl-0 sm:pl-14 border-t border-gray-200 dark:border-gray-800 pt-3 sm:pt-4" onClick={(e) => e.stopPropagation()}>
             <CastComposer
               parentHash={cast.hash}
-              onSuccess={() => {
+              onSuccess={(newCast) => {
                 setShowReplyBox(false);
+                
+                // Optimistically add the new reply to topReplies immediately
+                if (newCast && cast.hash) {
+                  // Add metadata to match the format expected by the reply display
+                  const optimisticReply = {
+                    ...newCast,
+                    _replyDepth: 1,
+                    _parentCastHash: cast.hash,
+                    _isQuoteCast: false,
+                    _rootCastHash: cast.hash,
+                  };
+                  
+                  setTopReplies((prev) => {
+                    // Check if reply already exists (avoid duplicates)
+                    const exists = prev.some((r) => r.hash === newCast.hash);
+                    if (exists) {
+                      return prev;
+                    }
+                    // Add to the beginning for newest-first, or end for oldest-first
+                    // Based on sortBy, but default to newest first
+                    const sortOrder = sortBy === "recent-reply" ? "newest" : sortBy || "newest";
+                    if (sortOrder === "newest") {
+                      return [optimisticReply, ...prev];
+                    } else {
+                      return [...prev, optimisticReply];
+                    }
+                  });
+                  
+                  // Mark replies as loaded if they weren't already
+                  if (!repliesLoaded) {
+                    setRepliesLoaded(true);
+                  }
+                  
+                  // Refetch replies after a short delay to ensure we have the latest data
+                  // This handles cases where the reply needs to be stored in the database
+                  setTimeout(async () => {
+                    try {
+                      const params = new URLSearchParams({
+                        castHash: cast.hash!,
+                        sortBy: sortBy || "recent-reply",
+                      });
+                      if (user?.fid) {
+                        params.append("viewerFid", user.fid.toString());
+                      }
+                      
+                      const res = await fetch(`/api/feed/replies?${params}`);
+                      if (res.ok) {
+                        const data = await res.json();
+                        if (data.replies) {
+                          setTopReplies(data.replies);
+                        }
+                      }
+                    } catch (error) {
+                      console.error("Error refetching replies:", error);
+                    }
+                  }, 2000); // Wait 2 seconds for webhook to process
+                }
+                
                 if (onUpdate) {
                   onUpdate();
                 }
