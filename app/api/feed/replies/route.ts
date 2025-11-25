@@ -6,6 +6,18 @@ import { calculateEngagementScore } from "@/lib/engagement";
 import { isQuoteCast } from "@/lib/conversation";
 import { enrichCastsWithViewerContext } from "@/lib/interactions";
 
+type CastDataForEngagement = {
+  reactions?: {
+    likes_count?: number;
+    likes?: unknown[];
+    recasts_count?: number;
+    recasts?: unknown[];
+  };
+  replies?: {
+    count?: number;
+  };
+};
+
 /**
  * Lightweight endpoint to fetch top replies for a curated cast
  * Used for lazy loading replies in the feed
@@ -86,8 +98,8 @@ export async function GET(request: NextRequest) {
       sortedReplies = relevantReplies;
     } else {
       sortedReplies = [...relevantReplies].sort((a, b) => {
-        const aScore = calculateEngagementScore(a.castData);
-        const bScore = calculateEngagementScore(b.castData);
+        const aScore = calculateEngagementScore(a.castData as CastDataForEngagement);
+        const bScore = calculateEngagementScore(b.castData as CastDataForEngagement);
         return bScore - aScore;
       });
     }
