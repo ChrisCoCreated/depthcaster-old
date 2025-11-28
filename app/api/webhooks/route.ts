@@ -9,6 +9,7 @@ import { isQuoteCast, extractQuotedCastHashes, getRootCastHash } from "@/lib/con
 import { addQuoteCastToUnifiedReplyWebhook, addReplyToUnifiedReplyWebhook } from "@/lib/webhooks-unified";
 import { neynarClient } from "@/lib/neynar";
 import { LookupCastConversationTypeEnum } from "@neynar/nodejs-sdk/build/api";
+import { analyzeCastQualityAsync } from "@/lib/deepseek-quality";
 
 // Disable body parsing to read raw body for signature verification
 export const runtime = "nodejs";
@@ -257,6 +258,23 @@ export async function POST(request: NextRequest) {
 
               console.log(`[Webhook] Stored cast via curated-quote webhook: castHash=${castHash} curatedCastHash=${quotedCastHash}`);
 
+              // Trigger async quality analysis (non-blocking)
+              analyzeCastQualityAsync(castHash, castData, async (hash, result) => {
+                try {
+                  await db
+                    .update(castReplies)
+                    .set({
+                      qualityScore: result.qualityScore,
+                      category: result.category,
+                      qualityAnalyzedAt: new Date(),
+                    })
+                    .where(eq(castReplies.replyCastHash, hash));
+                  console.log(`[Webhook] Quality analysis completed for quote cast ${hash}: score=${result.qualityScore}, category=${result.category}`);
+                } catch (error: any) {
+                  console.error(`[Webhook] Error updating quality analysis for quote cast ${hash}:`, error.message);
+                }
+              });
+
               // Ensure unified reply webhook tracks this quote conversation
               try {
                 await addQuoteCastToUnifiedReplyWebhook(castHash);
@@ -384,6 +402,23 @@ export async function POST(request: NextRequest) {
               }).onConflictDoNothing({ target: castReplies.replyCastHash });
 
             console.log(`[Webhook] Stored cast via curated-reply webhook: castHash=${castHash} curatedCastHash=${curatedCastHash} depth=${replyDepth}`);
+            
+            // Trigger async quality analysis (non-blocking)
+            analyzeCastQualityAsync(castHash, castData, async (hash, result) => {
+              try {
+                await db
+                  .update(castReplies)
+                  .set({
+                    qualityScore: result.qualityScore,
+                    category: result.category,
+                    qualityAnalyzedAt: new Date(),
+                  })
+                  .where(eq(castReplies.replyCastHash, hash));
+                console.log(`[Webhook] Quality analysis completed for reply ${hash}: score=${result.qualityScore}, category=${result.category}`);
+              } catch (error: any) {
+                console.error(`[Webhook] Error updating quality analysis for reply ${hash}:`, error.message);
+              }
+            });
             
             // Add this reply to the unified webhook so nested replies are captured
             try {
