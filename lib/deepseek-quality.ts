@@ -21,6 +21,11 @@ const VALID_CATEGORIES = [
   "opinion",
   "tutorial",
   "news",
+  "crypto",
+  "product",
+  "community",
+  "humor",
+  "personal",
   "other",
 ] as const;
 
@@ -53,7 +58,24 @@ export async function analyzeCastQuality(
 
   const prompt = `Analyze this Farcaster cast and provide:
 1. A quality score from 0-100 based on depth, clarity, and value
-2. A category from this list: technical, philosophy, art, discussion, question, announcement, opinion, tutorial, news, other
+2. A category from this list: technical, philosophy, art, discussion, question, announcement, opinion, tutorial, news, crypto, product, community, humor, personal, other
+
+Category descriptions:
+- technical: Technical content, code, engineering, development
+- philosophy: Deep thoughts, philosophical discussions, existential topics
+- art: Creative work, visual art, music, design, artistic expression
+- discussion: General discussion, conversation starters, debates
+- question: Questions seeking answers or input
+- announcement: Product launches, updates, important news
+- opinion: Personal opinions, takes, hot takes
+- tutorial: Educational content, how-to guides, explanations
+- news: Current events, news, updates about the world
+- crypto: Cryptocurrency, blockchain, web3, DeFi, NFTs
+- product: Product reviews, recommendations, tool discussions
+- community: Community building, events, meetups, social
+- humor: Jokes, memes, funny content, satire
+- personal: Personal stories, life updates, reflections
+- other: Anything that doesn't fit the above categories
 
 Cast text:
 ${castText.substring(0, 2000)}${castText.length > 2000 ? "..." : ""}

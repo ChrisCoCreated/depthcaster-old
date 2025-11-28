@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: errorMessage }, { status: 400 });
     }
 
-    const cast = await neynarClient.publishCast({
+    const castResponse = await neynarClient.publishCast({
       signerUuid,
       text: trimmedText,
       parent,
@@ -76,6 +76,10 @@ export async function POST(request: NextRequest) {
       channelId,
       parentAuthorFid,
     });
+
+    // Extract cast from PostCastResponse
+    const cast = (castResponse as any).cast || castResponse;
+    const castHash = (cast as any).hash;
 
     // Track interaction if this is a reply or quote to a curated cast thread
     if (userFid) {
@@ -100,19 +104,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Update database if this is a reply or quote to a curated cast
-    const castHash = (cast as any).hash;
-    let fullCastData = cast; // Default to the published cast
+    let fullCastData: any = cast; // Default to the published cast
     if (castHash) {
       try {
         // Fetch the full cast data from Neynar (includes reactions, etc.)
-        const castResponse = await neynarClient.lookupCastConversation({
+        const conversationResponse = await neynarClient.lookupCastConversation({
           identifier: castHash,
           type: LookupCastConversationTypeEnum.Hash,
           replyDepth: 0,
           includeChronologicalParentCasts: false,
         });
         
-        const fetchedCastData = castResponse.conversation?.cast;
+        const fetchedCastData = conversationResponse.conversation?.cast;
         if (fetchedCastData) {
           fullCastData = fetchedCastData;
         }
