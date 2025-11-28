@@ -151,7 +151,6 @@ export default function ChannelPage({
             <CastCard
               key={cast.hash}
               cast={cast}
-              viewerFid={user?.fid}
             />
           ))}
         </div>
