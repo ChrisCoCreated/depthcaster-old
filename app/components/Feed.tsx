@@ -91,6 +91,13 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
     }
     return null;
   });
+  const [minQualityScore, setMinQualityScore] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("minQualityScore");
+      return saved ? parseInt(saved, 10) : 60; // Default to 60 (0.6 * 100)
+    }
+    return 60;
+  });
   const [showScrollToTop, setShowScrollToTop] = useState(false);
   const [selectedCuratorFids, setSelectedCuratorFids] = useState<number[]>([]);
   const [my37PackId, setMy37PackId] = useState<string | null>(null);
@@ -372,6 +379,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
         if (selectedCategory) {
           params.append("category", selectedCategory);
         }
+        params.append("minQualityScore", minQualityScore.toString());
       }
       // Don't add packIds for my-37 feed - API will fetch it directly
       // Don't automatically apply packIds from localStorage to prevent feed switching
@@ -414,7 +422,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
     } finally {
       setLoading(false);
     }
-  }, [feedType, viewerFid, selectedCuratorFids, selectedCategory, my37PackId, my37HasUsers, sortBy]);
+  }, [feedType, viewerFid, selectedCuratorFids, selectedCategory, minQualityScore, my37PackId, my37HasUsers, sortBy]);
 
   const fetchMy37PackId = useCallback(async () => {
     if (!viewerFid) return;
@@ -447,6 +455,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   const lastFetchedFeedTypeRef = useRef<string>(""); // Track what we actually fetched
   const prevSortByRef = useRef<string>("");
   const prevSelectedCategoryRef = useRef<string | null>(null);
+  const prevMinQualityScoreRef = useRef<number>(60);
   const prevMy37PackIdRef = useRef<string | null>(null);
   const prevSelectedCuratorFidsRef = useRef<number[]>([]);
   const fetchingRef = useRef<boolean>(false);
@@ -621,6 +630,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
     const currentFidsSorted = [...selectedCuratorFids].sort();
     const curatorFidsChanged = JSON.stringify(prevFidsSorted) !== JSON.stringify(currentFidsSorted);
     const categoryChanged = prevSelectedCategoryRef.current !== selectedCategory;
+    const qualityScoreChanged = prevMinQualityScoreRef.current !== minQualityScore;
     const isInitialMount = !hasInitialFetchRef.current;
     // Check if we need to fetch based on what we last fetched, not what we last saw
     const needsFetch = lastFetchedFeedTypeRef.current !== feedType || 
@@ -687,6 +697,18 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       prevSelectedCategoryRef.current = selectedCategory;
     }
     
+    // Clear feed when quality score changes (for curated feed)
+    if (qualityScoreChanged && feedType === "curated" && !isInitialMount) {
+      setCasts([]);
+      setCursor(null);
+      setHasMore(false);
+      castsRestoredRef.current = false; // Reset casts restoration when quality filter changes
+      prevMinQualityScoreRef.current = minQualityScore;
+    } else if (qualityScoreChanged) {
+      // Update quality score ref even if not curated
+      prevMinQualityScoreRef.current = minQualityScore;
+    }
+    
     // Only fetch if not my-37 feed, or if my-37 feed has saved pack with users
     if (feedType !== "my-37" || (my37PackId && my37HasUsers)) {
       // Check if we already restored casts from saved state
@@ -706,10 +728,11 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       const condition3 = (sortByChanged && feedType === "curated" && !isInitialMount);
       const condition4 = (curatorFidsChanged && feedType === "curated" && !isInitialMount);
       const condition5 = (categoryChanged && feedType === "curated" && !isInitialMount);
-      const condition6 = (lastFetchedFeedTypeRef.current !== feedType && !fetchingRef.current);
-      const fetchCondition = condition1 || condition2 || condition3 || condition4 || condition5 || condition6;
+      const condition6 = (qualityScoreChanged && feedType === "curated" && !isInitialMount);
+      const condition7 = (lastFetchedFeedTypeRef.current !== feedType && !fetchingRef.current);
+      const fetchCondition = condition1 || condition2 || condition3 || condition4 || condition5 || condition6 || condition7;
       // Only skip if we have restored casts AND state is not stale AND feed type hasn't actually changed
-      const skipCondition = hasRestoredCasts && !isStateStaleResult && !actualFeedTypeChanged && !curatorFidsChanged && !categoryChanged;
+      const skipCondition = hasRestoredCasts && !isStateStaleResult && !actualFeedTypeChanged && !curatorFidsChanged && !categoryChanged && !qualityScoreChanged;
       const shouldFetch = fetchCondition && !skipCondition;
       
       if (shouldFetch && !fetchingRef.current) {
@@ -738,7 +761,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       // Update ref even if we can't fetch (e.g., my-37 without pack)
       prevFeedTypeRef.current = feedType;
     }
-  }, [feedType, selectedCuratorFids, selectedCategory, preferencesVersion, fetchFeed, my37PackId, my37HasUsers, viewerFid, fetchMy37PackId, sortBy, casts.length]);
+  }, [feedType, selectedCuratorFids, selectedCategory, minQualityScore, preferencesVersion, fetchFeed, my37PackId, my37HasUsers, viewerFid, fetchMy37PackId, sortBy, casts.length]);
   
   // Separate effect for when My 37 pack becomes ready
   useEffect(() => {
@@ -1315,6 +1338,35 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
                     {option.label}
                   </button>
                 ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Quality filter - shown only for curated feed */}
+        {feedType === "curated" && (
+          <div className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-black">
+            <div className="px-3 sm:px-4 py-2 sm:py-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-gray-600 dark:text-gray-400">Min Quality:</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="5"
+                    value={minQualityScore}
+                    onChange={(e) => {
+                      const newValue = parseInt(e.target.value, 10);
+                      setMinQualityScore(newValue);
+                      localStorage.setItem("minQualityScore", newValue.toString());
+                    }}
+                    className="w-24 sm:w-32"
+                  />
+                  <span className="text-xs font-medium text-gray-700 dark:text-gray-300 min-w-[2.5rem]">
+                    {minQualityScore}
+                  </span>
+                </div>
               </div>
             </div>
           </div>

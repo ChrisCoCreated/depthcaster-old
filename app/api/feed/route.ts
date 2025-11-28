@@ -7,7 +7,7 @@ import { CURATED_FIDS, CURATED_CHANNELS } from "@/lib/curated";
 import { db } from "@/lib/db";
 import { curatorPackUsers, curatedCasts, curatedCastInteractions, curatorPacks, users, curatorCastCurations, castReplies, userRoles } from "@/lib/schema";
 import { enrichCastsWithViewerContext } from "@/lib/interactions";
-import { eq, inArray, desc, lt, and, sql, asc, or } from "drizzle-orm";
+import { eq, inArray, desc, lt, and, sql, asc, or, gte } from "drizzle-orm";
 import { cacheFeed, cacheCuratorRoleUsers } from "@/lib/cache";
 import { deduplicateRequest } from "@/lib/neynar-batch";
 import { getUser, getLastCuratedFeedView, updateLastCuratedFeedView } from "@/lib/users";
@@ -44,6 +44,9 @@ export async function GET(request: NextRequest) {
     const hideRecasts = searchParams.get("hideRecasts") === "true";
     const sortBy = searchParams.get("sortBy") || "recent-reply"; // "recently-curated" | "time-of-cast" | "recent-reply"
     const category = searchParams.get("category") || undefined; // Category filter
+    const minQualityScore = searchParams.get("minQualityScore")
+      ? parseInt(searchParams.get("minQualityScore")!)
+      : 60; // Quality filter, default to 60 (0.6 * 100)
 
     // Fetch user preferences for bot filtering
     let userBotPreferences: { hideBots?: boolean; hiddenBots?: string[] } = {};
@@ -89,6 +92,7 @@ export async function GET(request: NextRequest) {
       hideRecasts,
       sortBy, // Include sortBy in cache key so different sorts get different cache entries
       category, // Include category in cache key
+      minQualityScore, // Include quality filter in cache key
     });
 
     // Check cache first
@@ -370,7 +374,8 @@ export async function GET(request: NextRequest) {
           .where(
             and(
               inArray(curatedCasts.castHash, castHashArray),
-              category ? eq(curatedCasts.category, category) : undefined
+              category ? eq(curatedCasts.category, category) : undefined,
+              gte(curatedCasts.qualityScore, minQualityScore)
             )
           ),
       ]);

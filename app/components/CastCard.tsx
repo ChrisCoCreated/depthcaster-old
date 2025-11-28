@@ -1879,12 +1879,6 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                   </svg>
                 </span>
               )}
-              {/* Category badge - only show for casts, not replies */}
-              {category && !isReply && (
-                <span className="px-2 py-0.5 text-[10px] sm:text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full border border-gray-200 dark:border-gray-700 font-medium">
-                  {formatCategoryName(category)}
-                </span>
-              )}
             </div>
 
             {/* Cast text */}
@@ -2491,15 +2485,23 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
               );
             })()}
 
-            {/* Channel */}
-            {cast.channel && (
-              <div className="mb-3" onClick={(e) => e.stopPropagation()}>
-                <Link
-                  href={`/channel/${cast.channel.id}`}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-                >
-                  <span>#{cast.channel.name}</span>
-                </Link>
+            {/* Channel and Category */}
+            {(cast.channel || (category && !isReply)) && (
+              <div className="mb-3 flex items-center gap-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
+                {cast.channel && (
+                  <Link
+                    href={`/channel/${cast.channel.id}`}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                  >
+                    <span>/{cast.channel.name}</span>
+                  </Link>
+                )}
+                {/* Category badge - only show for casts, not replies */}
+                {category && !isReply && (
+                  <span className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full border border-gray-200 dark:border-gray-700 font-medium">
+                    {formatCategoryName(category)}
+                  </span>
+                )}
               </div>
             )}
 
