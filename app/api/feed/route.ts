@@ -343,12 +343,12 @@ export async function GET(request: NextRequest) {
       // Phase 1: Get aggregated times and cast metadata in parallel
       // Run all independent queries simultaneously for maximum performance
       const phase1Start = Date.now();
-      const [latestCurationTimes, latestReplyTimes, castsForSorting] = await Promise.all([
-        // Aggregation query for latest curation times (uses composite index)
+      const [firstCurationTimes, latestReplyTimes, castsForSorting] = await Promise.all([
+        // Aggregation query for first curation times (uses composite index)
         db
           .select({
             castHash: curatorCastCurations.castHash,
-            latestCurationTime: sql<Date>`MAX(${curatorCastCurations.createdAt})`.as("latest_curation_time"),
+            firstCurationTime: sql<Date>`MIN(${curatorCastCurations.createdAt})`.as("first_curation_time"),
           })
           .from(curatorCastCurations)
           .where(inArray(curatorCastCurations.castHash, castHashArray))
@@ -381,12 +381,12 @@ export async function GET(request: NextRequest) {
       ]);
 
       const phase1Time = Date.now() - phase1Start;
-      console.log(`[Feed] Phase 1 (parallel queries): ${phase1Time}ms - curation times: ${latestCurationTimes.length}, reply times: ${latestReplyTimes.length}, casts for sorting: ${castsForSorting.length}`);
+      console.log(`[Feed] Phase 1 (parallel queries): ${phase1Time}ms - curation times: ${firstCurationTimes.length}, reply times: ${latestReplyTimes.length}, casts for sorting: ${castsForSorting.length}`);
       
       // Create maps for quick lookup
-      const latestCurationTimeMap = new Map<string, Date>();
-      latestCurationTimes.forEach((row) => {
-        latestCurationTimeMap.set(row.castHash, row.latestCurationTime);
+      const firstCurationTimeMap = new Map<string, Date>();
+      firstCurationTimes.forEach((row) => {
+        firstCurationTimeMap.set(row.castHash, row.firstCurationTime);
       });
 
       const latestReplyTimeMap = new Map<string, Date>();
@@ -406,7 +406,7 @@ export async function GET(request: NextRequest) {
       const castsWithSortTimes = castsForSorting.map((cast) => {
         let sortTime: Date;
         if (sortBy === "recently-curated") {
-          sortTime = toDate(latestCurationTimeMap.get(cast.castHash), cast.createdAt);
+          sortTime = toDate(firstCurationTimeMap.get(cast.castHash), cast.createdAt);
         } else if (sortBy === "time-of-cast") {
           sortTime = toDate(cast.castTimestamp, cast.createdAt);
         } else {
@@ -467,7 +467,7 @@ export async function GET(request: NextRequest) {
       // Add latest times to results
       const resultsWithTimes = curatedResults.map((row) => ({
         ...row,
-        latestCurationTime: latestCurationTimeMap.get(row.castHash) || null,
+        firstCurationTime: firstCurationTimeMap.get(row.castHash) || null,
         latestReplyTime: latestReplyTimeMap.get(row.castHash) || null,
       }));
 

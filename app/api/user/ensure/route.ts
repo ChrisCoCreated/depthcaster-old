@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { upsertUser } from "@/lib/users";
+import { upsertUser, getUser } from "@/lib/users";
+import { syncUserReactions } from "@/lib/reactions";
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,8 +14,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if user already exists before upserting
+    const existingUser = await getUser(fid);
+    const wasNewUser = !existingUser;
+
     // Upsert the user - this will create the record if it doesn't exist
     await upsertUser(fid, undefined, signer_uuid);
+
+    // If this is a first-time login (user was just created), sync their reactions
+    if (wasNewUser) {
+      // Sync reactions asynchronously - don't block the response
+      syncUserReactions(fid).catch((error) => {
+        console.error(`[User Ensure] Error syncing reactions for new user ${fid}:`, error);
+      });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
