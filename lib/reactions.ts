@@ -53,7 +53,7 @@ export async function fetchUserReactions(
       const response = await fetch(url, {
         method: "GET",
         headers: {
-          "x-api-key": NEYNAR_API_KEY,
+          "x-api-key": NEYNAR_API_KEY as string,
         },
       });
 
