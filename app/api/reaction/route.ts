@@ -61,13 +61,15 @@ export async function POST(request: NextRequest) {
               
               const castData = castResponse.conversation?.cast;
               if (castData) {
+                // Map interaction type for notification: "like" -> "liked"
+                const notificationType = interactionType === "like" ? "liked" : interactionType;
                 notifyCuratorsAboutInteraction(
                   curatedCastHash,
                   castData,
-                  interactionType,
+                  notificationType,
                   userFid
                 ).catch((error) => {
-                  console.error(`[Reaction API] Error notifying curators about ${interactionType}:`, error);
+                  console.error(`[Reaction API] Error notifying curators about ${notificationType}:`, error);
                   // Don't fail reaction if notification fails
                 });
               }
