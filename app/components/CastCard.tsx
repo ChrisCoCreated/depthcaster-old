@@ -773,9 +773,10 @@ interface CastCardProps {
   sortBy?: "recently-curated" | "time-of-cast" | "recent-reply";
   disableClick?: boolean; // Disable click navigation (e.g., when in conversation view)
   rootCastHash?: string; // Root cast hash for the current page/view
+  compressedView?: boolean; // Whether to show compressed view (collapsed text)
 }
 
-export function CastCard({ cast, showThread = false, showTopReplies = true, onUpdate, feedType, curatorInfo, sortBy, isReply = false, disableClick = false, rootCastHash }: CastCardProps) {
+export function CastCard({ cast, showThread = false, showTopReplies = true, onUpdate, feedType, curatorInfo, sortBy, isReply = false, disableClick = false, rootCastHash, compressedView = false }: CastCardProps) {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showRecastMenu, setShowRecastMenu] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
@@ -811,9 +812,30 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
   const [isDeleting, setIsDeleting] = useState(false);
   const [isCuratedCastExpanded, setIsCuratedCastExpanded] = useState(false);
 
+  const [localCompressedView, setLocalCompressedView] = useState(compressedView);
+  
+  // Listen for preference changes
+  useEffect(() => {
+    const handlePreferencesChange = () => {
+      if (feedType === "curated") {
+        const saved = localStorage.getItem("curatedFeedCompressedView");
+        setLocalCompressedView(saved === "true");
+      }
+    };
+    window.addEventListener("feedPreferencesChanged", handlePreferencesChange);
+    return () => {
+      window.removeEventListener("feedPreferencesChanged", handlePreferencesChange);
+    };
+  }, [feedType]);
+  
+  // Update when prop changes
+  useEffect(() => {
+    setLocalCompressedView(compressedView);
+  }, [compressedView]);
+
   const castTextLines = useMemo(() => (cast.text ? cast.text.split(/\r?\n/) : []), [cast.text]);
   const shouldCollapseCuratedCastText = useMemo(() => {
-    if (feedType !== "curated" || castTextLines.length <= CURATED_FEED_COLLAPSE_LINE_LIMIT) {
+    if (!localCompressedView || castTextLines.length <= CURATED_FEED_COLLAPSE_LINE_LIMIT) {
       return false;
     }
     
@@ -824,7 +846,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
     
     // Only collapse if at least 6 lines would be hidden
     return hiddenCount >= 6;
-  }, [feedType, castTextLines.length]);
+  }, [localCompressedView, castTextLines.length]);
   const collapsedCuratedCastSegments = useMemo(() => {
     if (!shouldCollapseCuratedCastText) {
       return null;

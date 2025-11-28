@@ -84,6 +84,13 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   const [showFavoriteDropdown, setShowFavoriteDropdown] = useState(false);
   const [loadingPacks, setLoadingPacks] = useState(false);
   const [preferencesVersion, setPreferencesVersion] = useState(0);
+  const [compressedView, setCompressedView] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("curatedFeedCompressedView");
+      return saved === "true";
+    }
+    return false; // Default to full text
+  });
   const [selectedCategory, setSelectedCategory] = useState<string | null>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("selectedCategory");
@@ -1267,6 +1274,38 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
         {/* Filter settings - shown for all feeds except curated */}
         {feedType !== "curated" && <FeedSettingsInline feedType={feedType} />}
         
+        {/* Compressed view toggle - shown only for curated feed */}
+        {feedType === "curated" && (
+          <div className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-black">
+            <div className="px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Compressed View
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  const newValue = !compressedView;
+                  setCompressedView(newValue);
+                  localStorage.setItem("curatedFeedCompressedView", String(newValue));
+                  // Dispatch event to notify CastCard components
+                  window.dispatchEvent(new CustomEvent("feedPreferencesChanged"));
+                }}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  compressedView
+                    ? "bg-blue-600"
+                    : "bg-gray-200 dark:bg-gray-700"
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    compressedView ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+        )}
+        
         {/* Curator filter - shown only for curated feed */}
         {feedType === "curated" && (
           <CuratorFilterInline
@@ -1458,6 +1497,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
                   showThread
                   feedType={feedType}
                   sortBy={feedType === "curated" ? sortBy : undefined}
+                  compressedView={feedType === "curated" ? compressedView : false}
                   onUpdate={() => {
                     // Refresh the feed to get updated reaction counts
                     fetchFeed();

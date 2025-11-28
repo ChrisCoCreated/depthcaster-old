@@ -199,3 +199,4 @@ if (command === "casts" || command === "curated") {
       process.exit(1);
     });
 }
+
