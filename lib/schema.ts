@@ -87,6 +87,9 @@ export const curatedCasts = pgTable("curated_casts", {
   repliesCount: integer("replies_count").default(0),
   engagementScore: integer("engagement_score").default(0),
   parentHash: text("parent_hash"),
+  qualityScore: integer("quality_score"),
+  category: text("category"),
+  qualityAnalyzedAt: timestamp("quality_analyzed_at"),
 }, (table) => ({
   castHashIdx: index("cast_hash_idx").on(table.castHash),
   curatorFidIdx: index("curator_fid_idx").on(table.curatorFid),
@@ -95,6 +98,9 @@ export const curatedCasts = pgTable("curated_casts", {
   castTextLengthEngagementScoreIdx: index("curated_casts_cast_text_length_engagement_score_idx").on(table.castTextLength, table.engagementScore),
   authorFidCastCreatedAtIdx: index("curated_casts_author_fid_cast_created_at_idx").on(table.authorFid, table.castCreatedAt),
   parentHashIdx: index("curated_casts_parent_hash_idx").on(table.parentHash),
+  qualityScoreIdx: index("curated_casts_quality_score_idx").on(table.qualityScore),
+  categoryIdx: index("curated_casts_category_idx").on(table.category),
+  qualityCategoryIdx: index("curated_casts_quality_category_idx").on(table.qualityScore, table.category),
 }));
 
 export const curatorCastCurations = pgTable("curator_cast_curations", {
@@ -207,6 +213,9 @@ export const castReplies = pgTable("cast_replies", {
   recastsCount: integer("recasts_count").default(0),
   repliesCount: integer("replies_count").default(0),
   engagementScore: integer("engagement_score").default(0),
+  qualityScore: integer("quality_score"),
+  category: text("category"),
+  qualityAnalyzedAt: timestamp("quality_analyzed_at"),
 }, (table) => ({
   replyCastHashUnique: uniqueIndex("reply_cast_hash_unique").on(table.replyCastHash),
   curatedCastHashIdx: index("cast_replies_curated_cast_hash_idx").on(table.curatedCastHash),
@@ -217,6 +226,9 @@ export const castReplies = pgTable("cast_replies", {
   castTextLengthEngagementScoreIdx: index("cast_replies_cast_text_length_engagement_score_idx").on(table.castTextLength, table.engagementScore),
   authorFidCastCreatedAtIdx: index("cast_replies_author_fid_cast_created_at_idx").on(table.authorFid, table.castCreatedAt),
   parentHashIdx: index("cast_replies_parent_hash_idx").on(table.parentCastHash),
+  qualityScoreIdx: index("cast_replies_quality_score_idx").on(table.qualityScore),
+  categoryIdx: index("cast_replies_category_idx").on(table.category),
+  qualityCategoryIdx: index("cast_replies_quality_category_idx").on(table.qualityScore, table.category),
 }));
 
 export const buildIdeas = pgTable("build_ideas", {

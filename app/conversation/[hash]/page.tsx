@@ -3,7 +3,7 @@
 import { ConversationView } from "../../components/ConversationView";
 import { CastComposer } from "../../components/CastComposer";
 import { useNeynarContext } from "@neynar/react";
-import { use, useEffect, useRef } from "react";
+import { use, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 
 export default function ConversationPage({
@@ -18,8 +18,8 @@ export default function ConversationPage({
   const shouldAutoFocus = searchParams.get("reply") === "true";
   const focusReplyHash = searchParams.get("replyHash") || undefined;
 
-  useEffect(() => {
-    if (shouldAutoFocus && composerRef.current && user) {
+  const focusReplyBox = useCallback(() => {
+    if (composerRef.current && user) {
       // Scroll to composer and focus the textarea
       setTimeout(() => {
         composerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -29,12 +29,18 @@ export default function ConversationPage({
         }
       }, 300); // Small delay to ensure component is rendered
     }
-  }, [shouldAutoFocus, user]);
+  }, [user]);
+
+  useEffect(() => {
+    if (shouldAutoFocus) {
+      focusReplyBox();
+    }
+  }, [shouldAutoFocus, focusReplyBox]);
 
   return (
     <div className="min-h-screen">
       <main className="max-w-7xl mx-auto px-4 py-8">
-        <ConversationView castHash={hash} viewerFid={user?.fid} focusReplyHash={focusReplyHash} />
+        <ConversationView castHash={hash} viewerFid={user?.fid} focusReplyHash={focusReplyHash} onFocusReply={focusReplyBox} />
         
         {user && (
           <div ref={composerRef} className="mt-8">

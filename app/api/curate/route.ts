@@ -11,6 +11,7 @@ import { deleteCuratedCastWebhooks } from "@/lib/webhooks";
 import { refreshUnifiedCuratedWebhooks } from "@/lib/webhooks-unified";
 import { sendPushNotificationToUser } from "@/lib/pushNotifications";
 import { upsertUser } from "@/lib/users";
+import { analyzeCastQualityAsync } from "@/lib/deepseek-quality";
 
 // Disable body parsing to read raw body for signature verification
 export const runtime = "nodejs";
@@ -310,6 +311,23 @@ export async function POST(request: NextRequest) {
           engagementScore: metadata.engagementScore,
           parentHash: metadata.parentHash,
         });
+
+        // Trigger async quality analysis (non-blocking)
+        analyzeCastQualityAsync(castHash, finalCastData, async (hash, result) => {
+          try {
+            await db
+              .update(curatedCasts)
+              .set({
+                qualityScore: result.qualityScore,
+                category: result.category,
+                qualityAnalyzedAt: new Date(),
+              })
+              .where(eq(curatedCasts.castHash, hash));
+            console.log(`[Curate] Quality analysis completed for cast ${hash}: score=${result.qualityScore}, category=${result.category}`);
+          } catch (error: any) {
+            console.error(`[Curate] Error updating quality analysis for cast ${hash}:`, error.message);
+          }
+        });
       } catch (insertError: any) {
         // Handle case where cast was inserted by another request (race condition)
         // or if there are orphaned curator_cast_curations rows
@@ -379,6 +397,23 @@ export async function POST(request: NextRequest) {
                 parentHash: metadata.parentHash,
               });
               console.log(`[Curate] Successfully inserted cast ${castHash} after cleanup/retry`);
+
+              // Trigger async quality analysis (non-blocking)
+              analyzeCastQualityAsync(castHash, finalCastData, async (hash, result) => {
+                try {
+                  await db
+                    .update(curatedCasts)
+                    .set({
+                      qualityScore: result.qualityScore,
+                      category: result.category,
+                      qualityAnalyzedAt: new Date(),
+                    })
+                    .where(eq(curatedCasts.castHash, hash));
+                  console.log(`[Curate] Quality analysis completed for cast ${hash}: score=${result.qualityScore}, category=${result.category}`);
+                } catch (error: any) {
+                  console.error(`[Curate] Error updating quality analysis for cast ${hash}:`, error.message);
+                }
+              });
             } catch (retryError: any) {
               console.error(`[Curate] Retry insert also failed for ${castHash}:`, retryError);
               throw retryError;

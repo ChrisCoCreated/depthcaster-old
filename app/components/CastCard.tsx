@@ -19,7 +19,7 @@ import { analytics } from "@/lib/analytics";
 import { hasActiveProSubscription } from "@/lib/castLimits";
 import { VideoPlayer } from "./VideoPlayer";
 
-const CURATED_FEED_COLLAPSE_LINE_LIMIT = 12;
+const CURATED_FEED_COLLAPSE_LINE_LIMIT = 8;
 
 // Helper function to convert URLs in text to clickable links
 function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>, insideLink: boolean = false) {
@@ -812,10 +812,19 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
   const [isCuratedCastExpanded, setIsCuratedCastExpanded] = useState(false);
 
   const castTextLines = useMemo(() => (cast.text ? cast.text.split(/\r?\n/) : []), [cast.text]);
-  const shouldCollapseCuratedCastText = useMemo(
-    () => feedType === "curated" && castTextLines.length > CURATED_FEED_COLLAPSE_LINE_LIMIT,
-    [feedType, castTextLines.length]
-  );
+  const shouldCollapseCuratedCastText = useMemo(() => {
+    if (feedType !== "curated" || castTextLines.length <= CURATED_FEED_COLLAPSE_LINE_LIMIT) {
+      return false;
+    }
+    
+    // Calculate how many lines would be hidden
+    const topCount = Math.ceil(CURATED_FEED_COLLAPSE_LINE_LIMIT / 2);
+    const bottomCount = CURATED_FEED_COLLAPSE_LINE_LIMIT - topCount;
+    const hiddenCount = Math.max(castTextLines.length - (topCount + bottomCount), 0);
+    
+    // Only collapse if at least 6 lines would be hidden
+    return hiddenCount >= 6;
+  }, [feedType, castTextLines.length]);
   const collapsedCuratedCastSegments = useMemo(() => {
     if (!shouldCollapseCuratedCastText) {
       return null;

@@ -11,6 +11,7 @@ interface ConversationViewProps {
   castHash: string;
   viewerFid?: number;
   focusReplyHash?: string;
+  onFocusReply?: () => void;
 }
 
 interface ThreadedReply {
@@ -23,7 +24,7 @@ interface ThreadedReply {
   [key: string]: any;
 }
 
-export function ConversationView({ castHash, viewerFid, focusReplyHash }: ConversationViewProps) {
+export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusReply }: ConversationViewProps) {
   const [rootCast, setRootCast] = useState<any>(null);
   const [replies, setReplies] = useState<ThreadedReply[]>([]);
   const [loading, setLoading] = useState(true);
@@ -589,8 +590,19 @@ export function ConversationView({ castHash, viewerFid, focusReplyHash }: Conver
       })()}
 
       {replies.length === 0 && (
-        <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-          No replies stored in database yet
+        <div className="p-8 text-center">
+          {onFocusReply ? (
+            <button
+              onClick={onFocusReply}
+              className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 underline transition-colors cursor-pointer"
+            >
+              No quality replies detected yet. Start the conversation.
+            </button>
+          ) : (
+            <span className="text-gray-500 dark:text-gray-400">
+              No quality replies detected yet. Start the conversation.
+            </span>
+          )}
         </div>
       )}
 

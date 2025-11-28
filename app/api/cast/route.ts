@@ -14,6 +14,7 @@ import {
   getUtf8ByteLength,
   hasActiveProSubscription,
 } from "@/lib/castLimits";
+import { analyzeCastQualityAsync } from "@/lib/deepseek-quality";
 
 export async function POST(request: NextRequest) {
   try {
@@ -137,11 +138,12 @@ export async function POST(request: NextRequest) {
                 const { extractCastTimestamp } = await import("@/lib/cast-timestamp");
                 const { extractCastMetadata } = await import("@/lib/cast-metadata");
                 const metadata = extractCastMetadata(fullCastData as any);
+                const replyCastHash = (fullCastData as any).hash;
                 await db
                   .insert(castReplies)
                   .values({
                     curatedCastHash: quotedCastHash,
-                    replyCastHash: (fullCastData as any).hash,
+                    replyCastHash: replyCastHash,
                     castData: fullCastData,
                     castCreatedAt: extractCastTimestamp(fullCastData as any),
                     parentCastHash: (fullCastData as any).parent_hash || null,
@@ -178,7 +180,24 @@ export async function POST(request: NextRequest) {
                     },
                   });
 
-                console.log(`[Cast API] Stored quote cast ${(fullCastData as any).hash} for curated cast ${quotedCastHash}`);
+                console.log(`[Cast API] Stored quote cast ${replyCastHash} for curated cast ${quotedCastHash}`);
+
+                // Trigger async quality analysis (non-blocking)
+                analyzeCastQualityAsync(replyCastHash, fullCastData, async (hash, result) => {
+                  try {
+                    await db
+                      .update(castReplies)
+                      .set({
+                        qualityScore: result.qualityScore,
+                        category: result.category,
+                        qualityAnalyzedAt: new Date(),
+                      })
+                      .where(eq(castReplies.replyCastHash, hash));
+                    console.log(`[Cast API] Quality analysis completed for reply ${hash}: score=${result.qualityScore}, category=${result.category}`);
+                  } catch (error: any) {
+                    console.error(`[Cast API] Error updating quality analysis for reply ${hash}:`, error.message);
+                  }
+                });
               }
 
               // Refresh quoted cast data and replies to capture updated reactions
@@ -258,11 +277,12 @@ export async function POST(request: NextRequest) {
                 const { extractCastTimestamp } = await import("@/lib/cast-timestamp");
                 const { extractCastMetadata } = await import("@/lib/cast-metadata");
                 const metadata = extractCastMetadata(fullCastData as any);
+                const replyCastHash = (fullCastData as any).hash;
                 await db
                   .insert(castReplies)
                   .values({
                     curatedCastHash: rootHash,
-                    replyCastHash: (fullCastData as any).hash,
+                    replyCastHash: replyCastHash,
                     castData: fullCastData,
                     castCreatedAt: extractCastTimestamp(fullCastData as any),
                     parentCastHash: parent,
@@ -299,7 +319,24 @@ export async function POST(request: NextRequest) {
                     },
                   });
 
-                console.log(`[Cast API] Stored reply ${(fullCastData as any).hash} for curated cast ${rootHash} at depth ${replyDepth}`);
+                console.log(`[Cast API] Stored reply ${replyCastHash} for curated cast ${rootHash} at depth ${replyDepth}`);
+
+                // Trigger async quality analysis (non-blocking)
+                analyzeCastQualityAsync(replyCastHash, fullCastData, async (hash, result) => {
+                  try {
+                    await db
+                      .update(castReplies)
+                      .set({
+                        qualityScore: result.qualityScore,
+                        category: result.category,
+                        qualityAnalyzedAt: new Date(),
+                      })
+                      .where(eq(castReplies.replyCastHash, hash));
+                    console.log(`[Cast API] Quality analysis completed for reply ${hash}: score=${result.qualityScore}, category=${result.category}`);
+                  } catch (error: any) {
+                    console.error(`[Cast API] Error updating quality analysis for reply ${hash}:`, error.message);
+                  }
+                });
               }
 
               // Refresh root cast data and replies after posting reply

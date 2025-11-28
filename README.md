@@ -32,11 +32,16 @@ A Farcaster client focused on deep thoughts, philosophy, art, and meaningful con
    NEXT_PUBLIC_NEYNAR_CLIENT_ID=your_neynar_client_id_here
    NEXT_PUBLIC_APP_URL=http://localhost:3000
    POSTGRES_URL=your_postgres_url_here
+   DEEPSEEK_API_KEY=your_deepseek_api_key_here
    ```
 
-   Get your API keys from [Neynar](https://neynar.com)
+   Get your API keys from:
+   - [Neynar](https://neynar.com) - for Farcaster integration
+   - [DeepSeek](https://www.deepseek.com) - for quality analysis and categorization (optional, but recommended)
    
    For local development, you can use a local PostgreSQL database or a service like [Neon](https://neon.tech) or [Supabase](https://supabase.com)
+   
+   **Note:** The `DEEPSEEK_API_KEY` is optional. If not provided, quality analysis will be skipped. Quality analysis provides AI-powered quality scores (0-100) and topic categorization for casts and replies.
 
 3. **Set up the database**:
    ```bash
@@ -115,6 +120,7 @@ Ensure `WEBHOOK_BASE_URL`, `NEYNAR_API_KEY`, and database credentials are presen
    - `NEXT_PUBLIC_NEYNAR_CLIENT_ID` - Your Neynar client ID
    - `NEXT_PUBLIC_APP_URL` - Your Vercel deployment URL (e.g., `https://depthcaster.vercel.app`)
    - `POSTGRES_URL` - Automatically set by Vercel Postgres
+   - `DEEPSEEK_API_KEY` - Your DeepSeek API key (optional, for quality analysis)
 
 5. **Initialize the Database**:
    After deployment, run the database setup:
