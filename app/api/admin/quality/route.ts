@@ -75,8 +75,14 @@ export async function GET(request: NextRequest) {
     const buildQualityConditions = (qualityScoreColumn: any) => {
       const conditions: any[] = [];
       
-      if (includeNullParam) {
-        // Include null values
+      // If only null is requested (includeNull=true, no range specified)
+      const onlyNull = includeNullParam && minQuality === null && maxQuality === null;
+      
+      if (onlyNull) {
+        // Show only null quality scores
+        conditions.push(isNull(qualityScoreColumn));
+      } else if (includeNullParam) {
+        // Include null values along with range
         if (minQuality !== null && maxQuality !== null) {
           // Range with null: (quality >= min AND quality <= max) OR quality IS NULL
           conditions.push(

@@ -50,7 +50,9 @@ export async function findOriginalCuratedCast(castHash: string): Promise<string 
     // Recursively check the parent
     return await findOriginalCuratedCast(cast.parent_hash);
   } catch (error) {
-    console.error(`Error finding original curated cast for ${castHash}:`, error);
+    // Only log a concise error message instead of the full error object
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`Error finding original curated cast for ${castHash}: ${errorMessage}`);
     return null;
   }
 }

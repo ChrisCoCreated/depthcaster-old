@@ -1,5 +1,7 @@
 import { getUserRoles } from "./roles";
-import { findOriginalCuratedCast, trackCuratedCastInteraction } from "./interactions";
+import { db } from "./db";
+import { curatedCasts, curatedCastInteractions, castReplies } from "./schema";
+import { eq } from "drizzle-orm";
 
 const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY;
 if (!NEYNAR_API_KEY) {
@@ -90,7 +92,7 @@ export async function fetchUserReactions(
 
 /**
  * Sync all reactions for a user (likes and recasts)
- * Only syncs if user has a role, and only stores reactions to curated casts
+ * Only syncs if user has a role, and only stores reactions to curated casts or replies
  */
 export async function syncUserReactions(fid: number): Promise<{
   likesSynced: number;
@@ -120,15 +122,38 @@ export async function syncUserReactions(fid: number): Promise<{
 
     for (const reaction of likeReactions) {
       try {
-        // Check if this cast is part of a curated thread
-        const curatedCastHash = await findOriginalCuratedCast(reaction.castHash);
+        let curatedCastHash: string | null = null;
+
+        // Check if cast is in curatedCasts table
+        const curatedCast = await db
+          .select({ castHash: curatedCasts.castHash })
+          .from(curatedCasts)
+          .where(eq(curatedCasts.castHash, reaction.castHash))
+          .limit(1);
+
+        if (curatedCast.length > 0) {
+          curatedCastHash = curatedCast[0].castHash;
+        } else {
+          // Check if cast is in castReplies table
+          const reply = await db
+            .select({ curatedCastHash: castReplies.curatedCastHash })
+            .from(castReplies)
+            .where(eq(castReplies.replyCastHash, reaction.castHash))
+            .limit(1);
+
+          if (reply.length > 0) {
+            curatedCastHash = reply[0].curatedCastHash;
+          }
+        }
+
+        // If found in either table, record the reaction
         if (curatedCastHash) {
-          // Store the reaction
-          await trackCuratedCastInteraction(
-            reaction.castHash,
-            "like",
-            fid
-          );
+          await db.insert(curatedCastInteractions).values({
+            curatedCastHash,
+            targetCastHash: reaction.castHash,
+            interactionType: "like",
+            userFid: fid,
+          }).onConflictDoNothing();
           stats.likesSynced++;
         }
       } catch (error) {
@@ -152,15 +177,38 @@ export async function syncUserReactions(fid: number): Promise<{
 
     for (const reaction of recastReactions) {
       try {
-        // Check if this cast is part of a curated thread
-        const curatedCastHash = await findOriginalCuratedCast(reaction.castHash);
+        let curatedCastHash: string | null = null;
+
+        // Check if cast is in curatedCasts table
+        const curatedCast = await db
+          .select({ castHash: curatedCasts.castHash })
+          .from(curatedCasts)
+          .where(eq(curatedCasts.castHash, reaction.castHash))
+          .limit(1);
+
+        if (curatedCast.length > 0) {
+          curatedCastHash = curatedCast[0].castHash;
+        } else {
+          // Check if cast is in castReplies table
+          const reply = await db
+            .select({ curatedCastHash: castReplies.curatedCastHash })
+            .from(castReplies)
+            .where(eq(castReplies.replyCastHash, reaction.castHash))
+            .limit(1);
+
+          if (reply.length > 0) {
+            curatedCastHash = reply[0].curatedCastHash;
+          }
+        }
+
+        // If found in either table, record the reaction
         if (curatedCastHash) {
-          // Store the reaction
-          await trackCuratedCastInteraction(
-            reaction.castHash,
-            "recast",
-            fid
-          );
+          await db.insert(curatedCastInteractions).values({
+            curatedCastHash,
+            targetCastHash: reaction.castHash,
+            interactionType: "recast",
+            userFid: fid,
+          }).onConflictDoNothing();
           stats.recastsSynced++;
         }
       } catch (error) {

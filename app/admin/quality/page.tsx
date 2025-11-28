@@ -5,6 +5,7 @@ import { useNeynarContext } from "@neynar/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CastCard } from "@/app/components/CastCard";
+import { extractCastTimestamp } from "@/lib/cast-timestamp";
 
 interface QualityItem {
   hash: string;
@@ -176,6 +177,11 @@ export default function QualityPage() {
                 />
                 <span className="text-sm text-gray-700 dark:text-gray-300">
                   Include null quality scores
+                  {!minQuality && !maxQuality && includeNull && (
+                    <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                      (showing only null)
+                    </span>
+                  )}
                 </span>
               </label>
             </div>
@@ -222,38 +228,63 @@ export default function QualityPage() {
               Results ({items.length})
             </h2>
             <div className="space-y-4">
-              {items.map((item) => (
-                <div key={item.hash} className="border-b border-gray-200 dark:border-gray-800 pb-4 last:border-b-0">
-                  <div className="mb-2 flex items-center gap-2">
-                    <span className={`px-2 py-1 text-xs rounded ${
-                      item.type === "cast" 
-                        ? "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200"
-                        : "bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200"
-                    }`}>
-                      {item.type === "cast" ? "Cast" : "Reply"}
-                    </span>
-                    {item.qualityScore !== null ? (
-                      <span className="px-2 py-1 text-xs rounded bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
-                        Quality: {item.qualityScore}
+              {items.map((item) => {
+                // Ensure castData has a valid timestamp
+                const castData = { ...item.castData };
+                if (!castData.timestamp) {
+                  const extractedTimestamp = extractCastTimestamp(castData);
+                  if (extractedTimestamp) {
+                    castData.timestamp = extractedTimestamp.toISOString();
+                  } else {
+                    // Fallback to current time if no valid timestamp found
+                    castData.timestamp = new Date().toISOString();
+                  }
+                } else {
+                  // Validate existing timestamp
+                  const date = new Date(castData.timestamp);
+                  if (isNaN(date.getTime())) {
+                    const extractedTimestamp = extractCastTimestamp(castData);
+                    if (extractedTimestamp) {
+                      castData.timestamp = extractedTimestamp.toISOString();
+                    } else {
+                      castData.timestamp = new Date().toISOString();
+                    }
+                  }
+                }
+
+                return (
+                  <div key={item.hash} className="border-b border-gray-200 dark:border-gray-800 pb-4 last:border-b-0">
+                    <div className="mb-2 flex items-center gap-2">
+                      <span className={`px-2 py-1 text-xs rounded ${
+                        item.type === "cast" 
+                          ? "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200"
+                          : "bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200"
+                      }`}>
+                        {item.type === "cast" ? "Cast" : "Reply"}
                       </span>
-                    ) : (
-                      <span className="px-2 py-1 text-xs rounded bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-500">
-                        Quality: null
-                      </span>
-                    )}
-                    {item.category && (
-                      <span className="px-2 py-1 text-xs rounded bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
-                        {item.category}
-                      </span>
-                    )}
+                      {item.qualityScore !== null ? (
+                        <span className="px-2 py-1 text-xs rounded bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
+                          Quality: {item.qualityScore}
+                        </span>
+                      ) : (
+                        <span className="px-2 py-1 text-xs rounded bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-500">
+                          Quality: null
+                        </span>
+                      )}
+                      {item.category && (
+                        <span className="px-2 py-1 text-xs rounded bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
+                          {item.category}
+                        </span>
+                      )}
+                    </div>
+                    <CastCard
+                      cast={castData}
+                      feedType="curated"
+                      isReply={item.type === "reply"}
+                    />
                   </div>
-                  <CastCard
-                    cast={item.castData}
-                    feedType="curated"
-                    isReply={item.type === "reply"}
-                  />
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     const notifyOnQualityReply = preferences.notifyOnQualityReply !== undefined ? preferences.notifyOnQualityReply : true;
     const qualityReplyThreshold = preferences.qualityReplyThreshold !== undefined ? preferences.qualityReplyThreshold : 60;
     const notifyOnCurated = preferences.notifyOnCurated !== undefined ? preferences.notifyOnCurated : false;
-    const notifyOnLiked = preferences.notifyOnLiked !== undefined ? preferences.notifyOnLiked : false;
+    const notifyOnLiked = preferences.notifyOnLiked !== undefined ? preferences.notifyOnLiked : true;
     const notifyOnRecast = preferences.notifyOnRecast !== undefined ? preferences.notifyOnRecast : false;
 
     return NextResponse.json({
@@ -120,7 +120,7 @@ export async function PUT(request: NextRequest) {
       notifyOnQualityReply: notifyOnQualityReply !== undefined ? notifyOnQualityReply : existingPreferences.notifyOnQualityReply !== undefined ? existingPreferences.notifyOnQualityReply : true,
       qualityReplyThreshold: qualityReplyThreshold !== undefined ? qualityReplyThreshold : existingPreferences.qualityReplyThreshold !== undefined ? existingPreferences.qualityReplyThreshold : 60,
       notifyOnCurated: notifyOnCurated !== undefined ? notifyOnCurated : existingPreferences.notifyOnCurated !== undefined ? existingPreferences.notifyOnCurated : false,
-      notifyOnLiked: notifyOnLiked !== undefined ? notifyOnLiked : existingPreferences.notifyOnLiked !== undefined ? existingPreferences.notifyOnLiked : false,
+      notifyOnLiked: notifyOnLiked !== undefined ? notifyOnLiked : existingPreferences.notifyOnLiked !== undefined ? existingPreferences.notifyOnLiked : true,
       notifyOnRecast: notifyOnRecast !== undefined ? notifyOnRecast : existingPreferences.notifyOnRecast !== undefined ? existingPreferences.notifyOnRecast : false,
     };
 

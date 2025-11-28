@@ -36,7 +36,7 @@ export async function getUserNotificationPreferences(fid: number): Promise<Notif
     notifyOnQualityReply: preferences.notifyOnQualityReply !== undefined ? preferences.notifyOnQualityReply : true,
     qualityReplyThreshold: preferences.qualityReplyThreshold !== undefined ? preferences.qualityReplyThreshold : 60,
     notifyOnCurated: preferences.notifyOnCurated !== undefined ? preferences.notifyOnCurated : false,
-    notifyOnLiked: preferences.notifyOnLiked !== undefined ? preferences.notifyOnLiked : false,
+    notifyOnLiked: preferences.notifyOnLiked !== undefined ? preferences.notifyOnLiked : true,
     notifyOnRecast: preferences.notifyOnRecast !== undefined ? preferences.notifyOnRecast : false,
   };
 }

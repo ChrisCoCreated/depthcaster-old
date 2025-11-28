@@ -35,7 +35,7 @@ const DEFAULT_CURATED_PREFERENCES: CuratedCastPreferences = {
   notifyOnQualityReply: true,
   qualityReplyThreshold: 60,
   notifyOnCurated: false,
-  notifyOnLiked: false,
+  notifyOnLiked: true,
   notifyOnRecast: false,
 };
 
@@ -76,7 +76,7 @@ export function NotificationSettings() {
               notifyOnQualityReply: data.notifyOnQualityReply !== undefined ? data.notifyOnQualityReply : true,
               qualityReplyThreshold: data.qualityReplyThreshold !== undefined ? data.qualityReplyThreshold : 60,
               notifyOnCurated: data.notifyOnCurated !== undefined ? data.notifyOnCurated : false,
-              notifyOnLiked: data.notifyOnLiked !== undefined ? data.notifyOnLiked : false,
+              notifyOnLiked: data.notifyOnLiked !== undefined ? data.notifyOnLiked : true,
               notifyOnRecast: data.notifyOnRecast !== undefined ? data.notifyOnRecast : false,
             });
           }
@@ -276,8 +276,8 @@ export function NotificationSettings() {
           {/* Other Curated Cast Notifications */}
           {[
             { key: "notifyOnCurated" as const, label: "When Cast is Curated", emoji: "✨", description: "Get notified when someone else curates a cast you curated" },
-            { key: "notifyOnLiked" as const, label: "When Cast is Liked", emoji: "❤️", description: "Get notified when someone likes a cast you curated" },
-            { key: "notifyOnRecast" as const, label: "When Cast is Recast", emoji: "🔄", description: "Get notified when someone recasts a cast you curated" },
+            { key: "notifyOnLiked" as const, label: "When Cast is Liked", emoji: "❤️", description: "Get notified when someone likes a cast you curated (within DepthCaster)" },
+            { key: "notifyOnRecast" as const, label: "When Cast is Recast", emoji: "🔄", description: "Get notified when someone recasts a cast you curated (within DepthCaster)" },
           ].map(({ key, label, emoji, description }) => (
             <label
               key={key}
