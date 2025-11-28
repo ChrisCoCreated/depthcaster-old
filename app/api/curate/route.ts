@@ -490,14 +490,23 @@ export async function POST(request: NextRequest) {
 
     // Insert into curator_cast_curations (link curator to cast)
     try {
+      // Check if there are any existing curators for this cast (before inserting)
+      const existingCurators = await db
+        .select()
+        .from(curatorCastCurations)
+        .where(eq(curatorCastCurations.castHash, castHash))
+        .limit(1);
+      
+      const isNewCuration = existingCurators.length === 0;
+
       const curationResult = await db.insert(curatorCastCurations).values({
         castHash,
         curatorFid,
       }).returning();
 
-      // Send notification to admin user 5701 when a cast is curated
+      // Send notification to admin user 5701 only when a cast is curated for the first time
       const ADMIN_FID = 5701;
-      if (curatorFid !== ADMIN_FID) {
+      if (curatorFid !== ADMIN_FID && isNewCuration) {
         // Get curator's name for the notification
         // Try database first, then castData, then fallback to FID
         let curatorName = `User ${curatorFid}`;
