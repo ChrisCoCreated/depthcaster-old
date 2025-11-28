@@ -435,6 +435,8 @@ export async function GET(request: NextRequest) {
           castHash: curatedCasts.castHash,
           castData: curatedCasts.castData,
           createdAt: curatedCasts.createdAt,
+          qualityScore: curatedCasts.qualityScore,
+          category: curatedCasts.category,
         })
         .from(curatedCasts)
         .where(inArray(curatedCasts.castHash, selectedCastHashes));
@@ -511,6 +513,14 @@ export async function GET(request: NextRequest) {
           if (curatorInfo) {
             cast._curatorInfo = curatorInfo;
           }
+        }
+        
+        // Add quality and category data
+        if (row.qualityScore !== null && row.qualityScore !== undefined) {
+          cast._qualityScore = row.qualityScore;
+        }
+        if (row.category) {
+          cast._category = row.category;
         }
         
         // Check if this is a quote cast with a parent (not root)

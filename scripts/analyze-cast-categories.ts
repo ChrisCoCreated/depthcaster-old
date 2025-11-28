@@ -8,9 +8,9 @@
 import { config } from "dotenv";
 import { resolve } from "path";
 
-// Load environment variables from .env.local or .env
-config({ path: resolve(process.cwd(), ".env.local") });
+// Load environment variables from .env or .env.local
 config({ path: resolve(process.cwd(), ".env") });
+config({ path: resolve(process.cwd(), ".env.local") });
 
 import { db } from "../lib/db";
 import { curatedCasts } from "../lib/schema";
@@ -44,20 +44,25 @@ async function getCategorySuggestion(castText: string): Promise<CategorySuggesti
     return null;
   }
 
-  const prompt = `Analyze this Farcaster cast and suggest a specific category name that best describes its topic/content type.
+  const prompt = `Analyze this Farcaster cast and suggest the BEST category name that describes its topic/content type.
 
-Current categories we use: technical, philosophy, art, discussion, question, announcement, opinion, tutorial, news, other
+IMPORTANT: Don't just pick from existing categories. Think creatively about what category would be most useful and specific for this type of content. Suggest NEW categories if the existing ones don't fit well.
+
+Current categories we have (for reference, but feel free to suggest better ones):
+- technical, philosophy, art, discussion, question, announcement, opinion, tutorial, news, crypto, product, community, humor, personal, other
 
 Cast text:
 ${castText.substring(0, 2000)}${castText.length > 2000 ? "..." : ""}
 
 Please suggest:
-1. A specific category name (can be from the list above, or suggest a new one if none fit well)
+1. A specific, descriptive category name (preferably a NEW category if existing ones don't fit well - be creative!)
 2. Brief reasoning for why this category fits
+
+Examples of good category names: "startup-advice", "book-review", "crypto-analysis", "design-critique", "life-lesson", "tech-trend", "philosophical-question", etc.
 
 Respond in JSON format:
 {
-  "suggestedCategory": "<category name>",
+  "suggestedCategory": "<category name - be specific and creative>",
   "reasoning": "<brief explanation>"
 }`;
 
@@ -74,7 +79,7 @@ Respond in JSON format:
           {
             role: "system",
             content:
-              "You are an expert at categorizing social media content. Always respond with valid JSON only. Suggest specific, useful category names.",
+              "You are an expert at categorizing social media content. Your goal is to suggest NEW and CREATIVE category names that are specific and useful. Don't just reuse existing categories - think about what would be most helpful for organizing this type of content. Always respond with valid JSON only.",
           },
           {
             role: "user",
@@ -82,7 +87,7 @@ Respond in JSON format:
           },
         ],
         max_tokens: 150,
-        temperature: 0.4,
+        temperature: 0.7, // Higher temperature for more creative category suggestions
       }),
     });
 
@@ -131,7 +136,7 @@ async function analyzeCastCategories() {
   console.log("Starting category analysis for curated casts...\n");
 
   if (!DEEPSEEK_API_KEY) {
-    console.error("❌ DEEPSEEK_API_KEY not configured. Please set it in .env.local");
+    console.error("❌ DEEPSEEK_API_KEY not configured. Please set it in .env");
     process.exit(1);
   }
 

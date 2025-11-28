@@ -38,6 +38,14 @@ export async function GET(request: NextRequest) {
 
     // Get the root cast data
     const rootCastData = curatedCast[0].castData as any;
+    
+    // Add quality and category to root cast
+    if (curatedCast[0].qualityScore !== null && curatedCast[0].qualityScore !== undefined) {
+      rootCastData._qualityScore = curatedCast[0].qualityScore;
+    }
+    if (curatedCast[0].category) {
+      rootCastData._category = curatedCast[0].category;
+    }
 
     // Fetch all stored replies/quotes for this curated cast
     // Exclude parent casts saved for display only (they use placeholder hash 0x0000...)
@@ -109,6 +117,11 @@ export async function GET(request: NextRequest) {
       castData._isQuoteCast = storedReply.isQuoteCast;
       castData._rootCastHash = storedReply.rootCastHash;
       castData.castCreatedAt = storedReply.castCreatedAt; // Include for sorting
+      
+      // Add quality score if available
+      if (storedReply.qualityScore !== null && storedReply.qualityScore !== undefined) {
+        castData._qualityScore = storedReply.qualityScore;
+      }
 
       replyMap.set(storedReply.replyCastHash, {
         ...castData,

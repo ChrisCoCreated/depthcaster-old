@@ -1618,6 +1618,22 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
   const author = cast.author;
   const timestamp = new Date(cast.timestamp);
   const timeAgo = formatDistanceToNow(timestamp, { addSuffix: true });
+  
+  // Get quality score and category from cast metadata
+  const qualityScore = (cast as any)._qualityScore;
+  const category = (cast as any)._category;
+  
+  // Helper function to format category name (convert hyphens to readable format)
+  const formatCategoryName = (cat: string): string => {
+    return cat.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+  };
+  
+  // Helper function to get quality score color
+  const getQualityColor = (score: number): string => {
+    if (score >= 80) return "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20";
+    if (score >= 60) return "text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20";
+    return "text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800";
+  };
 
   const handleCardClick = (e: React.MouseEvent) => {
     // Don't navigate if clicks are disabled
@@ -1861,6 +1877,12 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                   <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                   </svg>
+                </span>
+              )}
+              {/* Category badge - only show for casts, not replies */}
+              {category && !isReply && (
+                <span className="px-2 py-0.5 text-[10px] sm:text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full border border-gray-200 dark:border-gray-700 font-medium">
+                  {formatCategoryName(category)}
                 </span>
               )}
             </div>
@@ -2563,6 +2585,13 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                   </div>
                 )}
               </div>
+
+              {/* Quality score indicator */}
+              {qualityScore !== null && qualityScore !== undefined && (
+                <div className={`px-2 py-1 rounded text-xs font-medium ${getQualityColor(qualityScore)}`} title={`Quality score: ${qualityScore}/100`}>
+                  Q: {qualityScore}
+                </div>
+              )}
 
               {/* Thread link */}
               {showThread && cast.hash && (
