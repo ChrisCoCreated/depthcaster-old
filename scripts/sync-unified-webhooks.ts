@@ -1,5 +1,6 @@
 /**
- * Sync/refresh the three unified Neynar webhooks used by Depthcaster.
+ * Sync/refresh the unified Neynar webhooks used by Depthcaster.
+ * Includes: curated-reply, curated-quote, curated-reaction, and user-watch webhooks.
  *
  * Usage: npx tsx scripts/sync-unified-webhooks.ts
  */
@@ -17,7 +18,7 @@ import { refreshUnifiedUserWatchWebhook } from "../lib/webhooks-unified-watches"
 
 type ExpectedWebhook = {
   neynarWebhookId: string;
-  type: "curated-reply" | "curated-quote" | "user-watch";
+  type: "curated-reply" | "curated-quote" | "curated-reaction" | "user-watch";
   name: string;
   secret: string;
 };
@@ -47,6 +48,12 @@ const EXPECTED_WEBHOOKS: ExpectedWebhook[] = [
     neynarWebhookId: "01KA4AEVR22SWJ088DBG0F28N4",
     type: "user-watch",
     secret: "_XZbjMkINuJ36_Ky4PY_xHPd5",
+  },
+  {
+    name: "curated-reactions-unified",
+    neynarWebhookId: "01KB6132663X5HFEGEV5KSK6K6",
+    type: "curated-reaction",
+    secret: "1QfJI-vLy4SjagS8hfyGAzfRt",
   },
 ];
 

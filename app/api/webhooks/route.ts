@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
 import { db } from "@/lib/db";
-import { userNotifications, webhooks, castReplies, curatedCasts } from "@/lib/schema";
-import { eq, and, sql, or } from "drizzle-orm";
+import { userNotifications, webhooks, castReplies, curatedCasts, curatedCastInteractions } from "@/lib/schema";
+import { eq, and, or } from "drizzle-orm";
 import { sendPushNotificationToUser } from "@/lib/pushNotifications";
 import { meetsCastQualityThreshold } from "@/lib/cast-quality";
 import { isQuoteCast, extractQuotedCastHashes, getRootCastHash } from "@/lib/conversation";
@@ -10,6 +10,8 @@ import { addQuoteCastToUnifiedReplyWebhook, addReplyToUnifiedReplyWebhook } from
 import { neynarClient } from "@/lib/neynar";
 import { LookupCastConversationTypeEnum } from "@neynar/nodejs-sdk/build/api";
 import { analyzeCastQualityAsync } from "@/lib/deepseek-quality";
+import { findOriginalCuratedCast } from "@/lib/interactions";
+import { getUserRoles } from "@/lib/roles";
 
 // Disable body parsing to read raw body for signature verification
 export const runtime = "nodejs";
@@ -74,6 +76,93 @@ function verifyWebhookSignature(
   return false;
 }
 
+/**
+ * Handle reaction webhook events (reaction.created and reaction.deleted)
+ */
+async function handleReactionEvent(
+  eventType: string,
+  reactionData: { reaction_type?: string; target?: string; user?: { fid?: number }; cast?: { hash?: string } },
+  webhookType: string | null
+): Promise<NextResponse> {
+  // Only process if this is from the curated-reaction webhook
+  if (webhookType !== "curated-reaction") {
+    console.log(`[Webhook] Reaction event not from curated-reaction webhook (type: ${webhookType}), ignoring`);
+    return NextResponse.json({ success: true, message: "Event ignored" });
+  }
+
+  const reactionType = reactionData.reaction_type; // "like" or "recast"
+  const targetCastHash = reactionData.target; // Cast hash that was reacted to
+  const userFid = reactionData.user?.fid;
+
+  console.log(`[Webhook] Processing ${eventType} - reactionType: ${reactionType}, target: ${targetCastHash}, userFid: ${userFid}`);
+
+  if (!targetCastHash || !userFid || !reactionType) {
+    console.log("[Webhook] Missing required fields in reaction webhook payload", { targetCastHash, userFid, reactionType });
+    return NextResponse.json({ success: true, message: "Missing required fields" });
+  }
+
+  // Only process likes and recasts
+  if (reactionType !== "like" && reactionType !== "recast") {
+    console.log(`[Webhook] Ignoring reaction type: ${reactionType}`);
+    return NextResponse.json({ success: true, message: "Reaction type not supported" });
+  }
+
+  // Check if user has a role
+  const userRoles = await getUserRoles(userFid);
+  if (userRoles.length === 0) {
+    console.log(`[Webhook] User ${userFid} has no roles, skipping reaction storage`);
+    return NextResponse.json({ success: true, message: "User has no roles" });
+  }
+
+  // Find the original curated cast for this target cast
+  const curatedCastHash = await findOriginalCuratedCast(targetCastHash);
+  
+  if (!curatedCastHash) {
+    console.log(`[Webhook] Target cast ${targetCastHash} is not part of a curated thread, skipping`);
+    return NextResponse.json({ success: true, message: "Not part of curated thread" });
+  }
+
+  if (eventType === "cast.reaction.created") {
+    // Store the reaction
+    try {
+      await db.insert(curatedCastInteractions).values({
+        curatedCastHash,
+        targetCastHash,
+        interactionType: reactionType,
+        userFid,
+      }).onConflictDoNothing();
+
+      console.log(`[Webhook] Stored ${reactionType} interaction for cast ${targetCastHash} by user ${userFid} in curated cast ${curatedCastHash}`);
+    } catch (error: any) {
+      if (error.code !== "23505") { // Ignore duplicate key errors
+        console.error(`[Webhook] Error storing reaction interaction:`, error);
+      } else {
+        console.log(`[Webhook] Reaction interaction already exists (duplicate), skipping`);
+      }
+    }
+  } else if (eventType === "cast.reaction.deleted") {
+    // Remove the reaction
+    try {
+      await db
+        .delete(curatedCastInteractions)
+        .where(
+          and(
+            eq(curatedCastInteractions.curatedCastHash, curatedCastHash),
+            eq(curatedCastInteractions.targetCastHash, targetCastHash),
+            eq(curatedCastInteractions.interactionType, reactionType),
+            eq(curatedCastInteractions.userFid, userFid)
+          )
+        );
+
+      console.log(`[Webhook] Removed ${reactionType} interaction for cast ${targetCastHash} by user ${userFid} in curated cast ${curatedCastHash}`);
+    } catch (error: any) {
+      console.error(`[Webhook] Error removing reaction interaction:`, error);
+    }
+  }
+
+  return NextResponse.json({ success: true });
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Get the raw body for signature verification
@@ -94,7 +183,8 @@ export async function POST(request: NextRequest) {
         or(
           eq(webhooks.type, "user-watch"),
           eq(webhooks.type, "curated-reply"),
-          eq(webhooks.type, "curated-quote")
+          eq(webhooks.type, "curated-quote"),
+          eq(webhooks.type, "curated-reaction")
         )
       );
 
@@ -164,27 +254,11 @@ export async function POST(request: NextRequest) {
     // Log full webhook structure for analysis
     console.log(`[Webhook] Full webhook payload structure:`, JSON.stringify(body, null, 2));
     
-    // Neynar webhook format: { type: "cast.created", data: { hash: "0x...", parent_hash: "0x...", author: { fid: 123 } } }
+    // Neynar webhook format: { type: "cast.created" | "reaction.created" | "reaction.deleted", data: {...} }
     const eventType = body.type;
-    const castData = body.data;
+    const eventData = body.data;
 
     console.log(`[Webhook] Received event: ${eventType}`);
-
-    if (eventType !== "cast.created" || !castData) {
-      console.log(`[Webhook] Ignoring non-cast.created event (type: ${eventType}) or missing data`);
-      return NextResponse.json({ success: true, message: "Event ignored" });
-    }
-
-    const castHash = castData.hash;
-    const parentHash = castData.parent_hash;
-    const authorFid = castData.author?.fid;
-
-    console.log(`[Webhook] Processing cast.created - hash: ${castHash}, authorFid: ${authorFid}, parentHash: ${parentHash}`);
-
-    if (!castHash || !authorFid) {
-      console.log("[Webhook] Missing required fields in webhook payload", { castHash, authorFid });
-      return NextResponse.json({ success: true, message: "Missing required fields" });
-    }
 
     // Determine which webhook type this event belongs to based on verified webhook
     let webhookType: string | null = null;
@@ -197,6 +271,30 @@ export async function POST(request: NextRequest) {
         webhookConfig = verifiedWebhook.config;
         console.log(`[Webhook] Verified hook type: ${webhookType} (${verifiedWebhookId})`);
       }
+    }
+
+    // Handle reaction events
+    if (eventType === "reaction.created" || eventType === "reaction.deleted") {
+      return await handleReactionEvent(eventType, eventData, webhookType);
+    }
+
+    // Handle cast.created events (replies and quotes)
+    if (eventType !== "cast.created" || !eventData) {
+      console.log(`[Webhook] Ignoring unsupported event (type: ${eventType}) or missing data`);
+      return NextResponse.json({ success: true, message: "Event ignored" });
+    }
+
+    const castData = eventData;
+
+    const castHash = castData.hash;
+    const parentHash = castData.parent_hash;
+    const authorFid = castData.author?.fid;
+
+    console.log(`[Webhook] Processing cast.created - hash: ${castHash}, authorFid: ${authorFid}, parentHash: ${parentHash}`);
+
+    if (!castHash || !authorFid) {
+      console.log("[Webhook] Missing required fields in webhook payload", { castHash, authorFid });
+      return NextResponse.json({ success: true, message: "Missing required fields" });
     }
 
     // Handle curated conversation webhooks (unified webhooks)

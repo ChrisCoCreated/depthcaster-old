@@ -732,12 +732,215 @@ export async function createUnifiedCuratedQuoteWebhook() {
 }
 
 /**
+ * Create or update unified webhook for reactions on all curated casts
+ * Uses a single webhook with multiple parent_hashes filters
+ */
+export async function createUnifiedCuratedReactionWebhook() {
+  // Ensure we use production URL, not localhost
+  // Force production URL for webhooks - localhost won't work
+  const baseUrl = process.env.WEBHOOK_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || "https://depthcaster.vercel.app";
+  const webhookUrl = `${baseUrl}/api/webhooks`;
+  const webhookName = "curated-reactions-unified";
+  
+  // Validate URL is not localhost
+  if (webhookUrl.includes("localhost") || webhookUrl.includes("127.0.0.1")) {
+    throw new Error(`Invalid webhook URL: ${webhookUrl}. Webhooks must use a public URL. Set WEBHOOK_BASE_URL or NEXT_PUBLIC_APP_URL environment variable.`);
+  }
+  
+  console.log(`[Webhook] Using webhook URL: ${webhookUrl}`);
+
+  // Get all curated cast hashes
+  const allCuratedHashes = await getAllCuratedCastHashes();
+  
+  if (allCuratedHashes.length === 0) {
+    console.log("[Webhook] No curated casts found, skipping reaction webhook creation");
+    return null;
+  }
+
+  // Also include all reply hashes so we can capture reactions to replies in curated threads
+  const existingReplyRows = await db
+    .select({ replyCastHash: castReplies.replyCastHash })
+    .from(castReplies);
+
+  const existingReplyHashes = Array.from(
+    new Set(
+      existingReplyRows
+        .map((row) => row.replyCastHash)
+        .filter((hash): hash is string => Boolean(hash))
+    )
+  );
+
+  // Combine all target hashes (curated casts + replies)
+  const targetHashes = Array.from(
+    new Set([
+      ...allCuratedHashes,
+      ...existingReplyHashes,
+    ])
+  );
+
+  console.log(
+    `[Webhook] Building reaction subscription with ${targetHashes.length} target_hashes (${allCuratedHashes.length} curated, ${existingReplyHashes.length} replies)`
+  );
+  console.log(`[Webhook] Sample hashes:`, targetHashes.slice(0, 3));
+
+  // Check if unified webhook already exists
+  const existingWebhook = await db
+    .select()
+    .from(webhooks)
+    .where(eq(webhooks.type, "curated-reaction"))
+    .limit(1);
+
+  const subscription = {
+    "reaction.created": {
+      target_cast_hashes: targetHashes,
+    },
+    "reaction.deleted": {
+      target_cast_hashes: targetHashes,
+    },
+  };
+
+  const configPayload = {
+    curatedCastHashes: allCuratedHashes,
+    replyHashes: existingReplyHashes,
+  };
+
+  console.log(`[Webhook] Reaction subscription structure:`, JSON.stringify({
+    subscription: subscription,
+  }, null, 2));
+
+  let neynarWebhookId: string | undefined;
+  let webhookResult: any = null;
+
+  if (existingWebhook.length > 0) {
+    // Update existing webhook with all current curated casts
+    const existing = existingWebhook[0];
+    try {
+      webhookResult = await neynarClient.updateWebhook({
+        webhookId: existing.neynarWebhookId,
+        name: webhookName,
+        url: webhookUrl,
+        subscription,
+      });
+      neynarWebhookId = existing.neynarWebhookId;
+
+      const webhookData = (webhookResult as any).webhook || webhookResult;
+      const secrets = webhookData?.secrets || [];
+      let secret = null;
+      if (secrets.length > 0) {
+        const secretObj = secrets[0];
+        secret = secretObj?.value || secretObj?.secret || (typeof secretObj === 'string' ? secretObj : null);
+      }
+
+      await db
+        .update(webhooks)
+        .set({
+          config: configPayload,
+          url: webhookUrl,
+          secret: secret || existing.secret,
+          updatedAt: new Date(),
+        })
+        .where(eq(webhooks.id, existing.id));
+      
+      console.log(`[Webhook] Updated unified reaction webhook with ${allCuratedHashes.length} curated casts`);
+    } catch (error: any) {
+      console.error("Error updating unified curated reaction webhook:", error);
+      console.error("Error details:", {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+        webhookId: existing.neynarWebhookId,
+        subscription,
+        targetHashesCount: targetHashes.length,
+        sampleHashes: targetHashes.slice(0, 3),
+      });
+      
+      // If webhook not found, delete and recreate
+      if (error?.response?.data?.code === "InvalidField" || error?.response?.data?.message?.includes("not found")) {
+        console.log(`[Webhook] Webhook not found, deleting and recreating...`);
+        try {
+          await neynarClient.deleteWebhook({ webhookId: existing.neynarWebhookId });
+        } catch (deleteError: any) {
+          console.error(`[Webhook] Error deleting invalid webhook:`, deleteError);
+        }
+        // Fall through to create new webhook - set webhookResult to null
+        webhookResult = null;
+      } else {
+        throw error;
+      }
+    }
+  }
+  
+  // Create new webhook (either first time or after deleting invalid one)
+  if (!webhookResult) {
+    // Create new unified webhook
+    try {
+      console.log(`[Webhook] Creating new reaction webhook...`);
+      webhookResult = await neynarClient.publishWebhook({
+        name: webhookName,
+        url: webhookUrl,
+        subscription,
+      });
+      neynarWebhookId = (webhookResult.webhook as any).webhook_id || (webhookResult as any).webhook_id;
+
+      if (!neynarWebhookId) {
+        throw new Error("Failed to get webhook ID from Neynar response");
+      }
+
+      const webhookData = (webhookResult as any).webhook || webhookResult;
+      const secrets = webhookData?.secrets || [];
+      let secret = null;
+      if (secrets.length > 0) {
+        const secretObj = secrets[0];
+        secret = secretObj?.value || secretObj?.secret || (typeof secretObj === 'string' ? secretObj : null);
+      }
+
+      await db.insert(webhooks).values({
+        neynarWebhookId,
+        type: "curated-reaction",
+        config: configPayload,
+        url: webhookUrl,
+        secret,
+      });
+      
+      console.log(`[Webhook] Created unified reaction webhook with ${allCuratedHashes.length} curated casts`);
+    } catch (error: any) {
+      console.error("Error creating unified curated reaction webhook:", error);
+      console.error("Error details:", {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+        subscription,
+        targetHashesCount: targetHashes.length,
+        sampleHashes: targetHashes.slice(0, 3),
+      });
+      throw error;
+    }
+  }
+
+  return { neynarWebhookId, webhookResult };
+}
+
+/**
+ * Refresh unified reaction webhook with current curated casts
+ */
+export async function refreshUnifiedCuratedReactionWebhook() {
+  try {
+    await createUnifiedCuratedReactionWebhook();
+    console.log("[Webhook] Successfully refreshed unified reaction webhook");
+  } catch (error: any) {
+    console.error("[Webhook] Error refreshing unified reaction webhook:", error);
+    throw error;
+  }
+}
+
+/**
  * Refresh both unified webhooks with current curated casts
  */
 export async function refreshUnifiedCuratedWebhooks() {
   try {
     await createUnifiedCuratedReplyWebhook();
     await createUnifiedCuratedQuoteWebhook();
+    await createUnifiedCuratedReactionWebhook();
     console.log("[Webhook] Successfully refreshed unified curated webhooks");
   } catch (error: any) {
     console.error("[Webhook] Error refreshing unified curated webhooks:", error);
