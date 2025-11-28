@@ -579,6 +579,23 @@ export async function POST(request: NextRequest) {
         // Don't fail curation if notification check fails
       }
 
+      // Notify existing curators about new curation
+      try {
+        const { notifyCuratorsAboutNewCuration } = await import("@/lib/notifications");
+        const castDataForNotification = finalCastData || castData;
+        notifyCuratorsAboutNewCuration(
+          castHash,
+          castDataForNotification,
+          curatorFid
+        ).catch((error) => {
+          console.error(`[Curate] Error notifying existing curators about new curation:`, error);
+          // Don't fail curation if notification fails
+        });
+      } catch (error) {
+        console.error(`[Curate] Error notifying existing curators:`, error);
+        // Don't fail curation if notification fails
+      }
+
       return NextResponse.json({ 
         success: true, 
         curation: curationResult[0] 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { neynarClient } from "@/lib/neynar";
-import { ReactionType } from "@neynar/nodejs-sdk/build/api";
+import { ReactionType, LookupCastConversationTypeEnum } from "@neynar/nodejs-sdk/build/api";
 import { trackCuratedCastInteraction } from "@/lib/interactions";
 import { db } from "@/lib/db";
 import { curatedCasts, curatedCastInteractions } from "@/lib/schema";
@@ -42,6 +42,44 @@ export async function POST(request: NextRequest) {
         trackCuratedCastInteraction(target, interactionType, userFid).catch((error) => {
           console.error("Error tracking reaction interaction:", error);
         });
+        
+        // Notify curators about the interaction
+        try {
+          const { findOriginalCuratedCast } = await import("@/lib/interactions");
+          const { notifyCuratorsAboutInteraction } = await import("@/lib/notifications");
+          const curatedCastHash = await findOriginalCuratedCast(target);
+          
+          if (curatedCastHash) {
+            // Fetch cast data for notification
+            try {
+              const castResponse = await neynarClient.lookupCastConversation({
+                identifier: target,
+                type: LookupCastConversationTypeEnum.Hash,
+                replyDepth: 0,
+                includeChronologicalParentCasts: false,
+              });
+              
+              const castData = castResponse.conversation?.cast;
+              if (castData) {
+                notifyCuratorsAboutInteraction(
+                  curatedCastHash,
+                  castData,
+                  interactionType,
+                  userFid
+                ).catch((error) => {
+                  console.error(`[Reaction API] Error notifying curators about ${interactionType}:`, error);
+                  // Don't fail reaction if notification fails
+                });
+              }
+            } catch (error) {
+              console.error(`[Reaction API] Error fetching cast data for notification:`, error);
+              // Don't fail reaction if cast fetch fails
+            }
+          }
+        } catch (error) {
+          console.error(`[Reaction API] Error notifying curators:`, error);
+          // Don't fail reaction if notification fails
+        }
       }
     }
 

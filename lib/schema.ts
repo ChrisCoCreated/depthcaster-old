@@ -154,7 +154,7 @@ export const curatedCastInteractions = pgTable("curated_cast_interactions", {
 export const userNotifications = pgTable("user_notifications", {
   id: uuid("id").defaultRandom().primaryKey(),
   userFid: bigint("user_fid", { mode: "number" }).notNull().references(() => users.fid),
-  type: text("type").notNull(), // 'cast.created'
+  type: text("type").notNull(), // 'cast.created', 'curated.quality_reply', 'curated.curated', 'curated.liked', 'curated.recast'
   castHash: text("cast_hash").notNull(),
   castData: jsonb("cast_data").notNull(),
   authorFid: bigint("author_fid", { mode: "number" }).notNull(),

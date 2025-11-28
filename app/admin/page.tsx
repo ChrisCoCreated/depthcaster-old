@@ -199,6 +199,12 @@ export default function AdminPage() {
             >
               Curators Leaderboard
             </Link>
+            <Link
+              href="/admin/quality"
+              className="block px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-center"
+            >
+              Quality Range Filter
+            </Link>
           </div>
         </div>
 

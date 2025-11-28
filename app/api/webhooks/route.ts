@@ -270,6 +270,20 @@ export async function POST(request: NextRequest) {
                     })
                     .where(eq(castReplies.replyCastHash, hash));
                   console.log(`[Webhook] Quality analysis completed for quote cast ${hash}: score=${result.qualityScore}, category=${result.category}`);
+                  
+                  // Notify curators if quality score meets threshold
+                  if (result.qualityScore !== undefined) {
+                    const { notifyCuratorsAboutQualityReply } = await import("@/lib/notifications");
+                    notifyCuratorsAboutQualityReply(
+                      quotedCastHash,
+                      hash,
+                      castData,
+                      result.qualityScore
+                    ).catch((error) => {
+                      console.error(`[Webhook] Error notifying curators about quality quote ${hash}:`, error);
+                      // Don't fail if notification fails
+                    });
+                  }
                 } catch (error: any) {
                   console.error(`[Webhook] Error updating quality analysis for quote cast ${hash}:`, error.message);
                 }
@@ -415,6 +429,20 @@ export async function POST(request: NextRequest) {
                   })
                   .where(eq(castReplies.replyCastHash, hash));
                 console.log(`[Webhook] Quality analysis completed for reply ${hash}: score=${result.qualityScore}, category=${result.category}`);
+                
+                // Notify curators if quality score meets threshold
+                if (result.qualityScore !== undefined) {
+                  const { notifyCuratorsAboutQualityReply } = await import("@/lib/notifications");
+                  notifyCuratorsAboutQualityReply(
+                    curatedCastHash,
+                    hash,
+                    castData,
+                    result.qualityScore
+                  ).catch((error) => {
+                    console.error(`[Webhook] Error notifying curators about quality reply ${hash}:`, error);
+                    // Don't fail if notification fails
+                  });
+                }
               } catch (error: any) {
                 console.error(`[Webhook] Error updating quality analysis for reply ${hash}:`, error.message);
               }

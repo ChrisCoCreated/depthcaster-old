@@ -149,18 +149,25 @@ export async function GET(request: NextRequest) {
         const timestamp = notif.createdAt instanceof Date 
           ? notif.createdAt.toISOString()
           : new Date(notif.createdAt).toISOString();
+        
+        // Handle curated cast notification types
+        const notificationType = notif.type || "cast.created";
+        const isCuratedNotification = notificationType.startsWith("curated.");
+        
         return {
           object: "notification",
-          type: "cast.created",
+          type: notificationType,
           fid: notif.userFid,
           timestamp,
           most_recent_timestamp: timestamp, // Add for display compatibility
           cast: castData,
+          castHash: notif.castHash, // Include castHash for curated notifications
+          castData: castData, // Include castData for curated notifications
           actor: {
             fid: notif.authorFid,
-            username: castData.author?.username,
-            display_name: castData.author?.display_name,
-            pfp_url: castData.author?.pfp_url,
+            username: castData?.author?.username || castData?.author?.display_name,
+            display_name: castData?.author?.display_name || castData?.author?.username,
+            pfp_url: castData?.author?.pfp_url,
           },
           seen: notif.isRead, // Include seen status
         };

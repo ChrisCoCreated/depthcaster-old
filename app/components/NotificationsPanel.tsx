@@ -147,12 +147,27 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
         return "💭";
       case "cast.created":
         return "👀";
+      case "curated.quality_reply":
+        return "⭐";
+      case "curated.curated":
+        return "✨";
+      case "curated.liked":
+        return "❤️";
+      case "curated.recast":
+        return "🔄";
       default:
         return "🔔";
     }
   };
 
   const getNotificationLink = (notification: Notification): string | null => {
+    const notif = notification as any;
+    
+    // For curated cast notifications, use castHash from notification data
+    if (notif.castHash) {
+      return `/cast/${notif.castHash}`;
+    }
+    
     if (notification.cast?.hash) {
       return `/cast/${notification.cast.hash}`;
     }
@@ -183,12 +198,16 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
     } else if (notif.actor) {
       // For webhook notifications (cast.created), use actor field
       users = [notif.actor];
+    } else if (notif.castData?.author) {
+      // For curated cast notifications, use castData.author
+      users = [notif.castData.author];
     }
     
     const firstUser = users[0];
     const firstName = (firstUser as any)?.username || 
                      (firstUser as any)?.user?.username || 
                      (firstUser as any)?.display_name ||
+                     (firstUser as any)?.displayName ||
                      "Someone";
 
     switch (type) {
@@ -214,6 +233,14 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
         return `${firstName} and ${count - 1} others quoted your cast`;
       case "cast.created":
         return `${firstName} posted a new cast`;
+      case "curated.quality_reply":
+        return `${firstName} posted a quality reply to your curated cast`;
+      case "curated.curated":
+        return `${firstName} also curated this cast`;
+      case "curated.liked":
+        return `${firstName} liked your curated cast`;
+      case "curated.recast":
+        return `${firstName} recast your curated cast`;
       default:
         return "New notification";
     }
