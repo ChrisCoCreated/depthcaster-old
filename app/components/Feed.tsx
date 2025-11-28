@@ -84,6 +84,13 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   const [showFavoriteDropdown, setShowFavoriteDropdown] = useState(false);
   const [loadingPacks, setLoadingPacks] = useState(false);
   const [preferencesVersion, setPreferencesVersion] = useState(0);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("selectedCategory");
+      return saved || null;
+    }
+    return null;
+  });
   const [showScrollToTop, setShowScrollToTop] = useState(false);
   const [selectedCuratorFids, setSelectedCuratorFids] = useState<number[]>([]);
   const [my37PackId, setMy37PackId] = useState<string | null>(null);
@@ -362,6 +369,9 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       if (feedType === "curated") {
         params.append("curatorFids", selectedCuratorFids.join(","));
         params.append("sortBy", sortBy);
+        if (selectedCategory) {
+          params.append("category", selectedCategory);
+        }
       }
       // Don't add packIds for my-37 feed - API will fetch it directly
       // Don't automatically apply packIds from localStorage to prevent feed switching
@@ -404,7 +414,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
     } finally {
       setLoading(false);
     }
-  }, [feedType, viewerFid, selectedCuratorFids, my37PackId, my37HasUsers, sortBy]);
+  }, [feedType, viewerFid, selectedCuratorFids, selectedCategory, my37PackId, my37HasUsers, sortBy]);
 
   const fetchMy37PackId = useCallback(async () => {
     if (!viewerFid) return;
@@ -436,6 +446,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   const prevFeedTypeRef = useRef<string>("");
   const lastFetchedFeedTypeRef = useRef<string>(""); // Track what we actually fetched
   const prevSortByRef = useRef<string>("");
+  const prevSelectedCategoryRef = useRef<string | null>(null);
   const prevMy37PackIdRef = useRef<string | null>(null);
   const prevSelectedCuratorFidsRef = useRef<number[]>([]);
   const fetchingRef = useRef<boolean>(false);
@@ -609,6 +620,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
     const prevFidsSorted = [...prevSelectedCuratorFidsRef.current].sort();
     const currentFidsSorted = [...selectedCuratorFids].sort();
     const curatorFidsChanged = JSON.stringify(prevFidsSorted) !== JSON.stringify(currentFidsSorted);
+    const categoryChanged = prevSelectedCategoryRef.current !== selectedCategory;
     const isInitialMount = !hasInitialFetchRef.current;
     // Check if we need to fetch based on what we last fetched, not what we last saw
     const needsFetch = lastFetchedFeedTypeRef.current !== feedType || 
@@ -663,6 +675,18 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       prevSelectedCuratorFidsRef.current = [...selectedCuratorFids];
     }
     
+    // Clear feed when category changes (for curated feed)
+    if (categoryChanged && feedType === "curated" && !isInitialMount) {
+      setCasts([]);
+      setCursor(null);
+      setHasMore(false);
+      castsRestoredRef.current = false; // Reset casts restoration when category filter changes
+      prevSelectedCategoryRef.current = selectedCategory;
+    } else if (categoryChanged) {
+      // Update category ref even if not curated
+      prevSelectedCategoryRef.current = selectedCategory;
+    }
+    
     // Only fetch if not my-37 feed, or if my-37 feed has saved pack with users
     if (feedType !== "my-37" || (my37PackId && my37HasUsers)) {
       // Check if we already restored casts from saved state
@@ -674,17 +698,18 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       const actualFeedTypeChanged = lastFetchedFeedTypeRef.current !== feedType && lastFetchedFeedTypeRef.current !== "";
       
       // Always fetch when feed type changes, or on initial mount, or when sortBy changes for curated
-      // or when curator FIDs change for curated feed
+      // or when curator FIDs change for curated feed, or when category changes for curated feed
       // Also check if we haven't fetched this feed type yet (defensive check)
       // Skip fetch if we just restored casts and state is not stale, BUT only if feed type hasn't changed
       const condition1 = isInitialMount;
       const condition2 = feedTypeChanged || actualFeedTypeChanged;
       const condition3 = (sortByChanged && feedType === "curated" && !isInitialMount);
       const condition4 = (curatorFidsChanged && feedType === "curated" && !isInitialMount);
-      const condition5 = (lastFetchedFeedTypeRef.current !== feedType && !fetchingRef.current);
-      const fetchCondition = condition1 || condition2 || condition3 || condition4 || condition5;
+      const condition5 = (categoryChanged && feedType === "curated" && !isInitialMount);
+      const condition6 = (lastFetchedFeedTypeRef.current !== feedType && !fetchingRef.current);
+      const fetchCondition = condition1 || condition2 || condition3 || condition4 || condition5 || condition6;
       // Only skip if we have restored casts AND state is not stale AND feed type hasn't actually changed
-      const skipCondition = hasRestoredCasts && !isStateStaleResult && !actualFeedTypeChanged && !curatorFidsChanged;
+      const skipCondition = hasRestoredCasts && !isStateStaleResult && !actualFeedTypeChanged && !curatorFidsChanged && !categoryChanged;
       const shouldFetch = fetchCondition && !skipCondition;
       
       if (shouldFetch && !fetchingRef.current) {
@@ -713,7 +738,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       // Update ref even if we can't fetch (e.g., my-37 without pack)
       prevFeedTypeRef.current = feedType;
     }
-  }, [feedType, selectedCuratorFids, preferencesVersion, fetchFeed, my37PackId, my37HasUsers, viewerFid, fetchMy37PackId, sortBy, casts.length]);
+  }, [feedType, selectedCuratorFids, selectedCategory, preferencesVersion, fetchFeed, my37PackId, my37HasUsers, viewerFid, fetchMy37PackId, sortBy, casts.length]);
   
   // Separate effect for when My 37 pack becomes ready
   useEffect(() => {
@@ -1242,6 +1267,59 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
           />
         )}
         
+        {/* Category filter - shown only for curated feed */}
+        {feedType === "curated" && (
+          <div className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-black">
+            <div className="px-3 sm:px-4 py-2 sm:py-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-gray-600 dark:text-gray-400">Category:</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCategory(null);
+                    localStorage.removeItem("selectedCategory");
+                  }}
+                  className={`px-2.5 py-1 text-xs rounded transition-colors ${
+                    !selectedCategory
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                  }`}
+                >
+                  All
+                </button>
+                {[
+                  { value: "crypto-critique", label: "Crypto Critique" },
+                  { value: "platform-analysis", label: "Platform Analysis" },
+                  { value: "creator-economy", label: "Creator Economy" },
+                  { value: "art-culture", label: "Art & Culture" },
+                  { value: "ai-philosophy", label: "AI Philosophy" },
+                  { value: "community-culture", label: "Community Culture" },
+                  { value: "life-reflection", label: "Life Reflection" },
+                  { value: "market-news", label: "Market News" },
+                  { value: "playful", label: "Playful" },
+                  { value: "other", label: "Other" },
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => {
+                      setSelectedCategory(option.value);
+                      localStorage.setItem("selectedCategory", option.value);
+                    }}
+                    className={`px-2.5 py-1 text-xs rounded transition-colors ${
+                      selectedCategory === option.value
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Sort options - shown only for curated feed */}
         {feedType === "curated" && (
           <div className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-black">

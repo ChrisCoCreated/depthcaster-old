@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
       : [];
     const hideRecasts = searchParams.get("hideRecasts") === "true";
     const sortBy = searchParams.get("sortBy") || "recent-reply"; // "recently-curated" | "time-of-cast" | "recent-reply"
+    const category = searchParams.get("category") || undefined; // Category filter
 
     // Fetch user preferences for bot filtering
     let userBotPreferences: { hideBots?: boolean; hiddenBots?: string[] } = {};
@@ -87,6 +88,7 @@ export async function GET(request: NextRequest) {
       providerMetadata,
       hideRecasts,
       sortBy, // Include sortBy in cache key so different sorts get different cache entries
+      category, // Include category in cache key
     });
 
     // Check cache first
@@ -365,7 +367,12 @@ export async function GET(request: NextRequest) {
             castTimestamp: curatedCasts.castCreatedAt,
           })
           .from(curatedCasts)
-          .where(inArray(curatedCasts.castHash, castHashArray)),
+          .where(
+            and(
+              inArray(curatedCasts.castHash, castHashArray),
+              category ? eq(curatedCasts.category, category) : undefined
+            )
+          ),
       ]);
 
       const phase1Time = Date.now() - phase1Start;
