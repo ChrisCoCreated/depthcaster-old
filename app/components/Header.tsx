@@ -5,6 +5,7 @@ import { NotificationBell } from "./NotificationBell";
 import { HeaderUserSearch } from "./HeaderUserSearch";
 import { FeedbackModal } from "./FeedbackModal";
 import Link from "next/link";
+import Image from "next/image";
 import { useState, useEffect, useCallback } from "react";
 import { AvatarImage } from "./AvatarImage";
 import { analytics } from "@/lib/analytics";
@@ -443,15 +444,25 @@ export function Header() {
         </div>
       )}
       <header 
-        className="sticky top-0 z-[200] bg-white/80 dark:bg-black/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800" 
+        className="sticky top-0 z-[200] bg-white/80 dark:bg-black/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 overflow-x-hidden w-full" 
         style={{ 
           paddingTop: 'env(safe-area-inset-top, 0px)' 
         }}
       >
         <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between">
-          <div className="flex flex-col">
+          <div className="flex flex-col min-w-0">
             <div className="flex items-center gap-2">
-              <Link href="/" className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
+              <Link href="/" className="block sm:hidden">
+                <Image
+                  src="/icon-192x192.webp"
+                  alt="Depthcaster"
+                  width={32}
+                  height={32}
+                  className="w-8 h-8"
+                  priority
+                />
+              </Link>
+              <Link href="/" className="hidden sm:block text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
                 Depthcaster
               </Link>
               <span className="text-[10px] sm:text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider">
@@ -463,7 +474,7 @@ export function Header() {
             </p>
           </div>
           
-          <div className="flex items-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             {user ? (
               <>
                 <HeaderUserSearch />
