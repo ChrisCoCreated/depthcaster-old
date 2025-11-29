@@ -162,12 +162,48 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
 
   const getNotificationLink = (notification: Notification): string | null => {
     const notif = notification as any;
-    
-    // For curated cast notifications, use castHash from notification data
+
+    const type = String(notification.type);
+
+    // Curated notifications should prefer conversation view when possible
+    if (type === "curated.quality_reply") {
+      const replyHash: string | undefined =
+        notif.castHash || notification.cast?.hash;
+
+      // Try to infer curated/root cast hash from parent_hash or stored metadata
+      const curatedHash: string | undefined =
+        notification.cast?.parent_hash ||
+        notif.castData?._rootCastHash ||
+        notif.castData?._curatedCastHash;
+
+      if (curatedHash && replyHash) {
+        return `/conversation/${curatedHash}?replyHash=${replyHash}`;
+      }
+
+      // Fallback: open reply in conversation view directly
+      if (replyHash) {
+        return `/conversation/${replyHash}`;
+      }
+    }
+
+    if (
+      type === "curated.curated" ||
+      type === "curated.liked" ||
+      type === "curated.recast"
+    ) {
+      // For these types, castHash should be the curated/root cast hash
+      const curatedHash: string | undefined =
+        notif.castHash || notification.cast?.hash;
+      if (curatedHash) {
+        return `/conversation/${curatedHash}`;
+      }
+    }
+
+    // Default behavior – fall back to cast/profile routes
     if (notif.castHash) {
       return `/cast/${notif.castHash}`;
     }
-    
+
     if (notification.cast?.hash) {
       return `/cast/${notification.cast.hash}`;
     }
@@ -340,7 +376,14 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
                 );
 
                 return link ? (
-                  <Link key={index} href={link} onClick={() => markAsSeen()}>
+                  <Link
+                    key={index}
+                    href={link}
+                    onClick={() => {
+                      markAsSeen();
+                      onClose();
+                    }}
+                  >
                     {content}
                   </Link>
                 ) : (

@@ -67,7 +67,45 @@ export function NotificationBell() {
     }
   };
 
-  const getNotificationUrl = (notification: { cast?: { hash?: string }; follows?: Array<{ fid?: number; user?: { fid?: number } }>; [key: string]: unknown }): string => {
+  const getNotificationUrl = (notification: {
+    type: string;
+    cast?: { hash?: string; parent_hash?: string };
+    castHash?: string;
+    castData?: { _rootCastHash?: string; _curatedCastHash?: string; parent_hash?: string };
+    follows?: Array<{ fid?: number; user?: { fid?: number } }>;
+    [key: string]: unknown;
+  }): string => {
+    const type = String(notification.type);
+
+    // Curated notifications: prefer conversation view
+    if (type === "curated.quality_reply") {
+      const replyHash = notification.castHash || notification.cast?.hash;
+      const curatedHash =
+        notification.cast?.parent_hash ||
+        notification.castData?._rootCastHash ||
+        notification.castData?._curatedCastHash;
+
+      if (curatedHash && replyHash) {
+        return `/conversation/${curatedHash}?replyHash=${replyHash}`;
+      }
+      if (replyHash) {
+        return `/conversation/${replyHash}`;
+      }
+    }
+
+    if (
+      type === "curated.curated" ||
+      type === "curated.liked" ||
+      type === "curated.recast"
+    ) {
+      const curatedHash =
+        notification.castHash || notification.cast?.hash;
+      if (curatedHash) {
+        return `/conversation/${curatedHash}`;
+      }
+    }
+
+    // Default behavior – fall back to cast/profile routes
     if (notification.cast?.hash) {
       return `/cast/${notification.cast.hash}`;
     }

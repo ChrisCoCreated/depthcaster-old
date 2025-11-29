@@ -53,6 +53,9 @@ export async function analyzeCastQuality(
 
   const prompt = `Analyze this Farcaster cast and provide:
 1. A quality score from 0-100 based on depth, clarity, and value
+   - Extremely low-effort content (single emoji, "gm", "lol", "👀", or similar) should be scored between 0 and 5
+   - Very short acknowledgements that add only a tiny bit of signal (e.g. "that's fair", "ok true") should typically be scored between 5 and 20
+   - Reserve scores above 60 for posts with substantial thought, argument, reflection, or original perspective
 2. A category from this list: crypto-critique, platform-analysis, creator-economy, art-culture, ai-philosophy, community-culture, life-reflection, market-news, playful, other
 
 Category descriptions:
@@ -139,6 +142,21 @@ Respond in JSON format:
     }
     if (isNaN(qualityScore) || qualityScore < 0) qualityScore = 0;
     if (qualityScore > 100) qualityScore = 100;
+
+    // Apply simple heuristic adjustments for ultra-short / emoji-only content
+    const normalizedText = castText.trim();
+    const textLength = normalizedText.length;
+    const wordCount = normalizedText === "" ? 0 : normalizedText.split(/\s+/).length;
+    const hasLettersOrDigits = /[A-Za-z0-9]/.test(normalizedText);
+
+    // Emoji-only or essentially content-free messages should always be very low quality
+    if (!hasLettersOrDigits && textLength > 0) {
+      qualityScore = Math.min(qualityScore, 5);
+    }
+    // Very short acknowledgements should be capped to keep separation from high-effort posts
+    else if (wordCount > 0 && wordCount <= 3 && textLength <= 30) {
+      qualityScore = Math.min(qualityScore, 20);
+    }
 
     // Validate and normalize category
     let category = result.category?.toLowerCase().trim();
