@@ -14,12 +14,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Run incremental sync asynchronously - don't block the response
-    syncUserReactionsIncremental(fid).catch((error) => {
-      console.error(`[Incremental Reaction Sync API] Error syncing reactions for user ${fid}:`, error);
-    });
+    syncUserReactionsIncremental(fid)
+      .then((stats) => {
+        console.log(`[Incremental Reaction Sync API] Completed for user ${fid}:`, stats);
+      })
+      .catch((error) => {
+        console.error(`[Incremental Reaction Sync API] Error syncing reactions for user ${fid}:`, error);
+      });
 
-    // Return immediately with success
-    return NextResponse.json({ success: true, message: "Incremental sync started" });
+    // Return immediately with success and informative message
+    return NextResponse.json({ 
+      success: true, 
+      message: "Checking for new reactions since last sync...",
+      status: "processing"
+    });
   } catch (error: any) {
     console.error("Error starting incremental reaction sync:", error);
     return NextResponse.json(
