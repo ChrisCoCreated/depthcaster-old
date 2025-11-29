@@ -121,6 +121,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
     }
     return true;
   });
+  const [allCurators, setAllCurators] = useState<Curator[]>([]);
   
   // Use shared activity monitor for curated feed refresh
   const { isUserActive, isTabVisible } = useActivityMonitor({
@@ -246,7 +247,9 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
         const response = await fetch("/api/curators");
         if (response.ok) {
           const data = await response.json();
-          const allCuratorFids = (data.curators || []).map((c: Curator) => c.fid);
+          const curatorsList = (data.curators || []) as Curator[];
+          setAllCurators(curatorsList);
+          const allCuratorFids = curatorsList.map((c: Curator) => c.fid);
           const excludedFids = getExcludedCurators();
           
           // Select all curators except excluded ones
@@ -1299,12 +1302,45 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
                 </span>
                 {!filtersExpanded && (
                   <span className="text-xs text-gray-500 dark:text-gray-400">
-                    {[
-                      selectedCategory && `Category: ${selectedCategory}`,
-                      minQualityScore !== 60 && `Quality: ${minQualityScore}`,
-                      sortBy !== "recent-reply" && `Sort: ${sortBy === "recently-curated" ? "Recently Curated" : sortBy === "time-of-cast" ? "Time of Cast" : "Recent Reply"}`,
-                      compressedView && "Compressed",
-                    ].filter(Boolean).join(" • ") || "All filters"}
+                    {(() => {
+                      const parts: string[] = [];
+                      
+                      // Show curators
+                      if (selectedCuratorFids.length === 0) {
+                        parts.push("Curators: None");
+                      } else if (selectedCuratorFids.length === allCurators.length) {
+                        parts.push("Curators: All");
+                      } else if (selectedCuratorFids.length <= 3) {
+                        const selectedNames = selectedCuratorFids
+                          .map(fid => {
+                            const curator = allCurators.find(c => c.fid === fid);
+                            return curator?.displayName || curator?.username || `@user${fid}`;
+                          })
+                          .join(", ");
+                        parts.push(`Curators: ${selectedNames}`);
+                      } else {
+                        parts.push(`Curators: ${selectedCuratorFids.length} selected`);
+                      }
+                      
+                      // Show category if selected
+                      if (selectedCategory) {
+                        const categoryLabel = [
+                          { value: "crypto-critique", label: "Crypto Critique" },
+                          { value: "platform-analysis", label: "Platform Analysis" },
+                          { value: "creator-economy", label: "Creator Economy" },
+                          { value: "art-culture", label: "Art & Culture" },
+                          { value: "ai-philosophy", label: "AI Philosophy" },
+                          { value: "community-culture", label: "Community Culture" },
+                          { value: "life-reflection", label: "Life Reflection" },
+                          { value: "market-news", label: "Market News" },
+                          { value: "playful", label: "Playful" },
+                          { value: "other", label: "Other" },
+                        ].find(c => c.value === selectedCategory)?.label || selectedCategory;
+                        parts.push(`Category: ${categoryLabel}`);
+                      }
+                      
+                      return parts.join(" • ");
+                    })()}
                   </span>
                 )}
               </div>
@@ -1323,31 +1359,79 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
             {/* Filters content - collapsible */}
             {filtersExpanded && (
               <div className="px-3 sm:px-4 pb-3 sm:pb-4 space-y-3 border-t border-gray-200 dark:border-gray-800">
-                {/* Compressed view toggle */}
-                <div className="flex items-center justify-between py-2">
-                  <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                    Compressed View
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newValue = !compressedView;
-                      setCompressedView(newValue);
-                      localStorage.setItem("curatedFeedCompressedView", String(newValue));
-                      window.dispatchEvent(new CustomEvent("feedPreferencesChanged"));
-                    }}
-                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                      compressedView
-                        ? "bg-blue-600"
-                        : "bg-gray-200 dark:bg-gray-700"
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                        compressedView ? "translate-x-5" : "translate-x-0.5"
-                      }`}
+                {/* Curator filter - inline - FIRST */}
+                <div>
+                  <div className="[&>div]:border-0 [&>div]:border-t [&>div]:border-gray-200 [&>div]:dark:border-gray-800">
+                    <CuratorFilterInline
+                      selectedCuratorFids={selectedCuratorFids}
+                      onCuratorFidsChange={(fids) => {
+                        setSelectedCuratorFids(fids);
+                        localStorage.setItem("selectedCuratorFids", JSON.stringify(fids));
+                        
+                        fetch("/api/curators")
+                          .then(res => res.json())
+                          .then(data => {
+                            const curatorsList = (data.curators || []) as Curator[];
+                            setAllCurators(curatorsList);
+                            const allCuratorFids = curatorsList.map((c: Curator) => c.fid);
+                            const excludedFids = allCuratorFids.filter((fid: number) => !fids.includes(fid));
+                            localStorage.setItem("excludedCuratorFids", JSON.stringify(excludedFids));
+                          })
+                          .catch(err => console.error("Failed to update excluded curators:", err));
+                        
+                        analytics.trackFeedCuratorFilter(feedType, fids);
+                      }}
                     />
-                  </button>
+                  </div>
+                </div>
+
+                {/* Category filter - compact - SECOND */}
+                <div className="space-y-1.5">
+                  <span className="text-xs text-gray-600 dark:text-gray-400">Category:</span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedCategory(null);
+                        localStorage.removeItem("selectedCategory");
+                      }}
+                      className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                        !selectedCategory
+                          ? "bg-blue-600 text-white"
+                          : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                      }`}
+                    >
+                      All
+                    </button>
+                    {[
+                      { value: "crypto-critique", label: "Crypto Critique" },
+                      { value: "platform-analysis", label: "Platform Analysis" },
+                      { value: "creator-economy", label: "Creator Economy" },
+                      { value: "art-culture", label: "Art & Culture" },
+                      { value: "ai-philosophy", label: "AI Philosophy" },
+                      { value: "community-culture", label: "Community Culture" },
+                      { value: "life-reflection", label: "Life Reflection" },
+                      { value: "market-news", label: "Market News" },
+                      { value: "playful", label: "Playful" },
+                      { value: "other", label: "Other" },
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => {
+                          setSelectedCategory(option.value);
+                          localStorage.setItem("selectedCategory", option.value);
+                        }}
+                        className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                          selectedCategory === option.value
+                            ? "bg-blue-600 text-white"
+                            : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Sort by - horizontal compact */}
@@ -1403,77 +1487,31 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
                   </div>
                 </div>
 
-                {/* Category filter - compact */}
-                <div className="space-y-1.5">
-                  <span className="text-xs text-gray-600 dark:text-gray-400">Category:</span>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedCategory(null);
-                        localStorage.removeItem("selectedCategory");
-                      }}
-                      className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                        !selectedCategory
-                          ? "bg-blue-600 text-white"
-                          : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                {/* Compressed view toggle - LAST */}
+                <div className="flex items-center justify-between py-2">
+                  <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                    Compressed View
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newValue = !compressedView;
+                      setCompressedView(newValue);
+                      localStorage.setItem("curatedFeedCompressedView", String(newValue));
+                      window.dispatchEvent(new CustomEvent("feedPreferencesChanged"));
+                    }}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                      compressedView
+                        ? "bg-blue-600"
+                        : "bg-gray-200 dark:bg-gray-700"
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                        compressedView ? "translate-x-5" : "translate-x-0.5"
                       }`}
-                    >
-                      All
-                    </button>
-                    {[
-                      { value: "crypto-critique", label: "Crypto Critique" },
-                      { value: "platform-analysis", label: "Platform Analysis" },
-                      { value: "creator-economy", label: "Creator Economy" },
-                      { value: "art-culture", label: "Art & Culture" },
-                      { value: "ai-philosophy", label: "AI Philosophy" },
-                      { value: "community-culture", label: "Community Culture" },
-                      { value: "life-reflection", label: "Life Reflection" },
-                      { value: "market-news", label: "Market News" },
-                      { value: "playful", label: "Playful" },
-                      { value: "other", label: "Other" },
-                    ].map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => {
-                          setSelectedCategory(option.value);
-                          localStorage.setItem("selectedCategory", option.value);
-                        }}
-                        className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                          selectedCategory === option.value
-                            ? "bg-blue-600 text-white"
-                            : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
-                        }`}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Curator filter - inline */}
-                <div className="pt-1">
-                  <div className="[&>div]:border-0 [&>div]:border-t [&>div]:border-gray-200 [&>div]:dark:border-gray-800">
-                    <CuratorFilterInline
-                      selectedCuratorFids={selectedCuratorFids}
-                      onCuratorFidsChange={(fids) => {
-                        setSelectedCuratorFids(fids);
-                        localStorage.setItem("selectedCuratorFids", JSON.stringify(fids));
-                        
-                        fetch("/api/curators")
-                          .then(res => res.json())
-                          .then(data => {
-                            const allCuratorFids = (data.curators || []).map((c: Curator) => c.fid);
-                            const excludedFids = allCuratorFids.filter((fid: number) => !fids.includes(fid));
-                            localStorage.setItem("excludedCuratorFids", JSON.stringify(excludedFids));
-                          })
-                          .catch(err => console.error("Failed to update excluded curators:", err));
-                        
-                        analytics.trackFeedCuratorFilter(feedType, fids);
-                      }}
                     />
-                  </div>
+                  </button>
                 </div>
               </div>
             )}
