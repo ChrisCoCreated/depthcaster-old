@@ -139,17 +139,28 @@ export function OnboardingFlow() {
   if (!showOnboarding) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+    <div 
+      className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4"
+      style={{ 
+        paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 0.75rem)',
+        paddingTop: 'max(env(safe-area-inset-top, 0px), 0.75rem)'
+      }}
+    >
+      <div 
+        className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-md w-full overflow-y-auto"
+        style={{ 
+          maxHeight: 'calc(90vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))'
+        }}
+      >
         {/* Header */}
-        <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+        <div className="p-4 sm:p-6 border-b border-gray-200 dark:border-gray-800">
           <div className="flex items-center justify-between mb-2">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
               {currentStepData.title}
             </h2>
             <button
               onClick={handleSkip}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-2 -mr-2"
               aria-label="Skip onboarding"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -173,43 +184,50 @@ export function OnboardingFlow() {
         </div>
 
         {/* Content */}
-        <div className="p-6">
-          <div className="min-h-[200px] flex flex-col justify-center">
+        <div className="p-4 sm:p-6">
+          <div className="min-h-[150px] sm:min-h-[200px] flex flex-col justify-center">
             {currentStepData.content}
           </div>
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-gray-200 dark:border-gray-800 flex items-center justify-between gap-4">
-          {currentStep > 0 && (
-            <button
-              onClick={() => setCurrentStep((prev) => prev - 1)}
-              className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-            >
-              Back
-            </button>
-          )}
-          <div className="flex-1" />
-          <div className="flex gap-2">
-            {currentStepData.action && (
+        <div 
+          className="p-4 sm:p-6 border-t border-gray-200 dark:border-gray-800"
+          style={{ 
+            paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 1rem)'
+          }}
+        >
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-4">
+            {currentStep > 0 && (
               <button
-                onClick={currentStepData.action.onClick}
-                disabled={isRequestingPermission || isGranted}
-                className={`px-4 py-2 rounded-lg transition-colors ${
-                  currentStepData.action.variant === "primary"
-                    ? "bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-                    : "bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600"
-                }`}
+                onClick={() => setCurrentStep((prev) => prev - 1)}
+                className="px-4 py-3 sm:py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors min-h-[44px] sm:min-h-0"
               >
-                {currentStepData.action.label}
+                Back
               </button>
             )}
-            <button
-              onClick={handleNext}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              {isLastStep ? "Get Started" : "Next"}
-            </button>
+            <div className="flex-1" />
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-2 w-full sm:w-auto">
+              {currentStepData.action && (
+                <button
+                  onClick={currentStepData.action.onClick}
+                  disabled={isRequestingPermission || isGranted}
+                  className={`px-4 py-3 sm:py-2 rounded-lg transition-colors min-h-[44px] sm:min-h-0 ${
+                    currentStepData.action.variant === "primary"
+                      ? "bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                      : "bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600"
+                  }`}
+                >
+                  {currentStepData.action.label}
+                </button>
+              )}
+              <button
+                onClick={handleNext}
+                className="px-4 py-3 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors min-h-[44px] sm:min-h-0"
+              >
+                {isLastStep ? "Get Started" : "Next"}
+              </button>
+            </div>
           </div>
         </div>
       </div>
