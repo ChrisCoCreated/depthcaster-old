@@ -13,10 +13,48 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Handle CAIP-2 format URLs (blockchain transaction identifiers)
+    // Format: eip155:CHAIN_ID/tx:0x... or eip155:CHAIN_ID/erc721:0x...
+    let targetUrlString = url;
+    const caip2Match = url.match(/^eip155:(\d+)\/(tx|erc721):(0x[a-fA-F0-9]+)$/i);
+    if (caip2Match) {
+      const chainId = parseInt(caip2Match[1]);
+      const txHash = caip2Match[3];
+      
+      // Convert to explorer URL based on chain ID
+      let explorerUrl: string | null = null;
+      switch (chainId) {
+        case 1: // Ethereum Mainnet
+          explorerUrl = `https://etherscan.io/tx/${txHash}`;
+          break;
+        case 8453: // Base
+          explorerUrl = `https://basescan.org/tx/${txHash}`;
+          break;
+        case 10: // Optimism
+          explorerUrl = `https://optimistic.etherscan.io/tx/${txHash}`;
+          break;
+        case 42161: // Arbitrum
+          explorerUrl = `https://arbiscan.io/tx/${txHash}`;
+          break;
+        case 137: // Polygon
+          explorerUrl = `https://polygonscan.com/tx/${txHash}`;
+          break;
+        default:
+          // Unknown chain - return 404
+          return NextResponse.json(
+            { error: "Unsupported blockchain network" },
+            { status: 404 }
+          );
+      }
+      
+      // Use the converted explorer URL
+      targetUrlString = explorerUrl;
+    }
+
     // Validate URL
     let targetUrl: URL;
     try {
-      targetUrl = new URL(url);
+      targetUrl = new URL(targetUrlString);
     } catch {
       return NextResponse.json(
         { error: "Invalid URL" },
@@ -29,7 +67,7 @@ export async function GET(request: NextRequest) {
     // Use Twitter oEmbed API for Twitter/X links (unfurl.js doesn't handle oEmbed directly)
     if (isXEmbed) {
       try {
-        const oembedUrl = `https://publish.twitter.com/oembed?url=${encodeURIComponent(targetUrl.toString())}`;
+        const oembedUrl = `https://publish.twitter.com/oembed?url=${encodeURIComponent(targetUrlString)}`;
         
         const oembedResponse = await fetch(oembedUrl, {
           headers: {
@@ -79,7 +117,7 @@ export async function GET(request: NextRequest) {
           }
           
           const result = {
-            url: targetUrl.toString(),
+            url: targetUrlString,
             title: oembedData.title || `${oembedData.author_name ? `Tweet by ${oembedData.author_name}` : 'Tweet'}`,
             description: description,
             image: imageUrl,
@@ -89,13 +127,13 @@ export async function GET(request: NextRequest) {
           
           return NextResponse.json(result);
         }
-      } catch (error) {
+      } catch {
         // Fall through to unfurl.js
       }
     }
 
     // Use unfurl.js for all other URLs
-    const result = await unfurl(targetUrl.toString());
+    const result = await unfurl(targetUrlString);
     
     // Filter out Twitter emoji SVGs if present
     let imageUrl = result.open_graph?.images?.[0]?.url || result.twitter_card?.images?.[0]?.url || null;
@@ -104,19 +142,20 @@ export async function GET(request: NextRequest) {
     }
     
     const response = {
-      url: targetUrl.toString(),
+      url: targetUrlString,
       title: result.open_graph?.title || result.twitter_card?.title || result.title || null,
       description: result.open_graph?.description || result.twitter_card?.description || result.description || null,
       image: imageUrl,
     };
     
     return NextResponse.json(response);
-  } catch (error: any) {
+  } catch (error) {
     // Check if it's an expected error from unfurl.js
-    const isHttpStatusError = error.message?.includes('BAD_HTTP_STATUS') || 
-                              error.message?.includes('http status not OK');
-    const isContentTypeError = error.message?.includes('WRONG_CONTENT_TYPE') ||
-                               error.message?.includes('Wrong content type header');
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const isHttpStatusError = errorMessage?.includes('BAD_HTTP_STATUS') || 
+                              errorMessage?.includes('http status not OK');
+    const isContentTypeError = errorMessage?.includes('WRONG_CONTENT_TYPE') ||
+                               errorMessage?.includes('Wrong content type header');
     
     if (isHttpStatusError || isContentTypeError) {
       // Don't log expected errors - they're normal for:
@@ -130,9 +169,11 @@ export async function GET(request: NextRequest) {
     
     // Only log unexpected errors
     console.error("[Metadata API] Metadata fetch error:", error);
-    console.error("[Metadata API] Error stack:", error.stack);
+    if (error instanceof Error) {
+      console.error("[Metadata API] Error stack:", error.stack);
+    }
     return NextResponse.json(
-      { error: error.message || "Failed to fetch metadata" },
+      { error: errorMessage || "Failed to fetch metadata" },
       { status: 500 }
     );
   }
