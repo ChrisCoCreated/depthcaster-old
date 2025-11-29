@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { sql } from "drizzle-orm";
+import { sql, eq } from "drizzle-orm";
 import {
   users,
   userRoles,
@@ -21,6 +21,7 @@ import {
   feedViewSessionsDaily,
   castViewsDaily,
   pageViewsDaily,
+  apiCallStats,
 } from "@/lib/schema";
 import { isAdmin, getUserRoles } from "@/lib/roles";
 
@@ -306,6 +307,16 @@ export async function GET(request: NextRequest) {
       SELECT 'cast_views', min(created_at) FROM cast_views
     `);
 
+    // API Call Statistics
+    const reactionFetchStats = await db
+      .select()
+      .from(apiCallStats)
+      .where(eq(apiCallStats.callType, "reaction_fetch"))
+      .limit(1);
+
+    const reactionFetchCount = reactionFetchStats[0]?.count || 0;
+    const reactionFetchCUCost = reactionFetchCount * 2; // 2 CU per fetch
+
     return NextResponse.json({
       period,
       users: {
@@ -400,6 +411,13 @@ export async function GET(request: NextRequest) {
         tableSizes: Array.isArray(tableSizes) ? tableSizes : (tableSizes as any).rows || [],
         rowCounts: Array.isArray(rowCounts) ? rowCounts : (rowCounts as any).rows || [],
         oldestRecords: Array.isArray(oldestRecords) ? oldestRecords : (oldestRecords as any).rows || [],
+      },
+      apiCalls: {
+        reactionFetches: {
+          count: reactionFetchCount,
+          cuCost: reactionFetchCUCost,
+          cuCostPerCall: 2,
+        },
       },
     });
   } catch (error: unknown) {

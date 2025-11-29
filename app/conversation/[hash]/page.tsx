@@ -3,7 +3,7 @@
 import { ConversationView } from "../../components/ConversationView";
 import { CastComposer } from "../../components/CastComposer";
 import { useNeynarContext } from "@neynar/react";
-import { use, useEffect, useRef, useCallback } from "react";
+import { use, useEffect, useRef, useCallback, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 export default function ConversationPage({
@@ -16,7 +16,45 @@ export default function ConversationPage({
   const searchParams = useSearchParams();
   const composerRef = useRef<HTMLDivElement>(null);
   const shouldAutoFocus = searchParams.get("reply") === "true";
-  const focusReplyHash = searchParams.get("replyHash") || undefined;
+  const searchParamsFocusReplyHash = searchParams.get("replyHash") || undefined;
+  
+  // State for checking if hash is a reply
+  const [isCheckingReply, setIsCheckingReply] = useState(true);
+  const [actualCastHash, setActualCastHash] = useState<string>(hash);
+  const [focusReplyHash, setFocusReplyHash] = useState<string | undefined>(searchParamsFocusReplyHash);
+
+  // Check if the hash is a reply in a curated thread
+  useEffect(() => {
+    const checkIfReply = async () => {
+      try {
+        const response = await fetch(`/api/conversation/check-reply?hash=${encodeURIComponent(hash)}`);
+        if (!response.ok) {
+          // If check fails, use hash as-is
+          setActualCastHash(hash);
+          setIsCheckingReply(false);
+          return;
+        }
+
+        const data = await response.json();
+        if (data.isReply && data.rootCastHash) {
+          // It's a reply - use root cast hash and focus on the original reply
+          setActualCastHash(data.rootCastHash);
+          setFocusReplyHash(data.originalHash);
+        } else {
+          // Not a reply, use hash as-is
+          setActualCastHash(hash);
+        }
+      } catch (error) {
+        console.error("Error checking if hash is reply:", error);
+        // On error, use hash as-is
+        setActualCastHash(hash);
+      } finally {
+        setIsCheckingReply(false);
+      }
+    };
+
+    checkIfReply();
+  }, [hash]);
 
   const focusReplyBox = useCallback(() => {
     if (composerRef.current && user) {
@@ -37,14 +75,27 @@ export default function ConversationPage({
     }
   }, [shouldAutoFocus, focusReplyBox]);
 
+  // Show loading state while checking if hash is a reply
+  if (isCheckingReply) {
+    return (
+      <div className="min-h-screen">
+        <main className="max-w-7xl mx-auto px-4 py-8">
+          <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+            Loading conversation...
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen">
       <main className="max-w-7xl mx-auto px-4 py-8">
-        <ConversationView castHash={hash} viewerFid={user?.fid} focusReplyHash={focusReplyHash} onFocusReply={focusReplyBox} />
+        <ConversationView castHash={actualCastHash} viewerFid={user?.fid} focusReplyHash={focusReplyHash} onFocusReply={focusReplyBox} />
         
         {user && (
           <div ref={composerRef} className="mt-8">
-            <CastComposer parentHash={hash} />
+            <CastComposer parentHash={actualCastHash} />
           </div>
         )}
       </main>

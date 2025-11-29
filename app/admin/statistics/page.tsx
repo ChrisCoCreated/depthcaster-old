@@ -70,6 +70,13 @@ interface Statistics {
     rowCounts: Array<{ table_name: string; row_count: number }>;
     oldestRecords: Array<{ table_name: string; oldest_record: string }>;
   };
+  apiCalls: {
+    reactionFetches: {
+      count: number;
+      cuCost: number;
+      cuCostPerCall: number;
+    };
+  };
 }
 
 export default function AdminStatisticsPage() {
@@ -622,7 +629,43 @@ export default function AdminStatisticsPage() {
           </div>
         ) : (
           <div className="text-center py-12">
-            <div className="text-red-600">Failed to load statistics</div>
+            <div className="text-red-600">Failed to load statistics            </div>
+          </div>
+        )}
+
+        {/* API Call Statistics */}
+        {statistics && (
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+              API Call Statistics
+            </h2>
+            <div className="space-y-4">
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Reaction Fetches (Incremental Sync)
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Total Fetches</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                      {formatNumber(statistics.apiCalls.reactionFetches.count)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">CU Cost per Fetch</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                      {statistics.apiCalls.reactionFetches.cuCostPerCall}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Total CU Cost</p>
+                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                      {formatNumber(statistics.apiCalls.reactionFetches.cuCost)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>

@@ -13,8 +13,21 @@ export function SessionTracker() {
 
   useEffect(() => {
     // Initialize session tracking
-    if (shouldStartNewSession()) {
+    const isNewSession = shouldStartNewSession();
+    if (isNewSession) {
       startSession();
+      
+      // Trigger incremental reaction sync on new session (non-blocking)
+      if (user?.fid) {
+        fetch("/api/user/reactions/sync-incremental", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fid: user.fid }),
+        }).catch((error) => {
+          // Silently fail - reaction sync shouldn't break the app
+          console.error("Failed to trigger incremental reaction sync:", error);
+        });
+      }
     }
 
     // Track page view
@@ -51,6 +64,18 @@ export function SessionTracker() {
         if (shouldStartNewSession()) {
           endSession();
           startSession();
+          
+          // Trigger incremental reaction sync on new session (non-blocking)
+          if (user?.fid) {
+            fetch("/api/user/reactions/sync-incremental", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ fid: user.fid }),
+            }).catch((error) => {
+              // Silently fail - reaction sync shouldn't break the app
+              console.error("Failed to trigger incremental reaction sync:", error);
+            });
+          }
         } else {
           trackSessionTime();
         }
@@ -70,7 +95,7 @@ export function SessionTracker() {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
-  }, [pathname]);
+  }, [pathname, user?.fid]);
 
   return null;
 }

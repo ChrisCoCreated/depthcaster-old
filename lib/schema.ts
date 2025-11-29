@@ -339,6 +339,31 @@ export const pageViewsDaily = pgTable("page_views_daily", {
   pagePathIdx: index("page_views_daily_page_path_idx").on(table.pagePath),
 }));
 
+export const userReactionSyncState = pgTable("user_reaction_sync_state", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userFid: bigint("user_fid", { mode: "number" }).notNull().references(() => users.fid, { onDelete: "cascade" }),
+  lastReactionHash: text("last_reaction_hash"), // Hash of the most recent reaction found in Neynar
+  lastReactionType: text("last_reaction_type"), // 'like' or 'recast'
+  lastReactionTimestamp: timestamp("last_reaction_timestamp"), // Timestamp of the last reaction (if available from Neynar)
+  lastCheckedAt: timestamp("last_checked_at").defaultNow().notNull(), // When we last ran the incremental check
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  userFidUnique: uniqueIndex("user_reaction_sync_state_user_fid_unique").on(table.userFid),
+  lastCheckedAtIdx: index("user_reaction_sync_state_last_checked_at_idx").on(table.lastCheckedAt),
+}));
+
+export const apiCallStats = pgTable("api_call_stats", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  callType: text("call_type").notNull(), // 'reaction_fetch' for incremental sync reaction fetches
+  count: integer("count").default(0).notNull(), // Total count of calls
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  callTypeUnique: uniqueIndex("api_call_stats_call_type_unique").on(table.callType),
+  callTypeIdx: index("api_call_stats_call_type_idx").on(table.callType),
+}));
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type CuratorPack = typeof curatorPacks.$inferSelect;
@@ -383,4 +408,8 @@ export type CastViewDaily = typeof castViewsDaily.$inferSelect;
 export type NewCastViewDaily = typeof castViewsDaily.$inferInsert;
 export type PageViewDaily = typeof pageViewsDaily.$inferSelect;
 export type NewPageViewDaily = typeof pageViewsDaily.$inferInsert;
+export type UserReactionSyncState = typeof userReactionSyncState.$inferSelect;
+export type NewUserReactionSyncState = typeof userReactionSyncState.$inferInsert;
+export type ApiCallStat = typeof apiCallStats.$inferSelect;
+export type NewApiCallStat = typeof apiCallStats.$inferInsert;
 
