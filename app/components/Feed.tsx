@@ -111,7 +111,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   const [my37PackId, setMy37PackId] = useState<string | null>(null);
   const [my37HasUsers, setMy37HasUsers] = useState<boolean>(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
-  const [sortBy, setSortBy] = useState<"recently-curated" | "time-of-cast" | "recent-reply">("recent-reply");
+  const [sortBy, setSortBy] = useState<"recently-curated" | "time-of-cast" | "recent-reply" | "quality">("recent-reply");
   const sortByInitializedRef = useRef(false);
   const [hasNewCuratedCasts, setHasNewCuratedCasts] = useState(false);
   const curatorFilterInitializedRef = useRef(false);
@@ -133,7 +133,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   useEffect(() => {
     if (!sortByInitializedRef.current) {
       const saved = localStorage.getItem("curatedFeedSortBy");
-      if (saved === "recently-curated" || saved === "time-of-cast" || saved === "recent-reply") {
+      if (saved === "recently-curated" || saved === "time-of-cast" || saved === "recent-reply" || saved === "quality") {
         setSortBy(saved);
       }
       sortByInitializedRef.current = true;
@@ -1456,6 +1456,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
                       { value: "recently-curated", label: "Recently Curated" },
                       { value: "time-of-cast", label: "Time of Cast" },
                       { value: "recent-reply", label: "Recent Reply" },
+                      { value: "quality", label: "Quality" },
                     ].map((option) => (
                       <button
                         key={option.value}

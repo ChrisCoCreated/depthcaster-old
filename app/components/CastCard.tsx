@@ -770,7 +770,7 @@ interface CastCardProps {
   feedType?: string; // 'curated' or other feed types
   isReply?: boolean; // Whether this is a reply (for delete functionality)
   curatorInfo?: { fid: number; username?: string; display_name?: string; pfp_url?: string };
-  sortBy?: "recently-curated" | "time-of-cast" | "recent-reply";
+  sortBy?: "recently-curated" | "time-of-cast" | "recent-reply" | "quality";
   disableClick?: boolean; // Disable click navigation (e.g., when in conversation view)
   rootCastHash?: string; // Root cast hash for the current page/view
   compressedView?: boolean; // Whether to show compressed view (collapsed text)

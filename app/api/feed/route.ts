@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
       ? searchParams.get("curatorFids")!.split(",").map(fid => parseInt(fid)).filter(fid => !isNaN(fid))
       : [];
     const hideRecasts = searchParams.get("hideRecasts") === "true";
-    const sortBy = searchParams.get("sortBy") || "recent-reply"; // "recently-curated" | "time-of-cast" | "recent-reply"
+    const sortBy = searchParams.get("sortBy") || "recent-reply"; // "recently-curated" | "time-of-cast" | "recent-reply" | "quality"
     const category = searchParams.get("category") || undefined; // Category filter
     const minQualityScore = searchParams.get("minQualityScore")
       ? parseInt(searchParams.get("minQualityScore")!)
@@ -364,11 +364,13 @@ export async function GET(request: NextRequest) {
           .where(inArray(castReplies.curatedCastHash, castHashArray))
           .groupBy(castReplies.curatedCastHash),
         // Get cast hashes with minimal data (use indexed castCreatedAt column)
+        // Include qualityScore for quality sorting
         db
           .select({
             castHash: curatedCasts.castHash,
             createdAt: curatedCasts.createdAt,
             castTimestamp: curatedCasts.castCreatedAt,
+            qualityScore: curatedCasts.qualityScore,
           })
           .from(curatedCasts)
           .where(
@@ -402,36 +404,75 @@ export async function GET(request: NextRequest) {
         return fallback;
       };
 
-      // Add sort times and sort in memory (lightweight - no JSONB)
-      const castsWithSortTimes = castsForSorting.map((cast) => {
-        let sortTime: Date;
-        if (sortBy === "recently-curated") {
-          sortTime = toDate(firstCurationTimeMap.get(cast.castHash), cast.createdAt);
-        } else if (sortBy === "time-of-cast") {
-          sortTime = toDate(cast.castTimestamp, cast.createdAt);
-        } else {
-          // recent-reply
-          const fallback = toDate(cast.castTimestamp, cast.createdAt);
-          sortTime = toDate(latestReplyTimeMap.get(cast.castHash), fallback);
+      // Add sort times/values and sort in memory (lightweight - no JSONB)
+      let castsWithSortTimes: Array<{ castHash: string; createdAt: Date; castTimestamp: Date | null; qualityScore: number | null; sortTime: Date }>;
+      let filteredCasts: Array<{ castHash: string; createdAt: Date; castTimestamp: Date | null; qualityScore: number | null; sortTime: Date }>;
+      
+      if (sortBy === "quality") {
+        // Sort by quality score (descending, nulls last)
+        const sortStart = Date.now();
+        castsForSorting.sort((a, b) => {
+          const aScore = a.qualityScore ?? -1;
+          const bScore = b.qualityScore ?? -1;
+          if (aScore === -1 && bScore === -1) return 0;
+          if (aScore === -1) return 1;
+          if (bScore === -1) return -1;
+          return bScore - aScore; // Descending (highest quality first)
+        });
+        const sortTime = Date.now() - sortStart;
+        console.log(`[Feed] In-memory sort by quality: ${sortTime}ms for ${castsForSorting.length} casts`);
+
+        // Map to include sortTime (using createdAt as fallback for cursor compatibility)
+        castsWithSortTimes = castsForSorting.map((cast) => ({ ...cast, sortTime: cast.createdAt }));
+
+        // Apply cursor filter if provided (for quality, cursor is a quality score)
+        filteredCasts = castsWithSortTimes;
+        if (cursor) {
+          try {
+            const cursorScore = parseFloat(cursor);
+            if (!isNaN(cursorScore)) {
+              filteredCasts = castsWithSortTimes.filter((cast) => {
+                const score = cast.qualityScore ?? -1;
+                return score < cursorScore;
+              });
+              console.log(`[Feed] Quality cursor filter: ${castsWithSortTimes.length} -> ${filteredCasts.length} casts`);
+            }
+          } catch {
+            // Invalid cursor, ignore it
+          }
         }
-        return { ...cast, sortTime };
-      });
+      } else {
+        // Time-based sorting
+        castsWithSortTimes = castsForSorting.map((cast) => {
+          let sortTime: Date;
+          if (sortBy === "recently-curated") {
+            sortTime = toDate(firstCurationTimeMap.get(cast.castHash), cast.createdAt);
+          } else if (sortBy === "time-of-cast") {
+            sortTime = toDate(cast.castTimestamp, cast.createdAt);
+          } else {
+            // recent-reply
+            const fallback = toDate(cast.castTimestamp, cast.createdAt);
+            sortTime = toDate(latestReplyTimeMap.get(cast.castHash), fallback);
+          }
+          return { ...cast, sortTime };
+        });
 
-      // Sort by sortTime
-      const sortStart = Date.now();
-      castsWithSortTimes.sort((a, b) => b.sortTime.getTime() - a.sortTime.getTime());
-      const sortTime = Date.now() - sortStart;
-      console.log(`[Feed] In-memory sort: ${sortTime}ms for ${castsWithSortTimes.length} casts`);
+        // Sort by sortTime
+        const sortStart = Date.now();
+        castsWithSortTimes.sort((a, b) => b.sortTime.getTime() - a.sortTime.getTime());
+        const sortTime = Date.now() - sortStart;
+        console.log(`[Feed] In-memory sort: ${sortTime}ms for ${castsWithSortTimes.length} casts`);
 
-      // Apply cursor filter if provided
-      let filteredCasts = castsWithSortTimes;
-      if (cursor) {
-        try {
-          const cursorDate = new Date(cursor);
-          filteredCasts = castsWithSortTimes.filter((cast) => cast.sortTime < cursorDate);
-          console.log(`[Feed] Cursor filter: ${castsWithSortTimes.length} -> ${filteredCasts.length} casts`);
-        } catch {
-          // Invalid cursor, ignore it
+        // Apply cursor filter if provided
+        filteredCasts = castsWithSortTimes;
+        if (cursor) {
+          try {
+            const cursorDate = new Date(cursor);
+            filteredCasts = castsWithSortTimes.filter((cast) => cast.sortTime < cursorDate);
+            console.log(`[Feed] Cursor filter: ${castsWithSortTimes.length} -> ${filteredCasts.length} casts`);
+          } catch {
+            // Invalid cursor, ignore it
+          }
         }
       }
 
@@ -681,14 +722,21 @@ export async function GET(request: NextRequest) {
           return cast;
         });
       
-      // Set cursor to the last item's sort time based on sortBy mode
+      // Set cursor to the last item's sort value based on sortBy mode
       // Limit to requested limit after all filtering and sorting
       const finalResults = filteredResults.slice(0, limit);
       if (filteredResults.length > limit) {
-        // Get the sort time from the filtered casts (which we already computed)
+        // Get the sort value from the filtered casts (which we already computed)
         const lastFilteredCast = filteredCasts[limit - 1];
         if (lastFilteredCast) {
-          neynarCursor = lastFilteredCast.sortTime.toISOString();
+          if (sortBy === "quality") {
+            // For quality sorting, use quality score as cursor
+            const qualityScore = lastFilteredCast.qualityScore;
+            neynarCursor = qualityScore !== null && qualityScore !== undefined ? qualityScore.toString() : null;
+          } else {
+            // For time-based sorting, use timestamp as cursor
+            neynarCursor = lastFilteredCast.sortTime.toISOString();
+          }
         } else {
           neynarCursor = null;
         }
