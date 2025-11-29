@@ -259,21 +259,25 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>,
 interface MinimalReplyCardProps {
   reply: any;
   rootCast: Cast;
+  compressedView?: boolean;
 }
 
-function MinimalReplyCard({ reply, rootCast }: MinimalReplyCardProps) {
-  return <ClusterReplyRow reply={reply} rootHash={rootCast?.hash} />;
+function MinimalReplyCard({ reply, rootCast, compressedView = true }: MinimalReplyCardProps) {
+  return <ClusterReplyRow reply={reply} rootHash={rootCast?.hash} compressedView={compressedView} />;
 }
 
 interface ClusterReplyRowProps {
   reply: any;
   rootHash?: string;
+  compressedView?: boolean;
 }
 
-function ClusterReplyRow({ reply, rootHash }: ClusterReplyRowProps) {
+function ClusterReplyRow({ reply, rootHash, compressedView = true }: ClusterReplyRowProps) {
   const replyAuthor = reply.author;
   const replyText = (reply.text || "").trim();
-  const truncatedText = replyText.length > 220 ? `${replyText.slice(0, 220)}…` : replyText;
+  const displayText = compressedView 
+    ? (replyText.length > 220 ? `${replyText.slice(0, 220)}…` : replyText)
+    : replyText;
   const replyHash = reply.hash;
   const href = replyHash && rootHash ? `/conversation/${rootHash}?replyHash=${replyHash}` : undefined;
 
@@ -291,9 +295,9 @@ function ClusterReplyRow({ reply, rootHash }: ClusterReplyRowProps) {
         <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
           {replyAuthor?.display_name || replyAuthor?.username || "Unknown"}
         </div>
-        {truncatedText && (
-          <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2 mt-0.5">
-            {truncatedText}
+        {displayText && (
+          <p className={`text-sm text-gray-700 dark:text-gray-300 mt-0.5 ${compressedView ? 'line-clamp-2' : 'whitespace-pre-wrap break-words'}`}>
+            {displayText}
           </p>
         )}
       </div>
@@ -2964,6 +2968,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                               key={item.reply.hash || `${cluster.id}-${idx}`}
                               reply={item.reply}
                               rootHash={cast.hash}
+                              compressedView={localCompressedView}
                             />
                                 )
                               )}
