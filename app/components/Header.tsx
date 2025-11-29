@@ -463,12 +463,14 @@ export function Header() {
                   unoptimized
                 />
               </Link>
-              <Link href="/" className="hidden sm:block text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
-                Depthcaster
-              </Link>
-              <span className="text-[10px] sm:text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider">
-                Alpha
-              </span>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2">
+                <Link href="/" className="text-xs sm:text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 leading-tight">
+                  Depthcaster
+                </Link>
+                <span className="text-[10px] sm:text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                  Alpha
+                </span>
+              </div>
             </div>
             <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-0.5 hidden sm:block">
               Depth is a sharp insight, a strong contribution to a topic, a display of intellect and thoughtfulness
