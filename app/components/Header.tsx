@@ -452,7 +452,7 @@ export function Header() {
         <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between">
           <div className="flex flex-col min-w-0">
             <div className="flex items-center gap-2">
-              <Link href="/" className="block sm:hidden">
+              <Link href="/" className="block sm:hidden shrink-0">
                 <Image
                   src="/icon-192x192.webp"
                   alt="Depthcaster"
@@ -460,6 +460,7 @@ export function Header() {
                   height={32}
                   className="w-8 h-8"
                   priority
+                  unoptimized
                 />
               </Link>
               <Link href="/" className="hidden sm:block text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
@@ -474,7 +475,7 @@ export function Header() {
             </p>
           </div>
           
-          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+          <div className="flex items-center gap-1 sm:gap-2 min-w-0">
             {user ? (
               <>
                 <HeaderUserSearch />
@@ -568,7 +569,7 @@ export function Header() {
                 <Link
                   href={`/profile/${user.fid}`}
                   onClick={() => analytics.trackNavProfile(user.fid)}
-                  className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors"
+                  className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-4 py-1.5 sm:py-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors"
                 >
                   <AvatarImage
                     src={user.pfp_url}
