@@ -1376,8 +1376,8 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
             {filtersExpanded && (
               <div className="px-3 sm:px-4 pb-3 sm:pb-4 space-y-3 border-t border-gray-200 dark:border-gray-800">
                 {/* Curator filter - inline - FIRST */}
-                <div>
-                  <div className="[&>div]:border-0 [&>div]:border-t [&>div]:border-gray-200 [&>div]:dark:border-gray-800">
+                <div className="-mx-3 sm:-mx-4">
+                  <div className="[&>div]:border-0 [&>div]:border-t [&>div]:border-gray-200 [&>div]:dark:border-gray-800 [&>div>button]:!px-0 [&>div>div]:!px-0 [&>div>div]:!sm:px-0">
                     <CuratorFilterInline
                       selectedCuratorFids={selectedCuratorFids}
                       onCuratorFidsChange={(fids) => {
