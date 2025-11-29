@@ -17,6 +17,13 @@ export async function POST(request: NextRequest) {
     const signer = await neynarClient.lookupSigner({ signerUuid });
     const userFid = signer.fid;
 
+    if (!userFid) {
+      return NextResponse.json(
+        { error: "Unable to determine user FID from signer" },
+        { status: 400 }
+      );
+    }
+
     // Use Neynar SDK's publishMute method
     const result = await neynarClient.publishMute({
       fid: userFid,
