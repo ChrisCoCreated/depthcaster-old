@@ -108,14 +108,19 @@ export async function GET(request: NextRequest) {
     if (sortBy === "recent-reply") {
       sortedReplies = relevantReplies;
     } else if (sortBy === "highest-quality-replies") {
-      // Database already sorted by qualityScore, but we need to handle nulls (put them last)
-      sortedReplies = [...relevantReplies].sort((a, b) => {
-        const aScore = a.qualityScore ?? -1;
-        const bScore = b.qualityScore ?? -1;
-        if (aScore === -1 && bScore === -1) return 0;
-        if (aScore === -1) return 1;
-        if (bScore === -1) return -1;
-        return bScore - aScore; // Descending (highest quality first)
+      // When sorting by quality, exclude null quality scores (they haven't been analyzed yet)
+      // and apply minQualityScore filter
+      const repliesWithQuality = relevantReplies.filter((reply) => {
+        const score = reply.qualityScore;
+        if (score === null || score === undefined) return false;
+        return score >= minQualityScore;
+      });
+      
+      // Sort by quality score (descending, highest first)
+      sortedReplies = repliesWithQuality.sort((a, b) => {
+        const aScore = a.qualityScore!;
+        const bScore = b.qualityScore!;
+        return bScore - aScore;
       });
     } else {
       // Highest engagement (default fallback)

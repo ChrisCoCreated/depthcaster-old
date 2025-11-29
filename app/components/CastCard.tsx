@@ -2878,6 +2878,33 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                     </div>
                   )}
                 </div>
+                {/* Quality filter buttons */}
+                {replySortBy === "highest-quality-replies" && (
+                  <div className="flex items-center gap-1">
+                    {[
+                      { value: 70, label: "70+" },
+                      { value: 60, label: "60+" },
+                      { value: 50, label: "50+" },
+                      { value: 0, label: "0" },
+                    ].map((filter) => (
+                      <button
+                        key={filter.value}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setReplyMinQuality(filter.value);
+                          localStorage.setItem("replyMinQuality", filter.value.toString());
+                        }}
+                        className={`px-1.5 py-0.5 text-xs rounded transition-colors ${
+                          replyMinQuality === filter.value
+                            ? "bg-blue-600 text-white"
+                            : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                        }`}
+                      >
+                        {filter.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {repliesLoading && (
                   <span className="text-xs text-gray-400 dark:text-gray-500">Loading...</span>
                 )}
