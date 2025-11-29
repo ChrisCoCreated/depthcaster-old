@@ -13,12 +13,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify signer ownership
+    // Verify signer ownership and get user FID
     const signer = await neynarClient.lookupSigner({ signerUuid });
     const userFid = signer.fid;
 
     // Make direct HTTP call to Neynar mute API
     // The SDK doesn't expose a mute method, so we call the API directly
+    // API expects: { fid: <your_fid>, muted_fid: <fid_to_mute> }
     const response = await fetch("https://api.neynar.com/v2/farcaster/mute", {
       method: "POST",
       headers: {
@@ -26,8 +27,8 @@ export async function POST(request: NextRequest) {
         "x-api-key": process.env.NEYNAR_API_KEY!,
       },
       body: JSON.stringify({
-        signer_uuid: signerUuid,
-        target_fid: parseInt(targetFid),
+        fid: userFid,
+        muted_fid: parseInt(targetFid),
       }),
     });
 

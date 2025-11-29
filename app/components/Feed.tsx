@@ -1503,7 +1503,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
 
                 {/* Compressed view toggle - LAST */}
                 <div className="flex items-center justify-between py-2">
-                  <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                  <span className="text-xs text-gray-600 dark:text-gray-400">
                     Compressed View
                   </span>
                   <button
