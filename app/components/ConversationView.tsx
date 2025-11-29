@@ -38,6 +38,22 @@ export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusR
   const router = useRouter();
   const [highlightedReply, setHighlightedReply] = useState<string | null>(null);
   const normalizedFocusHash = focusReplyHash?.toLowerCase() || null;
+  
+  // Quality filter state
+  const [minQualityScore, setMinQualityScore] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("minQualityScore");
+      return saved ? parseInt(saved, 10) : 60;
+    }
+    return 60;
+  });
+  const [qualityFilterEnabled, setQualityFilterEnabled] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("qualityFilterEnabled");
+      return saved !== null ? saved === "true" : true;
+    }
+    return true;
+  });
 
   // Check if a reply is a quote cast
   function isQuoteCast(reply: ThreadedReply): boolean {
@@ -57,6 +73,14 @@ export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusR
     return likes > 0 || recasts > 0 || replyCount > 0;
   }
 
+  // Check if a reply meets quality threshold
+  function meetsQualityThreshold(reply: ThreadedReply): boolean {
+    if (!qualityFilterEnabled) return true;
+    const qualityScore = (reply as any)._qualityScore;
+    if (qualityScore === null || qualityScore === undefined) return false;
+    return qualityScore >= minQualityScore;
+  }
+
   // Count all replies recursively (including nested)
   function countAllReplies(replies: ThreadedReply[]): number {
     let count = 0;
@@ -70,7 +94,7 @@ export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusR
     return count;
   }
 
-  // Recursively filter replies to hide those with no engagement (only when hideNoEngagement is true)
+  // Recursively filter replies to hide those with no engagement and/or low quality
   function filterReplies(replies: ThreadedReply[], hideNoEngagement: boolean): { visible: ThreadedReply[]; hidden: number } {
     const totalCount = countAllReplies(replies);
 
@@ -87,23 +111,34 @@ export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusR
         });
       }
 
-      // If not hiding no-engagement replies, show everything
-      if (!hideNoEngagement) {
-        return {
-          ...reply,
-          children: filteredChildren.length > 0 ? filteredChildren : undefined,
-        };
-      }
-
-      // When hiding no-engagement replies, filter based on engagement
+      // Check quality threshold
+      const meetsQuality = meetsQualityThreshold(reply);
+      
+      // Check engagement
       const hasEng = hasEngagement(reply);
       
-      // If no engagement and no children with engagement, hide it
-      if (!hasEng && filteredChildren.length === 0) {
+      // Determine if this reply should be shown
+      let shouldShow = true;
+      
+      // If quality filter is enabled, reply must meet quality threshold (unless it has children that do)
+      if (qualityFilterEnabled && !meetsQuality && filteredChildren.length === 0) {
+        shouldShow = false;
+      }
+      
+      // If hiding no-engagement replies, reply must have engagement (unless it has children that do)
+      if (hideNoEngagement && !hasEng && filteredChildren.length === 0) {
+        shouldShow = false;
+      }
+      
+      // If reply doesn't meet criteria but has children that do, show it to preserve the thread
+      if (!shouldShow && filteredChildren.length > 0) {
+        shouldShow = true;
+      }
+
+      if (!shouldShow) {
         return null;
       }
 
-      // Include if it has engagement or has children with engagement
       return {
         ...reply,
         children: filteredChildren.length > 0 ? filteredChildren : undefined,
@@ -512,41 +547,83 @@ export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusR
         <CastCard cast={rootCast} showThread={false} onUpdate={() => fetchConversation(true)} disableClick={true} rootCastHash={rootCast?.hash || castHash} />
       </div>
 
-      {/* Sort options */}
+      {/* Sort options and quality filter */}
       {replies.length > 0 && (
-        <div className="mt-4 px-4 py-2 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-          <span className="text-sm text-gray-600 dark:text-gray-400">Sort replies:</span>
-          <div className="flex gap-2">
+        <div className="mt-4 px-4 py-2 border-b border-gray-100 dark:border-gray-800">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm text-gray-600 dark:text-gray-400">Sort replies:</span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setSortBy("newest")}
+                className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                  sortBy === "newest"
+                    ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-medium"
+                    : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                }`}
+              >
+                Newest
+              </button>
+              <button
+                onClick={() => setSortBy("engagement")}
+                className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                  sortBy === "engagement"
+                    ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-medium"
+                    : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                }`}
+              >
+                Most Engagement
+              </button>
+              <button
+                onClick={() => setSortBy("quality")}
+                className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                  sortBy === "quality"
+                    ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-medium"
+                    : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                }`}
+              >
+                Quality
+              </button>
+            </div>
+          </div>
+          
+          {/* Quality filter controls */}
+          <div className="flex items-center gap-3 flex-wrap">
             <button
-              onClick={() => setSortBy("newest")}
+              onClick={() => {
+                const newValue = !qualityFilterEnabled;
+                setQualityFilterEnabled(newValue);
+                localStorage.setItem("qualityFilterEnabled", newValue.toString());
+              }}
               className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                sortBy === "newest"
+                qualityFilterEnabled
                   ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-medium"
                   : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
               }`}
             >
-              Newest
+              {qualityFilterEnabled ? `Q: ${minQualityScore}+` : "Q: 0"}
             </button>
-            <button
-              onClick={() => setSortBy("engagement")}
-              className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                sortBy === "engagement"
-                  ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-medium"
-                  : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-              }`}
-            >
-              Most Engagement
-            </button>
-            <button
-              onClick={() => setSortBy("quality")}
-              className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                sortBy === "quality"
-                  ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-medium"
-                  : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-              }`}
-            >
-              Quality
-            </button>
+            
+            {qualityFilterEnabled && (
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <span className="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">Min Quality:</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value={minQualityScore}
+                  onChange={(e) => {
+                    const newValue = parseInt(e.target.value, 10);
+                    setMinQualityScore(newValue);
+                    localStorage.setItem("minQualityScore", newValue.toString());
+                  }}
+                  className="flex-1 max-w-[120px]"
+                />
+                <span className="text-xs font-medium text-gray-700 dark:text-gray-300 min-w-10">
+                  {minQualityScore}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       )}
