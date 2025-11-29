@@ -7,6 +7,7 @@ import Link from "next/link";
 import { CloseFriendsPrompt } from "./CloseFriendsPrompt";
 import { My37Manager } from "./My37Manager";
 import { shouldHideCast, getFeedPreferences, FeedSettingsInline, CuratorFilterInline } from "./FeedSettings";
+import { AvatarImage } from "./AvatarImage";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { saveFeedState, getFeedState, isStateStale, throttle } from "@/lib/feedState";
 import { NeynarAuthButton } from "@neynar/react";
@@ -1296,52 +1297,61 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
               }}
               className="w-full px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between text-left hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
             >
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Filters & Options
                 </span>
                 {!filtersExpanded && (
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    {(() => {
-                      const parts: string[] = [];
-                      
-                      // Show curators
-                      if (selectedCuratorFids.length === 0) {
-                        parts.push("Curators: None");
-                      } else if (selectedCuratorFids.length === allCurators.length) {
-                        parts.push("Curators: All");
-                      } else if (selectedCuratorFids.length <= 3) {
-                        const selectedNames = selectedCuratorFids
-                          .map(fid => {
-                            const curator = allCurators.find(c => c.fid === fid);
-                            return curator?.displayName || curator?.username || `@user${fid}`;
-                          })
-                          .join(", ");
-                        parts.push(`Curators: ${selectedNames}`);
-                      } else {
-                        parts.push(`Curators: ${selectedCuratorFids.length} selected`);
-                      }
-                      
-                      // Show category if selected
-                      if (selectedCategory) {
-                        const categoryLabel = [
-                          { value: "crypto-critique", label: "Crypto Critique" },
-                          { value: "platform-analysis", label: "Platform Analysis" },
-                          { value: "creator-economy", label: "Creator Economy" },
-                          { value: "art-culture", label: "Art & Culture" },
-                          { value: "ai-philosophy", label: "AI Philosophy" },
-                          { value: "community-culture", label: "Community Culture" },
-                          { value: "life-reflection", label: "Life Reflection" },
-                          { value: "market-news", label: "Market News" },
-                          { value: "playful", label: "Playful" },
-                          { value: "other", label: "Other" },
-                        ].find(c => c.value === selectedCategory)?.label || selectedCategory;
-                        parts.push(`Category: ${categoryLabel}`);
-                      }
-                      
-                      return parts.join(" • ");
-                    })()}
-                  </span>
+                  <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
+                    {/* Curator avatars */}
+                    <div className="flex items-center gap-1 -space-x-1 flex-shrink-0">
+                      {selectedCuratorFids.length === 0 ? (
+                        <span className="text-xs text-gray-500 dark:text-gray-400">None</span>
+                      ) : selectedCuratorFids.length === allCurators.length ? (
+                        <span className="text-xs text-gray-500 dark:text-gray-400">All</span>
+                      ) : (
+                        selectedCuratorFids.slice(0, 5).map((fid) => {
+                          const curator = allCurators.find(c => c.fid === fid);
+                          return (
+                            <AvatarImage
+                              key={fid}
+                              src={curator?.pfpUrl || undefined}
+                              alt={curator?.displayName || curator?.username || `@user${fid}`}
+                              size={20}
+                              className="w-5 h-5 rounded-full border border-white dark:border-gray-800"
+                            />
+                          );
+                        })
+                      )}
+                      {selectedCuratorFids.length > 5 && (
+                        <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">
+                          +{selectedCuratorFids.length - 5}
+                        </span>
+                      )}
+                    </div>
+                    
+                    {/* Category */}
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-xs text-gray-500 dark:text-gray-400">•</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        {selectedCategory ? (() => {
+                          const categoryLabel = [
+                            { value: "crypto-critique", label: "Crypto Critique" },
+                            { value: "platform-analysis", label: "Platform Analysis" },
+                            { value: "creator-economy", label: "Creator Economy" },
+                            { value: "art-culture", label: "Art & Culture" },
+                            { value: "ai-philosophy", label: "AI Philosophy" },
+                            { value: "community-culture", label: "Community Culture" },
+                            { value: "life-reflection", label: "Life Reflection" },
+                            { value: "market-news", label: "Market News" },
+                            { value: "playful", label: "Playful" },
+                            { value: "other", label: "Other" },
+                          ].find(c => c.value === selectedCategory)?.label || selectedCategory;
+                          return categoryLabel;
+                        })() : "All Categories"}
+                      </span>
+                    </div>
+                  </div>
                 )}
               </div>
               <svg
