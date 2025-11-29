@@ -770,7 +770,7 @@ interface CastCardProps {
   feedType?: string; // 'curated' or other feed types
   isReply?: boolean; // Whether this is a reply (for delete functionality)
   curatorInfo?: { fid: number; username?: string; display_name?: string; pfp_url?: string };
-  sortBy?: "recently-curated" | "time-of-cast" | "recent-reply" | "quality" | "highest-quality-replies";
+  sortBy?: "recently-curated" | "time-of-cast" | "recent-reply" | "quality";
   disableClick?: boolean; // Disable click navigation (e.g., when in conversation view)
   rootCastHash?: string; // Root cast hash for the current page/view
   compressedView?: boolean; // Whether to show compressed view (collapsed text)
@@ -794,6 +794,16 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
   const [topReplies, setTopReplies] = useState<any[]>(cast._topReplies || []);
   const [repliesLoading, setRepliesLoading] = useState(false);
   const [repliesLoaded, setRepliesLoaded] = useState(!!cast._topReplies?.length);
+  const [replySortBy, setReplySortBy] = useState<"recent-reply" | "highest-quality-replies" | "highest-engagement">(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("replySortBy");
+      if (saved === "recent-reply" || saved === "highest-quality-replies" || saved === "highest-engagement") {
+        return saved;
+      }
+    }
+    return "highest-quality-replies"; // Default to highest quality replies
+  });
+  const [showReplySortMenu, setShowReplySortMenu] = useState(false);
   const [embedMetadata, setEmbedMetadata] = useState<Map<string, { title: string | null; description: string | null; image: string | null; author_name?: string | null; author_url?: string | null }>>(new Map());
   const fetchedUrlsRef = useRef<Set<string>>(new Set());
   const recastMenuRef = useRef<HTMLDivElement>(null);
@@ -1020,7 +1030,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
             setRepliesLoading(true);
             const params = new URLSearchParams({
               castHash: cast.hash!,
-              sortBy: sortBy || "recent-reply",
+              sortBy: replySortBy,
             });
             if (user?.fid) {
               params.append("viewerFid", user.fid.toString());
@@ -1058,7 +1068,35 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
         observer.unobserve(currentRef);
       }
     };
-  }, [cast.hash, repliesLoaded, repliesLoading, feedType, cast._curatorFid, sortBy, user?.fid]);
+  }, [cast.hash, repliesLoaded, repliesLoading, feedType, cast._curatorFid, replySortBy, user?.fid]);
+
+  // Refetch replies when replySortBy changes
+  useEffect(() => {
+    if (repliesLoaded && cast.hash && (feedType === "curated" || cast._curatorFid)) {
+      setRepliesLoading(true);
+      const params = new URLSearchParams({
+        castHash: cast.hash!,
+        sortBy: replySortBy,
+      });
+      if (user?.fid) {
+        params.append("viewerFid", user.fid.toString());
+      }
+
+      fetch(`/api/feed/replies?${params}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.replies) {
+            setTopReplies(data.replies);
+          }
+        })
+        .catch((error) => {
+          console.error("Error loading replies:", error);
+        })
+        .finally(() => {
+          setRepliesLoading(false);
+        });
+    }
+  }, [replySortBy, cast.hash, feedType, cast._curatorFid, user?.fid, repliesLoaded]);
 
   // Check if cast is already curated on mount (check regardless of user login status)
   useEffect(() => {
@@ -1182,6 +1220,24 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [showTagMenu]);
+
+  // Close reply sort menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      const menuElement = document.querySelector('[data-reply-sort-menu]');
+      const buttonElement = document.querySelector('[data-reply-sort-button]');
+      if (menuElement && !menuElement.contains(target) && buttonElement && !buttonElement.contains(target)) {
+        setShowReplySortMenu(false);
+      }
+    };
+    if (showReplySortMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+      };
+    }
+  }, [showReplySortMenu]);
 
   const handleLike = async () => {
     if (!user?.signer_uuid) {
@@ -2756,13 +2812,62 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
         {/* Top Replies Section */}
         {showTopReplies && (feedType === "curated" || cast._curatorFid) && (
           <div className={`mt-3 border-t ${(cast as any)._isQuoteCast && (cast as any)._parentCast ? 'border-gray-200 dark:border-gray-700 bg-gray-50/30 dark:bg-gray-800/20' : 'border-gray-200 dark:border-gray-800'} pt-3 rounded-b-lg transition-colors group/replies hover:bg-gray-50 dark:hover:bg-gray-800/30`} onClick={(e) => e.stopPropagation()}>
-            <div className="mb-1 px-1">
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                {sortBy === "recent-reply" ? "Most Recent Replies" : "Highest Engagement Replies"}
-              </span>
-              {repliesLoading && (
-                <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">Loading...</span>
-              )}
+            <div className="mb-1 px-1 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <button
+                    data-reply-sort-button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowReplySortMenu(!showReplySortMenu);
+                    }}
+                    className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 flex items-center gap-1"
+                  >
+                    {replySortBy === "recent-reply" 
+                      ? "Most Recent Replies" 
+                      : replySortBy === "highest-quality-replies"
+                      ? "Highest Quality Replies"
+                      : "Highest Engagement Replies"}
+                    <svg
+                      className={`w-3 h-3 transition-transform ${showReplySortMenu ? "rotate-180" : ""}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {showReplySortMenu && (
+                    <div data-reply-sort-menu className="absolute left-0 top-6 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-lg py-1 min-w-[180px]">
+                      {[
+                        { value: "highest-quality-replies", label: "Highest Quality Replies" },
+                        { value: "highest-engagement", label: "Highest Engagement Replies" },
+                        { value: "recent-reply", label: "Most Recent Replies" },
+                      ].map((option) => (
+                        <button
+                          key={option.value}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setReplySortBy(option.value as typeof replySortBy);
+                            localStorage.setItem("replySortBy", option.value);
+                            setShowReplySortMenu(false);
+                          }}
+                          className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
+                            replySortBy === option.value
+                              ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
+                              : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {repliesLoading && (
+                  <span className="text-xs text-gray-400 dark:text-gray-500">Loading...</span>
+                )}
+              </div>
             </div>
             {replyClusters.length > 0 ? (
               <div className="space-y-3">
@@ -2848,8 +2953,8 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                       return prev;
                     }
                     // Add to the beginning for newest-first, or end for oldest-first
-                    // Based on sortBy, but default to newest first
-                    const sortOrder = sortBy === "recent-reply" ? "newest" : sortBy || "newest";
+                    // Based on replySortBy
+                    const sortOrder = replySortBy === "recent-reply" ? "newest" : "oldest";
                     if (sortOrder === "newest") {
                       return [optimisticReply, ...prev];
                     } else {
@@ -2868,7 +2973,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                     try {
                       const params = new URLSearchParams({
                         castHash: cast.hash!,
-                        sortBy: sortBy || "recent-reply",
+                        sortBy: replySortBy,
                       });
                       if (user?.fid) {
                         params.append("viewerFid", user.fid.toString());

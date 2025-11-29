@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const castHash = searchParams.get("castHash");
-    const sortBy = searchParams.get("sortBy") || "recent-reply";
+    const sortBy = searchParams.get("sortBy") || "highest-quality-replies";
     const viewerFid = searchParams.get("viewerFid") 
       ? parseInt(searchParams.get("viewerFid")!) 
       : undefined;
@@ -51,6 +51,7 @@ export async function GET(request: NextRequest) {
         castData: castReplies.castData,
         castCreatedAt: castReplies.castCreatedAt,
         createdAt: castReplies.createdAt,
+        qualityScore: castReplies.qualityScore,
       })
       .from(castReplies)
       .where(
@@ -62,6 +63,8 @@ export async function GET(request: NextRequest) {
       .orderBy(
         sortBy === "recent-reply" 
           ? desc(castReplies.castCreatedAt) 
+          : sortBy === "highest-quality-replies"
+          ? desc(castReplies.qualityScore)
           : desc(castReplies.createdAt)
       )
       .limit(40); // Fetch extras so we can deduplicate before slicing
@@ -90,13 +93,24 @@ export async function GET(request: NextRequest) {
     }
 
     // Sort replies based on sortBy mode
-    // Note: Database already sorted by castCreatedAt for recent-reply mode
+    // Note: Database already sorted by castCreatedAt for recent-reply mode, and by qualityScore for highest-quality-replies
     // We just need to add metadata and filter
     let sortedReplies: typeof relevantReplies;
     
     if (sortBy === "recent-reply") {
       sortedReplies = relevantReplies;
+    } else if (sortBy === "highest-quality-replies") {
+      // Database already sorted by qualityScore, but we need to handle nulls (put them last)
+      sortedReplies = [...relevantReplies].sort((a, b) => {
+        const aScore = a.qualityScore ?? -1;
+        const bScore = b.qualityScore ?? -1;
+        if (aScore === -1 && bScore === -1) return 0;
+        if (aScore === -1) return 1;
+        if (bScore === -1) return -1;
+        return bScore - aScore; // Descending (highest quality first)
+      });
     } else {
+      // Highest engagement (default fallback)
       sortedReplies = [...relevantReplies].sort((a, b) => {
         const aScore = calculateEngagementScore(a.castData as CastDataForEngagement);
         const bScore = calculateEngagementScore(b.castData as CastDataForEngagement);
