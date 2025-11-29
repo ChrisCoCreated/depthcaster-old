@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     const sortBy = searchParams.get("sortBy") || "highest-quality-replies";
     const minQualityScore = searchParams.get("minQualityScore")
       ? parseInt(searchParams.get("minQualityScore")!)
-      : 0; // Default to 0 (show all replies)
+      : 60; // Default to 60 (60+ quality)
     const viewerFid = searchParams.get("viewerFid") 
       ? parseInt(searchParams.get("viewerFid")!) 
       : undefined;

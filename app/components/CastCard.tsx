@@ -809,12 +809,12 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
       const saved = localStorage.getItem("replyMinQuality");
       if (saved) {
         const parsed = parseInt(saved, 10);
-        if (!isNaN(parsed) && [0, 50, 60, 70].includes(parsed)) {
+        if (!isNaN(parsed) && [20, 50, 60, 70].includes(parsed)) {
           return parsed;
         }
       }
     }
-    return 0; // Default to show all replies (0+)
+    return 60; // Default to 60+ quality
   });
   const [embedMetadata, setEmbedMetadata] = useState<Map<string, { title: string | null; description: string | null; image: string | null; author_name?: string | null; author_url?: string | null }>>(new Map());
   const fetchedUrlsRef = useRef<Set<string>>(new Set());
@@ -1082,6 +1082,24 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
       }
     };
   }, [cast.hash, repliesLoaded, repliesLoading, feedType, cast._curatorFid, replySortBy, replyMinQuality, user?.fid]);
+
+  // Listen for reply filter changes from other cast cards to keep them in sync
+  useEffect(() => {
+    const handleReplyFilterChange = () => {
+      const saved = localStorage.getItem("replyMinQuality");
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && [20, 50, 60, 70].includes(parsed) && parsed !== replyMinQuality) {
+          setReplyMinQuality(parsed);
+        }
+      }
+    };
+
+    window.addEventListener("replyFilterChanged", handleReplyFilterChange);
+    return () => {
+      window.removeEventListener("replyFilterChanged", handleReplyFilterChange);
+    };
+  }, [replyMinQuality]);
 
   // Refetch replies when replySortBy or replyMinQuality changes
   useEffect(() => {
@@ -2885,7 +2903,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                       { value: 70, label: "70+" },
                       { value: 60, label: "60+" },
                       { value: 50, label: "50+" },
-                      { value: 0, label: "0" },
+                      { value: 20, label: "20+" },
                     ].map((filter) => (
                       <button
                         key={filter.value}
@@ -2893,6 +2911,8 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                           e.stopPropagation();
                           setReplyMinQuality(filter.value);
                           localStorage.setItem("replyMinQuality", filter.value.toString());
+                          // Notify other cast cards to update their filter
+                          window.dispatchEvent(new CustomEvent("replyFilterChanged"));
                         }}
                         className={`px-1.5 py-0.5 text-xs rounded transition-colors ${
                           replyMinQuality === filter.value
