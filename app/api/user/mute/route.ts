@@ -17,31 +17,11 @@ export async function POST(request: NextRequest) {
     const signer = await neynarClient.lookupSigner({ signerUuid });
     const userFid = signer.fid;
 
-    // Make direct HTTP call to Neynar mute API
-    // The SDK doesn't expose a mute method, so we call the API directly
-    // API expects: { fid: <your_fid>, muted_fid: <fid_to_mute> }
-    const response = await fetch("https://api.neynar.com/v2/farcaster/mute", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": process.env.NEYNAR_API_KEY!,
-      },
-      body: JSON.stringify({
-        fid: userFid,
-        muted_fid: parseInt(targetFid),
-      }),
+    // Use Neynar SDK's publishMute method
+    const result = await neynarClient.publishMute({
+      fid: userFid,
+      mutedFid: parseInt(targetFid),
     });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: "Failed to mute user" }));
-      console.error("Neynar mute API error:", errorData);
-      return NextResponse.json(
-        { error: errorData.error || "Failed to mute user" },
-        { status: response.status }
-      );
-    }
-
-    const result = await response.json();
 
     return NextResponse.json({ success: true, result });
   } catch (error: any) {
