@@ -41,16 +41,11 @@ export function UserInitializer() {
     // Ensure user record exists in database and reconcile signer
     const ensureUser = async () => {
       try {
-        console.log("[UserInitializer] ===== STARTING SIGNER RECONCILIATION =====");
-        console.log("[UserInitializer] FID:", user.fid);
-        console.log("[UserInitializer] New signer from Neynar:", user.signer_uuid);
-        
         // Call /api/user/ensure which will:
         // 1. Check for stored signer_uuid
         // 2. Verify stored signer is still valid
         // 3. Use stored signer if valid, otherwise use new one from login
         // 4. Return the effective signer_uuid to use
-        console.log("[UserInitializer] Calling /api/user/ensure to reconcile signer...");
         const response = await fetch("/api/user/ensure", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -67,11 +62,6 @@ export function UserInitializer() {
         const data = await response.json();
         const effectiveSignerUuid = data.signer_uuid || user.signer_uuid;
 
-        console.log("[UserInitializer] Response from /api/user/ensure:", {
-          effectiveSignerUuid,
-          newSignerFromNeynar: user.signer_uuid,
-        });
-
         initializedRef.current.add(user.fid);
         
         // Store both the Neynar-provided signer and the effective one
@@ -81,25 +71,8 @@ export function UserInitializer() {
         if (effectiveSignerUuid) {
           effectiveSignerUuidRef.current.set(user.fid, effectiveSignerUuid);
         }
-
-        // Check if stored signer in DB matches the one from user context
-        const signersMatch = effectiveSignerUuid === user.signer_uuid;
-        
-        if (signersMatch) {
-          console.log("[UserInitializer] ✅ SIGNERS MATCH");
-          console.log("[UserInitializer]   Stored signer in DB:", effectiveSignerUuid);
-          console.log("[UserInitializer]   Signer from Neynar context:", user.signer_uuid);
-          console.log("[UserInitializer]   ✓ Using the same signer - no new signer created");
-        } else {
-          console.log("[UserInitializer] ⚠️  SIGNERS DO NOT MATCH");
-          console.log("[UserInitializer]   Stored signer in DB:", effectiveSignerUuid);
-          console.log("[UserInitializer]   Signer from Neynar context:", user.signer_uuid);
-          console.log("[UserInitializer]   ⚠️  New signer was created by Neynar, but we're using stored one from DB");
-        }
-        
-        console.log("[UserInitializer] ===== SIGNER RECONCILIATION COMPLETE =====");
       } catch (error) {
-        console.error("[UserInitializer] ❌ Failed to ensure user exists:", error);
+        console.error("Failed to ensure user exists:", error);
       }
     };
 
