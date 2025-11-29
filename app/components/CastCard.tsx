@@ -792,6 +792,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
   const [curators, setCurators] = useState<Array<{ fid: number; username?: string; display_name?: string; pfp_url?: string }>>([]);
   const [showUncurateConfirm, setShowUncurateConfirm] = useState(false);
   const [topReplies, setTopReplies] = useState<any[]>(cast._topReplies || []);
+  const [hasAnyReplies, setHasAnyReplies] = useState<boolean | undefined>(undefined);
   const [repliesLoading, setRepliesLoading] = useState(false);
   const [repliesLoaded, setRepliesLoaded] = useState(!!cast._topReplies?.length);
   const [replySortBy, setReplySortBy] = useState<"recent-reply" | "highest-quality-replies" | "highest-engagement">(() => {
@@ -1054,6 +1055,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
               .then((data) => {
                 if (data.replies) {
                   setTopReplies(data.replies);
+                  setHasAnyReplies(data.hasAnyReplies !== undefined ? data.hasAnyReplies : true);
                   setRepliesLoaded(true);
                 }
               })
@@ -1119,6 +1121,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
         .then((data) => {
           if (data.replies) {
             setTopReplies(data.replies);
+            setHasAnyReplies(data.hasAnyReplies !== undefined ? data.hasAnyReplies : true);
           }
         })
         .catch((error) => {
@@ -2981,7 +2984,9 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
             ) : (
               <div className="py-2 text-center">
                 <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">
-                  No replies yet
+                  {replySortBy === "highest-quality-replies" && replyMinQuality > 0 && hasAnyReplies === true
+                    ? `No replies meet the ${replyMinQuality}+ quality threshold`
+                    : "No replies yet"}
                 </p>
               </div>
             )}
@@ -3046,6 +3051,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                         const data = await res.json();
                         if (data.replies) {
                           setTopReplies(data.replies);
+                          setHasAnyReplies(data.hasAnyReplies !== undefined ? data.hasAnyReplies : true);
                         }
                       }
                     } catch (error) {

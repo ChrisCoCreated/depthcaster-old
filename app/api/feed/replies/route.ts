@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { castReplies } from "@/lib/schema";
-import { eq, or, inArray, desc, and, gte } from "drizzle-orm";
+import { eq, or, inArray, desc, and, gte, ne } from "drizzle-orm";
 import { calculateEngagementScore } from "@/lib/engagement";
 import { isQuoteCast } from "@/lib/conversation";
 import { enrichCastsWithViewerContext } from "@/lib/interactions";
@@ -44,6 +44,29 @@ export async function GET(request: NextRequest) {
     // Fetch replies for this cast
     // Exclude parent casts saved for display only (they use placeholder hash 0x0000...)
     const PARENT_CAST_PLACEHOLDER_HASH = "0x0000000000000000000000000000000000000000";
+    
+    // Check if there are any replies at all (regardless of quality filter)
+    // This helps distinguish between "no replies exist" vs "replies exist but filtered out"
+    let hasAnyReplies = false;
+    if (minQualityScore > 0 && sortBy === "highest-quality-replies") {
+      // Check if any replies exist without quality filter
+      const anyRepliesCheck = await db
+        .select({ replyCastHash: castReplies.replyCastHash })
+        .from(castReplies)
+        .where(
+          and(
+            or(
+              eq(castReplies.curatedCastHash, castHash),
+              eq(castReplies.quotedCastHash, castHash)
+            ),
+            ne(castReplies.curatedCastHash, PARENT_CAST_PLACEHOLDER_HASH)
+          )
+        )
+        .limit(1);
+      
+      hasAnyReplies = anyRepliesCheck.length > 0;
+    }
+    
     const storedReplies = await db
       .select({
         curatedCastHash: castReplies.curatedCastHash,
@@ -97,7 +120,7 @@ export async function GET(request: NextRequest) {
     }
     
     if (relevantReplies.length === 0) {
-      return NextResponse.json({ replies: [] });
+      return NextResponse.json({ replies: [], hasAnyReplies: hasAnyReplies || false });
     }
 
     // Sort replies based on sortBy mode
@@ -193,7 +216,7 @@ export async function GET(request: NextRequest) {
       finalReplies = await enrichCastsWithViewerContext(finalReplies, viewerFid);
     }
 
-    return NextResponse.json({ replies: finalReplies });
+    return NextResponse.json({ replies: finalReplies, hasAnyReplies: true });
   } catch (error: any) {
     console.error("Feed replies API error:", error);
     return NextResponse.json(
