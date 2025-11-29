@@ -804,6 +804,18 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
     return "highest-quality-replies"; // Default to highest quality replies
   });
   const [showReplySortMenu, setShowReplySortMenu] = useState(false);
+  const [replyMinQuality, setReplyMinQuality] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("replyMinQuality");
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && [0, 50, 60, 70].includes(parsed)) {
+          return parsed;
+        }
+      }
+    }
+    return 0; // Default to show all replies (0+)
+  });
   const [embedMetadata, setEmbedMetadata] = useState<Map<string, { title: string | null; description: string | null; image: string | null; author_name?: string | null; author_url?: string | null }>>(new Map());
   const fetchedUrlsRef = useRef<Set<string>>(new Set());
   const recastMenuRef = useRef<HTMLDivElement>(null);
@@ -1031,6 +1043,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
             const params = new URLSearchParams({
               castHash: cast.hash!,
               sortBy: replySortBy,
+              minQualityScore: replyMinQuality.toString(),
             });
             if (user?.fid) {
               params.append("viewerFid", user.fid.toString());
@@ -1068,15 +1081,16 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
         observer.unobserve(currentRef);
       }
     };
-  }, [cast.hash, repliesLoaded, repliesLoading, feedType, cast._curatorFid, replySortBy, user?.fid]);
+  }, [cast.hash, repliesLoaded, repliesLoading, feedType, cast._curatorFid, replySortBy, replyMinQuality, user?.fid]);
 
-  // Refetch replies when replySortBy changes
+  // Refetch replies when replySortBy or replyMinQuality changes
   useEffect(() => {
     if (repliesLoaded && cast.hash && (feedType === "curated" || cast._curatorFid)) {
       setRepliesLoading(true);
       const params = new URLSearchParams({
         castHash: cast.hash!,
         sortBy: replySortBy,
+        minQualityScore: replyMinQuality.toString(),
       });
       if (user?.fid) {
         params.append("viewerFid", user.fid.toString());
@@ -1096,7 +1110,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
           setRepliesLoading(false);
         });
     }
-  }, [replySortBy, cast.hash, feedType, cast._curatorFid, user?.fid, repliesLoaded]);
+  }, [replySortBy, replyMinQuality, cast.hash, feedType, cast._curatorFid, user?.fid, repliesLoaded]);
 
   // Check if cast is already curated on mount (check regardless of user login status)
   useEffect(() => {
@@ -2974,6 +2988,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                       const params = new URLSearchParams({
                         castHash: cast.hash!,
                         sortBy: replySortBy,
+                        minQualityScore: replyMinQuality.toString(),
                       });
                       if (user?.fid) {
                         params.append("viewerFid", user.fid.toString());

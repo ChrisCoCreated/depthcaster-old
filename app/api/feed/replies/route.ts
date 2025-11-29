@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { castReplies } from "@/lib/schema";
-import { eq, or, inArray, desc } from "drizzle-orm";
+import { eq, or, inArray, desc, and, gte } from "drizzle-orm";
 import { calculateEngagementScore } from "@/lib/engagement";
 import { isQuoteCast } from "@/lib/conversation";
 import { enrichCastsWithViewerContext } from "@/lib/interactions";
@@ -27,6 +27,9 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const castHash = searchParams.get("castHash");
     const sortBy = searchParams.get("sortBy") || "highest-quality-replies";
+    const minQualityScore = searchParams.get("minQualityScore")
+      ? parseInt(searchParams.get("minQualityScore")!)
+      : 0; // Default to 0 (show all replies)
     const viewerFid = searchParams.get("viewerFid") 
       ? parseInt(searchParams.get("viewerFid")!) 
       : undefined;
@@ -55,9 +58,14 @@ export async function GET(request: NextRequest) {
       })
       .from(castReplies)
       .where(
-        or(
-          eq(castReplies.curatedCastHash, castHash),
-          eq(castReplies.quotedCastHash, castHash)
+        and(
+          or(
+            eq(castReplies.curatedCastHash, castHash),
+            eq(castReplies.quotedCastHash, castHash)
+          ),
+          minQualityScore > 0 
+            ? gte(castReplies.qualityScore, minQualityScore)
+            : undefined
         )
       )
       .orderBy(
