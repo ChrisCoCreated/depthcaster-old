@@ -93,7 +93,7 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
     }
   }, [user?.fid]);
 
-  const markAsSeen = useCallback(async (notificationType?: string) => {
+  const markAsSeen = useCallback(async (notificationType?: string, castHash?: string) => {
     if (!user?.signer_uuid) return;
 
     try {
@@ -106,6 +106,7 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
           signerUuid: user.signer_uuid,
           fid: user.fid, // Include FID for cache invalidation
           notificationType,
+          castHash, // Include castHash for curated notifications
         }),
       });
       
@@ -380,7 +381,11 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
                     key={index}
                     href={link}
                     onClick={() => {
-                      markAsSeen();
+                      const notif = notification as any;
+                      const type = String(notification.type);
+                      // For curated notifications, pass castHash to mark as read in database
+                      const castHash = (type.startsWith("curated.") && (notif.castHash || notification.cast?.hash)) || undefined;
+                      markAsSeen(type, castHash);
                       onClose();
                     }}
                   >

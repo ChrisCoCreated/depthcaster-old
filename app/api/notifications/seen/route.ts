@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { neynarClient } from "@/lib/neynar";
 import { NotificationType } from "@neynar/nodejs-sdk/build/api";
 import { cacheNotifications, cacheNotificationCount } from "@/lib/cache";
+import { db } from "@/lib/db";
+import { userNotifications } from "@/lib/schema";
+import { eq, and } from "drizzle-orm";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { signerUuid, notificationType, fid } = body;
+    const { signerUuid, notificationType, fid, castHash } = body;
 
     if (!signerUuid) {
       return NextResponse.json(
@@ -53,6 +56,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Handle database-stored curated notifications
+    if (castHash && userFid && notificationType && String(notificationType).startsWith("curated.")) {
+      // Mark the specific curated notification as read in the database
+      await db
+        .update(userNotifications)
+        .set({ isRead: true })
+        .where(
+          and(
+            eq(userNotifications.userFid, userFid),
+            eq(userNotifications.castHash, castHash),
+            eq(userNotifications.type, String(notificationType))
+          )
+        );
+      
+      // Invalidate count cache for this user
+      if (userFid) {
+        cacheNotificationCount.invalidateUser(userFid);
+      }
+    }
+
+    // Mark Neynar notifications as seen (for non-curated types)
     const result = await neynarClient.markNotificationsAsSeen({
       signerUuid,
       type: mappedType,

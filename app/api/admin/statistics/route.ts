@@ -308,14 +308,20 @@ export async function GET(request: NextRequest) {
     `);
 
     // API Call Statistics
-    const reactionFetchStats = await db
-      .select()
-      .from(apiCallStats)
-      .where(eq(apiCallStats.callType, "reaction_fetch"))
-      .limit(1);
-
-    const reactionFetchCount = reactionFetchStats[0]?.count || 0;
-    const reactionFetchCUCost = reactionFetchCount * 2; // 2 CU per fetch
+    let reactionFetchCount = 0;
+    let reactionFetchCUCost = 0;
+    try {
+      const reactionFetchStats = await db
+        .select()
+        .from(apiCallStats)
+        .where(eq(apiCallStats.callType, "reaction_fetch"))
+        .limit(1);
+      reactionFetchCount = reactionFetchStats[0]?.count || 0;
+      reactionFetchCUCost = reactionFetchCount * 2; // 2 CU per fetch
+    } catch (error) {
+      // Table might not exist yet, use default values
+      console.warn("api_call_stats table not available:", error);
+    }
 
     return NextResponse.json({
       period,
