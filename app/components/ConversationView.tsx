@@ -54,6 +54,7 @@ export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusR
     }
     return true;
   });
+  const [showQualitySettings, setShowQualitySettings] = useState(false);
 
   // Check if a reply is a quote cast
   function isQuoteCast(reply: ThreadedReply): boolean {
@@ -550,8 +551,42 @@ export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusR
       {/* Sort options and quality filter */}
       {replies.length > 0 && (
         <div className="mt-4 px-4 py-2 border-b border-gray-100 dark:border-gray-800">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-sm text-gray-600 dark:text-gray-400">Sort replies:</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-600 dark:text-gray-400">Sort replies:</span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => {
+                    const newValue = !qualityFilterEnabled;
+                    setQualityFilterEnabled(newValue);
+                    localStorage.setItem("qualityFilterEnabled", newValue.toString());
+                  }}
+                  className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                    qualityFilterEnabled
+                      ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-medium"
+                      : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                  }`}
+                >
+                  {qualityFilterEnabled ? `Q: ${minQualityScore}+` : "Q: 0"}
+                </button>
+                {qualityFilterEnabled && (
+                  <button
+                    onClick={() => setShowQualitySettings(!showQualitySettings)}
+                    className="p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                    title="Quality settings"
+                  >
+                    <svg
+                      className={`w-4 h-4 transition-transform ${showQualitySettings ? "rotate-180" : ""}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            </div>
             <div className="flex gap-2">
               <button
                 onClick={() => setSortBy("newest")}
@@ -586,25 +621,10 @@ export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusR
             </div>
           </div>
           
-          {/* Quality filter controls */}
-          <div className="flex items-center gap-3 flex-wrap">
-            <button
-              onClick={() => {
-                const newValue = !qualityFilterEnabled;
-                setQualityFilterEnabled(newValue);
-                localStorage.setItem("qualityFilterEnabled", newValue.toString());
-              }}
-              className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                qualityFilterEnabled
-                  ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-medium"
-                  : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-              }`}
-            >
-              {qualityFilterEnabled ? `Q: ${minQualityScore}+` : "Q: 0"}
-            </button>
-            
-            {qualityFilterEnabled && (
-              <div className="flex items-center gap-2 flex-1 min-w-0">
+          {/* Quality settings (expandable) */}
+          {showQualitySettings && (
+            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">Min Quality:</span>
                 <input
                   type="range"
@@ -617,14 +637,14 @@ export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusR
                     setMinQualityScore(newValue);
                     localStorage.setItem("minQualityScore", newValue.toString());
                   }}
-                  className="flex-1 max-w-[120px]"
+                  className="flex-1 max-w-[200px]"
                 />
                 <span className="text-xs font-medium text-gray-700 dark:text-gray-300 min-w-10">
                   {minQualityScore}
                 </span>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
 

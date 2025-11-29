@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
       ? searchParams.get("curatorFids")!.split(",").map(fid => parseInt(fid)).filter(fid => !isNaN(fid))
       : [];
     const hideRecasts = searchParams.get("hideRecasts") === "true";
-    const sortBy = searchParams.get("sortBy") || "recent-reply"; // "recently-curated" | "time-of-cast" | "recent-reply" | "quality"
+    const sortBy = searchParams.get("sortBy") || "highest-quality-replies"; // "recently-curated" | "time-of-cast" | "recent-reply" | "quality" | "highest-quality-replies"
     const category = searchParams.get("category") || undefined; // Category filter
     const minQualityScore = searchParams.get("minQualityScore")
       ? parseInt(searchParams.get("minQualityScore")!)
@@ -343,7 +343,7 @@ export async function GET(request: NextRequest) {
       // Phase 1: Get aggregated times and cast metadata in parallel
       // Run all independent queries simultaneously for maximum performance
       const phase1Start = Date.now();
-      const [firstCurationTimes, latestReplyTimes, castsForSorting] = await Promise.all([
+      const [firstCurationTimes, latestReplyTimes, maxReplyQualityScores, castsForSorting] = await Promise.all([
         // Aggregation query for first curation times (uses composite index)
         db
           .select({
@@ -359,6 +359,15 @@ export async function GET(request: NextRequest) {
           .select({
             curatedCastHash: castReplies.curatedCastHash,
             latestReplyTime: sql<Date>`MAX(${castReplies.castCreatedAt})`.as("latest_reply_time"),
+          })
+          .from(castReplies)
+          .where(inArray(castReplies.curatedCastHash, castHashArray))
+          .groupBy(castReplies.curatedCastHash),
+        // Aggregation query for max reply quality scores (for highest-quality-replies sorting)
+        db
+          .select({
+            curatedCastHash: castReplies.curatedCastHash,
+            maxReplyQualityScore: sql<number>`MAX(${castReplies.qualityScore})`.as("max_reply_quality_score"),
           })
           .from(castReplies)
           .where(inArray(castReplies.curatedCastHash, castHashArray))
@@ -383,7 +392,7 @@ export async function GET(request: NextRequest) {
       ]);
 
       const phase1Time = Date.now() - phase1Start;
-      console.log(`[Feed] Phase 1 (parallel queries): ${phase1Time}ms - curation times: ${firstCurationTimes.length}, reply times: ${latestReplyTimes.length}, casts for sorting: ${castsForSorting.length}`);
+      console.log(`[Feed] Phase 1 (parallel queries): ${phase1Time}ms - curation times: ${firstCurationTimes.length}, reply times: ${latestReplyTimes.length}, max reply quality: ${maxReplyQualityScores.length}, casts for sorting: ${castsForSorting.length}`);
       
       // Create maps for quick lookup
       const firstCurationTimeMap = new Map<string, Date>();
@@ -396,6 +405,11 @@ export async function GET(request: NextRequest) {
         latestReplyTimeMap.set(row.curatedCastHash, row.latestReplyTime);
       });
 
+      const maxReplyQualityScoreMap = new Map<string, number | null>();
+      maxReplyQualityScores.forEach((row) => {
+        maxReplyQualityScoreMap.set(row.curatedCastHash, row.maxReplyQualityScore);
+      });
+
       // Helper function to ensure we have a Date object
       const toDate = (value: Date | string | null | undefined, fallback: Date): Date => {
         if (!value) return fallback;
@@ -405,8 +419,8 @@ export async function GET(request: NextRequest) {
       };
 
       // Add sort times/values and sort in memory (lightweight - no JSONB)
-      let castsWithSortTimes: Array<{ castHash: string; createdAt: Date; castTimestamp: Date | null; qualityScore: number | null; sortTime: Date }>;
-      let filteredCasts: Array<{ castHash: string; createdAt: Date; castTimestamp: Date | null; qualityScore: number | null; sortTime: Date }>;
+      let castsWithSortTimes: Array<{ castHash: string; createdAt: Date; castTimestamp: Date | null; qualityScore: number | null; sortTime: Date; sortValue?: number }>;
+      let filteredCasts: Array<{ castHash: string; createdAt: Date; castTimestamp: Date | null; qualityScore: number | null; sortTime: Date; sortValue?: number }>;
       
       if (sortBy === "quality") {
         // Sort by quality score (descending, nulls last)
@@ -436,6 +450,42 @@ export async function GET(request: NextRequest) {
                 return score < cursorScore;
               });
               console.log(`[Feed] Quality cursor filter: ${castsWithSortTimes.length} -> ${filteredCasts.length} casts`);
+            }
+          } catch {
+            // Invalid cursor, ignore it
+          }
+        }
+      } else if (sortBy === "highest-quality-replies") {
+        // Sort by highest reply quality score (descending, nulls last)
+        const sortStart = Date.now();
+        castsForSorting.sort((a, b) => {
+          const aScore = maxReplyQualityScoreMap.get(a.castHash) ?? -1;
+          const bScore = maxReplyQualityScoreMap.get(b.castHash) ?? -1;
+          if (aScore === -1 && bScore === -1) return 0;
+          if (aScore === -1) return 1;
+          if (bScore === -1) return -1;
+          return bScore - aScore; // Descending (highest quality replies first)
+        });
+        const sortTime = Date.now() - sortStart;
+        console.log(`[Feed] In-memory sort by highest quality replies: ${sortTime}ms for ${castsForSorting.length} casts`);
+
+        // Map to include sortTime (using createdAt as fallback for cursor compatibility)
+        castsWithSortTimes = castsForSorting.map((cast) => {
+          const maxReplyQuality = maxReplyQualityScoreMap.get(cast.castHash) ?? -1;
+          return { ...cast, sortTime: cast.createdAt, sortValue: maxReplyQuality };
+        });
+
+        // Apply cursor filter if provided (for highest-quality-replies, cursor is a quality score)
+        filteredCasts = castsWithSortTimes;
+        if (cursor) {
+          try {
+            const cursorScore = parseFloat(cursor);
+            if (!isNaN(cursorScore)) {
+              filteredCasts = castsWithSortTimes.filter((cast) => {
+                const score = cast.sortValue ?? -1;
+                return score < cursorScore;
+              });
+              console.log(`[Feed] Highest quality replies cursor filter: ${castsWithSortTimes.length} -> ${filteredCasts.length} casts`);
             }
           } catch {
             // Invalid cursor, ignore it
@@ -733,6 +783,10 @@ export async function GET(request: NextRequest) {
             // For quality sorting, use quality score as cursor
             const qualityScore = lastFilteredCast.qualityScore;
             neynarCursor = qualityScore !== null && qualityScore !== undefined ? qualityScore.toString() : null;
+          } else if (sortBy === "highest-quality-replies") {
+            // For highest quality replies sorting, use max reply quality score as cursor
+            const maxReplyQuality = lastFilteredCast.sortValue;
+            neynarCursor = maxReplyQuality !== null && maxReplyQuality !== undefined && maxReplyQuality !== -1 ? maxReplyQuality.toString() : null;
           } else {
             // For time-based sorting, use timestamp as cursor
             neynarCursor = lastFilteredCast.sortTime.toISOString();

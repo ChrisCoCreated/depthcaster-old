@@ -111,7 +111,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   const [my37PackId, setMy37PackId] = useState<string | null>(null);
   const [my37HasUsers, setMy37HasUsers] = useState<boolean>(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
-  const [sortBy, setSortBy] = useState<"recently-curated" | "time-of-cast" | "recent-reply" | "quality">("recent-reply");
+  const [sortBy, setSortBy] = useState<"recently-curated" | "time-of-cast" | "recent-reply" | "quality" | "highest-quality-replies">("highest-quality-replies");
   const sortByInitializedRef = useRef(false);
   const [hasNewCuratedCasts, setHasNewCuratedCasts] = useState(false);
   const curatorFilterInitializedRef = useRef(false);
@@ -133,7 +133,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   useEffect(() => {
     if (!sortByInitializedRef.current) {
       const saved = localStorage.getItem("curatedFeedSortBy");
-      if (saved === "recently-curated" || saved === "time-of-cast" || saved === "recent-reply" || saved === "quality") {
+      if (saved === "recently-curated" || saved === "time-of-cast" || saved === "recent-reply" || saved === "quality" || saved === "highest-quality-replies") {
         setSortBy(saved);
       }
       sortByInitializedRef.current = true;
@@ -1453,6 +1453,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
                   <span className="text-xs text-gray-600 dark:text-gray-400 min-w-16">Sort by:</span>
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {[
+                      { value: "highest-quality-replies", label: "Highest Quality Replies" },
                       { value: "recently-curated", label: "Recently Curated" },
                       { value: "time-of-cast", label: "Time of Cast" },
                       { value: "recent-reply", label: "Recent Reply" },
