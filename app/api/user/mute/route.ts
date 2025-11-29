@@ -31,11 +31,12 @@ export async function POST(request: NextRequest) {
       // Check if publishMute exists on the client
       if (typeof (neynarClient as any).publishMute === 'function') {
         result = await (neynarClient as any).publishMute({
-          fid: userFid,
+          signerUuid,
           mutedFid: parseInt(targetFid),
         });
       } else {
         // Fall back to direct HTTP call
+        // Neynar API requires signer_uuid for authentication (not fid)
         const response = await fetch("https://api.neynar.com/v2/farcaster/mute", {
           method: "POST",
           headers: {
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
             "x-api-key": process.env.NEYNAR_API_KEY!,
           },
           body: JSON.stringify({
-            fid: userFid,
+            signer_uuid: signerUuid,
             muted_fid: parseInt(targetFid),
           }),
         });
