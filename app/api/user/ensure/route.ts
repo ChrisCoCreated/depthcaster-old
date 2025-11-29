@@ -91,10 +91,21 @@ export async function POST(request: NextRequest) {
 
     console.log(`[User Ensure] ===== USER ENSURE COMPLETE =====`);
     console.log(`[User Ensure] Returning effective signer UUID: ${effectiveSignerUuid || "none"}`);
+    
+    // Final check: compare stored signer with new one from login
+    const finalUser = await getUser(fid);
+    const storedSignerInDb = finalUser?.signerUuid;
+    const signersMatch = storedSignerInDb === signer_uuid;
+    
+    console.log(`[User Ensure] FINAL CHECK - Signer comparison:`);
+    console.log(`[User Ensure]   Stored in DB: ${storedSignerInDb || "none"}`);
+    console.log(`[User Ensure]   From login: ${signer_uuid || "none"}`);
+    console.log(`[User Ensure]   Match: ${signersMatch ? "✅ YES - Using same signer" : "❌ NO - Different signers"}`);
 
     return NextResponse.json({ 
       success: true,
       signer_uuid: effectiveSignerUuid, // Return the effective signer UUID the app should use
+      signers_match: signersMatch, // Indicate if stored signer matches the one from login
     });
   } catch (error: any) {
     console.error("Error ensuring user exists:", error);

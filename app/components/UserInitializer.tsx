@@ -82,18 +82,19 @@ export function UserInitializer() {
           effectiveSignerUuidRef.current.set(user.fid, effectiveSignerUuid);
         }
 
-        // Log the outcome
-        if (effectiveSignerUuid && user.signer_uuid && effectiveSignerUuid !== user.signer_uuid) {
-          console.log("[UserInitializer] ✅ REUSING STORED SIGNER");
-          console.log("[UserInitializer]   Stored signer (using):", effectiveSignerUuid);
-          console.log("[UserInitializer]   New signer (ignored):", user.signer_uuid);
-          console.log("[UserInitializer]   ⚠️  Note: New signer was created by Neynar but we're using stored one");
-        } else if (effectiveSignerUuid === user.signer_uuid) {
-          console.log("[UserInitializer] ✅ USING NEW SIGNER FROM NEYNAR");
-          console.log("[UserInitializer]   Signer UUID:", effectiveSignerUuid);
-          console.log("[UserInitializer]   Reason: No stored signer found or stored signer is invalid");
+        // Check if stored signer in DB matches the one from user context
+        const signersMatch = effectiveSignerUuid === user.signer_uuid;
+        
+        if (signersMatch) {
+          console.log("[UserInitializer] ✅ SIGNERS MATCH");
+          console.log("[UserInitializer]   Stored signer in DB:", effectiveSignerUuid);
+          console.log("[UserInitializer]   Signer from Neynar context:", user.signer_uuid);
+          console.log("[UserInitializer]   ✓ Using the same signer - no new signer created");
         } else {
-          console.log("[UserInitializer] ⚠️  No effective signer determined");
+          console.log("[UserInitializer] ⚠️  SIGNERS DO NOT MATCH");
+          console.log("[UserInitializer]   Stored signer in DB:", effectiveSignerUuid);
+          console.log("[UserInitializer]   Signer from Neynar context:", user.signer_uuid);
+          console.log("[UserInitializer]   ⚠️  New signer was created by Neynar, but we're using stored one from DB");
         }
         
         console.log("[UserInitializer] ===== SIGNER RECONCILIATION COMPLETE =====");
