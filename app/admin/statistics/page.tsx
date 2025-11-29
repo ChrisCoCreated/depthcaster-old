@@ -406,19 +406,41 @@ export default function AdminStatisticsPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                        {statistics.monitoring.tableSizes.map((table: any) => (
-                          <tr key={table.tablename}>
-                            <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">
-                              {table.tablename}
-                            </td>
-                            <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">
-                              {table.size}
-                            </td>
-                            <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">
-                              {table.column_count}
-                            </td>
-                          </tr>
-                        ))}
+                        {statistics.monitoring.tableSizes.map((table: any) => {
+                          const sizeMB = (table.size_bytes || 0) / (1024 * 1024);
+                          return (
+                            <tr key={table.tablename}>
+                              <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">
+                                {table.tablename}
+                              </td>
+                              <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">
+                                {sizeMB.toFixed(2)} MB
+                              </td>
+                              <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">
+                                {table.column_count}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        <tr className="border-t-2 border-gray-300 dark:border-gray-600 font-semibold">
+                          <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">
+                            Total
+                          </td>
+                          <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">
+                            {(
+                              statistics.monitoring.tableSizes.reduce(
+                                (sum: number, table: any) => sum + (table.size_bytes || 0),
+                                0
+                              ) / (1024 * 1024)
+                            ).toFixed(2)} MB
+                          </td>
+                          <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">
+                            {statistics.monitoring.tableSizes.reduce(
+                              (sum: number, table: any) => sum + (table.column_count || 0),
+                              0
+                            )}
+                          </td>
+                        </tr>
                       </tbody>
                     </table>
                   </div>
