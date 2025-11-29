@@ -5,7 +5,6 @@ import { NotificationBell } from "./NotificationBell";
 import { HeaderUserSearch } from "./HeaderUserSearch";
 import { FeedbackModal } from "./FeedbackModal";
 import Link from "next/link";
-import Image from "next/image";
 import { useState, useEffect, useCallback } from "react";
 import { AvatarImage } from "./AvatarImage";
 import { analytics } from "@/lib/analytics";
@@ -452,19 +451,8 @@ export function Header() {
         <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between">
           <div className="flex flex-col min-w-0">
             <div className="flex items-center gap-2">
-              <Link href="/" className="block sm:hidden shrink-0">
-                <Image
-                  src="/icon-192x192.webp"
-                  alt="Depthcaster"
-                  width={32}
-                  height={32}
-                  className="w-8 h-8"
-                  priority
-                  unoptimized
-                />
-              </Link>
               <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2">
-                <Link href="/" className="text-xs sm:text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 leading-tight">
+                <Link href="/" className="text-xs sm:text-2xl font-bold text-gray-900 dark:text-gray-100 leading-tight">
                   Depthcaster
                 </Link>
                 <span className="text-[10px] sm:text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider">
@@ -477,7 +465,7 @@ export function Header() {
             </p>
           </div>
           
-          <div className="flex items-center gap-1 sm:gap-2 min-w-0">
+          <div className="flex items-center gap-0.5 sm:gap-2 min-w-0">
             {user ? (
               <>
                 <HeaderUserSearch />
