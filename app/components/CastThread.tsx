@@ -5,6 +5,7 @@ import { Cast } from "@neynar/nodejs-sdk/build/api";
 import { CastCard } from "./CastCard";
 import { useNeynarContext } from "@neynar/react";
 import { shouldHideBotCastClient } from "@/lib/bot-filter";
+import { useRouter } from "next/navigation";
 
 interface CastThreadProps {
   castHash: string;
@@ -29,6 +30,9 @@ export function CastThread({ castHash, viewerFid }: CastThreadProps) {
   });
 
   const { user } = useNeynarContext();
+  const router = useRouter();
+
+  const [hasConversation, setHasConversation] = useState<boolean | null>(null);
 
   // Fetch user bot preferences
   useEffect(() => {
@@ -145,6 +149,36 @@ export function CastThread({ castHash, viewerFid }: CastThreadProps) {
   useEffect(() => {
     fetchConversation();
   }, [fetchConversation]);
+
+  // Check if a curated conversation exists for this cast
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkConversation = async () => {
+      if (!castHash) return;
+      try {
+        const response = await fetch(`/api/conversation/database?castHash=${encodeURIComponent(castHash)}`);
+        if (cancelled) return;
+        if (response.ok) {
+          setHasConversation(true);
+        } else if (response.status === 404) {
+          setHasConversation(false);
+        } else {
+          setHasConversation(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setHasConversation(false);
+        }
+      }
+    };
+
+    checkConversation();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [castHash]);
 
   if (loading) {
     return (
@@ -333,6 +367,13 @@ export function CastThread({ castHash, viewerFid }: CastThreadProps) {
 
   return (
     <div className="w-full max-w-3xl mx-auto">
+      {/* Non-curated notice */}
+      {hasConversation === false && (
+        <div className="mb-4 px-4 py-3 border border-yellow-200 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900/40 text-sm text-yellow-800 dark:text-yellow-100 rounded-md">
+          This cast is not part of a curated conversation. You&apos;re viewing the full algo thread only.
+        </div>
+      )}
+
       {/* Parent casts (if any) */}
       {parentCasts.length > 0 && (
         <div className="border-b border-gray-200 dark:border-gray-800">
@@ -347,6 +388,22 @@ export function CastThread({ castHash, viewerFid }: CastThreadProps) {
       {/* Main cast */}
       <div className="border-b border-gray-100 dark:border-gray-800">
         <CastCard cast={mainCast} showThread={false} onUpdate={() => fetchConversation(undefined, true)} rootCastHash={actualRootCastHash} />
+      </div>
+
+      {/* Mode banner */}
+      <div className="mt-4 px-4 py-3 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/60 rounded-md flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <p className="text-sm text-gray-700 dark:text-gray-300">
+          You&apos;re viewing the full algo thread. Conversation view shows the best replies only.
+        </p>
+        {hasConversation && (
+          <button
+            type="button"
+            onClick={() => router.push(`/conversation/${castHash}`)}
+            className="inline-flex items-center justify-center px-3 py-1.5 text-sm font-medium rounded-full bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400 transition-colors whitespace-nowrap"
+          >
+            Go to conversation view
+          </button>
+        )}
       </div>
 
       {/* Replies */}
