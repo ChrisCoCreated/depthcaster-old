@@ -55,9 +55,14 @@ export async function upsertUser(fid: number, userData?: { username?: string; di
       updatedAt: new Date(),
     };
 
-    // Update signerUuid if provided (always update to new one per option 2a)
-    if (signerUuid !== undefined) {
+    // Only update signerUuid if provided AND user doesn't already have one stored
+    // This preserves existing fid <> signer_uuid mappings to prevent creating new signers on each login
+    if (signerUuid !== undefined && !existingUser[0].signerUuid) {
+      console.log(`[upsertUser] Setting new signer UUID for FID ${fid}: ${signerUuid}`);
       updateData.signerUuid = signerUuid;
+    } else if (signerUuid !== undefined && existingUser[0].signerUuid) {
+      console.log(`[upsertUser] Preserving existing signer UUID for FID ${fid}: ${existingUser[0].signerUuid}`);
+      console.log(`[upsertUser] Ignoring new signer UUID: ${signerUuid}`);
     }
 
     const [updated] = await db
@@ -68,6 +73,10 @@ export async function upsertUser(fid: number, userData?: { username?: string; di
     return updated;
   } else {
     // Insert new user
+    console.log(`[upsertUser] Creating new user record for FID ${fid}`);
+    if (signerUuid) {
+      console.log(`[upsertUser] Storing signer UUID for new user: ${signerUuid}`);
+    }
     const [newUser] = await db
       .insert(users)
       .values({
