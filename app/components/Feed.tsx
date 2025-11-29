@@ -1409,7 +1409,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
                         setSelectedCategory(null);
                         localStorage.removeItem("selectedCategory");
                       }}
-                      className={`px-2 py-0.5 text-xs rounded transition-colors whitespace-nowrap flex-shrink-0 ${
+                      className={`px-2 py-0.5 text-xs rounded transition-colors whitespace-nowrap shrink-0 ${
                         !selectedCategory
                           ? "bg-blue-600 text-white"
                           : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
@@ -1436,7 +1436,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
                           setSelectedCategory(option.value);
                           localStorage.setItem("selectedCategory", option.value);
                         }}
-                        className={`px-2 py-0.5 text-xs rounded transition-colors whitespace-nowrap flex-shrink-0 ${
+                        className={`px-2 py-0.5 text-xs rounded transition-colors whitespace-nowrap shrink-0 ${
                           selectedCategory === option.value
                             ? "bg-blue-600 text-white"
                             : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
@@ -1504,7 +1504,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
                 </div>
 
                 {/* Compressed view toggle - LAST */}
-                <div className="flex items-center justify-between py-2">
+                <div className="flex items-center justify-between">
                   <span className="text-xs text-gray-600 dark:text-gray-400">
                     Compressed View
                   </span>

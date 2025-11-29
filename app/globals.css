@@ -70,11 +70,14 @@ body {
   .nested-curator-filter > div > button {
     padding-left: 0 !important;
     padding-right: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
   }
   
   .nested-curator-filter > div > div {
     padding-left: 0 !important;
     padding-right: 0 !important;
+    padding-top: 0 !important;
   }
   
   .nested-curator-filter > div {
