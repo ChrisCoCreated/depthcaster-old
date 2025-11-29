@@ -1018,18 +1018,50 @@ export function CuratorFilterInline({
         onClick={() => setIsExpanded(!isExpanded)}
         className="w-full px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between text-left hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
             Curators
           </span>
-          {selectedCuratorFids.length > 0 && selectedCuratorFids.length < allDisplayedCurators.length && (
+          {!isExpanded && (
+            <div className="flex items-center gap-1.5 flex-1 min-w-0 overflow-hidden">
+              {selectedCuratorFids.length === 0 ? (
+                <span className="text-xs text-gray-500 dark:text-gray-400">None</span>
+              ) : selectedCuratorFids.length === allDisplayedCurators.length ? (
+                <span className="text-xs text-gray-500 dark:text-gray-400">All</span>
+              ) : (
+                <>
+                  <div className="flex items-center gap-1 -space-x-1 flex-shrink-0">
+                    {selectedCuratorFids.slice(0, 5).map((fid) => {
+                      const curator = allDisplayedCurators.find(c => c.fid === fid);
+                      const displayName = curator?.displayName || curator?.username || `@user${fid}`;
+                      return (
+                        <AvatarImage
+                          key={fid}
+                          src={curator?.pfpUrl || undefined}
+                          alt={displayName}
+                          size={20}
+                          className="w-5 h-5 rounded-full border border-white dark:border-gray-800"
+                        />
+                      );
+                    })}
+                  </div>
+                  {selectedCuratorFids.length > 5 && (
+                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">
+                      +{selectedCuratorFids.length - 5}
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+          {isExpanded && selectedCuratorFids.length > 0 && selectedCuratorFids.length < allDisplayedCurators.length && (
             <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">
               {selectedCuratorFids.length}
             </span>
           )}
         </div>
         <svg
-          className={`w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform ${
+          className={`w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform flex-shrink-0 ${
             isExpanded ? "rotate-180" : ""
           }`}
           fill="none"

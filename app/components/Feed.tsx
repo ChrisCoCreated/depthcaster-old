@@ -1304,35 +1304,41 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
                 {!filtersExpanded && (
                   <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
                     {/* Curator avatars */}
-                    <div className="flex items-center gap-1 -space-x-1 flex-shrink-0">
-                      {selectedCuratorFids.length === 0 ? (
-                        <span className="text-xs text-gray-500 dark:text-gray-400">None</span>
-                      ) : selectedCuratorFids.length === allCurators.length ? (
-                        <span className="text-xs text-gray-500 dark:text-gray-400">All</span>
-                      ) : (
-                        selectedCuratorFids.slice(0, 5).map((fid) => {
-                          const curator = allCurators.find(c => c.fid === fid);
-                          return (
-                            <AvatarImage
-                              key={fid}
-                              src={curator?.pfpUrl || undefined}
-                              alt={curator?.displayName || curator?.username || `@user${fid}`}
-                              size={20}
-                              className="w-5 h-5 rounded-full border border-white dark:border-gray-800"
-                            />
-                          );
-                        })
-                      )}
-                      {selectedCuratorFids.length > 5 && (
-                        <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">
-                          +{selectedCuratorFids.length - 5}
-                        </span>
-                      )}
-                    </div>
+                    {allCurators.length > 0 && (
+                      <div className="flex items-center gap-1 -space-x-1 flex-shrink-0">
+                        {selectedCuratorFids.length === 0 ? (
+                          <span className="text-xs text-gray-500 dark:text-gray-400">None</span>
+                        ) : selectedCuratorFids.length === allCurators.length ? (
+                          <span className="text-xs text-gray-500 dark:text-gray-400">All</span>
+                        ) : (
+                          <>
+                            {selectedCuratorFids.slice(0, 5).map((fid) => {
+                              const curator = allCurators.find(c => c.fid === fid);
+                              return (
+                                <AvatarImage
+                                  key={fid}
+                                  src={curator?.pfpUrl || undefined}
+                                  alt={curator?.displayName || curator?.username || `@user${fid}`}
+                                  size={20}
+                                  className="w-5 h-5 rounded-full border border-white dark:border-gray-800"
+                                />
+                              );
+                            })}
+                            {selectedCuratorFids.length > 5 && (
+                              <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">
+                                +{selectedCuratorFids.length - 5}
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
                     
-                    {/* Category */}
+                    {/* Category - always show */}
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="text-xs text-gray-500 dark:text-gray-400">•</span>
+                      {allCurators.length > 0 && (
+                        <span className="text-xs text-gray-500 dark:text-gray-400">•</span>
+                      )}
                       <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
                         {selectedCategory ? (() => {
                           const categoryLabel = [
@@ -1398,14 +1404,14 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
                 {/* Category filter - compact - SECOND */}
                 <div className="space-y-1.5">
                   <span className="text-xs text-gray-600 dark:text-gray-400">Category:</span>
-                  <div className="flex items-center gap-1.5 flex-wrap">
+                  <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide pb-1">
                     <button
                       type="button"
                       onClick={() => {
                         setSelectedCategory(null);
                         localStorage.removeItem("selectedCategory");
                       }}
-                      className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                      className={`px-2 py-0.5 text-xs rounded transition-colors whitespace-nowrap flex-shrink-0 ${
                         !selectedCategory
                           ? "bg-blue-600 text-white"
                           : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
@@ -1432,7 +1438,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
                           setSelectedCategory(option.value);
                           localStorage.setItem("selectedCategory", option.value);
                         }}
-                        className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                        className={`px-2 py-0.5 text-xs rounded transition-colors whitespace-nowrap flex-shrink-0 ${
                           selectedCategory === option.value
                             ? "bg-blue-600 text-white"
                             : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
