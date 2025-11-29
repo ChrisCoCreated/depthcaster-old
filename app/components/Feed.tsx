@@ -1376,29 +1376,27 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
             {filtersExpanded && (
               <div className="px-3 sm:px-4 pb-3 sm:pb-4 space-y-3 border-t border-gray-200 dark:border-gray-800">
                 {/* Curator filter - inline - FIRST */}
-                <div className="-mx-3 sm:-mx-4">
-                  <div className="[&>div]:border-0 [&>div]:border-t [&>div]:border-gray-200 [&>div]:dark:border-gray-800 [&>div>button]:!px-0 [&>div>div]:!px-0 [&>div>div]:!sm:px-0">
-                    <CuratorFilterInline
-                      selectedCuratorFids={selectedCuratorFids}
-                      onCuratorFidsChange={(fids) => {
-                        setSelectedCuratorFids(fids);
-                        localStorage.setItem("selectedCuratorFids", JSON.stringify(fids));
-                        
-                        fetch("/api/curators")
-                          .then(res => res.json())
-                          .then(data => {
-                            const curatorsList = (data.curators || []) as Curator[];
-                            setAllCurators(curatorsList);
-                            const allCuratorFids = curatorsList.map((c: Curator) => c.fid);
-                            const excludedFids = allCuratorFids.filter((fid: number) => !fids.includes(fid));
-                            localStorage.setItem("excludedCuratorFids", JSON.stringify(excludedFids));
-                          })
-                          .catch(err => console.error("Failed to update excluded curators:", err));
-                        
-                        analytics.trackFeedCuratorFilter(feedType, fids);
-                      }}
-                    />
-                  </div>
+                <div className="nested-curator-filter">
+                  <CuratorFilterInline
+                    selectedCuratorFids={selectedCuratorFids}
+                    onCuratorFidsChange={(fids) => {
+                      setSelectedCuratorFids(fids);
+                      localStorage.setItem("selectedCuratorFids", JSON.stringify(fids));
+                      
+                      fetch("/api/curators")
+                        .then(res => res.json())
+                        .then(data => {
+                          const curatorsList = (data.curators || []) as Curator[];
+                          setAllCurators(curatorsList);
+                          const allCuratorFids = curatorsList.map((c: Curator) => c.fid);
+                          const excludedFids = allCuratorFids.filter((fid: number) => !fids.includes(fid));
+                          localStorage.setItem("excludedCuratorFids", JSON.stringify(excludedFids));
+                        })
+                        .catch(err => console.error("Failed to update excluded curators:", err));
+                      
+                      analytics.trackFeedCuratorFilter(feedType, fids);
+                    }}
+                  />
                 </div>
 
                 {/* Category filter - compact - SECOND */}

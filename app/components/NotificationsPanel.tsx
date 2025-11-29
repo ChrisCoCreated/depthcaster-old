@@ -19,6 +19,7 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
   const [error, setError] = useState<string | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
+  const [expandedMuteIndex, setExpandedMuteIndex] = useState<number | null>(null);
   const { user } = useNeynarContext();
 
   const getNotificationPreferences = (): string[] => {
@@ -216,6 +217,77 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
     return null;
   };
 
+  const isNeynarNotification = (notification: Notification): boolean => {
+    const type = String(notification.type).toLowerCase();
+    const neynarTypes = ["follows", "recasts", "likes", "mentions", "replies", "quotes"];
+    return neynarTypes.includes(type);
+  };
+
+  const getNotificationActorFid = (notification: Notification): number | null => {
+    const notif = notification as any;
+    const type = String(notification.type).toLowerCase();
+
+    // For follows
+    if (notif.follows && notif.follows.length > 0) {
+      const follower = notif.follows[0];
+      return (follower as any).fid || (follower as any).user?.fid || null;
+    }
+
+    // For reactions (likes/recasts)
+    if (notif.reactions && notif.reactions.length > 0) {
+      const reaction = notif.reactions[0];
+      return (reaction as any).user?.fid || null;
+    }
+
+    // For replies
+    if (notif.replies && notif.replies.length > 0) {
+      const reply = notif.replies[0];
+      return (reply as any).user?.fid || (reply as any).author?.fid || null;
+    }
+
+    // For mentions/quotes - use cast author
+    if (notification.cast?.author) {
+      return notification.cast.author.fid || null;
+    }
+
+    return null;
+  };
+
+  const handleMuteUser = async (targetFid: number) => {
+    if (!user?.signer_uuid) {
+      alert("Please sign in to mute users");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/user/mute", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          signerUuid: user.signer_uuid,
+          targetFid,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to mute user");
+      }
+
+      // Close the expanded menu
+      setExpandedMuteIndex(null);
+      
+      // Optionally refresh notifications to remove muted user's notifications
+      // For now, just show success feedback
+      alert("User muted successfully");
+    } catch (error: any) {
+      console.error("Mute error:", error);
+      alert(error.message || "Failed to mute user");
+    }
+  };
+
   const getNotificationText = (notification: Notification): string => {
     const count = notification.count || 1;
     const type = String(notification.type).toLowerCase();
@@ -289,6 +361,23 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
     setMounted(true);
   }, []);
 
+  // Close expanded mute menu when clicking outside
+  useEffect(() => {
+    if (expandedMuteIndex === null) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.mute-menu-container')) {
+        setExpandedMuteIndex(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [expandedMuteIndex]);
+
   if (!isOpen || !mounted) return null;
 
   const content = (
@@ -348,9 +437,13 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
             <div>
               {notifications.map((notification, index) => {
                 const link = getNotificationLink(notification);
+                const isNeynar = isNeynarNotification(notification);
+                const actorFid = isNeynar ? getNotificationActorFid(notification) : null;
+                const isMuteExpanded = expandedMuteIndex === index;
+
                 const content = (
                   <div
-                    className={`p-4 border-b border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors ${
+                    className={`p-4 border-b border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors relative ${
                       !notification.seen ? "bg-blue-50 dark:bg-blue-900/20" : ""
                     }`}
                   >
@@ -372,6 +465,47 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
                           )}
                         </div>
                       </div>
+                      {isNeynar && actorFid && (
+                        <div className="relative mute-menu-container">
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setExpandedMuteIndex(isMuteExpanded ? null : index);
+                            }}
+                            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                            title="Mute options"
+                          >
+                            <svg
+                              className="w-5 h-5"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
+                              />
+                            </svg>
+                          </button>
+                          {isMuteExpanded && (
+                            <div className="absolute right-0 top-8 z-10 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg min-w-[200px]">
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleMuteUser(actorFid);
+                                }}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                              >
+                                Mute user everywhere on Farcaster
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
