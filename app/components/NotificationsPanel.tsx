@@ -219,7 +219,8 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
 
   const isNeynarNotification = (notification: Notification): boolean => {
     const type = String(notification.type).toLowerCase();
-    const neynarTypes = ["follows", "recasts", "likes", "mentions", "replies", "quotes"];
+    // Handle both singular and plural forms, and enum values
+    const neynarTypes = ["follows", "recasts", "likes", "mentions", "replies", "quotes", "follow", "recast", "like", "mention", "reply", "quote"];
     return neynarTypes.includes(type);
   };
 
@@ -227,27 +228,37 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
     const notif = notification as any;
     const type = String(notification.type).toLowerCase();
 
+    // Match the exact pattern from getNotificationText for consistency
+    
     // For follows
     if (notif.follows && notif.follows.length > 0) {
       const follower = notif.follows[0];
       return (follower as any).fid || (follower as any).user?.fid || null;
     }
 
-    // For reactions (likes/recasts)
+    // For reactions (likes/recasts) - check reactions array
     if (notif.reactions && notif.reactions.length > 0) {
       const reaction = notif.reactions[0];
-      return (reaction as any).user?.fid || null;
+      const user = (reaction as any).user;
+      if (user?.fid) return user.fid;
     }
 
-    // For replies
+    // For replies - check replies array (matches getNotificationText pattern)
     if (notif.replies && notif.replies.length > 0) {
       const reply = notif.replies[0];
-      return (reply as any).user?.fid || (reply as any).author?.fid || null;
+      const user = (reply as any).user || (reply as any).author;
+      if (user?.fid) return user.fid;
     }
 
-    // For mentions/quotes - use cast author
-    if (notification.cast?.author) {
-      return notification.cast.author.fid || null;
+    // For mentions/quotes - use cast author (matches getNotificationText pattern)
+    // This is the fallback in getNotificationText for replies/quotes/mentions
+    if (notification.cast?.author?.fid) {
+      return notification.cast.author.fid;
+    }
+
+    // Additional fallback: check if cast exists at all
+    if (notif.cast?.author?.fid) {
+      return notif.cast.author.fid;
     }
 
     return null;
@@ -440,6 +451,14 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
                 const isNeynar = isNeynarNotification(notification);
                 const actorFid = isNeynar ? getNotificationActorFid(notification) : null;
                 const isMuteExpanded = expandedMuteIndex === index;
+
+                // Debug logging (can be removed later)
+                if (isNeynar && !actorFid) {
+                  console.log("Neynar notification without actor FID:", {
+                    type: notification.type,
+                    notification: notification,
+                  });
+                }
 
                 const content = (
                   <div
