@@ -33,31 +33,38 @@ export async function GET(request: NextRequest) {
     }
 
     // Map string types to enum values
+    // If types is an empty string, user has disabled all Neynar notification types
     const notificationTypes = types
-      ? types.split(",").map((t) => {
-          const normalized = t.trim().toLowerCase();
-          // Map to enum values
-          switch (normalized) {
-            case "follows":
-              return FetchAllNotificationsTypeEnum.Follows;
-            case "recasts":
-              return FetchAllNotificationsTypeEnum.Recasts;
-            case "likes":
-              return FetchAllNotificationsTypeEnum.Likes;
-            case "mentions":
-            case "mention":
-              return FetchAllNotificationsTypeEnum.Mentions;
-            case "replies":
-            case "reply":
-              return FetchAllNotificationsTypeEnum.Replies;
-            case "quotes":
-            case "quote":
-              return FetchAllNotificationsTypeEnum.Quotes;
-            default:
-              return normalized as FetchAllNotificationsTypeEnum;
-          }
-        }) as FetchAllNotificationsTypeEnum[]
+      ? types.split(",")
+          .map((t) => t.trim())
+          .filter((t) => t.length > 0)
+          .map((t) => {
+            const normalized = t.toLowerCase();
+            // Map to enum values
+            switch (normalized) {
+              case "follows":
+                return FetchAllNotificationsTypeEnum.Follows;
+              case "recasts":
+                return FetchAllNotificationsTypeEnum.Recasts;
+              case "likes":
+                return FetchAllNotificationsTypeEnum.Likes;
+              case "mentions":
+              case "mention":
+                return FetchAllNotificationsTypeEnum.Mentions;
+              case "replies":
+              case "reply":
+                return FetchAllNotificationsTypeEnum.Replies;
+              case "quotes":
+              case "quote":
+                return FetchAllNotificationsTypeEnum.Quotes;
+              default:
+                return normalized as FetchAllNotificationsTypeEnum;
+            }
+          }) as FetchAllNotificationsTypeEnum[]
       : undefined;
+    
+    // If user has explicitly disabled all Neynar notification types, skip Neynar API call
+    const hasNeynarTypesSelected = notificationTypes && notificationTypes.length > 0;
 
     // Check for cache-busting parameter
     const cacheBust = searchParams.get("_t");
@@ -78,17 +85,20 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fetch Neynar notifications
-    const neynarNotifications = await deduplicateRequest(cacheKey, async () => {
-      return await neynarClient.fetchAllNotifications({
-        fid: parseInt(fid),
-        type: notificationTypes,
-        limit,
-        cursor,
-      });
-    });
+    // Fetch Neynar notifications only if user has selected Neynar notification types
+    // If types parameter was provided but resulted in empty array, skip Neynar API call
+    const neynarNotifications = hasNeynarTypesSelected
+      ? await deduplicateRequest(cacheKey, async () => {
+          return await neynarClient.fetchAllNotifications({
+            fid: parseInt(fid),
+            type: notificationTypes,
+            limit,
+            cursor,
+          });
+        })
+      : { notifications: [], next: null };
 
-    console.log(`[Notifications] Found ${neynarNotifications.notifications?.length || 0} Neynar notification(s) for user ${fid}, types: ${types || 'all'}`);
+    console.log(`[Notifications] Found ${neynarNotifications.notifications?.length || 0} Neynar notification(s) for user ${fid}, types: ${types || (hasNeynarTypesSelected ? 'all' : 'none selected')}`);
 
     // Fetch webhook-based notifications (user watches - parent casts only)
     // Include webhook notifications for all notification types (they're cast.created events)

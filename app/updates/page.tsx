@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { MarkdownRenderer } from "../components/MarkdownRenderer";
 import Link from "next/link";
 import { useNeynarContext } from "@neynar/react";
-import { hasPlusRoleUser, hasCuratorOrAdminRoleUser } from "@/lib/roles";
+import { hasPlusRole } from "@/lib/roles";
 import { hasNeynarUpdatesAccess } from "@/lib/plus-features";
 
 export default function UpdatesPage() {
@@ -70,14 +70,18 @@ export default function UpdatesPage() {
       }
 
       try {
-        // Check for plus role or curator role (for backward compatibility)
-        const [hasPlus, hasCurator] = await Promise.all([
-          hasPlusRoleUser(user),
-          hasCuratorOrAdminRoleUser(user),
-        ]);
-        
-        // User has access if they have plus role OR curator role
-        setHasAccess(hasNeynarUpdatesAccess(hasPlus) || hasCurator);
+        // Check for plus role only via API
+        const response = await fetch(`/api/admin/check?fid=${user.fid}`);
+        if (response.ok) {
+          const data = await response.json();
+          const roles = data.roles || [];
+          const userHasPlus = hasPlusRole(roles);
+          
+          // User has access only if they have plus role
+          setHasAccess(hasNeynarUpdatesAccess(userHasPlus));
+        } else {
+          setHasAccess(false);
+        }
       } catch (error) {
         console.error("Error checking updates access:", error);
         setHasAccess(false);

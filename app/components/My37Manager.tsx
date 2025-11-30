@@ -43,6 +43,7 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
   const [savedUsers, setSavedUsers] = useState<UserSuggestion[]>([]);
   const [maxUsers, setMaxUsers] = useState(7); // Default to 7, will be updated based on role
   const [feedName, setFeedName] = useState("My 7"); // Default to "My 7", will be updated based on role
+  const [hasPlus, setHasPlus] = useState(false); // Track if user has plus role
   const [hideRecasts, setHideRecasts] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("my37HideRecasts");
@@ -314,20 +315,23 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
       if (!user?.fid) {
         setMaxUsers(7);
         setFeedName("My 7");
+        setHasPlus(false);
         return;
       }
 
       try {
         const roles = await getUserRoles(user.fid);
-        const hasPlus = hasPlusRole(roles);
-        const max = getMaxMyUsers(hasPlus);
+        const userHasPlus = hasPlusRole(roles);
+        const max = getMaxMyUsers(userHasPlus);
         setMaxUsers(max);
         setFeedName(`My ${max}`);
+        setHasPlus(userHasPlus);
       } catch (error) {
         console.error("Error fetching user role:", error);
         // Default to 7 on error
         setMaxUsers(7);
         setFeedName("My 7");
+        setHasPlus(false);
       }
     };
 
@@ -641,7 +645,13 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
             {/* User Selection */}
             <div className="mb-4">
               <label className="block text-sm font-semibold mb-2 text-gray-900 dark:text-gray-100">
-                Selected Users ({selectedUsers.length}/{maxUsers})
+                Selected Users ({selectedUsers.length}/{maxUsers}
+                {!hasPlus && (
+                  <span className="text-gray-400 dark:text-gray-600 line-through ml-1">
+                    {" "}/37
+                  </span>
+                )}
+                )
               </label>
               <UserSearchInput
                 selectedUsers={selectedUsers}
