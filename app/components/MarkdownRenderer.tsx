@@ -1,14 +1,16 @@
 "use client";
 
+import React from "react";
+
 interface MarkdownRendererProps {
   content: string;
 }
 
 export function MarkdownRenderer({ content }: MarkdownRendererProps) {
   // Simple markdown parser for basic syntax
-  const parseMarkdown = (text: string): JSX.Element[] => {
+  const parseMarkdown = (text: string): React.ReactElement[] => {
     const lines = text.split("\n");
-    const elements: JSX.Element[] = [];
+    const elements: React.ReactElement[] = [];
     let currentList: string[] = [];
     let currentParagraph: string[] = [];
     let inCodeBlock = false;
@@ -152,10 +154,10 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
     return elements;
   };
 
-  const parseInlineMarkdown = (text: string): (string | JSX.Element)[] => {
+  const parseInlineMarkdown = (text: string): (string | React.ReactElement)[] => {
     if (!text) return [];
     
-    const parts: (string | JSX.Element)[] = [];
+    const parts: (string | React.ReactElement)[] = [];
     let currentIndex = 0;
     let lastIndex = 0;
 

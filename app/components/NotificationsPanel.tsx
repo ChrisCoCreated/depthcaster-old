@@ -6,6 +6,8 @@ import { Notification } from "@neynar/nodejs-sdk/build/api";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { useNeynarContext } from "@neynar/react";
+import { NotificationSettings } from "./NotificationSettings";
+import { AvatarImage } from "./AvatarImage";
 
 interface NotificationsPanelProps {
   isOpen: boolean;

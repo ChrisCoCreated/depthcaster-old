@@ -18,14 +18,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!adminFidParam) {
+    if (!adminFid) {
       return NextResponse.json(
         { error: "adminFid is required (as query param or in body)" },
         { status: 400 }
       );
     }
 
-    const adminFidNum = parseInt(adminFidParam);
+    const adminFidNum = parseInt(String(adminFid));
     if (isNaN(adminFidNum)) {
       return NextResponse.json(
         { error: "Invalid adminFid" },
