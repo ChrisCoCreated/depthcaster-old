@@ -177,6 +177,7 @@ export default function AdminStatisticsPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-black p-8">
       <div className="max-w-7xl mx-auto">
+        <>
         <div className="mb-6 flex items-center justify-between">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
             Statistics Dashboard
@@ -690,6 +691,7 @@ export default function AdminStatisticsPage() {
             </div>
           </div>
         )}
+        </>
       </div>
     </div>
   );
