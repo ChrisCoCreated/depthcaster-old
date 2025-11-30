@@ -93,6 +93,11 @@ function AvatarImageComponent({
   const resolvedWidth = width ?? size;
   const resolvedHeight = height ?? size;
   const resolvedAlt = alt?.trim() || "User avatar";
+  
+  // For local static files (starting with /) or external URLs, use unoptimized
+  // This prevents Next.js from trying to optimize static assets through /_next/image
+  const isLocalStaticFile = currentSrc.startsWith("/") && !currentSrc.startsWith("/api/");
+  const shouldUnoptimize = isExternalUrl(currentSrc) || isLocalStaticFile;
 
   return (
     <Image
@@ -103,7 +108,7 @@ function AvatarImageComponent({
       className={className}
       onError={handleError}
       priority={priority}
-      unoptimized={isExternalUrl(currentSrc)}
+      unoptimized={shouldUnoptimize}
       loading={priority ? undefined : "lazy"}
       placeholder="empty"
       style={{ display: 'block' }}
