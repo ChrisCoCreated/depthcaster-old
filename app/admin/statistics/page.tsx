@@ -690,6 +690,7 @@ export default function AdminStatisticsPage() {
             </div>
           </div>
         )}
+      </div>
     </div>
   );
 }
