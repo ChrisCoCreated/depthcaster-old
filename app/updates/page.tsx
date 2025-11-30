@@ -58,32 +58,47 @@ export default function UpdatesPage() {
   }, [user]);
 
   const parseMarkdownForNotification = (markdown: string): { title: string; body: string } => {
-    const lines = markdown.split("\n");
+    // Extract the first update (before the first separator)
+    const firstUpdate = markdown.split("\n\n---\n\n")[0];
+    const lines = firstUpdate.split("\n");
     let title = "Feature Update";
     let body = "";
 
-    // Find first H1 header
+    // Find first H1 header, or fall back to H2 if no H1 found
+    let foundHeader = false;
     for (const line of lines) {
       if (line.trim().startsWith("# ")) {
         // Remove # and emojis, get clean title
         title = line.trim().substring(2).trim();
         // Remove emojis (optional, but cleaner)
         title = title.replace(/[\u{1F300}-\u{1F9FF}]/gu, "").trim();
+        foundHeader = true;
         break;
+      } else if (!foundHeader && line.trim().startsWith("## ")) {
+        // Fall back to H2 if no H1 found (e.g., date header)
+        title = line.trim().substring(3).trim();
+        foundHeader = true;
+        // Continue to look for H1 after H2
       }
     }
 
-    // Extract first paragraph after H1 (text until next header or empty line)
-    let foundH1 = false;
+    // Extract first paragraph after H1 (or after H2 if no H1)
+    let foundTargetHeader = false;
     const bodyLines: string[] = [];
     
     for (const line of lines) {
       if (line.trim().startsWith("# ")) {
-        foundH1 = true;
+        foundTargetHeader = true;
         continue;
       }
       
-      if (foundH1) {
+      // If we found H2 but no H1, use H2 as starting point
+      if (!foundTargetHeader && line.trim().startsWith("## ")) {
+        foundTargetHeader = true;
+        continue;
+      }
+      
+      if (foundTargetHeader) {
         // Stop at next header
         if (line.trim().startsWith("##") || line.trim().startsWith("###")) {
           break;

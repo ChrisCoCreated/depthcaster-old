@@ -645,7 +645,7 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
                           size={40}
                           className="w-10 h-10 rounded-full object-cover"
                         />
-                        <div className="absolute bg-white dark:bg-gray-800 rounded-full p-0.5 border border-gray-300 dark:border-gray-600 flex items-center justify-center" style={{ bottom: '4%', right: '4%', width: '40%', height: '40%', minWidth: '16px', minHeight: '16px' }}>
+                        <div className="absolute bg-white dark:bg-gray-800 rounded-full p-0.5 border border-gray-300 dark:border-gray-600 flex items-center justify-center" style={{ bottom: '0%', right: '0%', width: '40%', height: '40%', minWidth: '16px', minHeight: '16px', transform: 'translate(25%, 25%)' }}>
                           <span className="text-[10px] leading-none">
                             {getNotificationIcon(String(notification.type))}
                           </span>
