@@ -96,7 +96,7 @@ export default function AdminLayout({
   }
 
   const getBreadcrumbs = () => {
-    if (pathname === "/admin") return [{ label: "Dashboard" }];
+    if (pathname === "/admin") return [{ label: "Dashboard", href: "/admin" }];
     
     const parts = pathname.split("/").filter(Boolean);
     const crumbs = [{ label: "Dashboard", href: "/admin" }];
@@ -104,7 +104,7 @@ export default function AdminLayout({
     if (parts.length > 1) {
       const page = navItems.find((item) => item.href === pathname);
       if (page) {
-        crumbs.push({ label: page.label });
+        crumbs.push({ label: page.label, href: page.href });
       }
     }
     
