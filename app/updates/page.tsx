@@ -267,8 +267,24 @@ export default function UpdatesPage() {
           </div>
         ) : !hasAccess ? (
           <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-8">
-            <div className="text-center text-gray-500 dark:text-gray-400 py-8">
-              You don't have access to feature updates. This feature is available to Plus users.
+            <div className="text-center py-8">
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+                  Feature Updates Limited
+                </h2>
+                <p className="text-gray-600 dark:text-gray-400 mb-4">
+                  You don't have access to feature updates. This feature is available to Plus users.
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">
+                  Upgrade to Plus to stay up to date with the latest features and improvements.
+                </p>
+                <Link
+                  href="/upgrade"
+                  className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                >
+                  Upgrade to Plus
+                </Link>
+              </div>
             </div>
           </div>
         ) : (

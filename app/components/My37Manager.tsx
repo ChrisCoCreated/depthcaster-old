@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useNeynarContext } from "@neynar/react";
 import { UserSearchInput } from "./UserSearchInput";
 import { AvatarImage } from "./AvatarImage";
-import { getUserRoles, hasPlusRole } from "@/lib/roles";
+import Link from "next/link";
+import { hasPlusRole } from "@/lib/roles";
 import { getMaxMyUsers } from "@/lib/plus-features";
 
 interface UserSuggestion {
@@ -320,12 +321,21 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
       }
 
       try {
-        const roles = await getUserRoles(user.fid);
-        const userHasPlus = hasPlusRole(roles);
-        const max = getMaxMyUsers(userHasPlus);
-        setMaxUsers(max);
-        setFeedName(`My ${max}`);
-        setHasPlus(userHasPlus);
+        const response = await fetch(`/api/admin/check?fid=${user.fid}`);
+        if (response.ok) {
+          const data = await response.json();
+          const roles = data.roles || [];
+          const userHasPlus = hasPlusRole(roles);
+          const max = getMaxMyUsers(userHasPlus);
+          setMaxUsers(max);
+          setFeedName(`My ${max}`);
+          setHasPlus(userHasPlus);
+        } else {
+          // Default to 7 on API error
+          setMaxUsers(7);
+          setFeedName("My 7");
+          setHasPlus(false);
+        }
       } catch (error) {
         console.error("Error fetching user role:", error);
         // Default to 7 on error
@@ -653,6 +663,19 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
                 )}
                 )
               </label>
+              {!hasPlus && (
+                <div className="mb-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                  <p className="text-sm text-amber-800 dark:text-amber-200 mb-2">
+                    <strong>Features are limited.</strong> Upgrade to Plus to unlock up to 37 users and access to feature updates.
+                  </p>
+                  <Link
+                    href="/upgrade"
+                    className="inline-block px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-sm font-medium"
+                  >
+                    Upgrade to Plus
+                  </Link>
+                </div>
+              )}
               <UserSearchInput
                 selectedUsers={selectedUsers}
                 onSelectUsers={handleUsersChange}
