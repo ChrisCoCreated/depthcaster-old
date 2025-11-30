@@ -638,13 +638,18 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
                     }`}
                   >
                     <div className="flex gap-3">
-                      <div className="flex-shrink-0">
+                      <div className="flex-shrink-0 relative">
                         <AvatarImage
                           src={getNotificationPfpUrl(notification)}
                           alt="User avatar"
                           size={40}
                           className="w-10 h-10 rounded-full object-cover"
                         />
+                        <div className="absolute -bottom-1 -right-1 bg-white dark:bg-gray-800 rounded-full p-1 border-2 border-white dark:border-gray-900">
+                          <span className="text-xs">
+                            {getNotificationIcon(String(notification.type))}
+                          </span>
+                        </div>
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="text-sm text-gray-900 dark:text-gray-100">
