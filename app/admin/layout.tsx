@@ -17,6 +17,7 @@ import {
   Menu,
   X,
   ChevronRight,
+  Lightbulb,
 } from "lucide-react";
 import { AvatarImage } from "@/app/components/AvatarImage";
 
@@ -34,6 +35,7 @@ const navItems: NavItem[] = [
   { href: "/admin/tags", label: "Cast Tags", icon: TagIcon, section: "content" },
   { href: "/admin/curators-leaderboard", label: "Curators Leaderboard", icon: Award, section: "content" },
   { href: "/admin/quality", label: "Quality Filter", icon: Filter, section: "content" },
+  { href: "/admin/build-ideas", label: "Build Ideas", icon: Lightbulb, section: "system" },
   { href: "/admin/notifications", label: "Notifications", icon: Bell, section: "system" },
   { href: "/admin/art-feed", label: "Art Feed", icon: Palette, section: "experimental" },
 ];
@@ -213,9 +215,9 @@ export default function AdminLayout({
           <div className="px-4 lg:px-8 py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-black">
             <nav className="flex items-center gap-2 text-sm overflow-x-auto">
               {breadcrumbs.map((crumb, index) => (
-                <div key={index} className="flex items-center gap-2 flex-shrink-0">
+                <div key={index} className="flex items-center gap-2 shrink-0">
                   {index > 0 && (
-                    <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
                   )}
                   {crumb.href ? (
                     <Link

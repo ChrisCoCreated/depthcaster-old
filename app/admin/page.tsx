@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNeynarContext } from "@neynar/react";
 import Link from "next/link";
 import { useNotificationPermission } from "@/lib/hooks/useNotificationPermission";
-import { BuildIdeasManager } from "@/app/components/BuildIdeasManager";
 import {
   ChevronDown,
   ChevronUp,
@@ -16,7 +15,7 @@ import {
   Bell,
   Palette,
   TestTube,
-  Settings,
+  Lightbulb,
 } from "lucide-react";
 
 export default function AdminPage() {
@@ -39,9 +38,9 @@ export default function AdminPage() {
       } else {
         setNotificationStatus("✗ Notification permission denied. Please enable it in your browser settings.");
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Failed to request permission:", error);
-      setNotificationStatus(`Error: ${error.message || "Failed to request permission"}`);
+      setNotificationStatus(`Error: ${error instanceof Error ? error.message : "Failed to request permission"}`);
     }
   };
 
@@ -79,9 +78,9 @@ export default function AdminPage() {
         `✓ Push notification sent! Delivered to ${result.sent} device(s). Check your other devices!`
       );
       setTimeout(() => setNotificationStatus(""), 5000);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Failed to send push notification:", error);
-      setNotificationStatus(`Error: ${error.message || "Failed to send notification"}`);
+      setNotificationStatus(`Error: ${error instanceof Error ? error.message : "Failed to send notification"}`);
     }
   };
 
@@ -278,6 +277,23 @@ export default function AdminPage() {
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <Link
+            href="/admin/build-ideas"
+            className="group bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 hover:border-blue-500 dark:hover:border-blue-500 transition-colors"
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
+                <Lightbulb className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                Build Ideas
+              </h3>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Manage build ideas and feedback from users
+            </p>
+          </Link>
+
+          <Link
             href="/admin/notifications"
             className="group bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 hover:border-blue-500 dark:hover:border-blue-500 transition-colors"
           >
@@ -315,15 +331,10 @@ export default function AdminPage() {
               </h3>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              View images from any user's casts in a gallery
+              View images from any user&apos;s casts in a gallery
             </p>
           </Link>
         </div>
-      </div>
-
-      {/* Build Ideas Manager */}
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
-        <BuildIdeasManager />
       </div>
     </div>
   );
