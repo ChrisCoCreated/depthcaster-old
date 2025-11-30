@@ -1,6 +1,6 @@
 import { db } from "./db";
-import { curatorCastCurations, userNotifications, users } from "./schema";
-import { eq, and } from "drizzle-orm";
+import { curatorCastCurations, userNotifications, users, userRoles } from "./schema";
+import { eq, and, inArray } from "drizzle-orm";
 import { sendPushNotificationToUser } from "./pushNotifications";
 import { getUser } from "./users";
 import { cacheNotificationCount } from "./cache";
@@ -308,4 +308,134 @@ export async function notifyCuratorsAboutInteraction(
       // Continue with other curators even if one fails
     }
   }
+}
+
+/**
+ * Create an app update notification for a user
+ */
+export async function createAppUpdateNotification(
+  userFid: number,
+  title: string,
+  body: string,
+  url?: string,
+  adminFid: number = 0
+): Promise<void> {
+  try {
+    // Generate a unique castHash for this notification
+    const timestamp = Date.now();
+    const castHash = `app-update-${timestamp}-${userFid}`;
+
+    // Check for existing notification to prevent duplicates (within same second)
+    const existing = await db
+      .select()
+      .from(userNotifications)
+      .where(
+        and(
+          eq(userNotifications.userFid, userFid),
+          eq(userNotifications.castHash, castHash),
+          eq(userNotifications.type, "app.update")
+        )
+      )
+      .limit(1);
+
+    if (existing.length > 0) {
+      console.log(`[Notifications] App update notification already exists for user ${userFid}`);
+      return;
+    }
+
+    // Create castData with notification content
+    const castData = {
+      title,
+      body,
+      url: url || null,
+      type: "app.update",
+    };
+
+    // Create notification
+    await db.insert(userNotifications).values({
+      userFid,
+      type: "app.update",
+      castHash,
+      castData,
+      authorFid: adminFid,
+      isRead: false,
+    });
+
+    // Invalidate count cache
+    cacheNotificationCount.invalidateUser(userFid);
+
+    console.log(`[Notifications] Created app.update notification for user ${userFid}`);
+  } catch (error: any) {
+    // Handle unique constraint violation (duplicate notification)
+    if (error.code === "23505") {
+      console.log(`[Notifications] Duplicate app update notification prevented for user ${userFid}`);
+      return;
+    }
+    console.error(`[Notifications] Error creating app update notification for user ${userFid}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Send app update notifications to multiple users
+ */
+export async function sendAppUpdateNotificationToUsers(
+  userFids: number[],
+  title: string,
+  body: string,
+  url?: string,
+  adminFid: number = 0
+): Promise<{ notificationsCreated: number; pushNotificationsSent: number; errors: number }> {
+  let notificationsCreated = 0;
+  let pushNotificationsSent = 0;
+  let errors = 0;
+
+  // Process in batches of 50 to avoid overwhelming the system
+  const batchSize = 50;
+  for (let i = 0; i < userFids.length; i += batchSize) {
+    const batch = userFids.slice(i, i + batchSize);
+
+    // Create notifications in parallel
+    const notificationResults = await Promise.allSettled(
+      batch.map((fid) => createAppUpdateNotification(fid, title, body, url, adminFid))
+    );
+
+    // Count successes
+    notificationResults.forEach((result) => {
+      if (result.status === "fulfilled") {
+        notificationsCreated++;
+      } else {
+        errors++;
+        console.error(`[Notifications] Failed to create notification:`, result.reason);
+      }
+    });
+
+    // Send push notifications in parallel (after notifications are created)
+    const pushResults = await Promise.allSettled(
+      batch.map((fid) =>
+        sendPushNotificationToUser(fid, {
+          title,
+          body: body.length > 200 ? body.substring(0, 200) + "..." : body,
+          icon: "/icon-192x192.webp",
+          badge: "/icon-96x96.webp",
+          data: {
+            type: "app.update",
+            url: url || "/",
+          },
+        })
+      )
+    );
+
+    // Count push notification successes
+    pushResults.forEach((result) => {
+      if (result.status === "fulfilled") {
+        pushNotificationsSent += result.value.sent;
+      } else {
+        // Push notification failures are less critical, just log
+        console.error(`[Notifications] Failed to send push notification:`, result.reason);
+      }
+    });
+  }
+
+  return { notificationsCreated, pushNotificationsSent, errors };
 }

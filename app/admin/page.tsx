@@ -205,6 +205,12 @@ export default function AdminPage() {
             >
               Quality Range Filter
             </Link>
+            <Link
+              href="/admin/notifications"
+              className="block px-4 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-center"
+            >
+              Send App Update Notifications
+            </Link>
           </div>
         </div>
 

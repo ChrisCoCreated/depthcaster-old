@@ -201,6 +201,12 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
 
   const getNotificationPfpUrl = (notification: Notification): string | null => {
     const notif = notification as any;
+    const type = String(notification.type);
+    
+    // App update notifications don't have a user PFP, return null to use default
+    if (type === "app.update") {
+      return null;
+    }
     
     // For webhook notifications, check actor.pfp_url first
     if (notif.actor?.pfp_url) {
@@ -270,6 +276,8 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
         return "❤️";
       case "curated.recast":
         return "🔄";
+      case "app.update":
+        return "📢";
       default:
         return "🔔";
     }
@@ -279,6 +287,16 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
     const notif = notification as any;
 
     const type = String(notification.type);
+
+    // App update notifications use URL from castData
+    if (type === "app.update") {
+      const url = notif.castData?.url || notif.cast?.data?.url;
+      if (url) {
+        // If URL is relative, return as-is; if absolute, return full URL
+        return url.startsWith("http") ? url : url;
+      }
+      return "/";
+    }
 
     // Curated notifications should prefer conversation view when possible
     if (type === "curated.quality_reply") {
@@ -415,10 +433,16 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
   const getNotificationText = (notification: Notification): string => {
     const count = notification.count || 1;
     const type = String(notification.type).toLowerCase();
+    const notif = notification as any;
+    
+    // App update notifications use title and body from castData
+    if (type === "app.update") {
+      const title = notif.castData?.title || notif.cast?.data?.title || "App Update";
+      return title;
+    }
     
     // Get users based on notification type
     let users: any[] = [];
-    const notif = notification as any;
     if (notif.follows) {
       users = notif.follows;
     } else if (notif.reactions) {
@@ -624,11 +648,33 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
                         <div className="text-sm text-gray-900 dark:text-gray-100">
                           {getNotificationText(notification)}
                         </div>
-                        {notification.cast && (
-                          <div className="mt-2 text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
-                            {notification.cast.text}
-                          </div>
-                        )}
+                        {(() => {
+                          const notif = notification as any;
+                          const type = String(notification.type);
+                          
+                          // For app.update, show body from castData
+                          if (type === "app.update") {
+                            const body = notif.castData?.body || notif.cast?.data?.body;
+                            if (body) {
+                              return (
+                                <div className="mt-2 text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
+                                  {body}
+                                </div>
+                              );
+                            }
+                            return null;
+                          }
+                          
+                          // For other notifications, show cast text
+                          if (notification.cast) {
+                            return (
+                              <div className="mt-2 text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
+                                {notification.cast.text}
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
                         <div className="mt-1 text-xs text-gray-500 dark:text-gray-500">
                           {formatDistanceToNow(
                             new Date((notification as any).most_recent_timestamp || (notification as any).timestamp || (notification as any).created_at || Date.now()),
