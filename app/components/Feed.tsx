@@ -13,6 +13,8 @@ import { saveFeedState, getFeedState, isStateStale, throttle } from "@/lib/feedS
 import { NeynarAuthButton } from "@neynar/react";
 import { analytics } from "@/lib/analytics";
 import { useActivityMonitor } from "@/lib/hooks/useActivityMonitor";
+import { hasPlusRole } from "@/lib/roles-client";
+import { getMaxMyUsers } from "@/lib/plus-features";
 
 interface Curator {
   fid: number;
@@ -110,6 +112,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   const [selectedCuratorFids, setSelectedCuratorFids] = useState<number[]>([]);
   const [my37PackId, setMy37PackId] = useState<string | null>(null);
   const [my37HasUsers, setMy37HasUsers] = useState<boolean>(false);
+  const [myFeedLabel, setMyFeedLabel] = useState<string>("My 7"); // Default to "My 7", will be updated based on role
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [sortBy, setSortBy] = useState<"recently-curated" | "time-of-cast" | "recent-reply" | "quality">(() => {
     if (typeof window !== "undefined") {
@@ -1258,7 +1261,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
             { id: "trending", label: "Trending", requiresAuth: true },
             { id: "for-you", label: "For You", requiresAuth: true },
             { id: "following", label: "Following", requiresAuth: true },
-            { id: "my-37", label: "My 37", requiresAuth: true },
+            { id: "my-37", label: myFeedLabel, requiresAuth: true },
           ].map((tab) => {
             const isDisabled = tab.requiresAuth && !viewerFid;
             const isActive = feedType === tab.id;

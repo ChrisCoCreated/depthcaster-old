@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { useNotificationPermission } from "@/lib/hooks/useNotificationPermission";
 import { useNeynarContext } from "@neynar/react";
 import { analytics } from "@/lib/analytics";
+import { hasPlusRole } from "@/lib/roles-client";
+import Link from "next/link";
 
 interface NotificationPreferences {
   follows: boolean;
@@ -46,6 +48,8 @@ export function NotificationSettings() {
   const [deviceNotificationsEnabled, setDeviceNotificationsEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [hasPlus, setHasPlus] = useState(false);
+  const [isCheckingPlus, setIsCheckingPlus] = useState(true);
   const { isSupported, isGranted, isDenied, requestPermission } = useNotificationPermission();
 
   useEffect(() => {
@@ -62,6 +66,33 @@ export function NotificationSettings() {
     // Load device notification preference
     const deviceEnabled = localStorage.getItem("deviceNotificationsEnabled") === "true";
     setDeviceNotificationsEnabled(deviceEnabled);
+    
+    // Check for plus role
+    const checkPlusRole = async () => {
+      if (!user?.fid) {
+        setHasPlus(false);
+        setIsCheckingPlus(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/admin/check?fid=${user.fid}`);
+        if (response.ok) {
+          const data = await response.json();
+          const roles = data.roles || [];
+          setHasPlus(hasPlusRole(roles));
+        } else {
+          setHasPlus(false);
+        }
+      } catch (error) {
+        console.error("Error checking plus role:", error);
+        setHasPlus(false);
+      } finally {
+        setIsCheckingPlus(false);
+      }
+    };
+
+    checkPlusRole();
     
     // Load curated cast preferences from database
     if (user?.fid && user?.signer_uuid) {
@@ -189,33 +220,68 @@ export function NotificationSettings() {
         </div>
       )}
       
-      <div className="space-y-3">
-        {[
-          { key: "follows" as const, label: "New Followers", emoji: "👥" },
-          { key: "recasts" as const, label: "Recasts", emoji: "🔄" },
-          { key: "likes" as const, label: "Likes", emoji: "❤️" },
-          { key: "mentions" as const, label: "Mentions", emoji: "@" },
-          { key: "replies" as const, label: "Replies", emoji: "💬" },
-          { key: "quotes" as const, label: "Quote Casts", emoji: "💭" },
-        ].map(({ key, label, emoji }) => (
-          <label
-            key={key}
-            className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-800 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900 cursor-pointer"
-          >
-            <div className="flex items-center gap-3">
-              <span className="text-xl">{emoji}</span>
-              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                {label}
-              </span>
-            </div>
-            <input
-              type="checkbox"
-              checked={preferences[key]}
-              onChange={(e) => updatePreference(key, e.target.checked)}
-              className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
-            />
-          </label>
-        ))}
+      {/* Neynar Notifications Section */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            Neynar Notifications
+          </h3>
+          {!isCheckingPlus && !hasPlus && (
+            <span className="text-xs px-2 py-1 bg-amber-100 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200 rounded-full">
+              Plus Required
+            </span>
+          )}
+        </div>
+        {!isCheckingPlus && !hasPlus && (
+          <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+            <p className="text-sm text-amber-800 dark:text-amber-200 mb-2">
+              <strong>Neynar notifications require Plus.</strong> These notifications (follows, recasts, likes, mentions, replies, quotes) are powered by Neynar and require a Plus subscription.
+            </p>
+            <Link
+              href="/upgrade"
+              className="inline-block px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-sm font-medium"
+            >
+              Upgrade to Plus
+            </Link>
+          </div>
+        )}
+        <div className="space-y-3">
+          {[
+            { key: "follows" as const, label: "New Followers", emoji: "👥" },
+            { key: "recasts" as const, label: "Recasts", emoji: "🔄" },
+            { key: "likes" as const, label: "Likes", emoji: "❤️" },
+            { key: "mentions" as const, label: "Mentions", emoji: "@" },
+            { key: "replies" as const, label: "Replies", emoji: "💬" },
+            { key: "quotes" as const, label: "Quote Casts", emoji: "💭" },
+          ].map(({ key, label, emoji }) => (
+            <label
+              key={key}
+              className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer ${
+                !hasPlus && !isCheckingPlus
+                  ? "border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10 opacity-75"
+                  : "border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-xl">{emoji}</span>
+                <span className={`text-sm font-medium ${
+                  !hasPlus && !isCheckingPlus
+                    ? "text-gray-500 dark:text-gray-500"
+                    : "text-gray-900 dark:text-gray-100"
+                }`}>
+                  {label}
+                </span>
+              </div>
+              <input
+                type="checkbox"
+                checked={preferences[key]}
+                onChange={(e) => updatePreference(key, e.target.checked)}
+                disabled={!hasPlus && !isCheckingPlus}
+                className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+            </label>
+          ))}
+        </div>
       </div>
 
       {/* Curated Cast Notifications Section */}

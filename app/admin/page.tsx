@@ -211,6 +211,12 @@ export default function AdminPage() {
             >
               Send App Update Notifications
             </Link>
+            <Link
+              href="/updates"
+              className="block px-4 py-3 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors text-center"
+            >
+              Feature Updates
+            </Link>
           </div>
         </div>
 

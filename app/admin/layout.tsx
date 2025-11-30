@@ -18,6 +18,7 @@ import {
   X,
   ChevronRight,
   Lightbulb,
+  FileText,
 } from "lucide-react";
 import { AvatarImage } from "@/app/components/AvatarImage";
 
@@ -37,6 +38,7 @@ const navItems: NavItem[] = [
   { href: "/admin/quality", label: "Quality Filter", icon: Filter, section: "content" },
   { href: "/admin/build-ideas", label: "Build Ideas", icon: Lightbulb, section: "system" },
   { href: "/admin/notifications", label: "Notifications", icon: Bell, section: "system" },
+  { href: "/updates", label: "Feature Updates", icon: FileText, section: "system" },
   { href: "/admin/art-feed", label: "Art Feed", icon: Palette, section: "experimental" },
 ];
 
@@ -103,11 +105,14 @@ export default function AdminLayout({
     const parts = pathname.split("/").filter(Boolean);
     const crumbs = [{ label: "Dashboard", href: "/admin" }];
     
-    if (parts.length > 1) {
-      const page = navItems.find((item) => item.href === pathname);
-      if (page) {
-        crumbs.push({ label: page.label, href: page.href });
-      }
+    // Handle both /admin/* routes and external routes like /updates
+    const page = navItems.find((item) => item.href === pathname);
+    if (page) {
+      crumbs.push({ label: page.label, href: page.href });
+    } else if (parts.length > 1 && parts[0] === "admin") {
+      // Fallback for admin routes not in navItems
+      const routeName = parts[parts.length - 1];
+      crumbs.push({ label: routeName.charAt(0).toUpperCase() + routeName.slice(1) });
     }
     
     return crumbs;

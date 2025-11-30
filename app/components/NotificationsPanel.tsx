@@ -23,6 +23,7 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
   const [hasMore, setHasMore] = useState(true);
   const [expandedMuteIndex, setExpandedMuteIndex] = useState<number | null>(null);
   const [settingsExpanded, setSettingsExpanded] = useState(false);
+  const [isCurator, setIsCurator] = useState<boolean | null>(null);
   const { user } = useNeynarContext();
 
   const getNotificationPreferences = (): string[] => {
@@ -193,13 +194,61 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
 
   useEffect(() => {
     if (isOpen && user?.fid) {
-      // Mark all notifications as seen first, then fetch fresh data
-      markAsSeen().then(() => {
-        // Add cache-busting parameter to ensure fresh data
+      // Check unread count first to avoid unnecessary API calls
+      const checkAndMarkAsSeen = async () => {
+        try {
+          const countResponse = await fetch(`/api/notifications/count?fid=${user.fid}`);
+          if (countResponse.ok) {
+            const countData = await countResponse.json();
+            const unreadCount = countData.unreadCount || 0;
+            
+            // Only mark as seen if there are unread notifications
+            if (unreadCount > 0) {
+              await markAsSeen();
+            }
+          }
+        } catch (err) {
+          console.error("Failed to check unread count", err);
+          // If count check fails, still try to mark as seen (fallback)
+          await markAsSeen();
+        }
+        
+        // Fetch notifications regardless
         fetchNotifications();
-      });
+      };
+      
+      checkAndMarkAsSeen();
     }
   }, [isOpen, user?.fid, fetchNotifications, markAsSeen]);
+
+  // Check if user has curator role
+  useEffect(() => {
+    const checkCuratorStatus = async () => {
+      if (!user?.fid) {
+        setIsCurator(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/admin/check?fid=${user.fid}`);
+        if (response.ok) {
+          const data = await response.json();
+          // Check if user has curator role (admin/superadmin don't automatically confer curator)
+          const roles = data.roles || [];
+          setIsCurator(roles.includes("curator"));
+        } else {
+          setIsCurator(false);
+        }
+      } catch (error) {
+        console.error("Failed to check curator status:", error);
+        setIsCurator(false);
+      }
+    };
+
+    if (isOpen && user?.fid) {
+      checkCuratorStatus();
+    }
+  }, [isOpen, user?.fid]);
 
   const getNotificationPfpUrl = (notification: Notification): string | null => {
     const notif = notification as any;
@@ -604,6 +653,35 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
               </div>
             )}
           </div>
+
+          {/* Informational note for non-curator users */}
+          {isCurator === false && (
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-800">
+              <div className="flex items-start gap-2">
+                <svg
+                  className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <div className="flex-1">
+                  <p className="text-sm text-blue-900 dark:text-blue-100 font-medium">
+                    Curated Notifications
+                  </p>
+                  <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                    You won't see curated notifications (notifications about casts you've curated) since you don't have a curator role. You will still see regular notifications (follows, likes, recasts, mentions, replies, quotes) if you have a plus role.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {loading && notifications.length === 0 ? (
             <div className="p-8 text-center text-gray-500 dark:text-gray-400">

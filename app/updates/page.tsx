@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import { MarkdownRenderer } from "../components/MarkdownRenderer";
 import Link from "next/link";
 import { useNeynarContext } from "@neynar/react";
-import { hasPlusRole } from "@/lib/roles-client";
-import { hasNeynarUpdatesAccess } from "@/lib/plus-features";
 
 export default function UpdatesPage() {
   const { user } = useNeynarContext();
@@ -14,8 +12,6 @@ export default function UpdatesPage() {
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [isCheckingAdmin, setIsCheckingAdmin] = useState(true);
-  const [hasAccess, setHasAccess] = useState(false);
-  const [isCheckingAccess, setIsCheckingAccess] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [sendMessage, setSendMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -60,38 +56,6 @@ export default function UpdatesPage() {
 
     checkAdminAccess();
   }, [user]);
-
-  useEffect(() => {
-    const checkUpdatesAccess = async () => {
-      if (!user?.fid) {
-        setHasAccess(false);
-        setIsCheckingAccess(false);
-        return;
-      }
-
-      try {
-        // Check for plus role only via API
-        const response = await fetch(`/api/admin/check?fid=${user.fid}`);
-        if (response.ok) {
-          const data = await response.json();
-          const roles = data.roles || [];
-          const userHasPlus = hasPlusRole(roles);
-          
-          // User has access only if they have plus role
-          setHasAccess(hasNeynarUpdatesAccess(userHasPlus));
-        } else {
-          setHasAccess(false);
-        }
-      } catch (error) {
-        console.error("Error checking updates access:", error);
-        setHasAccess(false);
-      } finally {
-        setIsCheckingAccess(false);
-      }
-    };
-
-    checkUpdatesAccess();
-  }, [user?.fid]);
 
   const parseMarkdownForNotification = (markdown: string): { title: string; body: string } => {
     // Extract the first update (before the first separator)
@@ -259,49 +223,19 @@ export default function UpdatesPage() {
           </div>
         )}
 
-        {isCheckingAccess ? (
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-8">
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-8">
+          {loading ? (
             <div className="text-center text-gray-500 dark:text-gray-400 py-8">
-              Checking access...
+              Loading updates...
             </div>
-          </div>
-        ) : !hasAccess ? (
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-8">
-            <div className="text-center py-8">
-              <div className="mb-6">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-                  Feature Updates Limited
-                </h2>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  You don't have access to feature updates. This feature is available to Plus users.
-                </p>
-                <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">
-                  Upgrade to Plus to stay up to date with the latest features and improvements.
-                </p>
-                <Link
-                  href="/upgrade"
-                  className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                >
-                  Upgrade to Plus
-                </Link>
-              </div>
+          ) : error ? (
+            <div className="text-center text-red-600 dark:text-red-400 py-8">
+              {error}
             </div>
-          </div>
-        ) : (
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-8">
-            {loading ? (
-              <div className="text-center text-gray-500 dark:text-gray-400 py-8">
-                Loading updates...
-              </div>
-            ) : error ? (
-              <div className="text-center text-red-600 dark:text-red-400 py-8">
-                {error}
-              </div>
-            ) : (
-              <MarkdownRenderer content={content} />
-            )}
-          </div>
-        )}
+          ) : (
+            <MarkdownRenderer content={content} />
+          )}
+        </div>
       </main>
     </div>
   );

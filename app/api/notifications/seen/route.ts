@@ -4,7 +4,8 @@ import { NotificationType } from "@neynar/nodejs-sdk/build/api";
 import { cacheNotifications, cacheNotificationCount } from "@/lib/cache";
 import { db } from "@/lib/db";
 import { userNotifications } from "@/lib/schema";
-import { eq, and, like } from "drizzle-orm";
+import { eq, and, like, sql } from "drizzle-orm";
+import { getUserRoles, hasCuratorOrAdminRole, hasPlusRole } from "@/lib/roles";
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,6 +24,16 @@ export async function POST(request: NextRequest) {
     let userFid: number | null = null;
     if (fid) {
       userFid = parseInt(fid);
+    }
+
+    // Fetch user roles to check for curator and plus roles
+    let userRoles: string[] = [];
+    let isCurator = false;
+    let hasPlus = false;
+    if (userFid) {
+      userRoles = await getUserRoles(userFid);
+      isCurator = hasCuratorOrAdminRole(userRoles);
+      hasPlus = hasPlusRole(userRoles);
     }
 
     // Map notification type to enum if provided
@@ -56,8 +67,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Handle database-stored curated notifications
-    if (userFid) {
+    // Handle database-stored curated notifications (only if user has curator role)
+    if (userFid && isCurator) {
       if (castHash && notificationType && String(notificationType).startsWith("curated.")) {
         // Mark the specific curated notification as read in the database
         await db
@@ -83,16 +94,49 @@ export async function POST(request: NextRequest) {
             )
           );
       }
-      
-      // Invalidate count cache for this user
+    }
+    
+    // Invalidate count cache for this user (regardless of roles)
+    if (userFid) {
       cacheNotificationCount.invalidateUser(userFid);
     }
 
-    // Mark Neynar notifications as seen (for non-curated types)
-    const result = await neynarClient.markNotificationsAsSeen({
-      signerUuid,
-      type: mappedType,
-    });
+    // Check if there are any unread curated notifications before calling Neynar API
+    // This avoids unnecessary CU usage when there are no unread notifications
+    let hasUnreadCurated = false;
+    if (userFid && isCurator && !castHash && !notificationType) {
+      // Only check if we're opening the panel (not marking a specific notification)
+      const unreadCuratedResult = await db
+        .select({ count: sql<number>`count(*)::int`.as("count") })
+        .from(userNotifications)
+        .where(
+          and(
+            eq(userNotifications.userFid, userFid),
+            eq(userNotifications.isRead, false),
+            like(userNotifications.type, "curated.%")
+          )
+        );
+      hasUnreadCurated = (unreadCuratedResult[0]?.count || 0) > 0;
+    }
+
+    // Only call Neynar API if user has plus role
+    // If user has plus role AND curator role: call Neynar API if specific notificationType requested OR there are unread curated notifications
+    // If user has plus role BUT NOT curator role: call Neynar API if specific notificationType requested (for regular Neynar notifications)
+    // If user does NOT have plus role: skip Neynar API call entirely
+    let result = null;
+    if (hasPlus) {
+      const shouldCallNeynar = 
+        notificationType !== undefined || // Specific notification type requested
+        (isCurator && hasUnreadCurated); // Curator with unread curated notifications
+      
+      if (shouldCallNeynar) {
+        // Mark Neynar notifications as seen (for non-curated types)
+        result = await neynarClient.markNotificationsAsSeen({
+          signerUuid,
+          type: mappedType,
+        });
+      }
+    }
 
     // Invalidate only this user's cache entries instead of clearing all
     if (userFid) {
