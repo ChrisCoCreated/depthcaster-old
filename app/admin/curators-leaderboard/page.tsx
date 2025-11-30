@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useNeynarContext } from "@neynar/react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 
 type CuratorLeaderboardEntry = {
   fid: number;
@@ -96,19 +95,15 @@ export default function CuratorsLeaderboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-black p-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="mb-6">
-          <Link
-            href="/admin"
-            className="text-blue-600 dark:text-blue-400 hover:underline mb-4 inline-block"
-          >
-            ← Back to Admin
-          </Link>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-            Curators Leaderboard
-          </h1>
-        </div>
+    <div className="max-w-6xl mx-auto">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+          Curators Leaderboard
+        </h1>
+        <p className="text-gray-600 dark:text-gray-400">
+          Top curators ranked by their curation activity
+        </p>
+      </div>
 
         {loadingLeaderboard ? (
           <div className="text-center py-12">
@@ -187,7 +182,6 @@ export default function CuratorsLeaderboardPage() {
             </div>
           </div>
         )}
-      </div>
     </div>
   );
 }

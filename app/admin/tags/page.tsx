@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useNeynarContext } from "@neynar/react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { CastCard } from "@/app/components/CastCard";
 
 interface TagCount {
@@ -107,22 +106,15 @@ export default function TagsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-black p-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="mb-6">
-          <Link
-            href="/admin"
-            className="text-blue-600 dark:text-blue-400 hover:underline mb-4 inline-block"
-          >
-            ← Back to Admin Panel
-          </Link>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-            Cast Tags
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            View and manage tags assigned to casts
-          </p>
-        </div>
+    <div className="max-w-6xl mx-auto">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+          Cast Tags
+        </h1>
+        <p className="text-gray-600 dark:text-gray-400">
+          View and manage tags assigned to casts
+        </p>
+      </div>
 
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 mb-6">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
@@ -175,7 +167,6 @@ export default function TagsPage() {
             )}
           </div>
         )}
-      </div>
     </div>
   );
 }

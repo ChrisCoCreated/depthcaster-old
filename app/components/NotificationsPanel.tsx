@@ -645,8 +645,8 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
                           size={40}
                           className="w-10 h-10 rounded-full object-cover"
                         />
-                        <div className="absolute -bottom-1 -right-1 bg-white dark:bg-gray-800 rounded-full p-1 border-2 border-white dark:border-gray-900">
-                          <span className="text-xs">
+                        <div className="absolute bottom-0 right-0 w-5 h-5 flex items-center justify-center bg-gray-900 dark:bg-gray-100 rounded-full border-2 border-white dark:border-gray-900 shadow-sm">
+                          <span className="text-[10px] leading-none">
                             {getNotificationIcon(String(notification.type))}
                           </span>
                         </div>

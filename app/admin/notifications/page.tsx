@@ -308,7 +308,6 @@ export default function AdminNotificationsPage() {
             </div>
           </form>
         </div>
-      </div>
     </div>
   );
 }

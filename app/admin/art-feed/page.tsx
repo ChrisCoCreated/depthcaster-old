@@ -3,7 +3,6 @@
 import { useEffect, useState, useRef, useCallback, Suspense } from "react";
 import { useNeynarContext } from "@neynar/react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
 import { ImageModal } from "@/app/components/ImageModal";
 
 interface ArtFeedImage {
@@ -405,18 +404,17 @@ function ArtFeedContent() {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-black">
+    <div className="max-w-7xl mx-auto">
       {/* Header */}
-      <div className="sticky top-0 z-50 bg-white dark:bg-black border-b border-gray-200 dark:border-gray-800 p-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-          <Link
-            href="/admin"
-            className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-          >
-            ← Back to Admin
-          </Link>
-          
-          <div className="flex-1 max-w-md relative">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+          Art Feed
+        </h1>
+        <p className="text-gray-600 dark:text-gray-400 mb-4">
+          View images from any user's casts in a gallery
+        </p>
+        
+        <div className="max-w-md relative">
             <input
               type="text"
               placeholder="Search user by username..."
@@ -455,19 +453,18 @@ function ArtFeedContent() {
                 ))}
               </div>
             )}
-          </div>
-
-          {selectedUsername && (
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              Viewing: @{selectedUsername}
-            </div>
-          )}
         </div>
+
+        {selectedUsername && (
+          <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            Viewing: @{selectedUsername}
+          </div>
+        )}
       </div>
 
       {/* Image Gallery */}
       {images.length > 0 ? (
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 pb-16">
+        <div className="pb-16">
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5">
             {images.map((image, index) => {
               if (!image.imageUrl) {
@@ -516,13 +513,13 @@ function ArtFeedContent() {
           )}
         </div>
       ) : selectedFid ? (
-        <div className="flex items-center justify-center h-[calc(100vh-80px)]">
+        <div className="flex items-center justify-center py-16">
           <div className="text-gray-500 dark:text-gray-400">
             {loadingImages ? "Loading images..." : "No images found for this user"}
           </div>
         </div>
       ) : (
-        <div className="flex items-center justify-center h-[calc(100vh-80px)]">
+        <div className="flex items-center justify-center py-16">
           <div className="text-center">
             <p className="text-gray-500 dark:text-gray-400 mb-4">
               Search for a user to view their art feed

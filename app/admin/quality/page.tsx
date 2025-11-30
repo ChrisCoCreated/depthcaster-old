@@ -112,22 +112,15 @@ export default function QualityPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-black p-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="mb-6">
-          <Link
-            href="/admin"
-            className="text-blue-600 dark:text-blue-400 hover:underline mb-4 inline-block"
-          >
-            ← Back to Admin Panel
-          </Link>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-            Quality Range Filter
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            View casts and replies within a specific quality score range
-          </p>
-        </div>
+    <div className="max-w-6xl mx-auto">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+          Quality Range Filter
+        </h1>
+        <p className="text-gray-600 dark:text-gray-400">
+          View casts and replies within a specific quality score range
+        </p>
+      </div>
 
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 mb-6">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
@@ -296,7 +289,6 @@ export default function QualityPage() {
             </div>
           </div>
         )}
-      </div>
     </div>
   );
 }
