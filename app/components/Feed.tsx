@@ -111,7 +111,15 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   const [my37PackId, setMy37PackId] = useState<string | null>(null);
   const [my37HasUsers, setMy37HasUsers] = useState<boolean>(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
-  const [sortBy, setSortBy] = useState<"recently-curated" | "time-of-cast" | "recent-reply" | "quality">("recent-reply");
+  const [sortBy, setSortBy] = useState<"recently-curated" | "time-of-cast" | "recent-reply" | "quality">(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("curatedFeedSortBy");
+      if (saved === "recently-curated" || saved === "time-of-cast" || saved === "recent-reply" || saved === "quality") {
+        return saved;
+      }
+    }
+    return "recent-reply"; // Default
+  });
   const sortByInitializedRef = useRef(false);
   const [hasNewCuratedCasts, setHasNewCuratedCasts] = useState(false);
   const curatorFilterInitializedRef = useRef(false);
@@ -129,16 +137,20 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
     inactivityThreshold: 3 * 60 * 1000, // 3 minutes
   });
   
-  // Load sortBy from localStorage after hydration (only once)
+  // Note: sortBy is now initialized synchronously from localStorage above
+  // This useEffect is kept as a safety net to handle external localStorage changes
   useEffect(() => {
     if (!sortByInitializedRef.current) {
+      // Only update if localStorage has a different value than current state
       const saved = localStorage.getItem("curatedFeedSortBy");
       if (saved === "recently-curated" || saved === "time-of-cast" || saved === "recent-reply" || saved === "quality") {
-        setSortBy(saved);
+        if (saved !== sortBy) {
+          setSortBy(saved);
+        }
       }
       sortByInitializedRef.current = true;
     }
-  }, []);
+  }, [sortBy]);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const lastFetchTimeRef = useRef<number>(0);
   const consecutiveLoadsRef = useRef<number>(0);
