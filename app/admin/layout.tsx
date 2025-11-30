@@ -112,7 +112,7 @@ export default function AdminLayout({
     } else if (parts.length > 1 && parts[0] === "admin") {
       // Fallback for admin routes not in navItems
       const routeName = parts[parts.length - 1];
-      crumbs.push({ label: routeName.charAt(0).toUpperCase() + routeName.slice(1) });
+      crumbs.push({ label: routeName.charAt(0).toUpperCase() + routeName.slice(1), href: pathname });
     }
     
     return crumbs;
