@@ -347,7 +347,7 @@ export async function createAppUpdateNotification(
     const castData = {
       title,
       body,
-      url: url || null,
+      url: url || "/updates",
       type: "app.update",
     };
 

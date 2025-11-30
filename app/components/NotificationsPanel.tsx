@@ -297,7 +297,7 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
         // If URL is relative, return as-is; if absolute, return full URL
         return url.startsWith("http") ? url : url;
       }
-      return "/";
+      return "/updates";
     }
 
     // Curated notifications should prefer conversation view when possible
