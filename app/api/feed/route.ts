@@ -410,6 +410,7 @@ export async function GET(request: NextRequest) {
       
       if (sortBy === "quality") {
         // Sort by quality score (descending, nulls last)
+        // Secondary sort by createdAt descending for equal quality scores
         const sortStart = Date.now();
         castsForSorting.sort((a, b) => {
           const aScore = a.qualityScore ?? -1;
@@ -417,10 +418,23 @@ export async function GET(request: NextRequest) {
           if (aScore === -1 && bScore === -1) return 0;
           if (aScore === -1) return 1;
           if (bScore === -1) return -1;
-          return bScore - aScore; // Descending (highest quality first)
+          // Primary sort: quality score descending
+          const scoreDiff = bScore - aScore;
+          if (scoreDiff !== 0) return scoreDiff;
+          // Secondary sort: createdAt descending (newer first when scores are equal)
+          const aTime = a.createdAt.getTime();
+          const bTime = b.createdAt.getTime();
+          return bTime - aTime;
         });
         const sortTime = Date.now() - sortStart;
         console.log(`[Feed] In-memory sort by quality: ${sortTime}ms for ${castsForSorting.length} casts`);
+        
+        // Debug: Log first few quality scores to verify sort order
+        if (castsForSorting.length > 0) {
+          const topScores = castsForSorting.slice(0, Math.min(10, castsForSorting.length))
+            .map(c => ({ hash: c.castHash.substring(0, 8), score: c.qualityScore }));
+          console.log(`[Feed] Quality sort order (top 10):`, topScores);
+        }
 
         // Map to include sortTime (using createdAt as fallback for cursor compatibility)
         castsWithSortTimes = castsForSorting.map((cast) => ({ ...cast, sortTime: cast.createdAt }));
@@ -504,6 +518,13 @@ export async function GET(request: NextRequest) {
 
       const phase3Time = Date.now() - phase3Start;
       console.log(`[Feed] Phase 3 (fetch full cast data): ${phase3Time}ms for ${curatedResults.length} casts`);
+      
+      // Debug: Verify order preservation after database query (for quality sort)
+      if (sortBy === "quality" && curatedResults.length > 0) {
+        const orderAfterDb = curatedResults.slice(0, Math.min(10, curatedResults.length))
+          .map(r => ({ hash: r.castHash.substring(0, 8), score: r.qualityScore }));
+        console.log(`[Feed] Order after DB query (top 10):`, orderAfterDb);
+      }
 
       // Add latest times to results
       const resultsWithTimes = curatedResults.map((row) => ({
@@ -721,6 +742,13 @@ export async function GET(request: NextRequest) {
           }
           return cast;
         });
+        
+        // Debug: Verify final order before returning (for quality sort)
+        if (sortBy === "quality" && casts.length > 0) {
+          const finalOrder = casts.slice(0, Math.min(10, casts.length))
+            .map(c => ({ hash: c.hash?.substring(0, 8) || 'unknown', score: c._qualityScore }));
+          console.log(`[Feed] Final order before return (top 10):`, finalOrder);
+        }
       
       // Set cursor to the last item's sort value based on sortBy mode
       // Limit to requested limit after all filtering and sorting
