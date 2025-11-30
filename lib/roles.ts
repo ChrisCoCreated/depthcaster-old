@@ -13,6 +13,13 @@ export const CURATOR_ROLES = ["curator"] as const;
 export type CuratorRole = typeof CURATOR_ROLES[number];
 
 /**
+ * Centralized array of plus roles
+ */
+export const PLUS_ROLES = ["plus"] as const;
+
+export type PlusRole = typeof PLUS_ROLES[number];
+
+/**
  * Fetch user's roles from the database
  */
 export async function getUserRoles(fid: number): Promise<string[]> {
@@ -78,5 +85,23 @@ export async function hasCuratorOrAdminRoleUser(user: User | null | undefined, r
   if (!user) return false;
   const userRoles = roles || await getUserRoles(user.fid);
   return hasCuratorOrAdminRole(userRoles);
+}
+
+/**
+ * Check if any role in the array is a plus role
+ */
+export function hasPlusRole(roles: string[] | string | null | undefined): boolean {
+  if (!roles) return false;
+  const roleArray = Array.isArray(roles) ? roles : [roles];
+  return roleArray.some((role) => PLUS_ROLES.includes(role as PlusRole));
+}
+
+/**
+ * Check if user has plus role (fetches roles from DB if needed)
+ */
+export async function hasPlusRoleUser(user: User | null | undefined, roles?: string[]): Promise<boolean> {
+  if (!user) return false;
+  const userRoles = roles || await getUserRoles(user.fid);
+  return hasPlusRole(userRoles);
 }
 

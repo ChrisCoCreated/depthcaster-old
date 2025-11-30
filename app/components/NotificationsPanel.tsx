@@ -203,14 +203,16 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
 
   const getNotificationPfpUrl = (notification: Notification): string | null => {
     const notif = notification as any;
-    const type = String(notification.type);
+    const type = String(notification.type).toLowerCase().trim();
+    const castDataType = notif.castData?.type?.toLowerCase()?.trim();
     
-    // App update notifications use the app logo
-    if (type === "app.update") {
+    // App update notifications use the app logo (check first, before any other logic)
+    // Check both notification.type and castData.type for app.update
+    if (type === "app.update" || castDataType === "app.update") {
       return "/icon-192x192.webp";
     }
     
-    // For webhook notifications, check actor.pfp_url first
+    // For webhook notifications, check actor.pfp_url first (but skip for app.update)
     if (notif.actor?.pfp_url) {
       return notif.actor.pfp_url;
     }
@@ -641,7 +643,7 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
                       <div className="flex-shrink-0 relative w-10 h-10">
                         <AvatarImage
                           src={getNotificationPfpUrl(notification)}
-                          alt="User avatar"
+                          alt={String(notification.type).toLowerCase().trim() === "app.update" || (notification as any).castData?.type?.toLowerCase()?.trim() === "app.update" ? "App logo" : "User avatar"}
                           size={40}
                           className="w-10 h-10 rounded-full object-cover"
                         />

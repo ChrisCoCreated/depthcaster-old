@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { MarkdownRenderer } from "../components/MarkdownRenderer";
 import Link from "next/link";
 import { useNeynarContext } from "@neynar/react";
+import { hasPlusRoleUser, hasCuratorOrAdminRoleUser } from "@/lib/roles";
+import { hasNeynarUpdatesAccess } from "@/lib/plus-features";
 
 export default function UpdatesPage() {
   const { user } = useNeynarContext();
@@ -12,6 +14,8 @@ export default function UpdatesPage() {
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [isCheckingAdmin, setIsCheckingAdmin] = useState(true);
+  const [hasAccess, setHasAccess] = useState(false);
+  const [isCheckingAccess, setIsCheckingAccess] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [sendMessage, setSendMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -56,6 +60,34 @@ export default function UpdatesPage() {
 
     checkAdminAccess();
   }, [user]);
+
+  useEffect(() => {
+    const checkUpdatesAccess = async () => {
+      if (!user?.fid) {
+        setHasAccess(false);
+        setIsCheckingAccess(false);
+        return;
+      }
+
+      try {
+        // Check for plus role or curator role (for backward compatibility)
+        const [hasPlus, hasCurator] = await Promise.all([
+          hasPlusRoleUser(user),
+          hasCuratorOrAdminRoleUser(user),
+        ]);
+        
+        // User has access if they have plus role OR curator role
+        setHasAccess(hasNeynarUpdatesAccess(hasPlus) || hasCurator);
+      } catch (error) {
+        console.error("Error checking updates access:", error);
+        setHasAccess(false);
+      } finally {
+        setIsCheckingAccess(false);
+      }
+    };
+
+    checkUpdatesAccess();
+  }, [user?.fid]);
 
   const parseMarkdownForNotification = (markdown: string): { title: string; body: string } => {
     // Extract the first update (before the first separator)
@@ -223,19 +255,33 @@ export default function UpdatesPage() {
           </div>
         )}
 
-        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-8">
-          {loading ? (
+        {isCheckingAccess ? (
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-8">
             <div className="text-center text-gray-500 dark:text-gray-400 py-8">
-              Loading updates...
+              Checking access...
             </div>
-          ) : error ? (
-            <div className="text-center text-red-600 dark:text-red-400 py-8">
-              {error}
+          </div>
+        ) : !hasAccess ? (
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-8">
+            <div className="text-center text-gray-500 dark:text-gray-400 py-8">
+              You don't have access to feature updates. This feature is available to Plus users.
             </div>
-          ) : (
-            <MarkdownRenderer content={content} />
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-8">
+            {loading ? (
+              <div className="text-center text-gray-500 dark:text-gray-400 py-8">
+                Loading updates...
+              </div>
+            ) : error ? (
+              <div className="text-center text-red-600 dark:text-red-400 py-8">
+                {error}
+              </div>
+            ) : (
+              <MarkdownRenderer content={content} />
+            )}
+          </div>
+        )}
       </main>
     </div>
   );

@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useNeynarContext } from "@neynar/react";
 import { UserSearchInput } from "./UserSearchInput";
 import { AvatarImage } from "./AvatarImage";
+import { getUserRoles, hasPlusRole } from "@/lib/roles";
+import { getMaxMyUsers } from "@/lib/plus-features";
 
 interface UserSuggestion {
   username: string;
@@ -29,8 +31,6 @@ interface My37ManagerProps {
   onPackReady?: (packId: string, hasUsers: boolean) => void;
 }
 
-const MAX_USERS = 37;
-
 export function My37Manager({ onPackReady }: My37ManagerProps) {
   const { user } = useNeynarContext();
   const [pack, setPack] = useState<Pack | null>(null);
@@ -41,6 +41,8 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
   const [error, setError] = useState<string | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [savedUsers, setSavedUsers] = useState<UserSuggestion[]>([]);
+  const [maxUsers, setMaxUsers] = useState(7); // Default to 7, will be updated based on role
+  const [feedName, setFeedName] = useState("My 7"); // Default to "My 7", will be updated based on role
   const [hideRecasts, setHideRecasts] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("my37HideRecasts");
@@ -95,11 +97,12 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
         }
       }
 
-      // Then, try to find existing "My 37" pack in database
+      // Then, try to find existing "My X" pack in database (could be "My 7" or "My 37")
       const packsResponse = await fetch(`/api/curator-packs?creatorFid=${user.fid}`);
       if (packsResponse.ok) {
         const packsData = await packsResponse.json();
-        const my37Pack = packsData.packs?.find((p: Pack) => p.name === "My 37");
+        // Look for "My 37" first (for backward compatibility), then "My 7"
+        const my37Pack = packsData.packs?.find((p: Pack) => p.name === "My 37" || p.name === "My 7");
         
         if (my37Pack) {
           // Fetch pack details with users
@@ -180,8 +183,8 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: "My 37",
-          description: "Your selected 37 users",
+          name: feedName,
+          description: `Your selected ${maxUsers} users`,
           fids,
           userData,
           isPublic: false,
@@ -219,7 +222,7 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
     } finally {
       setSaving(false);
     }
-  }, [user?.fid, onPackReady]);
+  }, [user?.fid, onPackReady, feedName, maxUsers]);
 
   // Update pack with new users
   const updatePack = useCallback(async (newUsers: UserSuggestion[], isAutoSave = false) => {
@@ -250,8 +253,8 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: "My 37",
-          description: "Your selected 37 users",
+          name: feedName,
+          description: `Your selected ${maxUsers} users`,
           fids,
           userData,
           creatorFid: user.fid,
@@ -288,7 +291,7 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
     } finally {
       setSaving(false);
     }
-  }, [pack, user?.fid, onPackReady]);
+  }, [pack, user?.fid, onPackReady, feedName, maxUsers, saving]);
 
   // Fetch suggested users from bestfriends
   const fetchSuggestedUsers = useCallback(async () => {
@@ -303,6 +306,32 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
     } catch (error) {
       console.error("Error fetching suggested users:", error);
     }
+  }, [user?.fid]);
+
+  // Fetch user's plus role status and set max users
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      if (!user?.fid) {
+        setMaxUsers(7);
+        setFeedName("My 7");
+        return;
+      }
+
+      try {
+        const roles = await getUserRoles(user.fid);
+        const hasPlus = hasPlusRole(roles);
+        const max = getMaxMyUsers(hasPlus);
+        setMaxUsers(max);
+        setFeedName(`My ${max}`);
+      } catch (error) {
+        console.error("Error fetching user role:", error);
+        // Default to 7 on error
+        setMaxUsers(7);
+        setFeedName("My 7");
+      }
+    };
+
+    fetchUserRole();
   }, [user?.fid]);
 
   useEffect(() => {
@@ -364,9 +393,9 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
   // Handle user selection - update local state and trigger auto-save
   const handleUsersChange = useCallback((newUsers: UserSuggestion[]) => {
     // Enforce maximum limit
-    const limitedUsers = newUsers.slice(0, MAX_USERS);
-    if (newUsers.length > MAX_USERS) {
-      setError(`Maximum ${MAX_USERS} users allowed. Only the first ${MAX_USERS} users will be saved.`);
+    const limitedUsers = newUsers.slice(0, maxUsers);
+    if (newUsers.length > maxUsers) {
+      setError(`Maximum ${maxUsers} users allowed. Only the first ${maxUsers} users will be saved.`);
       setSelectedUsers(limitedUsers);
       // Save to localStorage
       localStorage.setItem("my37SelectedUsers", JSON.stringify(limitedUsers.map(u => ({
@@ -390,7 +419,7 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
     }))));
     // Trigger auto-save
     triggerAutoSave(newUsers);
-  }, [triggerAutoSave]);
+  }, [triggerAutoSave, maxUsers]);
 
   // Save to database when user clicks save button
   const handleSave = async () => {
@@ -407,8 +436,8 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
       return;
     }
 
-    if (selectedUsers.length > MAX_USERS) {
-      setError(`Maximum ${MAX_USERS} users allowed`);
+    if (selectedUsers.length > maxUsers) {
+      setError(`Maximum ${maxUsers} users allowed`);
       return;
     }
 
@@ -433,7 +462,7 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
   if (loading) {
     return (
       <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-        Loading My 37...
+        Loading {feedName}...
       </div>
     );
   }
@@ -441,7 +470,7 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
   if (!user) {
     return (
       <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-        Please sign in to use My 37
+        Please sign in to use {feedName}
       </div>
     );
   }
@@ -457,7 +486,7 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
             >
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  My 37
+                  {feedName}
                 </span>
                 {selectedUsers.length > 0 && (
                   <div className="flex items-center gap-1.5">
@@ -523,10 +552,10 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
             >
               <div>
                 <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 mb-1">
-                  My 37
+                  {feedName}
                 </h3>
                 <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                  Select up to {MAX_USERS} users for your personalized feed
+                  Select up to {maxUsers} users for your personalized feed
                 </p>
               </div>
               <div className="flex items-center gap-3">
@@ -598,7 +627,7 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
               </div>
               <button
                 onClick={handleSave}
-                disabled={saving || selectedUsers.length === 0 || selectedUsers.length > MAX_USERS}
+                disabled={saving || selectedUsers.length === 0 || selectedUsers.length > maxUsers}
                 className={`px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium ${
                   hasPendingChanges
                     ? "bg-amber-600 text-white hover:bg-amber-700 dark:bg-amber-600 dark:hover:bg-amber-700"
@@ -612,7 +641,7 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
             {/* User Selection */}
             <div className="mb-4">
               <label className="block text-sm font-semibold mb-2 text-gray-900 dark:text-gray-100">
-                Selected Users ({selectedUsers.length}/{MAX_USERS})
+                Selected Users ({selectedUsers.length}/{maxUsers})
               </label>
               <UserSearchInput
                 selectedUsers={selectedUsers}
@@ -636,13 +665,13 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
                         <button
                           key={user.fid}
                           onClick={() => {
-                            if (selectedUsers.length < MAX_USERS) {
+                            if (selectedUsers.length < maxUsers) {
                               handleUsersChange([...selectedUsers, user]);
                             } else {
-                              setError(`Maximum ${MAX_USERS} users allowed`);
+                              setError(`Maximum ${maxUsers} users allowed`);
                             }
                           }}
-                          disabled={selectedUsers.length >= MAX_USERS}
+                          disabled={selectedUsers.length >= maxUsers}
                           className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <AvatarImage
@@ -669,7 +698,7 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     {selectedUsers.length} {selectedUsers.length === 1 ? "user" : "users"} selected
                   </span>
-                  {selectedUsers.length >= MAX_USERS && (
+                  {selectedUsers.length >= maxUsers && (
                     <span className="text-xs text-amber-600 dark:text-amber-400">
                       Maximum reached
                     </span>

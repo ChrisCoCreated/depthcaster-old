@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { NotificationSettings } from "../components/NotificationSettings";
 import { FeedSettings } from "../components/FeedSettings";
 import { BotSettings } from "../components/BotSettings";
@@ -8,12 +9,44 @@ import { CurationSettings } from "../components/CurationSettings";
 import { useNeynarContext } from "@neynar/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { hasPlusRoleUser, hasCuratorOrAdminRoleUser } from "@/lib/roles";
+import { hasNeynarUpdatesAccess } from "@/lib/plus-features";
 
 const ADMIN_FID = 5701;
 
 export default function SettingsPage() {
   const { user, logoutUser } = useNeynarContext();
   const router = useRouter();
+  const [hasUpdatesAccess, setHasUpdatesAccess] = useState(false);
+  const [isCheckingAccess, setIsCheckingAccess] = useState(true);
+
+  useEffect(() => {
+    const checkUpdatesAccess = async () => {
+      if (!user?.fid) {
+        setHasUpdatesAccess(false);
+        setIsCheckingAccess(false);
+        return;
+      }
+
+      try {
+        // Check for plus role or curator role (for backward compatibility)
+        const [hasPlus, hasCurator] = await Promise.all([
+          hasPlusRoleUser(user),
+          hasCuratorOrAdminRoleUser(user),
+        ]);
+        
+        // User has access if they have plus role OR curator role
+        setHasUpdatesAccess(hasNeynarUpdatesAccess(hasPlus) || hasCurator);
+      } catch (error) {
+        console.error("Error checking updates access:", error);
+        setHasUpdatesAccess(false);
+      } finally {
+        setIsCheckingAccess(false);
+      }
+    };
+
+    checkUpdatesAccess();
+  }, [user?.fid]);
 
   if (!user) {
     return (
@@ -75,20 +108,22 @@ export default function SettingsPage() {
             <CurationSettings />
           </div>
 
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-6">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
-              Feature Updates
-            </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Stay up to date with the latest features and improvements
-            </p>
-            <Link
-              href="/updates"
-              className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              View Updates
-            </Link>
-          </div>
+          {!isCheckingAccess && hasUpdatesAccess && (
+            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                Feature Updates
+              </h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                Stay up to date with the latest features and improvements
+              </p>
+              <Link
+                href="/updates"
+                className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                View Updates
+              </Link>
+            </div>
+          )}
 
           <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-6">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
