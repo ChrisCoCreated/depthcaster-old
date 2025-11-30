@@ -63,7 +63,7 @@ export default function UpgradePage() {
                 </li>
                 <li className="flex items-start">
                   <span className="text-green-600 dark:text-green-400 mr-2">✓</span>
-                  <span>Access to feature updates and announcements</span>
+                  <span>Farcaster-wide notifications (follows, recasts, likes, mentions, replies, quotes)</span>
                 </li>
               </ul>
             </div>
