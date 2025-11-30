@@ -26,3 +26,4 @@ CREATE INDEX IF NOT EXISTS "cast_replies_category_idx" ON "cast_replies" USING b
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "cast_replies_quality_category_idx" ON "cast_replies" USING btree ("quality_score", "category");
 
+

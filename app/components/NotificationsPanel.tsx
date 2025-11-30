@@ -205,9 +205,9 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
     const notif = notification as any;
     const type = String(notification.type);
     
-    // App update notifications don't have a user PFP, return null to use default
+    // App update notifications use the app logo
     if (type === "app.update") {
-      return null;
+      return "/icon-192x192.webp";
     }
     
     // For webhook notifications, check actor.pfp_url first
@@ -645,8 +645,8 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
                           size={40}
                           className="w-10 h-10 rounded-full object-cover"
                         />
-                        <div className="absolute bg-white dark:bg-gray-800 rounded-full p-0.5 border border-gray-300 dark:border-gray-600 flex items-center justify-center" style={{ bottom: '8.33%', right: '8.33%', width: '33.33%', height: '33.33%', minWidth: '14px', minHeight: '14px' }}>
-                          <span className="text-xs leading-none">
+                        <div className="absolute bg-white dark:bg-gray-800 rounded-full p-0.5 border border-gray-300 dark:border-gray-600 flex items-center justify-center" style={{ bottom: '4%', right: '4%', width: '40%', height: '40%', minWidth: '16px', minHeight: '16px' }}>
+                          <span className="text-[10px] leading-none">
                             {getNotificationIcon(String(notification.type))}
                           </span>
                         </div>
