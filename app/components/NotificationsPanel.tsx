@@ -20,6 +20,7 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [expandedMuteIndex, setExpandedMuteIndex] = useState<number | null>(null);
+  const [settingsExpanded, setSettingsExpanded] = useState(false);
   const { user } = useNeynarContext();
 
   const getNotificationPreferences = (): string[] => {
@@ -40,6 +41,65 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
     } catch (e) {
       return ["follows", "recasts", "likes", "mentions", "replies", "quotes"];
     }
+  };
+
+  const getNotificationUserScore = (notification: Notification): number | null => {
+    const notif = notification as any;
+    
+    // For webhook notifications, check actor.score or castData.author.score
+    if (notif.actor?.score !== undefined) {
+      return notif.actor.score;
+    }
+    if (notif.castData?.author?.score !== undefined) {
+      return notif.castData.author.score;
+    }
+    if (notif.castData?.author?.experimental?.neynar_user_score !== undefined) {
+      return notif.castData.author.experimental.neynar_user_score;
+    }
+    
+    // For Neynar notifications, check follows array
+    if (notif.follows && notif.follows.length > 0) {
+      const follower = notif.follows[0];
+      const score = (follower as any).user?.score ?? 
+                   (follower as any).score ?? 
+                   (follower as any).user?.experimental?.neynar_user_score;
+      if (score !== undefined) return score;
+    }
+    
+    // For reactions (likes/recasts)
+    if (notif.reactions && notif.reactions.length > 0) {
+      const reaction = notif.reactions[0];
+      const score = (reaction as any).user?.score ?? 
+                   (reaction as any).score ?? 
+                   (reaction as any).user?.experimental?.neynar_user_score;
+      if (score !== undefined) return score;
+    }
+    
+    // For replies
+    if (notif.replies && notif.replies.length > 0) {
+      const reply = notif.replies[0];
+      const user = (reply as any).user || (reply as any).author;
+      const score = user?.score ?? user?.experimental?.neynar_user_score;
+      if (score !== undefined) return score;
+    }
+    
+    // For curated cast notifications, check castData.author
+    if (notif.castData?.author?.score !== undefined) {
+      return notif.castData.author.score;
+    }
+    if (notif.castData?.author?.experimental?.neynar_user_score !== undefined) {
+      return notif.castData.author.experimental.neynar_user_score;
+    }
+    
+    // Fallback to cast author
+    if (notification.cast?.author?.score !== undefined) {
+      return notification.cast.author.score;
+    }
+    if (notification.cast?.author?.experimental?.neynar_user_score !== undefined) {
+      return notification.cast.author.experimental.neynar_user_score;
+    }
+    
+    return null;
   };
 
   const fetchNotifications = useCallback(async (newCursor?: string | null) => {
@@ -79,10 +139,19 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
 
       const data = await response.json();
       
+      // Filter out notifications from users with score < 0.55
+      const MIN_SCORE_THRESHOLD = 0.55;
+      const filteredNotifications = (data.notifications || []).filter((notification: Notification) => {
+        const userScore = getNotificationUserScore(notification);
+        // If score is null/undefined, include the notification (don't filter out unknown scores)
+        // Only filter out if score exists and is below threshold
+        return userScore === null || userScore === undefined || userScore >= MIN_SCORE_THRESHOLD;
+      });
+      
       if (newCursor) {
-        setNotifications((prev) => [...prev, ...data.notifications]);
+        setNotifications((prev) => [...prev, ...filteredNotifications]);
       } else {
-        setNotifications(data.notifications || []);
+        setNotifications(filteredNotifications);
       }
 
       setCursor(data.next?.cursor || null);
@@ -129,6 +198,50 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
       });
     }
   }, [isOpen, user?.fid, fetchNotifications, markAsSeen]);
+
+  const getNotificationPfpUrl = (notification: Notification): string | null => {
+    const notif = notification as any;
+    
+    // For webhook notifications, check actor.pfp_url first
+    if (notif.actor?.pfp_url) {
+      return notif.actor.pfp_url;
+    }
+    
+    // For Neynar notifications, check follows array
+    if (notif.follows && notif.follows.length > 0) {
+      const follower = notif.follows[0];
+      const pfp = (follower as any).user?.pfp_url || (follower as any).pfp_url;
+      if (pfp) return pfp;
+    }
+    
+    // For reactions (likes/recasts)
+    if (notif.reactions && notif.reactions.length > 0) {
+      const reaction = notif.reactions[0];
+      const pfp = (reaction as any).user?.pfp_url || (reaction as any).pfp_url;
+      if (pfp) return pfp;
+    }
+    
+    // For replies
+    if (notif.replies && notif.replies.length > 0) {
+      const reply = notif.replies[0];
+      const user = (reply as any).user || (reply as any).author;
+      const pfp = user?.pfp_url;
+      if (pfp) return pfp;
+    }
+    
+    // For curated cast notifications, check castData.author
+    if (notif.castData?.author?.pfp_url) {
+      return notif.castData.author.pfp_url;
+    }
+    
+    // Fallback to cast author
+    if (notification.cast?.author?.pfp_url) {
+      return notification.cast.author.pfp_url;
+    }
+    
+    return null;
+  };
+
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
@@ -432,6 +545,38 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
+          {/* Notification Settings Accordion */}
+          <div className="border-b border-gray-200 dark:border-gray-800">
+            <button
+              onClick={() => setSettingsExpanded(!settingsExpanded)}
+              className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+            >
+              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                Notification Settings
+              </span>
+              <svg
+                className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${
+                  settingsExpanded ? "rotate-180" : ""
+                }`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+            </button>
+            {settingsExpanded && (
+              <div className="border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50">
+                <NotificationSettings />
+              </div>
+            )}
+          </div>
+
           {loading && notifications.length === 0 ? (
             <div className="p-8 text-center text-gray-500 dark:text-gray-400">
               Loading notifications...
@@ -467,7 +612,14 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
                     }`}
                   >
                     <div className="flex gap-3">
-                      <div className="text-2xl">{getNotificationIcon(notification.type)}</div>
+                      <div className="flex-shrink-0">
+                        <AvatarImage
+                          src={getNotificationPfpUrl(notification)}
+                          alt="User avatar"
+                          size={40}
+                          className="w-10 h-10 rounded-full object-cover"
+                        />
+                      </div>
                       <div className="flex-1 min-w-0">
                         <div className="text-sm text-gray-900 dark:text-gray-100">
                           {getNotificationText(notification)}
