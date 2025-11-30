@@ -53,6 +53,11 @@ export default function AdminNotificationsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!user || !user.fid) {
+      setMessage({ type: "error", text: "You must be logged in to send notifications" });
+      return;
+    }
+    
     if (!title.trim() || !body.trim()) {
       setMessage({ type: "error", text: "Title and message are required" });
       return;
