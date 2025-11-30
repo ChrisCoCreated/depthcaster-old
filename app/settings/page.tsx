@@ -9,7 +9,7 @@ import { CurationSettings } from "../components/CurationSettings";
 import { useNeynarContext } from "@neynar/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { hasPlusRole } from "@/lib/roles";
+import { hasPlusRole } from "@/lib/roles-client";
 import { hasNeynarUpdatesAccess } from "@/lib/plus-features";
 
 const ADMIN_FID = 5701;

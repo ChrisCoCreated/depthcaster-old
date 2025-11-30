@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { MarkdownRenderer } from "../components/MarkdownRenderer";
 import Link from "next/link";
 import { useNeynarContext } from "@neynar/react";
-import { hasPlusRole } from "@/lib/roles";
+import { hasPlusRole } from "@/lib/roles-client";
 import { hasNeynarUpdatesAccess } from "@/lib/plus-features";
 
 export default function UpdatesPage() {

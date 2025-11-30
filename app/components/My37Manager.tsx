@@ -5,7 +5,7 @@ import { useNeynarContext } from "@neynar/react";
 import { UserSearchInput } from "./UserSearchInput";
 import { AvatarImage } from "./AvatarImage";
 import Link from "next/link";
-import { hasPlusRole } from "@/lib/roles";
+import { hasPlusRole } from "@/lib/roles-client";
 import { getMaxMyUsers } from "@/lib/plus-features";
 
 interface UserSuggestion {
