@@ -46,6 +46,11 @@ export default function AdminPage() {
   };
 
   const sendTestNotification = async () => {
+    if (!user) {
+      setNotificationStatus("Error: User not found");
+      return;
+    }
+
     try {
       setNotificationStatus("Sending push notification...");
 
@@ -113,7 +118,7 @@ export default function AdminPage() {
         {showNotificationTesting && (
           <div className="px-6 pb-6 space-y-4">
             <div className="text-sm text-gray-600 dark:text-gray-400">
-              <p>Test sending a device notification to user FID {user.fid}</p>
+              <p>Test sending a device notification to user FID {user?.fid ?? "N/A"}</p>
               <p className="mt-2">
                 Notification Support: {isSupported ? "✓ Supported" : "✗ Not Supported"}
               </p>
