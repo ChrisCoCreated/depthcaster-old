@@ -493,7 +493,7 @@ async function createFeedbackNotification(
       .limit(1);
 
     if (existing.length > 0) {
-      console.log(`[Notifications] Feedback notification already exists for admin ${adminFid}, feedback ${feedbackId}`);
+      console.log(`[Notifications] Feedback notification already exists for admin/superadmin ${adminFid}, feedback ${feedbackId}`);
       return;
     }
 
@@ -522,20 +522,20 @@ async function createFeedbackNotification(
     // Invalidate count cache
     cacheNotificationCount.invalidateUser(adminFid);
 
-    console.log(`[Notifications] Created feedback.new notification for admin ${adminFid}, feedback ${feedbackId}`);
+    console.log(`[Notifications] Created feedback.new notification for admin/superadmin ${adminFid}, feedback ${feedbackId}`);
   } catch (error: any) {
     // Handle unique constraint violation (duplicate notification)
     if (error.code === "23505") {
-      console.log(`[Notifications] Duplicate feedback notification prevented for admin ${adminFid}, feedback ${feedbackId}`);
+      console.log(`[Notifications] Duplicate feedback notification prevented for admin/superadmin ${adminFid}, feedback ${feedbackId}`);
       return;
     }
-    console.error(`[Notifications] Error creating feedback notification for admin ${adminFid}:`, error);
+    console.error(`[Notifications] Error creating feedback notification for admin/superadmin ${adminFid}:`, error);
     throw error;
   }
 }
 
 /**
- * Notify all admins about new feedback submission
+ * Notify all admins and superadmins about new feedback submission
  */
 export async function notifyAdminsAboutFeedback(
   feedbackId: string,
@@ -545,11 +545,11 @@ export async function notifyAdminsAboutFeedback(
   castHash: string | null
 ): Promise<void> {
   try {
-    // Get all admin FIDs
+    // Get all admin and superadmin FIDs
     const adminFids = await getAllAdminFids();
 
     if (adminFids.length === 0) {
-      console.log(`[Notifications] No admins found to notify about feedback ${feedbackId}`);
+      console.log(`[Notifications] No admins or superadmins found to notify about feedback ${feedbackId}`);
       return;
     }
 
@@ -592,15 +592,15 @@ export async function notifyAdminsAboutFeedback(
             url: `/admin/build-ideas?type=feedback`,
           },
         }).catch((error) => {
-          console.error(`[Notifications] Error sending push notification to admin ${adminFid}:`, error);
+          console.error(`[Notifications] Error sending push notification to admin/superadmin ${adminFid}:`, error);
         });
       } catch (error) {
-        console.error(`[Notifications] Error notifying admin ${adminFid} about feedback:`, error);
-        // Continue with other admins even if one fails
+        console.error(`[Notifications] Error notifying admin/superadmin ${adminFid} about feedback:`, error);
+        // Continue with other admins/superadmins even if one fails
       }
     }
 
-    console.log(`[Notifications] Notified ${adminFids.length} admin(s) about feedback ${feedbackId}`);
+    console.log(`[Notifications] Notified ${adminFids.length} admin/superadmin(s) about feedback ${feedbackId}`);
   } catch (error) {
     console.error(`[Notifications] Error notifying admins about feedback ${feedbackId}:`, error);
     // Don't throw - we don't want to fail feedback submission if notification fails

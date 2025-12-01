@@ -144,14 +144,31 @@ export function NotificationBell() {
         const body = getNotificationText(notification);
         const url = getNotificationUrl(notification);
         
-        registration.showNotification(title, {
-          body,
-          icon: "/icon-192x192.webp",
-          badge: "/icon-96x96.webp",
-          tag: `notification-${notification.cast?.hash || notification.timestamp || Date.now()}`,
-          data: { url },
-          requireInteraction: false,
-        });
+        // Send message to service worker to show notification
+        // This is more reliable on desktop browsers than calling registration.showNotification() directly
+        if (navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({
+            type: 'SHOW_NOTIFICATION',
+            notification: {
+              title,
+              body,
+              icon: "/icon-192x192.webp",
+              badge: "/icon-96x96.webp",
+              tag: `notification-${notification.cast?.hash || notification.timestamp || Date.now()}`,
+              data: { url },
+            }
+          });
+        } else {
+          // Fallback: if service worker isn't controlling the page yet, use direct call
+          registration.showNotification(title, {
+            body,
+            icon: "/icon-192x192.webp",
+            badge: "/icon-96x96.webp",
+            tag: `notification-${notification.cast?.hash || notification.timestamp || Date.now()}`,
+            data: { url },
+            requireInteraction: false,
+          });
+        }
       }
     } catch (error) {
       console.error("Failed to show device notification:", error);
