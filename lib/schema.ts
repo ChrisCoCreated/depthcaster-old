@@ -238,6 +238,7 @@ export const buildIdeas = pgTable("build_ideas", {
   url: text("url"), // For build ideas
   castHash: text("cast_hash"), // For feedback - optional cast hash or link
   type: text("type").notNull().default("build-idea"), // 'build-idea' or 'feedback'
+  feedbackType: text("feedback_type"), // For feedback: 'bug', 'feature', or 'feedback'
   userFid: bigint("user_fid", { mode: "number" }).notNull().references(() => users.fid),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

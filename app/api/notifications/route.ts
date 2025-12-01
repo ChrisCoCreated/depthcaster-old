@@ -89,6 +89,7 @@ export async function GET(request: NextRequest) {
     // Parse cursor to get count of Neynar notifications already loaded
     let neynarCountLoaded = 0;
     const MAX_NEYNAR_NOTIFICATIONS = 100;
+    let originalNeynarCursor: string | undefined = cursor;
     
     if (cursor) {
       try {
@@ -98,9 +99,15 @@ export async function GET(request: NextRequest) {
         // Check if cursor contains neynar_count (our custom tracking)
         if (cursorData.neynar_count !== undefined) {
           neynarCountLoaded = parseInt(cursorData.neynar_count) || 0;
+          // Extract original Neynar cursor (without our custom fields)
+          // Remove neynar_count and reconstruct the original cursor
+          const { neynar_count: _, ...originalCursorData } = cursorData;
+          // Re-encode the original cursor without our custom field
+          originalNeynarCursor = Buffer.from(JSON.stringify(originalCursorData)).toString('base64');
         }
       } catch {
-        // Not our custom cursor format, ignore
+        // Not our custom cursor format, use cursor as-is (it's the original Neynar cursor)
+        originalNeynarCursor = cursor;
       }
     }
 
@@ -115,11 +122,12 @@ export async function GET(request: NextRequest) {
             return { notifications: [], next: null };
           }
           
+          // Use the original Neynar cursor (without our custom fields) for the API call
           return await neynarClient.fetchAllNotifications({
             fid: parseInt(fid),
             type: notificationTypes,
             limit: remainingNeynarLimit,
-            cursor,
+            cursor: originalNeynarCursor,
           });
         })
       : { notifications: [], next: null };

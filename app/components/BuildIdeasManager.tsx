@@ -13,6 +13,7 @@ interface BuildIdea {
   url: string | null;
   castHash: string | null;
   type: string; // 'build-idea' or 'feedback'
+  feedbackType: string | null; // For feedback: 'bug', 'feature', or 'feedback'
   userFid: number;
   adminFid?: number; // For backward compatibility
   createdAt: string;

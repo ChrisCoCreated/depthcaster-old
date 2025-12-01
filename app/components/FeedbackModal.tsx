@@ -14,6 +14,7 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
   const { user } = useNeynarContext();
   const [formData, setFormData] = useState({
     title: "",
+    feedbackType: "feedback",
     description: "",
     castHash: "",
   });
@@ -36,6 +37,11 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
       return;
     }
 
+    if (!formData.feedbackType) {
+      setError("Please select a feedback type");
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setError(null);
@@ -48,6 +54,7 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
           description: formData.description || null,
           castHash: formData.castHash.trim() || null,
           type: "feedback",
+          feedbackType: formData.feedbackType,
           userFid: user.fid,
         }),
       });
@@ -66,7 +73,7 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
         formData.castHash.trim() || undefined
       );
       
-      setFormData({ title: "", description: "", castHash: "" });
+      setFormData({ title: "", feedbackType: "feedback", description: "", castHash: "" });
       
       // Close modal after 2 seconds
       setTimeout(() => {
@@ -82,7 +89,7 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
 
   const handleClose = () => {
     if (!isSubmitting) {
-      setFormData({ title: "", description: "", castHash: "" });
+      setFormData({ title: "", feedbackType: "feedback", description: "", castHash: "" });
       setError(null);
       setSuccess(false);
       onClose();
@@ -135,6 +142,23 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
               required
               disabled={isSubmitting}
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Type *
+            </label>
+            <select
+              value={formData.feedbackType}
+              onChange={(e) => setFormData({ ...formData, feedbackType: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+              disabled={isSubmitting}
+            >
+              <option value="bug">Bug</option>
+              <option value="feature">Feature</option>
+              <option value="feedback">Feedback</option>
+            </select>
           </div>
 
           <div>

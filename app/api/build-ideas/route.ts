@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { title, description, url, castHash, type = "build-idea", userFid, adminFid } = body;
+    const { title, description, url, castHash, type = "build-idea", feedbackType, userFid, adminFid } = body;
 
     // Support both userFid (new) and adminFid (backward compatibility)
     const fid = userFid || adminFid;
@@ -87,6 +87,17 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           { error: "User does not have admin or superadmin role" },
           { status: 403 }
+        );
+      }
+    }
+
+    // Validate feedbackType for feedback submissions
+    if (type === "feedback" && feedbackType) {
+      const validFeedbackTypes = ["bug", "feature", "feedback"];
+      if (!validFeedbackTypes.includes(feedbackType)) {
+        return NextResponse.json(
+          { error: "Invalid feedbackType. Must be one of: bug, feature, feedback" },
+          { status: 400 }
         );
       }
     }
@@ -124,6 +135,7 @@ export async function POST(request: NextRequest) {
         url: url || null,
         castHash: extractedCastHash || null,
         type,
+        feedbackType: feedbackType || null,
         userFid: fid,
       })
       .returning();
@@ -142,7 +154,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, title, description, url, castHash, userFid, adminFid } = body;
+    const { id, title, description, url, castHash, feedbackType, userFid, adminFid } = body;
 
     // Support both userFid (new) and adminFid (backward compatibility)
     const fid = userFid || adminFid;
@@ -178,6 +190,7 @@ export async function PUT(request: NextRequest) {
         description: description || null,
         url: url || null,
         castHash: castHash || null,
+        feedbackType: feedbackType !== undefined ? feedbackType : null,
         updatedAt: new Date(),
       })
       .where(eq(buildIdeas.id, id))
