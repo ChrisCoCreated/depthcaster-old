@@ -4,6 +4,7 @@ import { eq, and, inArray } from "drizzle-orm";
 import { sendPushNotificationToUser } from "./pushNotifications";
 import { getUser } from "./users";
 import { cacheNotificationCount } from "./cache";
+import { getAllAdminFids } from "./roles";
 
 export interface NotificationPreferences {
   notifyOnQualityReply?: boolean;
@@ -460,4 +461,148 @@ export async function sendAppUpdateNotificationToUsers(
   }
 
   return { notificationsCreated, pushNotificationsSent, errors };
+}
+
+/**
+ * Create a feedback notification for an admin
+ */
+async function createFeedbackNotification(
+  adminFid: number,
+  feedbackId: string,
+  feedbackTitle: string,
+  feedbackType: string | null,
+  submitterFid: number,
+  submitterInfo: { username: string | null; displayName: string | null; pfpUrl: string | null } | null,
+  castHash: string | null
+): Promise<void> {
+  try {
+    // Use feedback ID as castHash for uniqueness
+    const notificationCastHash = `feedback-${feedbackId}`;
+
+    // Check for existing notification to prevent duplicates
+    const existing = await db
+      .select()
+      .from(userNotifications)
+      .where(
+        and(
+          eq(userNotifications.userFid, adminFid),
+          eq(userNotifications.castHash, notificationCastHash),
+          eq(userNotifications.type, "feedback.new")
+        )
+      )
+      .limit(1);
+
+    if (existing.length > 0) {
+      console.log(`[Notifications] Feedback notification already exists for admin ${adminFid}, feedback ${feedbackId}`);
+      return;
+    }
+
+    // Create castData with feedback information
+    const castData = {
+      feedbackId,
+      title: feedbackTitle,
+      feedbackType: feedbackType || "feedback",
+      submitterFid,
+      submitter: submitterInfo,
+      castHash,
+      url: `/admin/build-ideas?type=feedback`,
+      type: "feedback.new",
+    };
+
+    // Create notification
+    await db.insert(userNotifications).values({
+      userFid: adminFid,
+      type: "feedback.new",
+      castHash: notificationCastHash,
+      castData,
+      authorFid: submitterFid,
+      isRead: false,
+    });
+
+    // Invalidate count cache
+    cacheNotificationCount.invalidateUser(adminFid);
+
+    console.log(`[Notifications] Created feedback.new notification for admin ${adminFid}, feedback ${feedbackId}`);
+  } catch (error: any) {
+    // Handle unique constraint violation (duplicate notification)
+    if (error.code === "23505") {
+      console.log(`[Notifications] Duplicate feedback notification prevented for admin ${adminFid}, feedback ${feedbackId}`);
+      return;
+    }
+    console.error(`[Notifications] Error creating feedback notification for admin ${adminFid}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Notify all admins about new feedback submission
+ */
+export async function notifyAdminsAboutFeedback(
+  feedbackId: string,
+  feedbackTitle: string,
+  feedbackType: string | null,
+  submitterFid: number,
+  castHash: string | null
+): Promise<void> {
+  try {
+    // Get all admin FIDs
+    const adminFids = await getAllAdminFids();
+
+    if (adminFids.length === 0) {
+      console.log(`[Notifications] No admins found to notify about feedback ${feedbackId}`);
+      return;
+    }
+
+    // Get submitter info
+    const submitter = await getUser(submitterFid);
+    const submitterInfo = submitter
+      ? {
+          username: submitter.username,
+          displayName: submitter.displayName,
+          pfpUrl: submitter.pfpUrl,
+        }
+      : null;
+
+    const submitterName = submitter?.displayName || submitter?.username || `User ${submitterFid}`;
+    const feedbackTypeLabel = feedbackType === "bug" ? "Bug Report" : feedbackType === "feature" ? "Feature Request" : "Feedback";
+
+    // Create notifications and send push notifications for each admin
+    for (const adminFid of adminFids) {
+      try {
+        await createFeedbackNotification(
+          adminFid,
+          feedbackId,
+          feedbackTitle,
+          feedbackType,
+          submitterFid,
+          submitterInfo,
+          castHash
+        );
+
+        // Send push notification
+        const previewText = feedbackTitle.length > 100 ? feedbackTitle.substring(0, 100) + "..." : feedbackTitle;
+        await sendPushNotificationToUser(adminFid, {
+          title: `New ${feedbackTypeLabel}`,
+          body: `${submitterName}: ${previewText}`,
+          icon: submitter?.pfpUrl || "/icon-192x192.webp",
+          badge: "/icon-96x96.webp",
+          data: {
+            type: "feedback.new",
+            feedbackId,
+            url: `/admin/build-ideas?type=feedback`,
+          },
+        }).catch((error) => {
+          console.error(`[Notifications] Error sending push notification to admin ${adminFid}:`, error);
+        });
+      } catch (error) {
+        console.error(`[Notifications] Error notifying admin ${adminFid} about feedback:`, error);
+        // Continue with other admins even if one fails
+      }
+    }
+
+    console.log(`[Notifications] Notified ${adminFids.length} admin(s) about feedback ${feedbackId}`);
+  } catch (error) {
+    console.error(`[Notifications] Error notifying admins about feedback ${feedbackId}:`, error);
+    // Don't throw - we don't want to fail feedback submission if notification fails
+  }
 }

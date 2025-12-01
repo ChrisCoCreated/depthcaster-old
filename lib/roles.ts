@@ -1,7 +1,7 @@
 import { User } from "./schema";
 import { db } from "./db";
 import { userRoles } from "./schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 /**
  * Centralized array of curator roles
@@ -103,5 +103,17 @@ export async function hasPlusRoleUser(user: User | null | undefined, roles?: str
   if (!user) return false;
   const userRoles = roles || await getUserRoles(user.fid);
   return hasPlusRole(userRoles);
+}
+
+/**
+ * Get all user FIDs that have admin or superadmin roles
+ */
+export async function getAllAdminFids(): Promise<number[]> {
+  const adminRoles = await db
+    .select({ userFid: userRoles.userFid })
+    .from(userRoles)
+    .where(inArray(userRoles.role, ["admin", "superadmin"]));
+  
+  return adminRoles.map((r) => r.userFid);
 }
 
