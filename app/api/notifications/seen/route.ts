@@ -150,20 +150,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Only call Neynar API if user has plus role
-    // If user has plus role AND curator role: call Neynar API if specific notificationType requested OR there are unread curated notifications
-    // If user has plus role BUT NOT curator role: call Neynar API if specific notificationType requested (for regular Neynar notifications)
-    // If user does NOT have plus role: skip Neynar API call entirely
+    // When panel opens (no notificationType), always mark all Neynar notifications as seen
+    // When specific notificationType is provided, mark that specific type as seen
     let result = null;
     if (hasPlus) {
       const shouldCallNeynar = 
         notificationType !== undefined || // Specific notification type requested
-        (isCurator && hasUnreadCurated); // Curator with unread curated notifications
+        (!notificationType && !castHash); // Panel opened - mark all Neynar notifications as seen
       
       if (shouldCallNeynar) {
         // Mark Neynar notifications as seen (for non-curated types)
         result = await neynarClient.markNotificationsAsSeen({
           signerUuid,
-          type: mappedType,
+          type: mappedType, // undefined when panel opens, which marks all types
         });
       }
     }
