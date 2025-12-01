@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
       notifyOnCurated?: boolean;
       notifyOnLiked?: boolean;
       notifyOnRecast?: boolean;
+      notifyOnDailyStats?: boolean;
     };
     
     // Ensure hiddenBots exists with defaults
@@ -51,6 +52,7 @@ export async function GET(request: NextRequest) {
     const notifyOnCurated = preferences.notifyOnCurated !== undefined ? preferences.notifyOnCurated : false;
     const notifyOnLiked = preferences.notifyOnLiked !== undefined ? preferences.notifyOnLiked : true;
     const notifyOnRecast = preferences.notifyOnRecast !== undefined ? preferences.notifyOnRecast : false;
+    const notifyOnDailyStats = preferences.notifyOnDailyStats !== undefined ? preferences.notifyOnDailyStats : true;
 
     return NextResponse.json({
       hideBots,
@@ -63,6 +65,7 @@ export async function GET(request: NextRequest) {
       notifyOnCurated,
       notifyOnLiked,
       notifyOnRecast,
+      notifyOnDailyStats,
     });
   } catch (error: any) {
     console.error("Error fetching user preferences:", error);
@@ -76,7 +79,7 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { fid, signerUuid, hideBots, hiddenBots, autoLikeOnCurate, hasSeenAutoLikeNotification, notifyOnDeepbotCurate, notifyOnQualityReply, qualityReplyThreshold, notifyOnCurated, notifyOnLiked, notifyOnRecast } = body;
+    const { fid, signerUuid, hideBots, hiddenBots, autoLikeOnCurate, hasSeenAutoLikeNotification, notifyOnDeepbotCurate, notifyOnQualityReply, qualityReplyThreshold, notifyOnCurated, notifyOnLiked, notifyOnRecast, notifyOnDailyStats } = body;
 
     if (!fid || !signerUuid) {
       return NextResponse.json(
@@ -107,6 +110,7 @@ export async function PUT(request: NextRequest) {
       notifyOnCurated?: boolean;
       notifyOnLiked?: boolean;
       notifyOnRecast?: boolean;
+      notifyOnDailyStats?: boolean;
     };
     
     // Update preferences
@@ -122,6 +126,7 @@ export async function PUT(request: NextRequest) {
       notifyOnCurated: notifyOnCurated !== undefined ? notifyOnCurated : existingPreferences.notifyOnCurated !== undefined ? existingPreferences.notifyOnCurated : false,
       notifyOnLiked: notifyOnLiked !== undefined ? notifyOnLiked : existingPreferences.notifyOnLiked !== undefined ? existingPreferences.notifyOnLiked : true,
       notifyOnRecast: notifyOnRecast !== undefined ? notifyOnRecast : existingPreferences.notifyOnRecast !== undefined ? existingPreferences.notifyOnRecast : false,
+      notifyOnDailyStats: notifyOnDailyStats !== undefined ? notifyOnDailyStats : existingPreferences.notifyOnDailyStats !== undefined ? existingPreferences.notifyOnDailyStats : true,
     };
 
     await updateUserPreferences(fid, updatedPreferences);
@@ -137,6 +142,7 @@ export async function PUT(request: NextRequest) {
       notifyOnCurated: updatedPreferences.notifyOnCurated,
       notifyOnLiked: updatedPreferences.notifyOnLiked,
       notifyOnRecast: updatedPreferences.notifyOnRecast,
+      notifyOnDailyStats: updatedPreferences.notifyOnDailyStats,
     });
   } catch (error: any) {
     console.error("Error updating user preferences:", error);

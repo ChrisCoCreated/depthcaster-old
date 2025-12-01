@@ -12,6 +12,7 @@ export interface NotificationPreferences {
   notifyOnCurated?: boolean;
   notifyOnLiked?: boolean;
   notifyOnRecast?: boolean;
+  notifyOnDailyStats?: boolean;
 }
 
 /**
@@ -39,6 +40,7 @@ export async function getUserNotificationPreferences(fid: number): Promise<Notif
     notifyOnCurated: preferences.notifyOnCurated !== undefined ? preferences.notifyOnCurated : false,
     notifyOnLiked: preferences.notifyOnLiked !== undefined ? preferences.notifyOnLiked : true,
     notifyOnRecast: preferences.notifyOnRecast !== undefined ? preferences.notifyOnRecast : false,
+    notifyOnDailyStats: preferences.notifyOnDailyStats !== undefined ? preferences.notifyOnDailyStats : true,
   };
 }
 

@@ -19,11 +19,11 @@ interface Statistics {
     castViews: { authenticated: number; anonymous: number; total: number };
   };
   content: {
-    curatedCasts: { total: number; new: number };
+    curatedCasts: { total: number; new: number; avgQualityScore: number | null };
     curatorPacks: number;
     packSubscriptions: number;
     packFavorites: number;
-    castReplies: number;
+    castReplies: { total: number; new: number };
   };
   interactions: {
     likes: number;
@@ -87,6 +87,8 @@ export default function AdminStatisticsPage() {
   const [statistics, setStatistics] = useState<Statistics | null>(null);
   const [period, setPeriod] = useState<string>("all-time");
   const [isLoadingStats, setIsLoadingStats] = useState(false);
+  const [isSendingTest, setIsSendingTest] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
 
   useEffect(() => {
     const checkAdminAccess = async () => {
@@ -144,6 +146,37 @@ export default function AdminStatisticsPage() {
     }
   }, [period, isAdmin, user?.fid]);
 
+  const sendTestNotification = async () => {
+    if (!user?.fid) return;
+
+    setIsSendingTest(true);
+    setTestResult(null);
+
+    try {
+      const response = await fetch("/api/admin/statistics/send-test", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ fid: user.fid }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setTestResult(
+          `Test notification sent! ${data.pushNotificationsSent} push notifications sent to ${data.usersNotified} admin(s).`
+        );
+      } else {
+        setTestResult(`Error: ${data.error || "Failed to send test notification"}`);
+      }
+    } catch (error: any) {
+      setTestResult(`Error: ${error.message || "Failed to send test notification"}`);
+    } finally {
+      setIsSendingTest(false);
+    }
+  };
+
   if (!user || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -190,20 +223,36 @@ export default function AdminStatisticsPage() {
           </Link>
         </div>
 
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Time Period
-          </label>
-          <select
-            value={period}
-            onChange={(e) => setPeriod(e.target.value)}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
-          >
-            <option value="all-time">All Time</option>
-            <option value="30d">Last 30 Days</option>
-            <option value="7d">Last 7 Days</option>
-            <option value="24h">Last 24 Hours</option>
-          </select>
+        <div className="mb-6 flex items-end gap-4">
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Time Period
+            </label>
+            <select
+              value={period}
+              onChange={(e) => setPeriod(e.target.value)}
+              className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+            >
+              <option value="all-time">All Time</option>
+              <option value="30d">Last 30 Days</option>
+              <option value="7d">Last 7 Days</option>
+              <option value="24h">Last 24 Hours</option>
+            </select>
+          </div>
+          <div>
+            <button
+              onClick={sendTestNotification}
+              disabled={isSendingTest}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSendingTest ? "Sending..." : "Send Test Notification"}
+            </button>
+            {testResult && (
+              <p className={`mt-2 text-sm ${testResult.startsWith("Error") ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>
+                {testResult}
+              </p>
+            )}
+          </div>
         </div>
 
         {isLoadingStats ? (
@@ -237,6 +286,11 @@ export default function AdminStatisticsPage() {
                 {statistics.content.curatedCasts.new > 0 && (
                   <p className="text-sm text-green-600 dark:text-green-400 mt-1">
                     +{formatNumber(statistics.content.curatedCasts.new)} new
+                  </p>
+                )}
+                {period !== "all-time" && statistics.content.curatedCasts.avgQualityScore !== null && (
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Avg Quality: {statistics.content.curatedCasts.avgQualityScore}
                   </p>
                 )}
               </div>
@@ -610,7 +664,7 @@ export default function AdminStatisticsPage() {
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Cast Replies</span>
                     <span className="font-medium text-gray-900 dark:text-gray-100">
-                      {formatNumber(statistics.content.castReplies)}
+                      {formatNumber(statistics.content.castReplies.total)} ({period !== "all-time" ? `+${formatNumber(statistics.content.castReplies.new)}` : ""})
                     </span>
                   </div>
                 </div>

@@ -22,6 +22,7 @@ interface CuratedCastPreferences {
   notifyOnCurated: boolean;
   notifyOnLiked: boolean;
   notifyOnRecast: boolean;
+  notifyOnDailyStats: boolean;
 }
 
 const DEFAULT_PREFERENCES: NotificationPreferences = {
@@ -39,6 +40,7 @@ const DEFAULT_CURATED_PREFERENCES: CuratedCastPreferences = {
   notifyOnCurated: false,
   notifyOnLiked: true,
   notifyOnRecast: false,
+  notifyOnDailyStats: true,
 };
 
 export function NotificationSettings() {
@@ -109,6 +111,7 @@ export function NotificationSettings() {
               notifyOnCurated: data.notifyOnCurated !== undefined ? data.notifyOnCurated : false,
               notifyOnLiked: data.notifyOnLiked !== undefined ? data.notifyOnLiked : true,
               notifyOnRecast: data.notifyOnRecast !== undefined ? data.notifyOnRecast : false,
+              notifyOnDailyStats: data.notifyOnDailyStats !== undefined ? data.notifyOnDailyStats : true,
             });
           }
         } catch (error) {
@@ -344,6 +347,7 @@ export function NotificationSettings() {
             { key: "notifyOnCurated" as const, label: "When Cast is Curated", emoji: "✨", description: "Get notified when someone else curates a cast you curated" },
             { key: "notifyOnLiked" as const, label: "When Cast is Liked", emoji: "❤️", description: "Get notified when someone likes a cast you curated (within DepthCaster)" },
             { key: "notifyOnRecast" as const, label: "When Cast is Recast", emoji: "🔄", description: "Get notified when someone recasts a cast you curated (within DepthCaster)" },
+            { key: "notifyOnDailyStats" as const, label: "Daily Stats Summary", emoji: "📊", description: "Receive a daily notification with statistics from the past 24 hours" },
           ].map(({ key, label, emoji, description }) => (
             <label
               key={key}

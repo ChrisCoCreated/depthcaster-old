@@ -47,12 +47,43 @@ export function NotificationBell() {
     }
   };
 
-  const getNotificationText = (notification: { count?: number; type: string; follows?: unknown[]; reactions?: Array<{ user: unknown }>; replies?: Array<{ user?: unknown; author?: unknown }>; cast?: { author?: { username?: string; display_name?: string } }; [key: string]: unknown }): string => {
+  const getNotificationText = (notification: { count?: number; type: string; follows?: unknown[]; reactions?: Array<{ user: unknown }>; replies?: Array<{ user?: unknown; author?: unknown }>; cast?: { author?: { username?: string; display_name?: string } }; castData?: { title?: string; author?: { username?: string; display_name?: string } }; actor?: { username?: string; display_name?: string; fid?: number }; [key: string]: unknown }): string => {
     const count = notification.count || 1;
-    const users = notification.follows || notification.reactions?.map((r) => r.user) || [];
-    const firstUser = users[0] as { username?: string; user?: { username?: string }; display_name?: string } | undefined;
-    const firstName = firstUser?.username || (firstUser as { user?: { username?: string } })?.user?.username || "Someone";
     const type = String(notification.type).toLowerCase();
+    const notif = notification as any;
+    
+    // App update notifications use title from castData
+    if (type === "app.update") {
+      const title = notif.castData?.title || notif.cast?.data?.title || "App Update";
+      return title;
+    }
+    
+    // Get users based on notification type
+    let users: any[] = [];
+    if (notif.follows) {
+      users = notif.follows;
+    } else if (notif.reactions) {
+      users = notif.reactions.map((r: any) => r.user);
+    } else if (notif.replies) {
+      users = notif.replies.map((r: any) => r.user || r.author);
+    } else if (notif.actor) {
+      // For webhook notifications and curated notifications, use actor field
+      // Actor contains the person who performed the action (curator, liker, recaster)
+      users = [notif.actor];
+    } else if (notification.cast?.author) {
+      // Fallback to cast author for replies/quotes/mentions
+      users = [notification.cast.author];
+    } else if (notif.castData?.author) {
+      // Final fallback to castData.author
+      users = [notif.castData.author];
+    }
+    
+    const firstUser = users[0];
+    const firstName = (firstUser as any)?.username || 
+                     (firstUser as any)?.user?.username || 
+                     (firstUser as any)?.display_name ||
+                     (firstUser as any)?.displayName ||
+                     "Someone";
 
     switch (type) {
       case "follows":
@@ -69,12 +100,22 @@ export function NotificationBell() {
         return `${firstName} mentioned you`;
       case "reply":
       case "replies":
-        return `${firstName} replied to your cast`;
+        if (count === 1) return `${firstName} replied to your cast`;
+        return `${firstName} and ${count - 1} others replied to your cast`;
       case "quote":
       case "quotes":
-        return `${firstName} quoted your cast`;
+        if (count === 1) return `${firstName} quoted your cast`;
+        return `${firstName} and ${count - 1} others quoted your cast`;
       case "cast.created":
         return `${firstName} posted a new cast`;
+      case "curated.quality_reply":
+        return `${firstName} posted a quality reply to your curated cast`;
+      case "curated.curated":
+        return `${firstName} also curated this cast`;
+      case "curated.liked":
+        return `${firstName} liked your curated cast`;
+      case "curated.recast":
+        return `${firstName} recast your curated cast`;
       default:
         return "New notification";
     }
@@ -140,7 +181,9 @@ export function NotificationBell() {
       const notificationsToShow = notifications.slice(0, 3);
       
       for (const notification of notificationsToShow) {
-        const title = "Depthcaster";
+        const notificationType = String(notification.type).toLowerCase();
+        // Use more descriptive title for app updates
+        const title = notificationType === "app.update" ? "Depthcaster Update" : "Depthcaster";
         const body = getNotificationText(notification);
         const url = getNotificationUrl(notification);
         

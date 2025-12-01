@@ -153,6 +153,24 @@ export async function GET(request: NextRequest) {
       .select({ count: sql<number>`count(*)::int` })
       .from(castReplies);
 
+    const newCastReplies = timeFilter
+      ? await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(castReplies)
+          .where(sql`created_at >= ${timeFilter.toISOString()}`)
+      : [{ count: 0 }];
+
+    // Average quality score for newly curated casts
+    const avgQualityScore = timeFilter
+      ? await db
+          .select({
+            avg: sql<number>`avg(quality_score)::int`,
+            count: sql<number>`count(*)::int`,
+          })
+          .from(curatedCasts)
+          .where(sql`created_at >= ${timeFilter.toISOString()} AND quality_score IS NOT NULL`)
+      : [{ avg: null, count: 0 }];
+
     // Cast Interactions
     const interactions = await db
       .select({
@@ -352,11 +370,15 @@ export async function GET(request: NextRequest) {
         curatedCasts: {
           total: totalCuratedCasts[0]?.count || 0,
           new: newCuratedCasts[0]?.count || 0,
+          avgQualityScore: avgQualityScore[0]?.avg || null,
         },
         curatorPacks: totalCuratorPacks[0]?.count || 0,
         packSubscriptions: totalPackSubscriptions[0]?.count || 0,
         packFavorites: totalPackFavorites[0]?.count || 0,
-        castReplies: totalCastReplies[0]?.count || 0,
+        castReplies: {
+          total: totalCastReplies[0]?.count || 0,
+          new: newCastReplies[0]?.count || 0,
+        },
       },
       interactions: {
         likes: interactionMap.get("like") || 0,
