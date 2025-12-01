@@ -213,11 +213,22 @@ export async function notifyCuratorsAboutNewCuration(
         continue;
       }
 
+      // Store actor (new curator) info in castData for display
+      const castDataWithActor = {
+        ...castData,
+        _actor: {
+          fid: newCuratorFid,
+          username: newCuratorUser?.username,
+          display_name: newCuratorUser?.displayName,
+          pfp_url: newCuratorUser?.pfpUrl,
+        },
+      };
+
       await createCuratorNotification(
         curatorFid,
         "curated.curated",
         castHash,
-        castData,
+        castDataWithActor,
         authorFid
       );
 
@@ -274,11 +285,22 @@ export async function notifyCuratorsAboutInteraction(
         continue;
       }
 
+      // Store actor (user who interacted) info in castData for display
+      const castDataWithActor = {
+        ...castData,
+        _actor: {
+          fid: userFid,
+          username: user?.username,
+          display_name: user?.displayName,
+          pfp_url: user?.pfpUrl,
+        },
+      };
+
       await createCuratorNotification(
         curatorFid,
         notificationType as "curated.liked" | "curated.recast",
         castHash,
-        castData,
+        castDataWithActor,
         authorFid
       );
 

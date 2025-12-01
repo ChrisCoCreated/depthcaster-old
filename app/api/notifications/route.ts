@@ -199,6 +199,22 @@ export async function GET(request: NextRequest) {
         const notificationType = notif.type || "cast.created";
         const isCuratedNotification = notificationType.startsWith("curated.");
         
+        // For curated notifications, use the actor from castData._actor if available
+        // Otherwise fall back to authorFid/castData.author
+        const actorInfo = isCuratedNotification && castData?._actor
+          ? {
+              fid: castData._actor.fid,
+              username: castData._actor.username || castData._actor.display_name,
+              display_name: castData._actor.display_name || castData._actor.username,
+              pfp_url: castData._actor.pfp_url,
+            }
+          : {
+              fid: notif.authorFid,
+              username: castData?.author?.username || castData?.author?.display_name,
+              display_name: castData?.author?.display_name || castData?.author?.username,
+              pfp_url: castData?.author?.pfp_url,
+            };
+
         return {
           object: "notification",
           type: notificationType,
@@ -208,12 +224,7 @@ export async function GET(request: NextRequest) {
           cast: castData,
           castHash: notif.castHash, // Include castHash for curated notifications
           castData: castData, // Include castData for curated notifications
-          actor: {
-            fid: notif.authorFid,
-            username: castData?.author?.username || castData?.author?.display_name,
-            display_name: castData?.author?.display_name || castData?.author?.username,
-            pfp_url: castData?.author?.pfp_url,
-          },
+          actor: actorInfo,
           seen: notif.isRead, // Include seen status
         };
       });

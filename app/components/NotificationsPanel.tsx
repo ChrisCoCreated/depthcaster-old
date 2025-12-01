@@ -87,6 +87,14 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
       if (score !== undefined) return score;
     }
     
+    // For curated cast notifications, check actor first (person who performed action)
+    if (notif.actor?.score !== undefined) {
+      return notif.actor.score;
+    }
+    if (notif.actor?.experimental?.neynar_user_score !== undefined) {
+      return notif.actor.experimental.neynar_user_score;
+    }
+    
     // For curated cast notifications, check castData.author
     if (notif.castData?.author?.score !== undefined) {
       return notif.castData.author.score;
@@ -339,6 +347,11 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
       if (pfp) return pfp;
     }
     
+    // For curated cast notifications, check actor first (person who performed action)
+    if (notif.actor?.pfp_url) {
+      return notif.actor.pfp_url;
+    }
+    
     // For curated cast notifications, check castData.author
     if (notif.castData?.author?.pfp_url) {
       return notif.castData.author.pfp_url;
@@ -485,6 +498,11 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
       if (user?.fid) return user.fid;
     }
 
+    // For curated notifications, check actor field (person who performed action)
+    if (notif.actor?.fid) {
+      return notif.actor.fid;
+    }
+
     // For mentions/quotes - use cast author (matches getNotificationText pattern)
     // This is the fallback in getNotificationText for replies/quotes/mentions
     if (notification.cast?.author?.fid) {
@@ -553,14 +571,15 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
       users = notif.reactions.map((r: any) => r.user);
     } else if (notif.replies) {
       users = notif.replies.map((r: any) => r.user || r.author);
+    } else if (notif.actor) {
+      // For webhook notifications and curated notifications, use actor field
+      // Actor contains the person who performed the action (curator, liker, recaster)
+      users = [notif.actor];
     } else if (notification.cast?.author) {
       // Fallback to cast author for replies/quotes/mentions
       users = [notification.cast.author];
-    } else if (notif.actor) {
-      // For webhook notifications (cast.created), use actor field
-      users = [notif.actor];
     } else if (notif.castData?.author) {
-      // For curated cast notifications, use castData.author
+      // Final fallback to castData.author
       users = [notif.castData.author];
     }
     
