@@ -2716,7 +2716,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
               {showThread && cast.hash && (
                 <div className="flex items-center gap-3 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                   <Link
-                    href={`/conversation/${cast.hash}`}
+                    href={(feedType === "curated" || cast._curatorFid) ? `/conversation/${cast.hash}` : `/cast/${cast.hash}`}
                     className="text-blue-600 dark:text-blue-400 hover:underline hidden sm:inline font-medium"
                   >
                     {topReplies.length === 0 && !cast._topReplies?.length ? "Start conversation →" : "View conversation →"}
@@ -2975,7 +2975,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                             </div>
                       {cast.hash && (
                         <Link
-                          href={`/conversation/${cast.hash}?replyHash=${cluster.rootReplyHash ?? ""}`}
+                          href={`${(feedType === "curated" || cast._curatorFid) ? `/conversation/${cast.hash}` : `/cast/${cast.hash}`}${cluster.rootReplyHash ? `?replyHash=${cluster.rootReplyHash}` : ""}`}
                           onClick={(e) => e.stopPropagation()}
                           className="mt-3 inline-flex text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
                         >

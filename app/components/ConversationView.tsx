@@ -30,7 +30,6 @@ export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusR
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [conversationFetchedAt, setConversationFetchedAt] = useState<Date | null>(null);
-  const [hideNoEngagement, setHideNoEngagement] = useState(false);
   const [sortBy, setSortBy] = useState<"newest" | "engagement" | "quality">("newest");
   const [fetchedParentCasts, setFetchedParentCasts] = useState<Map<string, ThreadedReply>>(new Map());
   const [fetchingParents, setFetchingParents] = useState<Set<string>>(new Set());
@@ -66,14 +65,6 @@ export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusR
     return false;
   }
 
-  // Check if a reply has any engagement
-  function hasEngagement(reply: ThreadedReply): boolean {
-    const likes = reply.reactions?.likes_count || reply.reactions?.likes?.length || 0;
-    const recasts = reply.reactions?.recasts_count || reply.reactions?.recasts?.length || 0;
-    const replyCount = reply.replies?.count || 0;
-    return likes > 0 || recasts > 0 || replyCount > 0;
-  }
-
   // Check if a reply meets quality threshold
   function meetsQualityThreshold(reply: ThreadedReply): boolean {
     if (!qualityFilterEnabled) return true;
@@ -95,8 +86,8 @@ export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusR
     return count;
   }
 
-  // Recursively filter replies to hide those with no engagement and/or low quality
-  function filterReplies(replies: ThreadedReply[], hideNoEngagement: boolean): { visible: ThreadedReply[]; hidden: number } {
+  // Recursively filter replies to hide those with low quality
+  function filterReplies(replies: ThreadedReply[]): { visible: ThreadedReply[]; hidden: number } {
     const totalCount = countAllReplies(replies);
 
     function filterRecursive(reply: ThreadedReply): ThreadedReply | null {
@@ -115,19 +106,11 @@ export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusR
       // Check quality threshold
       const meetsQuality = meetsQualityThreshold(reply);
       
-      // Check engagement
-      const hasEng = hasEngagement(reply);
-      
       // Determine if this reply should be shown
       let shouldShow = true;
       
       // If quality filter is enabled, reply must meet quality threshold (unless it has children that do)
       if (qualityFilterEnabled && !meetsQuality && filteredChildren.length === 0) {
-        shouldShow = false;
-      }
-      
-      // If hiding no-engagement replies, reply must have engagement (unless it has children that do)
-      if (hideNoEngagement && !hasEng && filteredChildren.length === 0) {
         shouldShow = false;
       }
       
@@ -650,39 +633,20 @@ export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusR
 
       {/* Replies */}
       {replies.length > 0 && (() => {
-        const { visible, hidden } = filterReplies(replies, hideNoEngagement);
-        // Calculate how many replies would be hidden if we filtered (for the button text)
-        const { hidden: hiddenCountWhenFiltering } = filterReplies(replies, true);
+        const { visible } = filterReplies(replies);
         
         return (
-          <>
-            <div className="mt-6">
-              {visible.map((reply, index) => 
-                renderThreadedReply(
-                  reply, 
-                  1, 
-                  index === visible.length - 1, 
-                  index < visible.length - 1,
-                  (reply.children && reply.children.length > 0) || false
-                )
-              )}
-            </div>
-
-            {/* Toggle button to hide/show no-engagement replies */}
-            {hiddenCountWhenFiltering > 0 && (
-              <div className="mt-6 px-4 py-3 text-center border-t border-gray-200 dark:border-gray-800">
-                <button
-                  onClick={() => setHideNoEngagement(!hideNoEngagement)}
-                  className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 underline transition-colors"
-                >
-                  {hideNoEngagement 
-                    ? `Show ${hiddenCountWhenFiltering} ${hiddenCountWhenFiltering === 1 ? 'reply' : 'replies'} with no engagement`
-                    : `Hide ${hiddenCountWhenFiltering} ${hiddenCountWhenFiltering === 1 ? 'reply' : 'replies'} with no engagement`
-                  }
-                </button>
-              </div>
+          <div className="mt-6">
+            {visible.map((reply, index) => 
+              renderThreadedReply(
+                reply, 
+                1, 
+                index === visible.length - 1, 
+                index < visible.length - 1,
+                (reply.children && reply.children.length > 0) || false
+              )
             )}
-          </>
+          </div>
         );
       })()}
 
