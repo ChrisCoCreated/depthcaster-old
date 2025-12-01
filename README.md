@@ -94,6 +94,36 @@ The script will:
 
 Ensure `WEBHOOK_BASE_URL`, `NEYNAR_API_KEY`, and database credentials are present in your environment before running the script.
 
+## Notification API Usage
+
+### Neynar Notification API Calls
+
+The app uses Neynar's notification API efficiently with on-demand fetching:
+
+**API Endpoints Used:**
+- `GET /v2/farcaster/notifications` - 12 CU per call
+- `POST /v2/farcaster/notifications/seen` - 20 CU per call
+
+**When Neynar APIs are Called:**
+1. **When notifications panel opens** - Once per panel open (12 CU)
+2. **When user clicks "Load More"** - On-demand for pagination (12 CU per page)
+3. **When marking notifications as seen** - Once when panel opens (20 CU)
+4. **For device notifications** - Only if badge count increased and device notifications enabled (12 CU)
+
+**When Neynar APIs are NOT Called:**
+- Badge count polling (every 5 minutes) - Uses database-only count endpoint (0 CU)
+- No automatic/polling of Neynar notifications
+- Only users with plus role can fetch Neynar notifications
+
+**Cost per User Session:**
+- Typical: ~32-44 CU per session (1-2 notification fetches + 1 seen call)
+- Much lower than polling every 5 minutes (which would be ~144 CU/hour)
+
+**Badge Count Behavior:**
+- Badge only shows database notifications (curated, cast.created, app.update)
+- Does NOT include Neynar notifications (follows, likes, recasts, mentions, replies, quotes) to avoid API costs
+- Neynar notifications are fetched and displayed when the panel opens
+
 ## Deployment
 
 ### Deploy to Vercel
