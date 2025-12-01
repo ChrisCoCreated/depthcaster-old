@@ -40,14 +40,27 @@ export function PushSubscriptionManager() {
             return;
           }
 
-          // Convert base64 URL to Uint8Array
-          const applicationServerKey = urlBase64ToUint8Array(publicKey);
+          try {
+            // Convert base64 URL to Uint8Array
+            const applicationServerKey = urlBase64ToUint8Array(publicKey);
 
-          // Subscribe
-          subscription = await registration.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey,
-          });
+            // Subscribe - this may fail if VAPID keys are invalid or browser doesn't support push
+            subscription = await registration.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey,
+            });
+          } catch (subscribeError: any) {
+            // Handle subscription errors gracefully
+            console.error("Failed to subscribe to push notifications:", subscribeError);
+            // Check if it's a known error type
+            if (subscribeError.name === "AbortError" || subscribeError.name === "NotAllowedError") {
+              console.warn("Push subscription not available - browser may not support it or user denied permission");
+            } else {
+              console.error("Unexpected error during push subscription:", subscribeError);
+            }
+            setIsLoading(false);
+            return; // Exit early if subscription fails
+          }
         }
 
         // Send subscription to server
@@ -71,11 +84,16 @@ export function PushSubscriptionManager() {
 
         if (response.ok) {
           setIsSubscribed(true);
+          console.log("Push subscription registered successfully");
         } else {
-          console.error("Failed to register push subscription");
+          const errorData = await response.json().catch(() => ({}));
+          console.error("Failed to register push subscription:", errorData.error || "Unknown error");
         }
-      } catch (error) {
+      } catch (error: any) {
+        // Handle errors gracefully - push notifications are optional
         console.error("Error registering push subscription:", error);
+        // Don't throw - allow the app to continue without push notifications
+        // The badge will still update via polling
       } finally {
         setIsLoading(false);
       }
