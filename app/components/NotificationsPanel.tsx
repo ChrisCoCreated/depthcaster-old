@@ -693,17 +693,7 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
     setMounted(true);
   }, []);
 
-  // Log state changes to debug flickering
-  useEffect(() => {
-    console.log('[NotificationsPanel] State changed', {
-      loading,
-      hasMore,
-      cursor: cursor ? `${cursor.substring(0, 20)}...` : null,
-      notificationCount: notifications.length,
-      isFetchingRef: isFetchingRef.current,
-      timestamp: new Date().toISOString(),
-    });
-  }, [loading, hasMore, cursor, notifications.length]);
+  // State change logging removed - was causing excessive logs
 
   // Close expanded mute menu when clicking outside
   useEffect(() => {
@@ -981,15 +971,7 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
               })}
 
               {/* Load more */}
-              {(() => {
-                console.log('[NotificationsPanel] Rendering Load More section', {
-                  hasMore,
-                  loading,
-                  cursor: cursor ? `${cursor.substring(0, 20)}...` : null,
-                  isFetchingRef: isFetchingRef.current,
-                  timestamp: new Date().toISOString(),
-                });
-                return hasMore && (
+              {hasMore && (
                   <div className="p-4 text-center">
                     <button
                       onClick={() => {
