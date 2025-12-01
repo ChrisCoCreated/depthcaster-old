@@ -59,14 +59,14 @@ export async function POST(request: NextRequest) {
       : "quality: N/A";
 
     const title = `[TEST] Daily Stats - ${date}`;
-    const body = `📊 Past 24h: ${stats.castsCurated} casts curated (${qualityText}), ${stats.replies} replies, ${stats.likes} likes, ${stats.recasts} recasts`;
+    const messageBody = `📊 Past 24h: ${stats.castsCurated} casts curated (${qualityText}), ${stats.replies} replies, ${stats.likes} likes, ${stats.recasts} recasts`;
     const url = "/admin/statistics?period=24h";
 
     // Send test notifications to all admins/superadmins
     const result = await sendAppUpdateNotificationToUsers(
       adminFids,
       title,
-      body,
+      messageBody,
       url,
       userFid
     );
