@@ -457,13 +457,42 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
     }
   }, [feedType, viewerFid, selectedCuratorFids, selectedCategory, minQualityScore, my37PackId, my37HasUsers, sortBy]);
 
+  // Fetch user's plus role status to set feed label
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      if (!viewerFid) {
+        setMyFeedLabel("My 7");
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/admin/check?fid=${viewerFid}`);
+        if (response.ok) {
+          const data = await response.json();
+          const roles = data.roles || [];
+          const userHasPlus = hasPlusRole(roles);
+          const max = getMaxMyUsers(userHasPlus);
+          setMyFeedLabel(`My ${max}`);
+        } else {
+          setMyFeedLabel("My 7");
+        }
+      } catch (error) {
+        console.error("Error fetching user role:", error);
+        setMyFeedLabel("My 7");
+      }
+    };
+
+    fetchUserRole();
+  }, [viewerFid]);
+
   const fetchMy37PackId = useCallback(async () => {
     if (!viewerFid) return;
     try {
       const response = await fetch(`/api/curator-packs?creatorFid=${viewerFid}`);
       if (response.ok) {
         const data = await response.json();
-        const my37Pack = data.packs?.find((p: Pack) => p.name === "My 37");
+        // Look for "My 37" or "My 7" pack (for backward compatibility)
+        const my37Pack = data.packs?.find((p: Pack) => p.name === "My 37" || p.name === "My 7");
         if (my37Pack) {
           setMy37PackId(my37Pack.id);
           // Check if pack has users

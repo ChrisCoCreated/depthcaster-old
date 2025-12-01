@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     const user = await db.select().from(users).where(eq(users.fid, userFid)).limit(1);
     
     if (user.length === 0) {
-      return NextResponse.json({ isAdmin: false, isSuperAdmin: false });
+      return NextResponse.json({ isAdmin: false, isSuperAdmin: false, roles: [] });
     }
 
     const roles = await getUserRoles(userFid);
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       isAdmin: adminStatus,
       isSuperAdmin: superAdminStatus,
-      roles: roles.length > 0 ? roles : null,
+      roles: roles, // Always return as array for consistency
     });
   } catch (error: unknown) {
     const err = error as { message?: string };
