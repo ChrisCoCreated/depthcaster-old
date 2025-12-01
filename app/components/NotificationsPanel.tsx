@@ -28,6 +28,8 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
   const isFetchingRef = useRef(false);
   const hasInitialFetchRef = useRef(false);
   const fetchNotificationsRef = useRef<((newCursor?: string | null) => Promise<void>) | null>(null);
+  const markAsSeenRef = useRef<((notificationType?: string, castHash?: string) => Promise<void>) | null>(null);
+  const onNotificationsSeenRef = useRef(onNotificationsSeen);
 
   const getNotificationPreferences = (): string[] => {
     const saved = localStorage.getItem("notificationPreferences");
@@ -255,10 +257,14 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
     }
   }, [user?.fid]);
 
-  // Keep ref updated with latest fetchNotifications function
+  // Keep refs updated with latest functions
   useEffect(() => {
     fetchNotificationsRef.current = fetchNotifications;
   }, [fetchNotifications]);
+  
+  useEffect(() => {
+    onNotificationsSeenRef.current = onNotificationsSeen;
+  }, [onNotificationsSeen]);
 
   const markAsSeen = useCallback(async (notificationType?: string, castHash?: string) => {
     if (!user?.signer_uuid) return;
@@ -278,16 +284,21 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
       });
       
       // Only notify parent component to refresh unread count if the API call succeeded
-      if (response.ok && onNotificationsSeen) {
+      if (response.ok && onNotificationsSeenRef.current) {
         // Delay to ensure database update and cache invalidation complete
         setTimeout(() => {
-          onNotificationsSeen();
+          onNotificationsSeenRef.current?.();
         }, 250);
       }
     } catch (err) {
       console.error("Failed to mark notifications as seen", err);
     }
-  }, [user?.signer_uuid, user?.fid, onNotificationsSeen]);
+  }, [user?.signer_uuid, user?.fid]);
+  
+  // Keep ref updated with latest markAsSeen function
+  useEffect(() => {
+    markAsSeenRef.current = markAsSeen;
+  }, [markAsSeen]);
 
   useEffect(() => {
     console.log('[NotificationsPanel] useEffect triggered', {
@@ -302,13 +313,15 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
         console.log('[NotificationsPanel] markAsSeenAndFetch called');
         hasInitialFetchRef.current = true;
         // Mark notifications as seen in background
-        await markAsSeen();
+        if (markAsSeenRef.current) {
+          await markAsSeenRef.current();
+        }
         
         // Notify parent to refresh count after marking as seen
-        if (onNotificationsSeen) {
+        if (onNotificationsSeenRef.current) {
           // Delay to ensure database update completes
           setTimeout(() => {
-            onNotificationsSeen();
+            onNotificationsSeenRef.current?.();
           }, 250);
         }
         
@@ -326,7 +339,7 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
       isFetchingRef.current = false;
       setLoading(false);
     }
-  }, [isOpen, user?.fid, markAsSeen, onNotificationsSeen]);
+  }, [isOpen, user?.fid]);
 
   // Check if user has curator role
   useEffect(() => {

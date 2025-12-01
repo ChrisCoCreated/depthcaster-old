@@ -13,6 +13,7 @@ export function NotificationBell() {
   const { isGranted } = useNotificationPermission();
   const previousUnreadCountRef = useRef(0);
   const previousNotificationsRef = useRef<unknown[]>([]);
+  const manualClearTimeRef = useRef<number | null>(null);
 
   const getNotificationPreferences = (): string[] => {
     const saved = localStorage.getItem("notificationPreferences");
@@ -229,8 +230,12 @@ export function NotificationBell() {
             }
           }
           
-          setUnreadCount(unread);
-          previousUnreadCountRef.current = unread;
+          // Skip update if badge was manually cleared recently (within last 3 seconds)
+          const MANUAL_CLEAR_TIMEOUT = 3000; // 3 seconds
+          if (!(manualClearTimeRef.current && Date.now() - manualClearTimeRef.current < MANUAL_CLEAR_TIMEOUT)) {
+            setUnreadCount(unread);
+            previousUnreadCountRef.current = unread;
+          }
           
           // Reset backoff on success
           backoffDelayRef.current = POLL_INTERVAL;
@@ -290,8 +295,12 @@ export function NotificationBell() {
             const response = await fetch(`/api/notifications/count?fid=${user.fid}`);
             if (response.ok) {
               const data = await response.json();
-              setUnreadCount(data.unreadCount || 0);
-              previousUnreadCountRef.current = data.unreadCount || 0;
+              // Skip update if badge was manually cleared recently (within last 3 seconds)
+              const MANUAL_CLEAR_TIMEOUT = 3000; // 3 seconds
+              if (!(manualClearTimeRef.current && Date.now() - manualClearTimeRef.current < MANUAL_CLEAR_TIMEOUT)) {
+                setUnreadCount(data.unreadCount || 0);
+                previousUnreadCountRef.current = data.unreadCount || 0;
+              }
             }
           } catch (err) {
             console.error("Failed to fetch unread count", err);
@@ -320,8 +329,12 @@ export function NotificationBell() {
             const response = await fetch(`/api/notifications/count?fid=${user.fid}`);
             if (response.ok) {
               const data = await response.json();
-              setUnreadCount(data.unreadCount || 0);
-              previousUnreadCountRef.current = data.unreadCount || 0;
+              // Skip update if badge was manually cleared recently (within last 3 seconds)
+              const MANUAL_CLEAR_TIMEOUT = 3000; // 3 seconds
+              if (!(manualClearTimeRef.current && Date.now() - manualClearTimeRef.current < MANUAL_CLEAR_TIMEOUT)) {
+                setUnreadCount(data.unreadCount || 0);
+                previousUnreadCountRef.current = data.unreadCount || 0;
+              }
             }
           } catch (err) {
             console.error("Failed to fetch unread count", err);
@@ -341,6 +354,7 @@ export function NotificationBell() {
       <button
         onClick={() => {
           setUnreadCount(0); // Clear badge immediately on click
+          manualClearTimeRef.current = Date.now(); // Track manual clear time
           console.log("Bell Cleared");
           setShowPanel(true);
         }}
@@ -374,6 +388,13 @@ export function NotificationBell() {
           // Refresh unread count when notifications are marked as seen
           const fetchUnreadCount = async () => {
             if (!user?.fid) return;
+            
+            // Skip update if badge was manually cleared recently (within last 3 seconds)
+            const MANUAL_CLEAR_TIMEOUT = 3000; // 3 seconds
+            if (manualClearTimeRef.current && Date.now() - manualClearTimeRef.current < MANUAL_CLEAR_TIMEOUT) {
+              return;
+            }
+            
             try {
               // Use lightweight count endpoint with cache-busting to ensure fresh count
               const response = await fetch(`/api/notifications/count?fid=${user.fid}&_t=${Date.now()}`);
