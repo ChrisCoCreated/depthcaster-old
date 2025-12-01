@@ -1000,8 +1000,7 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
                       {loading ? "Loading..." : "Load More"}
                     </button>
                   </div>
-                );
-              })()}
+                )}
             </div>
           )}
         </div>
