@@ -5,15 +5,27 @@ import { useNeynarContext } from "@neynar/react";
 import { NotificationsPanel } from "./NotificationsPanel";
 import { useNotificationPermission } from "@/lib/hooks/useNotificationPermission";
 import { useActivityMonitor } from "@/lib/hooks/useActivityMonitor";
+import { isSuperAdmin } from "@/lib/roles-client";
 
 export function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [showPanel, setShowPanel] = useState(false);
+  const [isSuperAdminUser, setIsSuperAdminUser] = useState(false);
   const { user } = useNeynarContext();
   const { isGranted } = useNotificationPermission();
   const previousUnreadCountRef = useRef(0);
   const previousNotificationsRef = useRef<unknown[]>([]);
   const manualClearTimeRef = useRef<number | null>(null);
+  const markAsSeenCompleteRef = useRef<number | null>(null);
+
+  // Helper function to show toast for superadmin
+  const showToast = useCallback((message: string, type: "success" | "error" = "success") => {
+    if (isSuperAdminUser) {
+      window.dispatchEvent(new CustomEvent("showToast", {
+        detail: { message, type }
+      }));
+    }
+  }, [isSuperAdminUser]);
 
   const getNotificationPreferences = (): string[] => {
     const saved = localStorage.getItem("notificationPreferences");
@@ -347,6 +359,30 @@ export function NotificationBell() {
     wasVisibleRef.current = isTabVisible;
   }, [isTabVisible, isUserActive, user?.fid]);
 
+  // Check if user is superadmin
+  useEffect(() => {
+    const checkSuperAdmin = async () => {
+      if (!user?.fid) {
+        setIsSuperAdminUser(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/admin/check?fid=${user.fid}`);
+        if (response.ok) {
+          const data = await response.json();
+          const roles = data.roles || [];
+          setIsSuperAdminUser(isSuperAdmin(roles));
+        }
+      } catch (error) {
+        console.error("Failed to check superadmin status:", error);
+        setIsSuperAdminUser(false);
+      }
+    };
+
+    checkSuperAdmin();
+  }, [user?.fid]);
+
   if (!user) return null;
 
   return (
@@ -356,6 +392,10 @@ export function NotificationBell() {
           setUnreadCount(0); // Clear badge immediately on click
           manualClearTimeRef.current = Date.now(); // Track manual clear time
           console.log("Bell Cleared");
+          if (isSuperAdminUser) {
+            console.log("[SuperAdmin] Badge cleared manually");
+            showToast("Badge cleared", "success");
+          }
           setShowPanel(true);
         }}
         className="relative p-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
@@ -385,6 +425,14 @@ export function NotificationBell() {
         isOpen={showPanel}
         onClose={() => setShowPanel(false)}
         onNotificationsSeen={() => {
+          // Mark that markAsSeen has completed
+          markAsSeenCompleteRef.current = Date.now();
+          console.log("markAsSeen completed at", markAsSeenCompleteRef.current);
+          if (isSuperAdminUser) {
+            console.log("[SuperAdmin] markAsSeen completed");
+            showToast("markAsSeen completed", "success");
+          }
+          
           // Refresh unread count when notifications are marked as seen
           const fetchUnreadCount = async () => {
             if (!user?.fid) return;
@@ -392,6 +440,9 @@ export function NotificationBell() {
             // Skip update if badge was manually cleared recently (within last 3 seconds)
             const MANUAL_CLEAR_TIMEOUT = 3000; // 3 seconds
             if (manualClearTimeRef.current && Date.now() - manualClearTimeRef.current < MANUAL_CLEAR_TIMEOUT) {
+              if (isSuperAdminUser) {
+                console.log("[SuperAdmin] Skipping badge update - within manual clear timeout");
+              }
               return;
             }
             
@@ -400,10 +451,18 @@ export function NotificationBell() {
               const response = await fetch(`/api/notifications/count?fid=${user.fid}&_t=${Date.now()}`);
               if (response.ok) {
                 const data = await response.json();
-                setUnreadCount(data.unreadCount || 0);
+                const newCount = data.unreadCount || 0;
+                if (isSuperAdminUser) {
+                  console.log("[SuperAdmin] Badge count updated:", newCount);
+                  showToast(`Badge count: ${newCount}`, newCount === 0 ? "success" : "error");
+                }
+                setUnreadCount(newCount);
               }
             } catch (err) {
               console.error("Failed to fetch unread count", err);
+              if (isSuperAdminUser) {
+                showToast("Failed to fetch unread count", "error");
+              }
             }
           };
           fetchUnreadCount();

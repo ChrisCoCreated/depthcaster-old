@@ -269,6 +269,8 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
   const markAsSeen = useCallback(async (notificationType?: string, castHash?: string) => {
     if (!user?.signer_uuid) return;
 
+    console.log('[NotificationsPanel] markAsSeen called', { notificationType, castHash });
+    
     try {
       const response = await fetch("/api/notifications/seen", {
         method: "POST",
@@ -283,15 +285,21 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
         }),
       });
       
-      // Only notify parent component to refresh unread count if the API call succeeded
-      if (response.ok && onNotificationsSeenRef.current) {
-        // Delay to ensure database update and cache invalidation complete
-        setTimeout(() => {
-          onNotificationsSeenRef.current?.();
-        }, 250);
+      if (response.ok) {
+        console.log('[NotificationsPanel] markAsSeen API call succeeded');
+        // Only notify parent component to refresh unread count if the API call succeeded
+        if (onNotificationsSeenRef.current) {
+          // Delay to ensure database update and cache invalidation complete
+          setTimeout(() => {
+            onNotificationsSeenRef.current?.();
+          }, 250);
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('[NotificationsPanel] markAsSeen API call failed', { status: response.status, error: errorData });
       }
     } catch (err) {
-      console.error("Failed to mark notifications as seen", err);
+      console.error('[NotificationsPanel] Failed to mark notifications as seen', err);
     }
   }, [user?.signer_uuid, user?.fid]);
   
@@ -314,7 +322,9 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
         hasInitialFetchRef.current = true;
         // Mark notifications as seen in background
         if (markAsSeenRef.current) {
+          console.log('[NotificationsPanel] Calling markAsSeen from useEffect');
           await markAsSeenRef.current();
+          console.log('[NotificationsPanel] markAsSeen completed in useEffect');
         }
         
         // Notify parent to refresh count after marking as seen
