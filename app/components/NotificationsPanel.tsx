@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Notification } from "@neynar/nodejs-sdk/build/api";
 import Link from "next/link";
@@ -17,7 +17,7 @@ interface NotificationsPanelProps {
 
 export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: NotificationsPanelProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
@@ -25,6 +25,7 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
   const [settingsExpanded, setSettingsExpanded] = useState(false);
   const [isCurator, setIsCurator] = useState<boolean | null>(null);
   const { user } = useNeynarContext();
+  const isFetchingRef = useRef(false);
 
   const getNotificationPreferences = (): string[] => {
     const saved = localStorage.getItem("notificationPreferences");
@@ -108,15 +109,17 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
   const fetchNotifications = useCallback(async (newCursor?: string | null) => {
     if (!user?.fid) {
       setLoading(false);
+      isFetchingRef.current = false;
       return;
     }
 
-    // Prevent loading if already loading
-    if (loading) {
+    // Prevent loading if already fetching (use ref to avoid dependency issues)
+    if (isFetchingRef.current) {
       return;
     }
 
     try {
+      isFetchingRef.current = true;
       setLoading(true);
       setError(null);
 
@@ -190,8 +193,9 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
       setError(err.message || "Failed to load notifications");
     } finally {
       setLoading(false);
+      isFetchingRef.current = false;
     }
-  }, [user?.fid, loading]);
+  }, [user?.fid]);
 
   const markAsSeen = useCallback(async (notificationType?: string, castHash?: string) => {
     if (!user?.signer_uuid) return;
@@ -245,6 +249,10 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
       };
       
       checkAndMarkAsSeen();
+    } else {
+      // Reset fetching state when panel closes
+      isFetchingRef.current = false;
+      setLoading(false);
     }
   }, [isOpen, user?.fid, fetchNotifications, markAsSeen]);
 

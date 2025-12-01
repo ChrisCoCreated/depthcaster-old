@@ -63,7 +63,7 @@ async function collectReplies(
  * @param casts - Array of cast objects
  * @returns Map of fid to user data
  */
-function extractAuthorDataFromCasts(casts: any[]): Map<number, { username?: string; displayName?: string; pfpUrl?: string }> {
+export function extractAuthorDataFromCasts(casts: any[]): Map<number, { username?: string; displayName?: string; pfpUrl?: string }> {
   const userDataMap = new Map<number, { username?: string; displayName?: string; pfpUrl?: string }>();
   
   for (const cast of casts) {

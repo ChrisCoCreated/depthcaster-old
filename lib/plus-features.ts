@@ -60,3 +60,4 @@ export function hasNeynarUpdatesAccess(hasPlusRole: boolean): boolean {
   return getFeatureValue("NEYNAR_UPDATES_ACCESS", hasPlusRole) as boolean;
 }
 
+

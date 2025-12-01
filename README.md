@@ -198,7 +198,11 @@ The app uses a hybrid filtering approach:
 
 The app uses AI-powered quality analysis to score all casts and replies on a scale of 0-100:
 
-- **Pure Recasts**: Quote casts with no additional text are automatically scored as the original cast's quality score minus 10 (minimum 0). This ensures recasts don't receive inflated scores when they add no original content. If the original cast hasn't been analyzed yet, pure recasts receive a default score of 5.
+- **Quote Casts**: Quote casts are scored based on both the original cast's quality and the quality of any additional text added by the quoter. The base adjustment is -10 from the original cast's score. The system then analyzes the additional text:
+  - **Neutral text** (single word, emoji, or very short acknowledgements): Keeps the default -10 adjustment
+  - **High-quality commentary**: Reduces the penalty (e.g., -5, -3, or even 0 for exceptional commentary)
+  - **Negative or harmful text**: Increases the penalty (e.g., -15, -20, or up to -40 for spam/trolling)
+  - If the original cast hasn't been analyzed yet, the system automatically fetches it from Neynar, stores it in the database, analyzes it, and then scores the quote cast accordingly.
 - **Quality Analysis**: Casts with original content are analyzed using DeepSeek AI to evaluate depth, clarity, and value, with scores ranging from 0-100.
 
 ## Customization

@@ -4,8 +4,13 @@
 
 import { db } from "@/lib/db";
 import { curatedCasts, castReplies } from "@/lib/schema";
-import { extractQuotedCastHashes } from "@/lib/conversation";
-import { eq } from "drizzle-orm";
+import { extractQuotedCastHashes, extractAuthorDataFromCasts } from "@/lib/conversation";
+import { eq, sql } from "drizzle-orm";
+import { neynarClient } from "@/lib/neynar";
+import { LookupCastConversationTypeEnum } from "@neynar/nodejs-sdk/build/api";
+import { extractCastTimestamp } from "@/lib/cast-timestamp";
+import { extractCastMetadata } from "@/lib/cast-metadata";
+import { upsertBulkUsers } from "@/lib/users";
 
 const DEEPSEEK_API_URL = process.env.DEEPSEEK_API_URL || "https://api.deepseek.com";
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
@@ -40,32 +45,138 @@ function extractCastText(castData: any): string {
 }
 
 /**
- * Check if cast is a pure recast (has embeds with cast but minimal/no text)
+ * Check if cast is a quote cast (has embeds with cast)
  */
-function isPureRecast(castData: any, castText: string): boolean {
+function isQuoteCast(castData: any): boolean {
   if (!castData) return false;
   
   // Check if cast has embeds with cast_id or cast (indicating it's a quote/recast)
-  const hasCastEmbed = castData.embeds?.some((embed: any) => 
+  return castData.embeds?.some((embed: any) => 
     embed.cast_id || (embed.cast && embed.cast.hash)
   ) || false;
-  
-  if (!hasCastEmbed) return false;
-  
-  // If it has a cast embed but minimal/no text, it's a pure recast
-  const normalizedText = castText.trim();
+}
+
+const PARENT_CAST_PLACEHOLDER_HASH = "0x0000000000000000000000000000000000000000";
+
+/**
+ * Analyze additional text in a quote cast to determine score adjustment
+ * Returns adjustment value: default -10, can go more negative for harmful text or less negative/positive for high quality
+ */
+async function analyzeAdditionalTextAdjustment(additionalText: string): Promise<number> {
+  if (!additionalText || additionalText.trim().length === 0) {
+    return -10; // No additional text, default adjustment
+  }
+
+  const normalizedText = additionalText.trim();
   const textLength = normalizedText.length;
   const wordCount = normalizedText === "" ? 0 : normalizedText.split(/\s+/).filter(w => w.length > 0).length;
-  
-  // Pure recast: has cast embed but no meaningful text (empty or just whitespace/emoji)
-  return textLength === 0 || (wordCount === 0 && textLength <= 5);
+  const hasLettersOrDigits = /[A-Za-z0-9]/.test(normalizedText);
+
+  // Neutral text: single word, emoji, or very short (1-2 words, <= 30 chars)
+  // These don't add value but don't harm either - keep default -10
+  if (!hasLettersOrDigits && textLength > 0) {
+    // Emoji-only
+    return -10;
+  }
+  if (wordCount <= 2 && textLength <= 30) {
+    // Very short, likely neutral
+    return -10;
+  }
+
+  // For longer text, analyze quality to determine adjustment
+  const prompt = `Analyze this additional text from a quote cast (someone quoting another cast and adding their own commentary). Determine how this additional text impacts the overall quality:
+
+Context: This is additional commentary added to a quoted cast. The base score adjustment is -10 from the original cast.
+
+Evaluate:
+1. Does this text add value, insight, or thoughtful commentary? (positive adjustment: -5 to 0, or even +5 for exceptional commentary)
+2. Is this text neutral - just acknowledging, agreeing, or minimal commentary? (keep at -10)
+3. Does this text negatively impact the reader's experience - spam, trolling, low-effort, or harmful content? (negative adjustment: -15 to -30)
+
+Additional text: "${normalizedText.substring(0, 500)}${normalizedText.length > 500 ? "..." : ""}"
+
+Respond in JSON format:
+{
+  "adjustment": <number representing change from base -10, e.g., -5 means final adjustment is -15, +5 means final adjustment is -5>,
+  "reasoning": "<brief explanation>"
+}`;
+
+  try {
+    const response = await fetch(`${DEEPSEEK_API_URL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "deepseek-chat",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are an expert at analyzing social media commentary quality. Always respond with valid JSON only.",
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        max_tokens: 150,
+        temperature: 0.3,
+      }),
+    });
+
+    if (!response.ok) {
+      console.warn(`[DeepSeek] Failed to analyze additional text, using default -10 adjustment`);
+      return -10;
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) {
+      return -10;
+    }
+
+    // Parse JSON from response
+    let jsonContent = content.trim();
+    if (jsonContent.startsWith("```json")) {
+      jsonContent = jsonContent.replace(/^```json\n?/, "").replace(/\n?```$/, "");
+    } else if (jsonContent.startsWith("```")) {
+      jsonContent = jsonContent.replace(/^```\n?/, "").replace(/\n?```$/, "");
+    }
+
+    const result = JSON.parse(jsonContent) as {
+      adjustment?: number;
+      reasoning?: string;
+    };
+
+    let adjustment = result.adjustment;
+    if (typeof adjustment !== "number") {
+      adjustment = parseInt(String(adjustment || "0"), 10);
+    }
+    if (isNaN(adjustment)) adjustment = 0;
+
+    // Clamp adjustment: -30 to +10 (so final adjustment ranges from -40 to 0)
+    adjustment = Math.max(-30, Math.min(10, adjustment));
+
+    // Base is -10, so add the adjustment
+    const finalAdjustment = -10 + adjustment;
+    console.log(`[DeepSeek] Additional text analysis: base -10 + adjustment ${adjustment} = ${finalAdjustment}`);
+    return finalAdjustment;
+  } catch (error: any) {
+    console.error(`[DeepSeek] Error analyzing additional text:`, error.message);
+    return -10; // Default on error
+  }
 }
 
 /**
  * Analyze a single cast for quality and category using DeepSeek API
+ * @param castData - The cast data to analyze
+ * @param analyzingQuotedCast - Internal flag to prevent infinite recursion when analyzing quoted casts
  */
 export async function analyzeCastQuality(
-  castData: any
+  castData: any,
+  analyzingQuotedCast: boolean = false
 ): Promise<QualityAnalysisResult | null> {
   if (!DEEPSEEK_API_KEY) {
     console.warn("[DeepSeek] DEEPSEEK_API_KEY not configured, skipping quality analysis");
@@ -74,8 +185,8 @@ export async function analyzeCastQuality(
 
   const castText = extractCastText(castData);
   
-  // Check if this is a pure recast (quote cast with no additional text)
-  if (isPureRecast(castData, castText)) {
+  // Check if this is a quote cast (only if we're not already analyzing a quoted cast to prevent recursion)
+  if (!analyzingQuotedCast && isQuoteCast(castData)) {
     // Extract quoted cast hash(es) from embeds
     const quotedCastHashes = extractQuotedCastHashes(castData as any);
     
@@ -89,20 +200,45 @@ export async function analyzeCastQuality(
           .select({
             qualityScore: curatedCasts.qualityScore,
             category: curatedCasts.category,
+            castData: curatedCasts.castData,
           })
           .from(curatedCasts)
           .where(eq(curatedCasts.castHash, quotedCastHash))
           .limit(1);
         
-        if (curatedCast.length > 0 && curatedCast[0].qualityScore !== null) {
-          const originalScore = curatedCast[0].qualityScore;
-          const adjustedScore = Math.max(0, originalScore - 10);
-          console.log(`[DeepSeek] Pure recast detected, using original score ${originalScore} - 10 = ${adjustedScore}`);
-          return {
-            qualityScore: adjustedScore,
-            category: curatedCast[0].category || "other",
-            reasoning: `Pure recast scored as original (${originalScore}) minus 10`,
-          };
+        if (curatedCast.length > 0) {
+          let originalScore: number | null = curatedCast[0].qualityScore;
+          let originalCategory: string | null = curatedCast[0].category;
+          
+          // If found but not analyzed, analyze it now
+          if (originalScore === null) {
+            console.log(`[DeepSeek] Quote cast detected, analyzing original cast ${quotedCastHash} from curatedCasts`);
+            const originalAnalysis = await analyzeCastQuality(curatedCast[0].castData, true);
+            if (originalAnalysis) {
+              await db
+                .update(curatedCasts)
+                .set({
+                  qualityScore: originalAnalysis.qualityScore,
+                  category: originalAnalysis.category,
+                  qualityAnalyzedAt: new Date(),
+                })
+                .where(eq(curatedCasts.castHash, quotedCastHash));
+              originalScore = originalAnalysis.qualityScore;
+              originalCategory = originalAnalysis.category;
+            }
+          }
+          
+          if (originalScore !== null) {
+            // Analyze additional text to determine adjustment
+            const adjustment = await analyzeAdditionalTextAdjustment(castText);
+            const adjustedScore = Math.max(0, originalScore + adjustment);
+            console.log(`[DeepSeek] Quote cast detected, using original score ${originalScore} + adjustment ${adjustment} = ${adjustedScore}`);
+            return {
+              qualityScore: adjustedScore,
+              category: originalCategory || "other",
+              reasoning: `Quote cast scored as original (${originalScore}) with adjustment ${adjustment} based on additional text quality`,
+            };
+          }
         }
         
         // If not found in curatedCasts, check castReplies table
@@ -110,33 +246,133 @@ export async function analyzeCastQuality(
           .select({
             qualityScore: castReplies.qualityScore,
             category: castReplies.category,
+            castData: castReplies.castData,
           })
           .from(castReplies)
           .where(eq(castReplies.replyCastHash, quotedCastHash))
           .limit(1);
         
-        if (castReply.length > 0 && castReply[0].qualityScore !== null) {
-          const originalScore = castReply[0].qualityScore;
-          const adjustedScore = Math.max(0, originalScore - 10);
-          console.log(`[DeepSeek] Pure recast detected, using original score ${originalScore} - 10 = ${adjustedScore}`);
-          return {
-            qualityScore: adjustedScore,
-            category: castReply[0].category || "other",
-            reasoning: `Pure recast scored as original (${originalScore}) minus 10`,
-          };
+        if (castReply.length > 0) {
+          let originalScore: number | null = castReply[0].qualityScore;
+          let originalCategory: string | null = castReply[0].category;
+          
+          // If found but not analyzed, analyze it now
+          if (originalScore === null) {
+            console.log(`[DeepSeek] Quote cast detected, analyzing original cast ${quotedCastHash} from castReplies`);
+            const originalAnalysis = await analyzeCastQuality(castReply[0].castData, true);
+            if (originalAnalysis) {
+              await db
+                .update(castReplies)
+                .set({
+                  qualityScore: originalAnalysis.qualityScore,
+                  category: originalAnalysis.category,
+                  qualityAnalyzedAt: new Date(),
+                })
+                .where(eq(castReplies.replyCastHash, quotedCastHash));
+              originalScore = originalAnalysis.qualityScore;
+              originalCategory = originalAnalysis.category;
+            }
+          }
+          
+          if (originalScore !== null) {
+            // Analyze additional text to determine adjustment
+            const adjustment = await analyzeAdditionalTextAdjustment(castText);
+            const adjustedScore = Math.max(0, originalScore + adjustment);
+            console.log(`[DeepSeek] Quote cast detected, using original score ${originalScore} + adjustment ${adjustment} = ${adjustedScore}`);
+            return {
+              qualityScore: adjustedScore,
+              category: originalCategory || "other",
+              reasoning: `Quote cast scored as original (${originalScore}) with adjustment ${adjustment} based on additional text quality`,
+            };
+          }
+        }
+        
+        // If not found anywhere, fetch from Neynar, store, and analyze
+        if (curatedCast.length === 0 && castReply.length === 0) {
+          console.log(`[DeepSeek] Quote cast detected, fetching original cast ${quotedCastHash} from Neynar`);
+          try {
+            const conversation = await neynarClient.lookupCastConversation({
+              identifier: quotedCastHash,
+              type: LookupCastConversationTypeEnum.Hash,
+              replyDepth: 0,
+              includeChronologicalParentCasts: false,
+            });
+            
+            const quotedCastData = conversation.conversation?.cast;
+            if (quotedCastData) {
+              // Extract metadata
+              const metadata = extractCastMetadata(quotedCastData);
+              const castCreatedAt = extractCastTimestamp(quotedCastData);
+              
+              // Ensure author exists in database
+              const authorDataMap = extractAuthorDataFromCasts([quotedCastData]);
+              if (authorDataMap.size > 0) {
+                await upsertBulkUsers(authorDataMap);
+              }
+              
+              // Store in castReplies with placeholder curatedCastHash
+              await db
+                .insert(castReplies)
+                .values({
+                  curatedCastHash: PARENT_CAST_PLACEHOLDER_HASH,
+                  replyCastHash: quotedCastHash,
+                  castData: quotedCastData,
+                  castCreatedAt: castCreatedAt,
+                  parentCastHash: quotedCastData.parent_hash || null,
+                  rootCastHash: PARENT_CAST_PLACEHOLDER_HASH,
+                  replyDepth: 0,
+                  isQuoteCast: false,
+                  quotedCastHash: null,
+                  castText: metadata.castText,
+                  castTextLength: metadata.castTextLength,
+                  authorFid: metadata.authorFid,
+                  likesCount: metadata.likesCount,
+                  recastsCount: metadata.recastsCount,
+                  repliesCount: metadata.repliesCount,
+                  engagementScore: metadata.engagementScore,
+                })
+                .onConflictDoUpdate({
+                  target: castReplies.replyCastHash,
+                  set: {
+                    castData: sql`excluded.cast_data`,
+                    castCreatedAt: sql`excluded.cast_created_at`,
+                  },
+                });
+              
+              // Analyze the quoted cast synchronously
+              console.log(`[DeepSeek] Analyzing fetched original cast ${quotedCastHash}`);
+              const originalAnalysis = await analyzeCastQuality(quotedCastData, true);
+              if (originalAnalysis) {
+                await db
+                  .update(castReplies)
+                  .set({
+                    qualityScore: originalAnalysis.qualityScore,
+                    category: originalAnalysis.category,
+                    qualityAnalyzedAt: new Date(),
+                  })
+                  .where(eq(castReplies.replyCastHash, quotedCastHash));
+                
+                const originalScore = originalAnalysis.qualityScore;
+                // Analyze additional text to determine adjustment
+                const adjustment = await analyzeAdditionalTextAdjustment(castText);
+                const adjustedScore = Math.max(0, originalScore + adjustment);
+                console.log(`[DeepSeek] Quote cast detected, using fetched original score ${originalScore} + adjustment ${adjustment} = ${adjustedScore}`);
+                return {
+                  qualityScore: adjustedScore,
+                  category: originalAnalysis.category,
+                  reasoning: `Quote cast scored as original (${originalScore}) with adjustment ${adjustment} based on additional text quality`,
+                };
+              }
+            }
+          } catch (error: any) {
+            console.error(`[DeepSeek] Error fetching/analyzing original cast ${quotedCastHash}:`, error.message);
+            // Fall through to normal analysis
+          }
         }
       } catch (error: any) {
         console.error(`[DeepSeek] Error looking up original cast quality score:`, error.message);
-        // Fall through to default behavior
+        // Fall through to normal analysis
       }
-      
-      // If original cast not found or not analyzed yet, return default low score
-      console.warn(`[DeepSeek] Pure recast detected but original cast ${quotedCastHash} not found or not analyzed, using default score`);
-      return {
-        qualityScore: 5,
-        category: "other",
-        reasoning: "Pure recast with no original cast quality score available",
-      };
     }
   }
   
