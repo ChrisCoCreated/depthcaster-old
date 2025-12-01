@@ -421,6 +421,16 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
       return "/icon-192x192.webp";
     }
     
+    // Feedback notifications use submitter's profile picture
+    if (type === "feedback.new") {
+      const submitterPfp = notif.castData?.submitter?.pfpUrl;
+      if (submitterPfp) {
+        return submitterPfp;
+      }
+      // Fallback to app logo if no submitter pfp
+      return "/icon-192x192.webp";
+    }
+    
     // For webhook notifications, check actor.pfp_url first (but skip for app.update)
     if (notif.actor?.pfp_url) {
       return notif.actor.pfp_url;
@@ -496,6 +506,8 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
         return "🔄";
       case "app.update":
         return "📢";
+      case "feedback.new":
+        return "💡";
       default:
         return "🔔";
     }
@@ -514,6 +526,16 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
         return url.startsWith("http") ? url : url;
       }
       return "/updates";
+    }
+
+    // Feedback notifications use URL from castData
+    if (type === "feedback.new") {
+      const url = notif.castData?.url;
+      if (url) {
+        // If URL is relative, return as-is; if absolute, return full URL
+        return url.startsWith("http") ? url : url;
+      }
+      return "/admin/build-ideas?type=feedback";
     }
 
     // Curated notifications should prefer conversation view when possible
@@ -703,6 +725,15 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
     if (type === "app.update") {
       const title = notif.castData?.title || notif.cast?.data?.title || "App Update";
       return title;
+    }
+    
+    // Feedback notifications show submitter name and feedback type
+    if (type === "feedback.new") {
+      const submitter = notif.castData?.submitter;
+      const submitterName = submitter?.displayName || submitter?.username || "Someone";
+      const feedbackType = notif.castData?.feedbackType || "feedback";
+      const feedbackTypeLabel = feedbackType === "bug" ? "Bug Report" : feedbackType === "feature" ? "Feature Request" : "Feedback";
+      return `${submitterName} submitted ${feedbackTypeLabel}`;
     }
     
     // Get users based on notification type
@@ -994,7 +1025,20 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
                       <div className="flex-shrink-0 relative w-10 h-10">
                         <AvatarImage
                           src={getNotificationPfpUrl(notification)}
-                          alt={String(notification.type).toLowerCase().trim() === "app.update" || (notification as any).castData?.type?.toLowerCase()?.trim() === "app.update" ? "App logo" : "User avatar"}
+                          alt={
+                            (() => {
+                              const type = String(notification.type).toLowerCase().trim();
+                              const castDataType = (notification as any).castData?.type?.toLowerCase()?.trim();
+                              if (type === "app.update" || castDataType === "app.update") {
+                                return "App logo";
+                              }
+                              if (type === "feedback.new") {
+                                const submitter = (notification as any).castData?.submitter;
+                                return submitter?.displayName || submitter?.username || "Feedback submitter";
+                              }
+                              return "User avatar";
+                            })()
+                          }
                           size={40}
                           className="w-10 h-10 rounded-full object-cover"
                         />
@@ -1019,6 +1063,19 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
                               return (
                                 <div className="mt-2 text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
                                   {body}
+                                </div>
+                              );
+                            }
+                            return null;
+                          }
+                          
+                          // For feedback.new, show title from castData
+                          if (type === "feedback.new") {
+                            const title = notif.castData?.title;
+                            if (title) {
+                              return (
+                                <div className="mt-2 text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
+                                  {title}
                                 </div>
                               );
                             }
