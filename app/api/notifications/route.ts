@@ -278,16 +278,24 @@ export async function GET(request: NextRequest) {
     }
 
     // Generate cursor for webhook notifications if there are more available
+    // Only generate cursor if we actually have more webhooks beyond what we've shown
     let webhookCursor: string | null = null;
-    const hasMoreWebhooks = webhookResults.length > limit || webhookResults.length === limit * 2;
-    if (hasMoreWebhooks && webhookResults.length > 0) {
-      // Get the last webhook notification's timestamp
-      const lastWebhook = webhookResults[webhookResults.length - 1];
-      if (lastWebhook.createdAt) {
-        const timestamp = lastWebhook.createdAt instanceof Date 
-          ? lastWebhook.createdAt.toISOString()
-          : new Date(lastWebhook.createdAt).toISOString();
-        
+    
+    // Only generate webhook cursor if we fetched exactly limit * 2 webhooks
+    // This indicates there might be more (if we got fewer, we've reached the end)
+    if (webhookResults.length === limit * 2 && limitedNotifications.length > 0) {
+      // Use the last notification's timestamp from limitedNotifications (what user actually sees)
+      // This ensures the cursor points to the right place for pagination
+      const lastNotification = limitedNotifications[limitedNotifications.length - 1];
+      const getTimestamp = (notif: any): string | null => {
+        if (notif.most_recent_timestamp) return notif.most_recent_timestamp;
+        if (notif.timestamp) return notif.timestamp;
+        if (notif.created_at) return notif.created_at;
+        return null;
+      };
+      
+      const timestamp = getTimestamp(lastNotification);
+      if (timestamp) {
         // Create cursor in Neynar format (base64-encoded JSON)
         const cursorData = {
           most_recent_timestamp: timestamp,

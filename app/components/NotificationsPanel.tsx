@@ -201,7 +201,7 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
     if (!user?.signer_uuid) return;
 
     try {
-      await fetch("/api/notifications/seen", {
+      const response = await fetch("/api/notifications/seen", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -214,9 +214,12 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
         }),
       });
       
-      // Notify parent component to refresh unread count
-      if (onNotificationsSeen) {
-        onNotificationsSeen();
+      // Only notify parent component to refresh unread count if the API call succeeded
+      if (response.ok && onNotificationsSeen) {
+        // Small delay to ensure database update and cache invalidation complete
+        setTimeout(() => {
+          onNotificationsSeen();
+        }, 150);
       }
     } catch (err) {
       console.error("Failed to mark notifications as seen", err);
@@ -236,12 +239,25 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
             // Only mark as seen if there are unread notifications
             if (unreadCount > 0) {
               await markAsSeen();
+              // Explicitly refresh count after marking as seen
+              // This ensures the badge updates even if onNotificationsSeen callback has timing issues
+              if (onNotificationsSeen) {
+                // Small delay to ensure database update completes
+                setTimeout(() => {
+                  onNotificationsSeen();
+                }, 100);
+              }
             }
           }
         } catch (err) {
           console.error("Failed to check unread count", err);
           // If count check fails, still try to mark as seen (fallback)
           await markAsSeen();
+          if (onNotificationsSeen) {
+            setTimeout(() => {
+              onNotificationsSeen();
+            }, 100);
+          }
         }
         
         // Fetch notifications regardless
@@ -254,7 +270,7 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
       isFetchingRef.current = false;
       setLoading(false);
     }
-  }, [isOpen, user?.fid, fetchNotifications, markAsSeen]);
+  }, [isOpen, user?.fid, fetchNotifications, markAsSeen, onNotificationsSeen]);
 
   // Check if user has curator role
   useEffect(() => {
