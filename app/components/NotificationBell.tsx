@@ -196,15 +196,19 @@ export function NotificationBell() {
       return;
     }
 
-    const POLL_INTERVAL = 5 * 60 * 1000; // 5 minutes - NEVER poll more frequently than this
+    // Use shorter polling when active (10 seconds), longer when inactive (5 minutes)
+    const ACTIVE_POLL_INTERVAL = 10 * 1000; // 10 seconds when active
+    const INACTIVE_POLL_INTERVAL = 5 * 60 * 1000; // 5 minutes when inactive
 
-    const fetchUnreadCount = async () => {
-      // Enforce minimum 5-minute interval - never poll more frequently
+    const fetchUnreadCount = async (useCacheBust = false) => {
       const now = Date.now();
+      const currentPollInterval = isUserActive && isTabVisible ? ACTIVE_POLL_INTERVAL : INACTIVE_POLL_INTERVAL;
       const timeSinceLastPoll = now - lastPollTimeRef.current;
-      if (timeSinceLastPoll < POLL_INTERVAL && lastPollTimeRef.current > 0) {
+      
+      // Enforce minimum interval - never poll more frequently than the current interval
+      if (timeSinceLastPoll < currentPollInterval && lastPollTimeRef.current > 0 && !useCacheBust) {
         // Too soon since last poll, reschedule for the remaining time
-        const remainingTime = POLL_INTERVAL - timeSinceLastPoll;
+        const remainingTime = currentPollInterval - timeSinceLastPoll;
         if (timeoutIdRef.current) clearTimeout(timeoutIdRef.current);
         timeoutIdRef.current = setTimeout(() => {
           fetchUnreadCount();
@@ -216,7 +220,11 @@ export function NotificationBell() {
       lastPollTimeRef.current = now;
       try {
         // Use lightweight count endpoint instead of full notifications
-        const response = await fetch(`/api/notifications/count?fid=${user.fid}`);
+        // Add cache-busting parameter if explicitly requested (e.g., from push notification)
+        const url = useCacheBust 
+          ? `/api/notifications/count?fid=${user.fid}&_t=${Date.now()}`
+          : `/api/notifications/count?fid=${user.fid}`;
+        const response = await fetch(url);
         if (response.ok) {
           const data = await response.json();
           const unread = data.unreadCount || 0;
@@ -267,7 +275,7 @@ export function NotificationBell() {
           }
           
           // Reset backoff on success
-          backoffDelayRef.current = POLL_INTERVAL;
+          backoffDelayRef.current = currentPollInterval;
         } else {
           // On error, use exponential backoff (but don't exceed 10 minutes)
           backoffDelayRef.current = Math.min(backoffDelayRef.current * 2, 10 * 60 * 1000); // Max 10 minutes
@@ -286,58 +294,64 @@ export function NotificationBell() {
       }
       
       if (timeoutIdRef.current) clearTimeout(timeoutIdRef.current);
+      
+      // Use appropriate interval based on activity
+      const currentPollInterval = isUserActive && isTabVisible ? ACTIVE_POLL_INTERVAL : INACTIVE_POLL_INTERVAL;
+      const delay = Math.max(backoffDelayRef.current, currentPollInterval);
+      
       timeoutIdRef.current = setTimeout(() => {
         // Only fetch if still active and tab is visible
         if (isUserActive && isTabVisible) {
           fetchUnreadCount();
           scheduleNextFetch();
         }
-      }, backoffDelayRef.current);
+      }, delay);
     };
 
     // Immediate fetch on new session (when component mounts)
     lastPollTimeRef.current = 0; // Reset to allow immediate fetch
     fetchUnreadCount();
     
-    // Schedule recurring fetches every 5 minutes
+    // Schedule recurring fetches (10s when active, 5min when inactive)
     scheduleNextFetch();
 
     return () => {
       if (timeoutIdRef.current) clearTimeout(timeoutIdRef.current);
     };
-  }, [user?.fid, isGranted, showDeviceNotifications]);
+  }, [user?.fid, isGranted, showDeviceNotifications, isUserActive, isTabVisible]);
 
   // Handle activity changes - resume polling when user becomes active
   useEffect(() => {
     if (!user?.fid) return;
 
-    const POLL_INTERVAL = 5 * 60 * 1000; // 5 minutes
+    const ACTIVE_POLL_INTERVAL = 10 * 1000; // 10 seconds when active
+    const INACTIVE_POLL_INTERVAL = 5 * 60 * 1000; // 5 minutes when inactive
 
     if (isUserActive && !wasActiveRef.current && isTabVisible) {
-      // User became active, check if enough time has passed since last poll
+      // User became active, fetch immediately and start shorter polling
       const now = Date.now();
-      const timeSinceLastPoll = now - lastPollTimeRef.current;
-      if (timeSinceLastPoll >= POLL_INTERVAL || lastPollTimeRef.current === 0) {
-        // Enough time has passed, fetch immediately
-        const fetchUnreadCount = async () => {
-          try {
-            const response = await fetch(`/api/notifications/count?fid=${user.fid}`);
-            if (response.ok) {
-              const data = await response.json();
-              // Skip update if badge was manually cleared recently (within last 3 seconds)
-              const MANUAL_CLEAR_TIMEOUT = 3000; // 3 seconds
-              if (!(manualClearTimeRef.current && Date.now() - manualClearTimeRef.current < MANUAL_CLEAR_TIMEOUT)) {
-                setUnreadCount(data.unreadCount || 0);
-                previousUnreadCountRef.current = data.unreadCount || 0;
-              }
+      const fetchUnreadCount = async () => {
+        try {
+          const response = await fetch(`/api/notifications/count?fid=${user.fid}&_t=${Date.now()}`);
+          if (response.ok) {
+            const data = await response.json();
+            // Skip update if badge was manually cleared recently (within last 3 seconds)
+            const MANUAL_CLEAR_TIMEOUT = 3000; // 3 seconds
+            if (!(manualClearTimeRef.current && Date.now() - manualClearTimeRef.current < MANUAL_CLEAR_TIMEOUT)) {
+              setUnreadCount(data.unreadCount || 0);
+              previousUnreadCountRef.current = data.unreadCount || 0;
             }
-          } catch (err) {
-            console.error("Failed to fetch unread count", err);
           }
-        };
-        fetchUnreadCount();
-        lastPollTimeRef.current = now;
-      }
+        } catch (err) {
+          console.error("Failed to fetch unread count", err);
+        }
+      };
+      fetchUnreadCount();
+      lastPollTimeRef.current = now;
+      backoffDelayRef.current = ACTIVE_POLL_INTERVAL;
+    } else if (!isUserActive && wasActiveRef.current) {
+      // User became inactive, switch to longer polling interval
+      backoffDelayRef.current = INACTIVE_POLL_INTERVAL;
     }
     wasActiveRef.current = isUserActive;
   }, [isUserActive, isTabVisible, user?.fid]);
@@ -346,35 +360,71 @@ export function NotificationBell() {
   useEffect(() => {
     if (!user?.fid) return;
 
-    const POLL_INTERVAL = 5 * 60 * 1000; // 5 minutes
+    const ACTIVE_POLL_INTERVAL = 10 * 1000; // 10 seconds when active
 
     if (isTabVisible && !wasVisibleRef.current && isUserActive) {
-      // Tab became visible and user is active, check if enough time has passed
+      // Tab became visible and user is active, fetch immediately
       const now = Date.now();
-      const timeSinceLastPoll = now - lastPollTimeRef.current;
-      if (timeSinceLastPoll >= POLL_INTERVAL || lastPollTimeRef.current === 0) {
-        const fetchUnreadCount = async () => {
-          try {
-            const response = await fetch(`/api/notifications/count?fid=${user.fid}`);
-            if (response.ok) {
-              const data = await response.json();
-              // Skip update if badge was manually cleared recently (within last 3 seconds)
-              const MANUAL_CLEAR_TIMEOUT = 3000; // 3 seconds
-              if (!(manualClearTimeRef.current && Date.now() - manualClearTimeRef.current < MANUAL_CLEAR_TIMEOUT)) {
-                setUnreadCount(data.unreadCount || 0);
-                previousUnreadCountRef.current = data.unreadCount || 0;
-              }
+      const fetchUnreadCount = async () => {
+        try {
+          const response = await fetch(`/api/notifications/count?fid=${user.fid}&_t=${Date.now()}`);
+          if (response.ok) {
+            const data = await response.json();
+            // Skip update if badge was manually cleared recently (within last 3 seconds)
+            const MANUAL_CLEAR_TIMEOUT = 3000; // 3 seconds
+            if (!(manualClearTimeRef.current && Date.now() - manualClearTimeRef.current < MANUAL_CLEAR_TIMEOUT)) {
+              setUnreadCount(data.unreadCount || 0);
+              previousUnreadCountRef.current = data.unreadCount || 0;
             }
-          } catch (err) {
-            console.error("Failed to fetch unread count", err);
           }
-        };
-        fetchUnreadCount();
-        lastPollTimeRef.current = now;
-      }
+        } catch (err) {
+          console.error("Failed to fetch unread count", err);
+        }
+      };
+      fetchUnreadCount();
+      lastPollTimeRef.current = now;
+      backoffDelayRef.current = ACTIVE_POLL_INTERVAL;
     }
     wasVisibleRef.current = isTabVisible;
   }, [isTabVisible, isUserActive, user?.fid]);
+
+  // Listen for service worker messages to refresh badge immediately
+  useEffect(() => {
+    if (!user?.fid || typeof window === "undefined" || !("serviceWorker" in navigator)) {
+      return;
+    }
+
+    const handleMessage = async (event: MessageEvent) => {
+      if (event.data && event.data.type === "BADGE_REFRESH") {
+        // Immediately refresh badge count with cache-busting
+        try {
+          const response = await fetch(`/api/notifications/count?fid=${user.fid}&_t=${Date.now()}`);
+          if (response.ok) {
+            const data = await response.json();
+            const newCount = data.unreadCount || 0;
+            // Skip update if badge was manually cleared recently (within last 3 seconds)
+            const MANUAL_CLEAR_TIMEOUT = 3000; // 3 seconds
+            if (!(manualClearTimeRef.current && Date.now() - manualClearTimeRef.current < MANUAL_CLEAR_TIMEOUT)) {
+              setUnreadCount(newCount);
+              previousUnreadCountRef.current = newCount;
+              if (isSuperAdminUser) {
+                console.log("[SuperAdmin] Badge refreshed from push notification:", newCount);
+                showToast(`Badge refreshed: ${newCount}`, newCount === 0 ? "success" : "error");
+              }
+            }
+          }
+        } catch (err) {
+          console.error("Failed to refresh badge from push notification", err);
+        }
+      }
+    };
+
+    navigator.serviceWorker.addEventListener("message", handleMessage);
+
+    return () => {
+      navigator.serviceWorker.removeEventListener("message", handleMessage);
+    };
+  }, [user?.fid, isSuperAdminUser, showToast]);
 
   // Check if user is superadmin
   useEffect(() => {

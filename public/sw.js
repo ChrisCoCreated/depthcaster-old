@@ -99,6 +99,23 @@ self.addEventListener('push', (event) => {
     }
   }
 
+  // Check if this is a badge refresh push (lightweight notification to update badge)
+  if (notificationData.data && notificationData.data.type === 'badge-refresh') {
+    // Forward BADGE_REFRESH message to all clients to trigger immediate badge update
+    event.waitUntil(
+      clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+        return Promise.all(
+          clientList.map((client) => {
+            return client.postMessage({ type: 'BADGE_REFRESH' });
+          })
+        );
+      })
+    );
+    // Don't show a visible notification for badge refresh pushes
+    return;
+  }
+
+  // For regular push notifications, show the notification
   event.waitUntil(
     self.registration.showNotification(notificationData.title, {
       body: notificationData.body,

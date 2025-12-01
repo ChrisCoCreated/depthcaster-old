@@ -110,6 +110,20 @@ export async function createCuratorNotification(
     // Invalidate count cache
     cacheNotificationCount.invalidateUser(curatorFid);
 
+    // Send badge refresh push notification to trigger immediate badge update
+    try {
+      await sendPushNotificationToUser(curatorFid, {
+        title: "New notification",
+        body: "",
+        icon: "/icon-192x192.webp",
+        badge: "/icon-96x96.webp",
+        data: { type: "badge-refresh" },
+      });
+    } catch (error) {
+      // Don't fail if badge refresh push fails - it's non-critical
+      console.error(`[Notifications] Error sending badge refresh push to curator ${curatorFid}:`, error);
+    }
+
     console.log(`[Notifications] Created ${type} notification for curator ${curatorFid}, cast ${castHash}`);
   } catch (error: any) {
     // Handle unique constraint violation (duplicate notification)
@@ -386,6 +400,20 @@ export async function createAppUpdateNotification(
 
     // Invalidate count cache
     cacheNotificationCount.invalidateUser(userFid);
+
+    // Send badge refresh push notification to trigger immediate badge update
+    try {
+      await sendPushNotificationToUser(userFid, {
+        title: "New notification",
+        body: "",
+        icon: "/icon-192x192.webp",
+        badge: "/icon-96x96.webp",
+        data: { type: "badge-refresh" },
+      });
+    } catch (error) {
+      // Don't fail if badge refresh push fails - it's non-critical
+      console.error(`[Notifications] Error sending badge refresh push to user ${userFid}:`, error);
+    }
 
     console.log(`[Notifications] Created app.update notification for user ${userFid}`);
   } catch (error: any) {

@@ -644,6 +644,23 @@ export async function POST(request: NextRequest) {
           for (const notification of notificationsToCreate) {
             cacheNotificationCount.invalidateUser(notification.userFid);
           }
+
+          // Send badge refresh push notifications to trigger immediate badge update
+          // This is a lightweight push that tells the client to refresh the badge count
+          for (const notification of notificationsToCreate) {
+            try {
+              await sendPushNotificationToUser(notification.userFid, {
+                title: "New notification",
+                body: "",
+                icon: "/icon-192x192.webp",
+                badge: "/icon-96x96.webp",
+                data: { type: "badge-refresh" },
+              });
+            } catch (error) {
+              // Don't fail if badge refresh push fails - it's non-critical
+              console.error(`[Webhook] Error sending badge refresh push to user ${notification.userFid}:`, error);
+            }
+          }
         } else {
           console.log(`[Webhook] All watchers already have notifications for cast ${castHash}, skipping creation`);
         }
