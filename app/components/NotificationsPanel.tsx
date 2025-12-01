@@ -1151,10 +1151,11 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
                     onClick={async (e) => {
                       const notif = notification as any;
                       const type = String(notification.type);
-                      // For curated notifications and webhook notifications (cast.created), pass castHash to mark as read in database
+                      // For curated notifications, webhook notifications (cast.created), and feedback notifications, pass castHash to mark as read in database
                       const castHash = 
                         (type.startsWith("curated.") && (notif.castHash || notification.cast?.hash)) ||
                         (type === "cast.created" && (notif.castHash || notification.cast?.hash)) ||
+                        (type === "feedback.new" && (notif.castHash || notification.cast?.hash)) ||
                         undefined;
                       await markAsSeen(type, castHash);
                       onClose();
