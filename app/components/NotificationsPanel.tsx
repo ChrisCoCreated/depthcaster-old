@@ -27,6 +27,7 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
   const { user } = useNeynarContext();
   const isFetchingRef = useRef(false);
   const hasInitialFetchRef = useRef(false);
+  const fetchNotificationsRef = useRef<((newCursor?: string | null) => Promise<void>) | null>(null);
 
   const getNotificationPreferences = (): string[] => {
     const saved = localStorage.getItem("notificationPreferences");
@@ -117,13 +118,14 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
 
   const fetchNotifications = useCallback(async (newCursor?: string | null) => {
     const stack = new Error().stack;
-    const caller = stack?.split('\n')[2]?.trim() || 'unknown';
+    const callerLines = stack?.split('\n').slice(1, 4) || [];
+    const caller = callerLines.map(line => line.trim()).join(' -> ') || 'unknown';
     console.log('[NotificationsPanel] fetchNotifications called', {
       newCursor: newCursor ? `${newCursor.substring(0, 20)}...` : null,
       hasUser: !!user?.fid,
       isFetchingRef: isFetchingRef.current,
       timestamp: new Date().toISOString(),
-      caller: caller,
+      caller: caller.substring(0, 200), // Limit length
     });
 
     if (!user?.fid) {
@@ -253,6 +255,11 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
     }
   }, [user?.fid]);
 
+  // Keep ref updated with latest fetchNotifications function
+  useEffect(() => {
+    fetchNotificationsRef.current = fetchNotifications;
+  }, [fetchNotifications]);
+
   const markAsSeen = useCallback(async (notificationType?: string, castHash?: string) => {
     if (!user?.signer_uuid) return;
 
@@ -307,7 +314,9 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
         
         // Fetch notifications regardless
         console.log('[NotificationsPanel] Calling fetchNotifications() from useEffect');
-        fetchNotifications();
+        if (fetchNotificationsRef.current) {
+          fetchNotificationsRef.current();
+        }
       };
       
       markAsSeenAndFetch();
@@ -317,7 +326,7 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
       isFetchingRef.current = false;
       setLoading(false);
     }
-  }, [isOpen, user?.fid, fetchNotifications, markAsSeen, onNotificationsSeen]);
+  }, [isOpen, user?.fid, markAsSeen, onNotificationsSeen]);
 
   // Check if user has curator role
   useEffect(() => {
