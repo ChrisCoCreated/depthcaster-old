@@ -216,10 +216,10 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
       
       // Only notify parent component to refresh unread count if the API call succeeded
       if (response.ok && onNotificationsSeen) {
-        // Small delay to ensure database update and cache invalidation complete
+        // Delay to ensure database update and cache invalidation complete
         setTimeout(() => {
           onNotificationsSeen();
-        }, 150);
+        }, 250);
       }
     } catch (err) {
       console.error("Failed to mark notifications as seen", err);
@@ -242,10 +242,10 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
               // Explicitly refresh count after marking as seen
               // This ensures the badge updates even if onNotificationsSeen callback has timing issues
               if (onNotificationsSeen) {
-                // Small delay to ensure database update completes
+                // Delay to ensure database update completes
                 setTimeout(() => {
                   onNotificationsSeen();
-                }, 100);
+                }, 250);
               }
             }
           }
@@ -256,7 +256,7 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
           if (onNotificationsSeen) {
             setTimeout(() => {
               onNotificationsSeen();
-            }, 100);
+            }, 250);
           }
         }
         

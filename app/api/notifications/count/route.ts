@@ -32,11 +32,17 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Check cache first
-    const cacheKey = cacheNotificationCount.generateKey({ fid: fidNum });
-    const cachedResult = cacheNotificationCount.get(cacheKey);
-    if (cachedResult !== undefined) {
-      return NextResponse.json(cachedResult);
+    // Check for cache-busting parameter - if present, skip cache to ensure fresh data
+    const cacheBust = searchParams.get("_t");
+    const shouldSkipCache = cacheBust !== null;
+
+    // Check cache first (only if not cache-busting)
+    if (!shouldSkipCache) {
+      const cacheKey = cacheNotificationCount.generateKey({ fid: fidNum });
+      const cachedResult = cacheNotificationCount.get(cacheKey);
+      if (cachedResult !== undefined) {
+        return NextResponse.json(cachedResult);
+      }
     }
 
     // Count unread webhook notifications from database (much cheaper than API call)
@@ -68,8 +74,11 @@ export async function GET(request: NextRequest) {
       // Those will be fetched when the panel is opened
     };
 
-    // Cache for 120 seconds (2 minutes)
-    cacheNotificationCount.set(cacheKey, result);
+    // Cache for 120 seconds (2 minutes) (only if not cache-busting)
+    if (!shouldSkipCache) {
+      const cacheKey = cacheNotificationCount.generateKey({ fid: fidNum });
+      cacheNotificationCount.set(cacheKey, result);
+    }
 
     return NextResponse.json(result);
   } catch (error: any) {
