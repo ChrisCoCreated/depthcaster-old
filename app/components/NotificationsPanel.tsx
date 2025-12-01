@@ -26,6 +26,7 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
   const [isCurator, setIsCurator] = useState<boolean | null>(null);
   const { user } = useNeynarContext();
   const isFetchingRef = useRef(false);
+  const hasInitialFetchRef = useRef(false);
 
   const getNotificationPreferences = (): string[] => {
     const saved = localStorage.getItem("notificationPreferences");
@@ -115,11 +116,14 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
   };
 
   const fetchNotifications = useCallback(async (newCursor?: string | null) => {
+    const stack = new Error().stack;
+    const caller = stack?.split('\n')[2]?.trim() || 'unknown';
     console.log('[NotificationsPanel] fetchNotifications called', {
       newCursor: newCursor ? `${newCursor.substring(0, 20)}...` : null,
       hasUser: !!user?.fid,
       isFetchingRef: isFetchingRef.current,
       timestamp: new Date().toISOString(),
+      caller: caller,
     });
 
     if (!user?.fid) {
@@ -279,9 +283,17 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
   }, [user?.signer_uuid, user?.fid, onNotificationsSeen]);
 
   useEffect(() => {
-    if (isOpen && user?.fid) {
+    console.log('[NotificationsPanel] useEffect triggered', {
+      isOpen,
+      hasUser: !!user?.fid,
+      hasInitialFetch: hasInitialFetchRef.current,
+      timestamp: new Date().toISOString(),
+    });
+    if (isOpen && user?.fid && !hasInitialFetchRef.current) {
       // Always mark as seen when panel opens (badge is already cleared in parent)
       const markAsSeenAndFetch = async () => {
+        console.log('[NotificationsPanel] markAsSeenAndFetch called');
+        hasInitialFetchRef.current = true;
         // Mark notifications as seen in background
         await markAsSeen();
         
@@ -294,12 +306,14 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
         }
         
         // Fetch notifications regardless
+        console.log('[NotificationsPanel] Calling fetchNotifications() from useEffect');
         fetchNotifications();
       };
       
       markAsSeenAndFetch();
-    } else {
+    } else if (!isOpen) {
       // Reset fetching state when panel closes
+      hasInitialFetchRef.current = false;
       isFetchingRef.current = false;
       setLoading(false);
     }

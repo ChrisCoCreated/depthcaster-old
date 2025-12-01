@@ -341,6 +341,7 @@ export function NotificationBell() {
       <button
         onClick={() => {
           setUnreadCount(0); // Clear badge immediately on click
+          console.log("Bell Cleared");
           setShowPanel(true);
         }}
         className="relative p-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
