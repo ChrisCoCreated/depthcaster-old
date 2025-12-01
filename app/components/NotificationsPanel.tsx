@@ -111,6 +111,11 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
       return;
     }
 
+    // Prevent loading if already loading
+    if (loading) {
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -152,7 +157,29 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
       });
       
       if (newCursor) {
-        setNotifications((prev) => [...prev, ...filteredNotifications]);
+        // Deduplicate when appending: check by castHash + type + timestamp
+        setNotifications((prev) => {
+          const existingKeys = new Set(
+            prev.map((n: Notification) => {
+              const notif = n as any;
+              const hash = notif.castHash || n.cast?.hash || '';
+              const type = String(n.type);
+              const timestamp = notif.most_recent_timestamp || notif.timestamp || notif.created_at || '';
+              return `${hash}:${type}:${timestamp}`;
+            })
+          );
+          
+          const newNotifications = filteredNotifications.filter((n: Notification) => {
+            const notif = n as any;
+            const hash = notif.castHash || n.cast?.hash || '';
+            const type = String(n.type);
+            const timestamp = notif.most_recent_timestamp || notif.timestamp || notif.created_at || '';
+            const key = `${hash}:${type}:${timestamp}`;
+            return !existingKeys.has(key);
+          });
+          
+          return [...prev, ...newNotifications];
+        });
       } else {
         setNotifications(filteredNotifications);
       }
@@ -164,7 +191,7 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
     } finally {
       setLoading(false);
     }
-  }, [user?.fid]);
+  }, [user?.fid, loading]);
 
   const markAsSeen = useCallback(async (notificationType?: string, castHash?: string) => {
     if (!user?.signer_uuid) return;
@@ -818,12 +845,15 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
                   <Link
                     key={index}
                     href={link}
-                    onClick={() => {
+                    onClick={async (e) => {
                       const notif = notification as any;
                       const type = String(notification.type);
-                      // For curated notifications, pass castHash to mark as read in database
-                      const castHash = (type.startsWith("curated.") && (notif.castHash || notification.cast?.hash)) || undefined;
-                      markAsSeen(type, castHash);
+                      // For curated notifications and webhook notifications (cast.created), pass castHash to mark as read in database
+                      const castHash = 
+                        (type.startsWith("curated.") && (notif.castHash || notification.cast?.hash)) ||
+                        (type === "cast.created" && (notif.castHash || notification.cast?.hash)) ||
+                        undefined;
+                      await markAsSeen(type, castHash);
                       onClose();
                     }}
                   >

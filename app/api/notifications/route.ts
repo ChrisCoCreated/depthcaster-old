@@ -85,20 +85,47 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Track total Neynar notifications loaded (max 100)
+    // Parse cursor to get count of Neynar notifications already loaded
+    let neynarCountLoaded = 0;
+    const MAX_NEYNAR_NOTIFICATIONS = 100;
+    
+    if (cursor) {
+      try {
+        const urlDecoded = decodeURIComponent(cursor);
+        const decoded = Buffer.from(urlDecoded, 'base64').toString('utf-8');
+        const cursorData = JSON.parse(decoded);
+        // Check if cursor contains neynar_count (our custom tracking)
+        if (cursorData.neynar_count !== undefined) {
+          neynarCountLoaded = parseInt(cursorData.neynar_count) || 0;
+        }
+      } catch {
+        // Not our custom cursor format, ignore
+      }
+    }
+
     // Fetch Neynar notifications only if user has selected Neynar notification types
-    // If types parameter was provided but resulted in empty array, skip Neynar API call
-    const neynarNotifications = hasNeynarTypesSelected
+    // AND we haven't reached the max of 100 Neynar notifications
+    const shouldFetchNeynar = hasNeynarTypesSelected && neynarCountLoaded < MAX_NEYNAR_NOTIFICATIONS;
+    const neynarNotifications = shouldFetchNeynar
       ? await deduplicateRequest(cacheKey, async () => {
+          // Calculate how many more we can fetch (don't exceed 100 total)
+          const remainingNeynarLimit = Math.min(limit, MAX_NEYNAR_NOTIFICATIONS - neynarCountLoaded);
+          if (remainingNeynarLimit <= 0) {
+            return { notifications: [], next: null };
+          }
+          
           return await neynarClient.fetchAllNotifications({
             fid: parseInt(fid),
             type: notificationTypes,
-            limit,
+            limit: remainingNeynarLimit,
             cursor,
           });
         })
       : { notifications: [], next: null };
 
-    console.log(`[Notifications] Found ${neynarNotifications.notifications?.length || 0} Neynar notification(s) for user ${fid}, types: ${types || (hasNeynarTypesSelected ? 'all' : 'none selected')}`);
+    const newNeynarCount = neynarCountLoaded + (neynarNotifications.notifications?.length || 0);
+    console.log(`[Notifications] Found ${neynarNotifications.notifications?.length || 0} Neynar notification(s) for user ${fid}, types: ${types || (hasNeynarTypesSelected ? 'all' : 'none selected')}, total loaded: ${newNeynarCount}/${MAX_NEYNAR_NOTIFICATIONS}`);
 
     // Fetch webhook-based notifications (user watches - parent casts only)
     // Include webhook notifications for all notification types (they're cast.created events)
@@ -242,9 +269,59 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Generate cursor for webhook notifications if there are more available
+    let webhookCursor: string | null = null;
+    const hasMoreWebhooks = webhookResults.length > limit || webhookResults.length === limit * 2;
+    if (hasMoreWebhooks && webhookResults.length > 0) {
+      // Get the last webhook notification's timestamp
+      const lastWebhook = webhookResults[webhookResults.length - 1];
+      if (lastWebhook.createdAt) {
+        const timestamp = lastWebhook.createdAt instanceof Date 
+          ? lastWebhook.createdAt.toISOString()
+          : new Date(lastWebhook.createdAt).toISOString();
+        
+        // Create cursor in Neynar format (base64-encoded JSON)
+        const cursorData = {
+          most_recent_timestamp: timestamp,
+          neynar_count: newNeynarCount, // Track Neynar count in cursor
+        };
+        webhookCursor = Buffer.from(JSON.stringify(cursorData)).toString('base64');
+      }
+    }
+
+    // Merge cursors: prefer Neynar cursor if available, otherwise use webhook cursor
+    // If Neynar has reached max (100), only use webhook cursor
+    let nextCursor: string | null = null;
+    if (neynarNotifications.next?.cursor && newNeynarCount < MAX_NEYNAR_NOTIFICATIONS) {
+      // Neynar has more and we haven't hit the limit - use Neynar cursor with updated count
+      try {
+        const neynarCursorDecoded = Buffer.from(neynarNotifications.next.cursor, 'base64').toString('utf-8');
+        const neynarCursorData = JSON.parse(neynarCursorDecoded);
+        const mergedCursorData = {
+          ...neynarCursorData,
+          neynar_count: newNeynarCount,
+        };
+        nextCursor = Buffer.from(JSON.stringify(mergedCursorData)).toString('base64');
+      } catch {
+        // If we can't parse Neynar cursor, create new one with our tracking
+        const cursorData = {
+          most_recent_timestamp: neynarNotifications.next.cursor, // Fallback: use cursor as-is if it's a timestamp
+          neynar_count: newNeynarCount,
+        };
+        nextCursor = Buffer.from(JSON.stringify(cursorData)).toString('base64');
+      }
+    } else if (webhookCursor) {
+      // No more Neynar notifications (or hit limit), but we have more webhooks
+      nextCursor = webhookCursor;
+    } else if (neynarNotifications.next?.cursor && newNeynarCount >= MAX_NEYNAR_NOTIFICATIONS) {
+      // We've hit the Neynar limit but there might be more webhooks - check if we have more
+      // If no webhook cursor, we're done
+      nextCursor = null;
+    }
+
     const response = {
-      ...neynarNotifications,
       notifications: limitedNotifications,
+      next: nextCursor ? { cursor: nextCursor } : null,
     };
 
     // Cache the response

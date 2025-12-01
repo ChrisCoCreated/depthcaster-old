@@ -194,6 +194,13 @@ The app uses a hybrid filtering approach:
 - **Curated Lists**: Manual curation of high-quality FIDs and channels
 - **Experimental Flag**: Uses Neynar's experimental filtering for spam reduction
 
+## Quality Scoring
+
+The app uses AI-powered quality analysis to score all casts and replies on a scale of 0-100:
+
+- **Pure Recasts**: Quote casts with no additional text are automatically scored as the original cast's quality score minus 10 (minimum 0). This ensures recasts don't receive inflated scores when they add no original content. If the original cast hasn't been analyzed yet, pure recasts receive a default score of 5.
+- **Quality Analysis**: Casts with original content are analyzed using DeepSeek AI to evaluate depth, clarity, and value, with scores ranging from 0-100.
+
 ## Customization
 
 - Edit `lib/curated.ts` to customize curated FIDs and channels

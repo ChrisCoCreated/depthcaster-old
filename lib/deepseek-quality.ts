@@ -2,6 +2,11 @@
  * DeepSeek API integration for cast quality analysis and categorization
  */
 
+import { db } from "@/lib/db";
+import { curatedCasts, castReplies } from "@/lib/schema";
+import { extractQuotedCastHashes } from "@/lib/conversation";
+import { eq } from "drizzle-orm";
+
 const DEEPSEEK_API_URL = process.env.DEEPSEEK_API_URL || "https://api.deepseek.com";
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 
@@ -35,6 +40,28 @@ function extractCastText(castData: any): string {
 }
 
 /**
+ * Check if cast is a pure recast (has embeds with cast but minimal/no text)
+ */
+function isPureRecast(castData: any, castText: string): boolean {
+  if (!castData) return false;
+  
+  // Check if cast has embeds with cast_id or cast (indicating it's a quote/recast)
+  const hasCastEmbed = castData.embeds?.some((embed: any) => 
+    embed.cast_id || (embed.cast && embed.cast.hash)
+  ) || false;
+  
+  if (!hasCastEmbed) return false;
+  
+  // If it has a cast embed but minimal/no text, it's a pure recast
+  const normalizedText = castText.trim();
+  const textLength = normalizedText.length;
+  const wordCount = normalizedText === "" ? 0 : normalizedText.split(/\s+/).filter(w => w.length > 0).length;
+  
+  // Pure recast: has cast embed but no meaningful text (empty or just whitespace/emoji)
+  return textLength === 0 || (wordCount === 0 && textLength <= 5);
+}
+
+/**
  * Analyze a single cast for quality and category using DeepSeek API
  */
 export async function analyzeCastQuality(
@@ -46,6 +73,73 @@ export async function analyzeCastQuality(
   }
 
   const castText = extractCastText(castData);
+  
+  // Check if this is a pure recast (quote cast with no additional text)
+  if (isPureRecast(castData, castText)) {
+    // Extract quoted cast hash(es) from embeds
+    const quotedCastHashes = extractQuotedCastHashes(castData as any);
+    
+    if (quotedCastHashes.length > 0) {
+      // Try to find the original cast's quality score in the database
+      const quotedCastHash = quotedCastHashes[0]; // Use first quoted cast
+      
+      try {
+        // First, check curatedCasts table
+        const curatedCast = await db
+          .select({
+            qualityScore: curatedCasts.qualityScore,
+            category: curatedCasts.category,
+          })
+          .from(curatedCasts)
+          .where(eq(curatedCasts.castHash, quotedCastHash))
+          .limit(1);
+        
+        if (curatedCast.length > 0 && curatedCast[0].qualityScore !== null) {
+          const originalScore = curatedCast[0].qualityScore;
+          const adjustedScore = Math.max(0, originalScore - 10);
+          console.log(`[DeepSeek] Pure recast detected, using original score ${originalScore} - 10 = ${adjustedScore}`);
+          return {
+            qualityScore: adjustedScore,
+            category: curatedCast[0].category || "other",
+            reasoning: `Pure recast scored as original (${originalScore}) minus 10`,
+          };
+        }
+        
+        // If not found in curatedCasts, check castReplies table
+        const castReply = await db
+          .select({
+            qualityScore: castReplies.qualityScore,
+            category: castReplies.category,
+          })
+          .from(castReplies)
+          .where(eq(castReplies.replyCastHash, quotedCastHash))
+          .limit(1);
+        
+        if (castReply.length > 0 && castReply[0].qualityScore !== null) {
+          const originalScore = castReply[0].qualityScore;
+          const adjustedScore = Math.max(0, originalScore - 10);
+          console.log(`[DeepSeek] Pure recast detected, using original score ${originalScore} - 10 = ${adjustedScore}`);
+          return {
+            qualityScore: adjustedScore,
+            category: castReply[0].category || "other",
+            reasoning: `Pure recast scored as original (${originalScore}) minus 10`,
+          };
+        }
+      } catch (error: any) {
+        console.error(`[DeepSeek] Error looking up original cast quality score:`, error.message);
+        // Fall through to default behavior
+      }
+      
+      // If original cast not found or not analyzed yet, return default low score
+      console.warn(`[DeepSeek] Pure recast detected but original cast ${quotedCastHash} not found or not analyzed, using default score`);
+      return {
+        qualityScore: 5,
+        category: "other",
+        reasoning: "Pure recast with no original cast quality score available",
+      };
+    }
+  }
+  
   if (!castText || castText.trim().length === 0) {
     console.warn("[DeepSeek] Cast has no text, skipping analysis");
     return null;

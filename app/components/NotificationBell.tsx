@@ -371,8 +371,8 @@ export function NotificationBell() {
           const fetchUnreadCount = async () => {
             if (!user?.fid) return;
             try {
-              // Use lightweight count endpoint
-              const response = await fetch(`/api/notifications/count?fid=${user.fid}`);
+              // Use lightweight count endpoint with cache-busting to ensure fresh count
+              const response = await fetch(`/api/notifications/count?fid=${user.fid}&_t=${Date.now()}`);
               if (response.ok) {
                 const data = await response.json();
                 setUnreadCount(data.unreadCount || 0);

@@ -67,10 +67,40 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Handle database-stored curated notifications (only if user has curator role)
-    if (userFid && isCurator) {
-      if (castHash && notificationType && String(notificationType).startsWith("curated.")) {
-        // Mark the specific curated notification as read in the database
+    // Handle database-stored notifications (curated and webhook)
+    if (userFid) {
+      // Handle curated notifications (only if user has curator role)
+      if (isCurator) {
+        if (castHash && notificationType && String(notificationType).startsWith("curated.")) {
+          // Mark the specific curated notification as read in the database
+          await db
+            .update(userNotifications)
+            .set({ isRead: true })
+            .where(
+              and(
+                eq(userNotifications.userFid, userFid),
+                eq(userNotifications.castHash, castHash),
+                eq(userNotifications.type, String(notificationType))
+              )
+            );
+        } else if (!castHash && !notificationType) {
+          // When panel opens (no specific notification), mark all unread curated notifications as read
+          await db
+            .update(userNotifications)
+            .set({ isRead: true })
+            .where(
+              and(
+                eq(userNotifications.userFid, userFid),
+                eq(userNotifications.isRead, false),
+                like(userNotifications.type, "curated.%")
+              )
+            );
+        }
+      }
+
+      // Handle webhook notifications (cast.created) - for ALL users regardless of role
+      if (castHash && notificationType && notificationType === "cast.created") {
+        // Mark the specific webhook notification as read in the database
         await db
           .update(userNotifications)
           .set({ isRead: true })
@@ -78,11 +108,11 @@ export async function POST(request: NextRequest) {
             and(
               eq(userNotifications.userFid, userFid),
               eq(userNotifications.castHash, castHash),
-              eq(userNotifications.type, String(notificationType))
+              eq(userNotifications.type, "cast.created")
             )
           );
       } else if (!castHash && !notificationType) {
-        // When panel opens (no specific notification), mark all unread curated notifications as read
+        // When panel opens (no specific notification), mark all unread webhook notifications as read
         await db
           .update(userNotifications)
           .set({ isRead: true })
@@ -90,7 +120,7 @@ export async function POST(request: NextRequest) {
             and(
               eq(userNotifications.userFid, userFid),
               eq(userNotifications.isRead, false),
-              like(userNotifications.type, "curated.%")
+              eq(userNotifications.type, "cast.created")
             )
           );
       }
