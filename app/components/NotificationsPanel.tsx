@@ -115,7 +115,15 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
   };
 
   const fetchNotifications = useCallback(async (newCursor?: string | null) => {
+    console.log('[NotificationsPanel] fetchNotifications called', {
+      newCursor: newCursor ? `${newCursor.substring(0, 20)}...` : null,
+      hasUser: !!user?.fid,
+      isFetchingRef: isFetchingRef.current,
+      timestamp: new Date().toISOString(),
+    });
+
     if (!user?.fid) {
+      console.log('[NotificationsPanel] No user FID, returning early');
       setLoading(false);
       isFetchingRef.current = false;
       return;
@@ -123,6 +131,7 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
 
     // Prevent loading if already fetching (use ref to avoid dependency issues)
     if (isFetchingRef.current) {
+      console.log('[NotificationsPanel] Already fetching, skipping');
       return;
     }
 
@@ -130,6 +139,10 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
       isFetchingRef.current = true;
       setLoading(true);
       setError(null);
+      console.log('[NotificationsPanel] Starting fetch', {
+        newCursor: newCursor ? `${newCursor.substring(0, 20)}...` : null,
+        loading: true,
+      });
 
       const types = getNotificationPreferences();
       const params = new URLSearchParams({
@@ -158,6 +171,12 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
 
       const data = await response.json();
       
+      console.log('[NotificationsPanel] Fetch response received', {
+        notificationCount: data.notifications?.length || 0,
+        hasNext: !!data.next?.cursor,
+        nextCursor: data.next?.cursor ? `${data.next.cursor.substring(0, 20)}...` : null,
+      });
+      
       // Filter out notifications from users with score < 0.55
       const MIN_SCORE_THRESHOLD = 0.55;
       const filteredNotifications = (data.notifications || []).filter((notification: Notification) => {
@@ -165,6 +184,11 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
         // If score is null/undefined, include the notification (don't filter out unknown scores)
         // Only filter out if score exists and is below threshold
         return userScore === null || userScore === undefined || userScore >= MIN_SCORE_THRESHOLD;
+      });
+      
+      console.log('[NotificationsPanel] After filtering', {
+        originalCount: data.notifications?.length || 0,
+        filteredCount: filteredNotifications.length,
       });
       
       if (newCursor) {
@@ -189,17 +213,37 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
             return !existingKeys.has(key);
           });
           
+          console.log('[NotificationsPanel] Appending notifications', {
+            prevCount: prev.length,
+            newCount: newNotifications.length,
+            totalAfter: prev.length + newNotifications.length,
+          });
+          
           return [...prev, ...newNotifications];
         });
       } else {
+        console.log('[NotificationsPanel] Setting initial notifications', {
+          count: filteredNotifications.length,
+        });
         setNotifications(filteredNotifications);
       }
 
-      setCursor(data.next?.cursor || null);
-      setHasMore(!!data.next?.cursor);
+      const newCursorValue = data.next?.cursor || null;
+      const newHasMore = !!data.next?.cursor;
+      console.log('[NotificationsPanel] Updating state', {
+        cursor: newCursorValue ? `${newCursorValue.substring(0, 20)}...` : null,
+        hasMore: newHasMore,
+      });
+      setCursor(newCursorValue);
+      setHasMore(newHasMore);
     } catch (err: any) {
+      console.error('[NotificationsPanel] Fetch error', {
+        error: err.message || "Failed to load notifications",
+        newCursor: newCursor ? `${newCursor.substring(0, 20)}...` : null,
+      });
       setError(err.message || "Failed to load notifications");
     } finally {
+      console.log('[NotificationsPanel] Fetch complete, resetting loading state');
       setLoading(false);
       isFetchingRef.current = false;
     }
@@ -236,43 +280,24 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
 
   useEffect(() => {
     if (isOpen && user?.fid) {
-      // Check unread count first to avoid unnecessary API calls
-      const checkAndMarkAsSeen = async () => {
-        try {
-          const countResponse = await fetch(`/api/notifications/count?fid=${user.fid}`);
-          if (countResponse.ok) {
-            const countData = await countResponse.json();
-            const unreadCount = countData.unreadCount || 0;
-            
-            // Only mark as seen if there are unread notifications
-            if (unreadCount > 0) {
-              await markAsSeen();
-              // Explicitly refresh count after marking as seen
-              // This ensures the badge updates even if onNotificationsSeen callback has timing issues
-              if (onNotificationsSeen) {
-                // Delay to ensure database update completes
-                setTimeout(() => {
-                  onNotificationsSeen();
-                }, 250);
-              }
-            }
-          }
-        } catch (err) {
-          console.error("Failed to check unread count", err);
-          // If count check fails, still try to mark as seen (fallback)
-          await markAsSeen();
-          if (onNotificationsSeen) {
-            setTimeout(() => {
-              onNotificationsSeen();
-            }, 250);
-          }
+      // Always mark as seen when panel opens (badge is already cleared in parent)
+      const markAsSeenAndFetch = async () => {
+        // Mark notifications as seen in background
+        await markAsSeen();
+        
+        // Notify parent to refresh count after marking as seen
+        if (onNotificationsSeen) {
+          // Delay to ensure database update completes
+          setTimeout(() => {
+            onNotificationsSeen();
+          }, 250);
         }
         
         // Fetch notifications regardless
         fetchNotifications();
       };
       
-      checkAndMarkAsSeen();
+      markAsSeenAndFetch();
     } else {
       // Reset fetching state when panel closes
       isFetchingRef.current = false;
@@ -632,6 +657,18 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
     setMounted(true);
   }, []);
 
+  // Log state changes to debug flickering
+  useEffect(() => {
+    console.log('[NotificationsPanel] State changed', {
+      loading,
+      hasMore,
+      cursor: cursor ? `${cursor.substring(0, 20)}...` : null,
+      notificationCount: notifications.length,
+      isFetchingRef: isFetchingRef.current,
+      timestamp: new Date().toISOString(),
+    });
+  }, [loading, hasMore, cursor, notifications.length]);
+
   // Close expanded mute menu when clicking outside
   useEffect(() => {
     if (expandedMuteIndex === null) return;
@@ -908,17 +945,35 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
               })}
 
               {/* Load more */}
-              {hasMore && (
-                <div className="p-4 text-center">
-                  <button
-                    onClick={() => fetchNotifications(cursor)}
-                    disabled={loading}
-                    className="px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
-                  >
-                    {loading ? "Loading..." : "Load More"}
-                  </button>
-                </div>
-              )}
+              {(() => {
+                console.log('[NotificationsPanel] Rendering Load More section', {
+                  hasMore,
+                  loading,
+                  cursor: cursor ? `${cursor.substring(0, 20)}...` : null,
+                  isFetchingRef: isFetchingRef.current,
+                  timestamp: new Date().toISOString(),
+                });
+                return hasMore && (
+                  <div className="p-4 text-center">
+                    <button
+                      onClick={() => {
+                        console.log('[NotificationsPanel] Load More button clicked', {
+                          cursor: cursor ? `${cursor.substring(0, 20)}...` : null,
+                          loading,
+                          hasMore,
+                          isFetchingRef: isFetchingRef.current,
+                          timestamp: new Date().toISOString(),
+                        });
+                        fetchNotifications(cursor);
+                      }}
+                      disabled={loading}
+                      className="px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
+                    >
+                      {loading ? "Loading..." : "Load More"}
+                    </button>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>

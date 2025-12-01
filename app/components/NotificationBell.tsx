@@ -339,7 +339,10 @@ export function NotificationBell() {
   return (
     <>
       <button
-        onClick={() => setShowPanel(true)}
+        onClick={() => {
+          setUnreadCount(0); // Clear badge immediately on click
+          setShowPanel(true);
+        }}
         className="relative p-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
         aria-label="Notifications"
       >
