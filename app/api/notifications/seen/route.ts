@@ -67,35 +67,33 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Handle database-stored notifications (curated and webhook)
+    // Handle database-stored notifications (curated, webhook, app.update) - for ALL users regardless of role
     if (userFid) {
-      // Handle curated notifications (only if user has curator role)
-      if (isCurator) {
-        if (castHash && notificationType && String(notificationType).startsWith("curated.")) {
-          // Mark the specific curated notification as read in the database
-          await db
-            .update(userNotifications)
-            .set({ isRead: true })
-            .where(
-              and(
-                eq(userNotifications.userFid, userFid),
-                eq(userNotifications.castHash, castHash),
-                eq(userNotifications.type, String(notificationType))
-              )
-            );
-        } else if (!castHash && !notificationType) {
-          // When panel opens (no specific notification), mark all unread curated notifications as read
-          await db
-            .update(userNotifications)
-            .set({ isRead: true })
-            .where(
-              and(
-                eq(userNotifications.userFid, userFid),
-                eq(userNotifications.isRead, false),
-                like(userNotifications.type, "curated.%")
-              )
-            );
-        }
+      // Handle curated notifications - for ALL users regardless of role
+      if (castHash && notificationType && String(notificationType).startsWith("curated.")) {
+        // Mark the specific curated notification as read in the database
+        await db
+          .update(userNotifications)
+          .set({ isRead: true })
+          .where(
+            and(
+              eq(userNotifications.userFid, userFid),
+              eq(userNotifications.castHash, castHash),
+              eq(userNotifications.type, String(notificationType))
+            )
+          );
+      } else if (!castHash && !notificationType) {
+        // When panel opens (no specific notification), mark all unread curated notifications as read
+        await db
+          .update(userNotifications)
+          .set({ isRead: true })
+          .where(
+            and(
+              eq(userNotifications.userFid, userFid),
+              eq(userNotifications.isRead, false),
+              like(userNotifications.type, "curated.%")
+            )
+          );
       }
 
       // Handle webhook notifications (cast.created) - for ALL users regardless of role
@@ -124,29 +122,38 @@ export async function POST(request: NextRequest) {
             )
           );
       }
+
+      // Handle app.update notifications - for ALL users regardless of role
+      if (castHash && notificationType && notificationType === "app.update") {
+        // Mark the specific app.update notification as read in the database
+        await db
+          .update(userNotifications)
+          .set({ isRead: true })
+          .where(
+            and(
+              eq(userNotifications.userFid, userFid),
+              eq(userNotifications.castHash, castHash),
+              eq(userNotifications.type, "app.update")
+            )
+          );
+      } else if (!castHash && !notificationType) {
+        // When panel opens (no specific notification), mark all unread app.update notifications as read
+        await db
+          .update(userNotifications)
+          .set({ isRead: true })
+          .where(
+            and(
+              eq(userNotifications.userFid, userFid),
+              eq(userNotifications.isRead, false),
+              eq(userNotifications.type, "app.update")
+            )
+          );
+      }
     }
     
     // Invalidate count cache for this user (regardless of roles)
     if (userFid) {
       cacheNotificationCount.invalidateUser(userFid);
-    }
-
-    // Check if there are any unread curated notifications before calling Neynar API
-    // This avoids unnecessary CU usage when there are no unread notifications
-    let hasUnreadCurated = false;
-    if (userFid && isCurator && !castHash && !notificationType) {
-      // Only check if we're opening the panel (not marking a specific notification)
-      const unreadCuratedResult = await db
-        .select({ count: sql<number>`count(*)::int`.as("count") })
-        .from(userNotifications)
-        .where(
-          and(
-            eq(userNotifications.userFid, userFid),
-            eq(userNotifications.isRead, false),
-            like(userNotifications.type, "curated.%")
-          )
-        );
-      hasUnreadCurated = (unreadCuratedResult[0]?.count || 0) > 0;
     }
 
     // Only call Neynar API if user has plus role

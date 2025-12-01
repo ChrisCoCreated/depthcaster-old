@@ -6,6 +6,7 @@ import { deduplicateRequest } from "@/lib/neynar-batch";
 import { db } from "@/lib/db";
 import { userNotifications } from "@/lib/schema";
 import { eq, desc, and, lt, inArray } from "drizzle-orm";
+import { getUserRoles, hasPlusRole } from "@/lib/roles";
 
 export async function GET(request: NextRequest) {
   try {
@@ -66,6 +67,13 @@ export async function GET(request: NextRequest) {
     // If user has explicitly disabled all Neynar notification types, skip Neynar API call
     const hasNeynarTypesSelected = notificationTypes && notificationTypes.length > 0;
 
+    // Check if user has plus role (required for Neynar notifications)
+    let hasPlus = false;
+    if (fid) {
+      const userRoles = await getUserRoles(parseInt(fid));
+      hasPlus = hasPlusRole(userRoles);
+    }
+
     // Check for cache-busting parameter
     const cacheBust = searchParams.get("_t");
     
@@ -111,9 +119,11 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fetch Neynar notifications only if user has selected Neynar notification types
-    // AND we haven't reached the max of 100 Neynar notifications
-    const shouldFetchNeynar = hasNeynarTypesSelected && neynarCountLoaded < MAX_NEYNAR_NOTIFICATIONS;
+    // Fetch Neynar notifications only if:
+    // 1. User has plus role
+    // 2. User has selected Neynar notification types
+    // 3. We haven't reached the max of 100 Neynar notifications
+    const shouldFetchNeynar = hasPlus && hasNeynarTypesSelected && neynarCountLoaded < MAX_NEYNAR_NOTIFICATIONS;
     const neynarNotifications = shouldFetchNeynar
       ? await deduplicateRequest(cacheKey, async () => {
           // Calculate how many more we can fetch (don't exceed 100 total)

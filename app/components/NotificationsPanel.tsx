@@ -8,6 +8,7 @@ import { formatDistanceToNow } from "date-fns";
 import { useNeynarContext } from "@neynar/react";
 import { NotificationSettings } from "./NotificationSettings";
 import { AvatarImage } from "./AvatarImage";
+import { hasPlusRole } from "@/lib/roles-client";
 
 interface NotificationsPanelProps {
   isOpen: boolean;
@@ -24,6 +25,7 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
   const [expandedMuteIndex, setExpandedMuteIndex] = useState<number | null>(null);
   const [settingsExpanded, setSettingsExpanded] = useState(false);
   const [isCurator, setIsCurator] = useState<boolean | null>(null);
+  const [hasPlus, setHasPlus] = useState<boolean | null>(null);
   const { user } = useNeynarContext();
   const isFetchingRef = useRef(false);
   const hasInitialFetchRef = useRef(false);
@@ -377,6 +379,34 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
 
     if (isOpen && user?.fid) {
       checkCuratorStatus();
+    }
+  }, [isOpen, user?.fid]);
+
+  // Check if user has plus role
+  useEffect(() => {
+    const checkPlusStatus = async () => {
+      if (!user?.fid) {
+        setHasPlus(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/admin/check?fid=${user.fid}`);
+        if (response.ok) {
+          const data = await response.json();
+          const roles = data.roles || [];
+          setHasPlus(hasPlusRole(roles));
+        } else {
+          setHasPlus(false);
+        }
+      } catch (error) {
+        console.error("Failed to check plus status:", error);
+        setHasPlus(false);
+      }
+    };
+
+    if (isOpen && user?.fid) {
+      checkPlusStatus();
     }
   }, [isOpen, user?.fid]);
 
@@ -796,6 +826,35 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
               </div>
             )}
           </div>
+
+          {/* Informational note for users without plus role */}
+          {hasPlus === false && (
+            <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-800">
+              <div className="flex items-start gap-2">
+                <svg
+                  className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <div className="flex-1">
+                  <p className="text-sm text-yellow-900 dark:text-yellow-100 font-medium">
+                    Neynar Notifications
+                  </p>
+                  <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                    You don't have a plus role, so you won't see Neynar notifications (follows, likes, recasts, mentions, replies, quotes). You will still see app updates and other notifications stored in the database.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Informational note for non-curator users */}
           {isCurator === false && (
