@@ -4,6 +4,7 @@ import { buildIdeas, users } from "@/lib/schema";
 import { eq, desc, and } from "drizzle-orm";
 import { isAdmin, getUserRoles } from "@/lib/roles";
 import { getUser } from "@/lib/users";
+import { notifyAdminsAboutFeedback } from "@/lib/notifications";
 
 export async function GET(request: NextRequest) {
   try {
@@ -139,6 +140,20 @@ export async function POST(request: NextRequest) {
         userFid: fid,
       })
       .returning();
+
+    // Notify admins if this is feedback (not a build-idea)
+    if (type === "feedback" && newIdea) {
+      notifyAdminsAboutFeedback(
+        newIdea.id,
+        title,
+        feedbackType || null,
+        fid,
+        extractedCastHash || null
+      ).catch((error) => {
+        // Log error but don't fail the feedback submission
+        console.error("Failed to notify admins about feedback:", error);
+      });
+    }
 
     return NextResponse.json({ idea: newIdea });
   } catch (error: unknown) {
