@@ -653,6 +653,47 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
     }
   };
 
+  const handleDeleteNotification = async (notificationId: string) => {
+    if (!user?.fid) {
+      console.error("Cannot delete notification: user not logged in");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/notifications/delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: notificationId,
+          fid: user.fid,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to delete notification");
+      }
+
+      // Remove notification from local state by ID
+      setNotifications((prev) => prev.filter((n) => {
+        const notif = n as any;
+        return notif.id !== notificationId;
+      }));
+
+      // Refresh unread count
+      if (onNotificationsSeenRef.current) {
+        setTimeout(() => {
+          onNotificationsSeenRef.current?.();
+        }, 250);
+      }
+    } catch (error: any) {
+      console.error("Delete notification error:", error);
+      // Don't show alert for delete failures to avoid interrupting UX
+    }
+  };
+
   const getNotificationText = (notification: Notification): string => {
     const count = notification.count || 1;
     const type = String(notification.type).toLowerCase();
@@ -913,12 +954,42 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
                   });
                 }
 
+                const notif = notification as any;
+                const notificationId = notif.id;
+                const isDatabaseNotification = notificationId && !isNeynar;
+
                 const content = (
                   <div
                     className={`p-4 border-b border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors relative ${
                       !notification.seen ? "bg-blue-50 dark:bg-blue-900/20" : ""
                     }`}
                   >
+                    {/* Delete button - only for database-stored notifications */}
+                    {isDatabaseNotification && (
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleDeleteNotification(notificationId);
+                        }}
+                        className="absolute top-2 right-2 text-gray-400 hover:text-red-600 dark:hover:text-red-400 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors z-10"
+                        title="Delete notification"
+                      >
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          />
+                        </svg>
+                      </button>
+                    )}
                     <div className="flex gap-3">
                       <div className="flex-shrink-0 relative w-10 h-10">
                         <AvatarImage

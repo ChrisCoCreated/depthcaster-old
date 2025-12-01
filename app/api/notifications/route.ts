@@ -227,6 +227,7 @@ export async function GET(request: NextRequest) {
 
         return {
           object: "notification",
+          id: notif.id, // Include UUID for deletion
           type: notificationType,
           fid: notif.userFid,
           timestamp,

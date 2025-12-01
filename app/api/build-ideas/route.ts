@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { title, description, url, castHash, type = "build-idea", feedbackType, userFid, adminFid } = body;
+    const { title, description, url, castHash, type = "build-idea", feedbackType, status, userFid, adminFid } = body;
 
     // Support both userFid (new) and adminFid (backward compatibility)
     const fid = userFid || adminFid;
@@ -169,7 +169,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, title, description, url, castHash, feedbackType, userFid, adminFid } = body;
+    const { id, title, description, url, castHash, feedbackType, status, userFid, adminFid } = body;
 
     // Support both userFid (new) and adminFid (backward compatibility)
     const fid = userFid || adminFid;
@@ -206,6 +206,7 @@ export async function PUT(request: NextRequest) {
         url: url || null,
         castHash: castHash || null,
         feedbackType: feedbackType !== undefined ? feedbackType : null,
+        status: status !== undefined ? status : null,
         updatedAt: new Date(),
       })
       .where(eq(buildIdeas.id, id))

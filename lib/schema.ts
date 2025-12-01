@@ -239,6 +239,7 @@ export const buildIdeas = pgTable("build_ideas", {
   castHash: text("cast_hash"), // For feedback - optional cast hash or link
   type: text("type").notNull().default("build-idea"), // 'build-idea' or 'feedback'
   feedbackType: text("feedback_type"), // For feedback: 'bug', 'feature', or 'feedback'
+  status: text("status"), // 'backlog', 'in-progress', or 'complete'
   userFid: bigint("user_fid", { mode: "number" }).notNull().references(() => users.fid),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -247,6 +248,7 @@ export const buildIdeas = pgTable("build_ideas", {
   userFidIdx: index("build_ideas_user_fid_idx").on(table.userFid),
   typeIdx: index("build_ideas_type_idx").on(table.type),
   castHashIdx: index("build_ideas_cast_hash_idx").on(table.castHash),
+  statusIdx: index("build_ideas_status_idx").on(table.status),
 }));
 
 export const pageViews = pgTable("page_views", {

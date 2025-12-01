@@ -14,6 +14,7 @@ interface BuildIdea {
   castHash: string | null;
   type: string; // 'build-idea' or 'feedback'
   feedbackType: string | null; // For feedback: 'bug', 'feature', or 'feedback'
+  status: string | null; // 'backlog', 'in-progress', or 'complete'
   userFid: number;
   adminFid?: number; // For backward compatibility
   createdAt: string;
@@ -160,6 +161,64 @@ export function BuildIdeasManager() {
   const cancelEdit = () => {
     setEditingId(null);
     setFormData({ title: "", description: "", url: "" });
+  };
+
+  const handleStatusChange = async (id: string, newStatus: string | null) => {
+    if (!user?.fid) {
+      setError("User not authenticated");
+      return;
+    }
+
+    try {
+      setError(null);
+      const response = await fetch("/api/build-ideas", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id,
+          title: ideas.find(i => i.id === id)?.title || "",
+          description: ideas.find(i => i.id === id)?.description || "",
+          url: ideas.find(i => i.id === id)?.url || "",
+          status: newStatus,
+          adminFid: user.fid, // Backward compatibility
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to update status");
+      }
+
+      fetchAllIdeas();
+    } catch (err: any) {
+      setError(err.message || "Failed to update status");
+    }
+  };
+
+  const getStatusBadgeClass = (status: string | null) => {
+    switch (status) {
+      case "backlog":
+        return "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300";
+      case "in-progress":
+        return "bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300";
+      case "complete":
+        return "bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300";
+      default:
+        return "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-500";
+    }
+  };
+
+  const getStatusLabel = (status: string | null) => {
+    switch (status) {
+      case "backlog":
+        return "Backlog";
+      case "in-progress":
+        return "In Progress";
+      case "complete":
+        return "Complete";
+      default:
+        return "No Status";
+    }
   };
 
   if (loading) {
@@ -329,7 +388,7 @@ export function BuildIdeasManager() {
                       <div className="space-y-2">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
                               {isFeedback ? (
                                 <>
                                   <MessageSquare className="w-3 h-3 text-green-500" />
@@ -342,6 +401,9 @@ export function BuildIdeasManager() {
                                   Build Idea
                                 </span>
                               )}
+                              <span className={`text-xs px-2 py-1 rounded ${getStatusBadgeClass(idea.status)}`}>
+                                {getStatusLabel(idea.status)}
+                              </span>
                             </div>
                             <h4 className="text-md font-semibold text-gray-900 dark:text-gray-100">
                               {idea.title}
@@ -392,24 +454,39 @@ export function BuildIdeasManager() {
                               </span>
                             </div>
                           </div>
-                          {!isFeedback && (
-                            <div className="flex gap-2 ml-4">
-                              <button
-                                onClick={() => handleEdit(idea)}
-                                className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                                title="Edit"
+                          <div className="flex flex-col items-end gap-2 ml-4">
+                            {!isFeedback && (
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleEdit(idea)}
+                                  className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                  title="Edit"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(idea.id)}
+                                  className="p-2 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            )}
+                            <div className="flex flex-col gap-1">
+                              <label className="text-xs text-gray-500 dark:text-gray-400">Status:</label>
+                              <select
+                                value={idea.status || ""}
+                                onChange={(e) => handleStatusChange(idea.id, e.target.value || null)}
+                                className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                               >
-                                <Edit2 className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => handleDelete(idea.id)}
-                                className="p-2 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
-                                title="Delete"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+                                <option value="">No Status</option>
+                                <option value="backlog">Backlog</option>
+                                <option value="in-progress">In Progress</option>
+                                <option value="complete">Complete</option>
+                              </select>
                             </div>
-                          )}
+                          </div>
                         </div>
                       </div>
                     )}
