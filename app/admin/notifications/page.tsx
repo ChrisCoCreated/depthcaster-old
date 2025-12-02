@@ -14,8 +14,10 @@ export default function AdminNotificationsPage() {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isSendingDailyTest, setIsSendingDailyTest] = useState(false);
   const [isSendingWeeklyTest, setIsSendingWeeklyTest] = useState(false);
+  const [isSendingMiniappTest, setIsSendingMiniappTest] = useState(false);
   const [dailyTestResult, setDailyTestResult] = useState<string | null>(null);
   const [weeklyTestResult, setWeeklyTestResult] = useState<string | null>(null);
+  const [miniappTestResult, setMiniappTestResult] = useState<string | null>(null);
 
   // Form state
   const [title, setTitle] = useState("");
@@ -198,6 +200,32 @@ export default function AdminNotificationsPage() {
     }
   };
 
+  const sendMiniappTest = async () => {
+    setIsSendingMiniappTest(true);
+    setMiniappTestResult(null);
+
+    try {
+      const response = await fetch("/api/admin/miniapp-notification/test", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setMiniappTestResult(data.message || `Test notification sent! ${data.sent} notification(s) delivered.`);
+      } else {
+        setMiniappTestResult(`Error: ${data.error || "Failed to send test notification"}`);
+      }
+    } catch (error: any) {
+      setMiniappTestResult(`Error: ${error.message || "Failed to send test notification"}`);
+    } finally {
+      setIsSendingMiniappTest(false);
+    }
+  };
+
   if (!user || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -295,6 +323,30 @@ export default function AdminNotificationsPage() {
               {weeklyTestResult && (
                 <p className={`mt-2 text-sm ${weeklyTestResult.startsWith("Error") ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>
                   {weeklyTestResult}
+                </p>
+              )}
+            </div>
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-1">
+                    Miniapp Notification
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Test the miniapp notification sent to all users when a new cast is curated
+                  </p>
+                </div>
+                <button
+                  onClick={sendMiniappTest}
+                  disabled={isSendingMiniappTest}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                >
+                  {isSendingMiniappTest ? "Sending..." : "Send Test"}
+                </button>
+              </div>
+              {miniappTestResult && (
+                <p className={`mt-2 text-sm ${miniappTestResult.startsWith("Error") ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>
+                  {miniappTestResult}
                 </p>
               )}
             </div>

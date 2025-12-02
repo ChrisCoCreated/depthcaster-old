@@ -51,14 +51,23 @@ export async function sendMiniappNotification(
     // Use Neynar's publishFrameNotifications API
     // Neynar automatically filters out disabled tokens and handles rate limits
     // When targetFids is empty, Neynar sends to all users with notifications enabled
-    const response = await neynarClient.publishFrameNotifications({
-      targetFids,
+    // Build the request object conditionally
+    const requestBody: any = {
       notification: {
         title,
         body: body.length > 200 ? body.substring(0, 200) + "..." : body,
         target_url: notificationUrl,
       },
-    });
+    };
+    
+    // Include targetFids only if it's not empty
+    // When empty, omit the field entirely - Neynar will send to all users with notifications enabled
+    if (targetFids.length > 0) {
+      requestBody.targetFids = targetFids;
+    }
+    // When empty, don't include targetFids field at all
+    
+    const response = await neynarClient.publishFrameNotifications(requestBody);
 
     const targetCount = targetFids.length === 0 ? "all users" : `${targetFids.length} users`;
     console.log(`[Miniapp] Sent notification to ${targetCount} via Neynar`);
@@ -77,6 +86,11 @@ export async function sendMiniappNotification(
     };
   } catch (error: any) {
     console.error("[Miniapp] Error sending notification:", error);
+    // Log more details about the error for debugging
+    if (error.response) {
+      console.error("[Miniapp] Error response:", error.response.data);
+      console.error("[Miniapp] Error status:", error.response.status);
+    }
     return {
       sent: 0,
       errors: targetFids.length === 0 ? 0 : targetFids.length,
