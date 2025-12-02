@@ -56,7 +56,119 @@ function isQuoteCast(castData: any): boolean {
   ) || false;
 }
 
+/**
+ * Check if a quote cast is quoting its parent cast
+ */
+function isQuotingParent(castData: any, quotedCastHash: string): boolean {
+  if (!castData || !quotedCastHash) return false;
+  return castData.parent_hash === quotedCastHash;
+}
+
 const PARENT_CAST_PLACEHOLDER_HASH = "0x0000000000000000000000000000000000000000";
+
+/**
+ * Analyze additional text in a parent quote cast and return a quality score (0-100)
+ * This is used when a cast quotes its parent - only the additional text adds value
+ */
+async function analyzeParentQuoteTextQuality(additionalText: string): Promise<number> {
+  if (!additionalText || additionalText.trim().length === 0) {
+    return 0; // No additional text, no value
+  }
+
+  const normalizedText = additionalText.trim();
+  const textLength = normalizedText.length;
+  const wordCount = normalizedText === "" ? 0 : normalizedText.split(/\s+/).filter(w => w.length > 0).length;
+  const hasLettersOrDigits = /[A-Za-z0-9]/.test(normalizedText);
+
+  // Very short or emoji-only: minimal value
+  if (!hasLettersOrDigits && textLength > 0) {
+    return 5; // Emoji-only
+  }
+  if (wordCount <= 2 && textLength <= 30) {
+    return 10; // Very short, minimal value
+  }
+
+  // For longer text, analyze quality to get a score
+  const prompt = `Analyze this additional text from a quote cast where someone is quoting their parent cast and adding commentary. Score ONLY the additional text quality (0-100), ignoring the quoted content.
+
+Context: This is additional commentary added when quoting a parent cast. Only the additional text contributes value here.
+
+Evaluate:
+1. Does this text add value, insight, or thoughtful commentary? (score 40-100)
+2. Is this text neutral - just acknowledging, agreeing, or minimal commentary? (score 10-30)
+3. Is this text low-effort, spam, or harmful? (score 0-10)
+
+Additional text: "${normalizedText.substring(0, 500)}${normalizedText.length > 500 ? "..." : ""}"
+
+Respond in JSON format:
+{
+  "qualityScore": <number 0-100>,
+  "reasoning": "<brief explanation>"
+}`;
+
+  try {
+    const response = await fetch(`${DEEPSEEK_API_URL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "deepseek-chat",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are an expert at analyzing social media commentary quality. Always respond with valid JSON only.",
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        max_tokens: 150,
+        temperature: 0.3,
+      }),
+    });
+
+    if (!response.ok) {
+      console.warn(`[DeepSeek] Failed to analyze parent quote text, using default score`);
+      return 10;
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) {
+      return 10;
+    }
+
+    // Parse JSON from response
+    let jsonContent = content.trim();
+    if (jsonContent.startsWith("```json")) {
+      jsonContent = jsonContent.replace(/^```json\n?/, "").replace(/\n?```$/, "");
+    } else if (jsonContent.startsWith("```")) {
+      jsonContent = jsonContent.replace(/^```\n?/, "").replace(/\n?```$/, "");
+    }
+
+    const result = JSON.parse(jsonContent) as {
+      qualityScore?: number;
+      reasoning?: string;
+    };
+
+    let qualityScore = result.qualityScore;
+    if (typeof qualityScore !== "number") {
+      qualityScore = parseInt(String(qualityScore || "10"), 10);
+    }
+    if (isNaN(qualityScore) || qualityScore < 0) qualityScore = 0;
+    if (qualityScore > 100) qualityScore = 100;
+
+    console.log(`[DeepSeek] Parent quote text analysis: score=${qualityScore}`);
+    return qualityScore;
+  } catch (error: any) {
+    console.error(`[DeepSeek] Error analyzing parent quote text:`, error.message);
+    return 10; // Default on error
+  }
+}
 
 /**
  * Analyze additional text in a quote cast to determine score adjustment
@@ -229,15 +341,29 @@ export async function analyzeCastQuality(
           }
           
           if (originalScore !== null) {
-            // Analyze additional text to determine adjustment
-            const adjustment = await analyzeAdditionalTextAdjustment(castText);
-            const adjustedScore = Math.max(0, originalScore + adjustment);
-            console.log(`[DeepSeek] Quote cast detected, using original score ${originalScore} + adjustment ${adjustment} = ${adjustedScore}`);
-            return {
-              qualityScore: adjustedScore,
-              category: originalCategory || "other",
-              reasoning: `Quote cast scored as original (${originalScore}) with adjustment ${adjustment} based on additional text quality`,
-            };
+            // Check if this is quoting the parent cast
+            const quotingParent = isQuotingParent(castData, quotedCastHash);
+            
+            if (quotingParent) {
+              // Only score the additional text when quoting parent
+              const textScore = await analyzeParentQuoteTextQuality(castText);
+              console.log(`[DeepSeek] Parent quote cast detected, scoring only additional text: ${textScore}`);
+              return {
+                qualityScore: textScore,
+                category: originalCategory || "other",
+                reasoning: `Parent quote cast - scored only additional text quality: ${textScore}`,
+              };
+            } else {
+              // Quote of different cast - score as adding to conversation
+              const adjustment = await analyzeAdditionalTextAdjustment(castText);
+              const adjustedScore = Math.max(0, originalScore + adjustment);
+              console.log(`[DeepSeek] Quote cast detected (different cast), using original score ${originalScore} + adjustment ${adjustment} = ${adjustedScore}`);
+              return {
+                qualityScore: adjustedScore,
+                category: originalCategory || "other",
+                reasoning: `Quote cast scored as original (${originalScore}) with adjustment ${adjustment} based on additional text quality`,
+              };
+            }
           }
         }
         
@@ -275,15 +401,29 @@ export async function analyzeCastQuality(
           }
           
           if (originalScore !== null) {
-            // Analyze additional text to determine adjustment
-            const adjustment = await analyzeAdditionalTextAdjustment(castText);
-            const adjustedScore = Math.max(0, originalScore + adjustment);
-            console.log(`[DeepSeek] Quote cast detected, using original score ${originalScore} + adjustment ${adjustment} = ${adjustedScore}`);
-            return {
-              qualityScore: adjustedScore,
-              category: originalCategory || "other",
-              reasoning: `Quote cast scored as original (${originalScore}) with adjustment ${adjustment} based on additional text quality`,
-            };
+            // Check if this is quoting the parent cast
+            const quotingParent = isQuotingParent(castData, quotedCastHash);
+            
+            if (quotingParent) {
+              // Only score the additional text when quoting parent
+              const textScore = await analyzeParentQuoteTextQuality(castText);
+              console.log(`[DeepSeek] Parent quote cast detected, scoring only additional text: ${textScore}`);
+              return {
+                qualityScore: textScore,
+                category: originalCategory || "other",
+                reasoning: `Parent quote cast - scored only additional text quality: ${textScore}`,
+              };
+            } else {
+              // Quote of different cast - score as adding to conversation
+              const adjustment = await analyzeAdditionalTextAdjustment(castText);
+              const adjustedScore = Math.max(0, originalScore + adjustment);
+              console.log(`[DeepSeek] Quote cast detected (different cast), using original score ${originalScore} + adjustment ${adjustment} = ${adjustedScore}`);
+              return {
+                qualityScore: adjustedScore,
+                category: originalCategory || "other",
+                reasoning: `Quote cast scored as original (${originalScore}) with adjustment ${adjustment} based on additional text quality`,
+              };
+            }
           }
         }
         
@@ -353,15 +493,29 @@ export async function analyzeCastQuality(
                   .where(eq(castReplies.replyCastHash, quotedCastHash));
                 
                 const originalScore = originalAnalysis.qualityScore;
-                // Analyze additional text to determine adjustment
-                const adjustment = await analyzeAdditionalTextAdjustment(castText);
-                const adjustedScore = Math.max(0, originalScore + adjustment);
-                console.log(`[DeepSeek] Quote cast detected, using fetched original score ${originalScore} + adjustment ${adjustment} = ${adjustedScore}`);
-                return {
-                  qualityScore: adjustedScore,
-                  category: originalAnalysis.category,
-                  reasoning: `Quote cast scored as original (${originalScore}) with adjustment ${adjustment} based on additional text quality`,
-                };
+                // Check if this is quoting the parent cast
+                const quotingParent = isQuotingParent(castData, quotedCastHash);
+                
+                if (quotingParent) {
+                  // Only score the additional text when quoting parent
+                  const textScore = await analyzeParentQuoteTextQuality(castText);
+                  console.log(`[DeepSeek] Parent quote cast detected, scoring only additional text: ${textScore}`);
+                  return {
+                    qualityScore: textScore,
+                    category: originalAnalysis.category,
+                    reasoning: `Parent quote cast - scored only additional text quality: ${textScore}`,
+                  };
+                } else {
+                  // Quote of different cast - score as adding to conversation
+                  const adjustment = await analyzeAdditionalTextAdjustment(castText);
+                  const adjustedScore = Math.max(0, originalScore + adjustment);
+                  console.log(`[DeepSeek] Quote cast detected (different cast), using fetched original score ${originalScore} + adjustment ${adjustment} = ${adjustedScore}`);
+                  return {
+                    qualityScore: adjustedScore,
+                    category: originalAnalysis.category,
+                    reasoning: `Quote cast scored as original (${originalScore}) with adjustment ${adjustment} based on additional text quality`,
+                  };
+                }
               }
             }
           } catch (error: any) {
