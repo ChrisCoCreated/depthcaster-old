@@ -25,6 +25,7 @@ function MiniappContent() {
   const [error, setError] = useState<string | null>(null);
   const [installed, setInstalled] = useState(false);
   const [checkingInstall, setCheckingInstall] = useState(true);
+  const [showInstallMessage, setShowInstallMessage] = useState(false);
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://depthcaster.vercel.app";
 
@@ -35,6 +36,24 @@ function MiniappContent() {
       setCheckingInstall(false);
     }
   }, [added]);
+
+  useEffect(() => {
+    // Check if installation message has been shown before
+    const messageShown = localStorage.getItem("miniapp-installation-message-shown");
+    if (messageShown === "true") {
+      setShowInstallMessage(false);
+      return;
+    }
+
+    // Show message when installed becomes true (user just installed)
+    if (installed && !checkingInstall) {
+      setShowInstallMessage(true);
+      // Mark as shown in localStorage so it doesn't show again
+      localStorage.setItem("miniapp-installation-message-shown", "true");
+    } else {
+      setShowInstallMessage(false);
+    }
+  }, [installed, checkingInstall]);
 
   useEffect(() => {
     // Check if user has miniapp installed in database
@@ -158,7 +177,7 @@ function MiniappContent() {
               </button>
             </div>
           )}
-          {installed && (
+          {showInstallMessage && (
             <div className="mt-4 px-4 py-2 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded-lg text-sm">
               ✓ Miniapp installed - you'll receive notifications
             </div>
