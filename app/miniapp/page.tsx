@@ -38,24 +38,6 @@ function MiniappContent() {
   }, [added]);
 
   useEffect(() => {
-    // Check if installation message has been shown before
-    const messageShown = localStorage.getItem("miniapp-installation-message-shown");
-    if (messageShown === "true") {
-      setShowInstallMessage(false);
-      return;
-    }
-
-    // Show message when installed becomes true (user just installed)
-    if (installed && !checkingInstall) {
-      setShowInstallMessage(true);
-      // Mark as shown in localStorage so it doesn't show again
-      localStorage.setItem("miniapp-installation-message-shown", "true");
-    } else {
-      setShowInstallMessage(false);
-    }
-  }, [installed, checkingInstall]);
-
-  useEffect(() => {
     // Check if user has miniapp installed in database
     const checkInstallation = async () => {
       if (context?.user?.fid) {
@@ -121,6 +103,20 @@ function MiniappContent() {
       // The 'added' state is managed by the hook and will update automatically
       if (result?.notificationDetails) {
         setInstalled(true);
+        
+        // Check if message has been shown before
+        const messageShown = localStorage.getItem("miniapp-installation-message-shown");
+        if (messageShown !== "true") {
+          // Show message and mark as shown
+          setShowInstallMessage(true);
+          localStorage.setItem("miniapp-installation-message-shown", "true");
+          
+          // Hide message after 5 seconds
+          setTimeout(() => {
+            setShowInstallMessage(false);
+          }, 5000);
+        }
+        
         // Track installation on server
         if (context?.user?.fid) {
           await fetch("/api/miniapp/install", {
