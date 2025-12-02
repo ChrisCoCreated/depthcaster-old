@@ -26,6 +26,8 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
   const [settingsExpanded, setSettingsExpanded] = useState(false);
   const [isCurator, setIsCurator] = useState<boolean | null>(null);
   const [hasPlus, setHasPlus] = useState<boolean | null>(null);
+  const [debugMessage, setDebugMessage] = useState<string | null>(null);
+  const [isForceFetching, setIsForceFetching] = useState(false);
   const { user } = useNeynarContext();
   const isFetchingRef = useRef(false);
   const hasInitialFetchRef = useRef(false);
@@ -268,6 +270,89 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
     onNotificationsSeenRef.current = onNotificationsSeen;
   }, [onNotificationsSeen]);
 
+  const forceFetchNotifications = useCallback(async () => {
+    if (!user?.fid) {
+      setDebugMessage("Error: No user FID available");
+      return;
+    }
+
+    setIsForceFetching(true);
+    setDebugMessage("Force fetching notifications from database...");
+
+    try {
+      // Get notification preferences
+      const saved = localStorage.getItem("notificationPreferences");
+      let types: string[] = [];
+      if (saved) {
+        try {
+          const prefs = JSON.parse(saved);
+          types = Object.entries(prefs)
+            .filter(([_, enabled]) => enabled)
+            .map(([key]) => {
+              if (key === "mentions") return "mentions";
+              if (key === "replies") return "replies";
+              if (key === "quotes") return "quotes";
+              return key;
+            });
+        } catch (e) {
+          types = ["follows", "recasts", "likes", "mentions", "replies", "quotes"];
+        }
+      } else {
+        types = ["follows", "recasts", "likes", "mentions", "replies", "quotes"];
+      }
+
+      const params = new URLSearchParams({
+        fid: user.fid.toString(),
+        limit: "25",
+        _t: Date.now().toString(), // Force cache-bust
+      });
+
+      if (types.length > 0) {
+        params.append("types", types.join(","));
+      }
+
+      const response = await fetch(`/api/notifications?${params}`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const notificationCount = data.notifications?.length || 0;
+      
+      // Filter out notifications from users with score < 0.55
+      const MIN_SCORE_THRESHOLD = 0.55;
+      const filteredNotifications = (data.notifications || []).filter((notification: Notification) => {
+        const userScore = getNotificationUserScore(notification);
+        return userScore === null || userScore === undefined || userScore >= MIN_SCORE_THRESHOLD;
+      });
+
+      const filteredCount = filteredNotifications.length;
+      const filteredOut = notificationCount - filteredCount;
+
+      if (filteredNotifications.length > 0) {
+        setNotifications(filteredNotifications);
+        setCursor(data.next?.cursor || null);
+        setHasMore(!!data.next?.cursor);
+        setError(null);
+        setDebugMessage(
+          `✓ Success! Found ${notificationCount} notification(s) in database. ` +
+          `${filteredCount} displayed${filteredOut > 0 ? ` (${filteredOut} filtered out due to low user score < 0.55)` : ""}.`
+        );
+      } else {
+        setDebugMessage(
+          notificationCount > 0
+            ? `Found ${notificationCount} notification(s) in database, but all were filtered out (user score < 0.55).`
+            : `No notifications found in database for user ${user.fid}.`
+        );
+      }
+    } catch (err: any) {
+      console.error("Force fetch error:", err);
+      setDebugMessage(`Error: ${err.message || "Failed to fetch notifications"}`);
+    } finally {
+      setIsForceFetching(false);
+    }
+  }, [user?.fid]);
+
   const markAsSeen = useCallback(async (notificationType?: string, castHash?: string) => {
     if (!user?.signer_uuid) return;
 
@@ -350,6 +435,7 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
       hasInitialFetchRef.current = false;
       isFetchingRef.current = false;
       setLoading(false);
+      setDebugMessage(null); // Clear debug message when panel closes
     }
   }, [isOpen, user?.fid]);
 
@@ -966,8 +1052,28 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
               Error: {error}
             </div>
           ) : notifications.length === 0 ? (
-            <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-              No notifications yet
+            <div className="p-8 text-center space-y-4">
+              <div className="text-gray-500 dark:text-gray-400">
+                No notifications yet
+              </div>
+              <div className="space-y-2">
+                <button
+                  onClick={forceFetchNotifications}
+                  disabled={isForceFetching || !user?.fid}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                >
+                  {isForceFetching ? "Fetching..." : "Force Fetch from Database"}
+                </button>
+                {debugMessage && (
+                  <div className={`text-xs mt-2 p-3 rounded-lg ${
+                    debugMessage.startsWith("Error") || debugMessage.includes("No notifications")
+                      ? "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300"
+                      : "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300"
+                  }`}>
+                    {debugMessage}
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
             <div>
