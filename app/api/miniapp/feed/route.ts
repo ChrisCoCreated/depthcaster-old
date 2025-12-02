@@ -48,16 +48,29 @@ export async function GET(request: NextRequest) {
       .groupBy(curatorCastCurations.castHash);
 
     // Step 3: Create a map for quick lookup
+    // Helper function to ensure we have a Date object
+    const toDate = (value: Date | string | null | undefined, fallback: Date): Date => {
+      if (!value) return fallback;
+      if (value instanceof Date) return value;
+      if (typeof value === 'string') return new Date(value);
+      return fallback;
+    };
+
     const curationTimeMap = new Map<string, Date>();
     firstCurationTimes.forEach((row) => {
-      curationTimeMap.set(row.castHash, row.firstCurationTime);
+      const date = toDate(row.firstCurationTime, new Date());
+      curationTimeMap.set(row.castHash, date);
     });
 
     // Step 4: Combine and sort by recently curated
-    const castsWithCurationTime = qualifiedCasts.map((cast) => ({
-      ...cast,
-      firstCurationTime: curationTimeMap.get(cast.castHash) || cast.castCreatedAt || new Date(),
-    }));
+    const castsWithCurationTime = qualifiedCasts.map((cast) => {
+      const curationTime = curationTimeMap.get(cast.castHash);
+      const fallback = toDate(cast.castCreatedAt, new Date());
+      return {
+        ...cast,
+        firstCurationTime: curationTime || fallback,
+      };
+    });
 
     // Sort by first curation time (most recently curated first)
     castsWithCurationTime.sort((a, b) => {
@@ -68,17 +81,22 @@ export async function GET(request: NextRequest) {
 
     // Step 5: Limit and format response
     const limitedCasts = castsWithCurationTime.slice(0, limit);
-    const feedItems = limitedCasts.map((cast) => ({
-      castHash: cast.castHash,
-      text: cast.castText || "",
-      authorFid: cast.authorFid,
-      likesCount: cast.likesCount || 0,
-      recastsCount: cast.recastsCount || 0,
-      repliesCount: cast.repliesCount || 0,
-      qualityScore: cast.qualityScore,
-      castCreatedAt: cast.castCreatedAt?.toISOString(),
-      curatedAt: cast.firstCurationTime?.toISOString(),
-    }));
+    const feedItems = limitedCasts.map((cast) => {
+      const castCreatedAtDate = toDate(cast.castCreatedAt, null);
+      const curatedAtDate = cast.firstCurationTime;
+      
+      return {
+        castHash: cast.castHash,
+        text: cast.castText || "",
+        authorFid: cast.authorFid,
+        likesCount: cast.likesCount || 0,
+        recastsCount: cast.recastsCount || 0,
+        repliesCount: cast.repliesCount || 0,
+        qualityScore: cast.qualityScore,
+        castCreatedAt: castCreatedAtDate?.toISOString() || null,
+        curatedAt: curatedAtDate?.toISOString() || null,
+      };
+    });
 
     return NextResponse.json({
       items: feedItems,
