@@ -34,28 +34,37 @@ export async function POST(request: NextRequest) {
     // Extract detailed error information
     let errorMessage = error.message || "Failed to send test miniapp notification";
     let errorDetails: any = null;
+    let statusCode = 500;
     
     if (error.response) {
+      // Axios error with response
+      statusCode = error.response.status || 500;
       errorDetails = {
         status: error.response.status,
+        statusText: error.response.statusText,
         data: error.response.data,
       };
+      
       if (error.response.data?.message) {
         errorMessage = error.response.data.message;
       }
       if (error.response.data?.errors) {
-        errorMessage += `: ${JSON.stringify(error.response.data.errors)}`;
+        const errorsStr = JSON.stringify(error.response.data.errors, null, 2);
+        errorMessage += `\nValidation errors:\n${errorsStr}`;
       }
     } else if (error.message) {
       errorMessage = error.message;
     }
     
+    // Ensure error details are serializable
+    const serializedErrorDetails = errorDetails ? JSON.parse(JSON.stringify(errorDetails)) : null;
+    
     return NextResponse.json(
       { 
         error: errorMessage,
-        errorDetails: errorDetails,
+        errorDetails: serializedErrorDetails,
       },
-      { status: 500 }
+      { status: statusCode }
     );
   }
 }

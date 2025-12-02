@@ -96,15 +96,14 @@ export async function sendMiniappNotification(
         });
       }
     }
-    return {
-      sent: 0,
-      errors: targetFids.length === 0 ? 0 : targetFids.length,
-    };
+    // Re-throw the error so calling code can handle it properly
+    throw error;
   }
 }
 
 /**
  * Send miniapp notification to a single user if they have the miniapp installed
+ * Returns false if user doesn't have miniapp installed or if sending fails
  */
 export async function sendMiniappNotificationToUser(
   userFid: number,
@@ -117,8 +116,13 @@ export async function sendMiniappNotificationToUser(
     return false;
   }
 
-  const result = await sendMiniappNotification([userFid], title, body, targetUrl);
-  return result.sent > 0;
+  try {
+    const result = await sendMiniappNotification([userFid], title, body, targetUrl);
+    return result.sent > 0;
+  } catch (error) {
+    console.error(`[Miniapp] Error sending notification to user ${userFid}:`, error);
+    return false;
+  }
 }
 
 /**

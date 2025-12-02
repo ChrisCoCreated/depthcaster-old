@@ -205,6 +205,7 @@ export default function AdminNotificationsPage() {
     setMiniappTestResult(null);
 
     try {
+      console.log("[Admin] Sending miniapp test notification...");
       const response = await fetch("/api/admin/miniapp-notification/test", {
         method: "POST",
         headers: {
@@ -212,25 +213,60 @@ export default function AdminNotificationsPage() {
         },
       });
 
-      const data = await response.json();
+      console.log("[Admin] Response status:", response.status, response.statusText);
+
+      // Try to parse JSON, but handle non-JSON responses
+      let data: any;
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        try {
+          data = await response.json();
+        } catch (parseError) {
+          console.error("[Admin] Failed to parse JSON response:", parseError);
+          const text = await response.text();
+          setMiniappTestResult(`Error: Failed to parse response as JSON\nStatus: ${response.status}\nResponse: ${text}`);
+          return;
+        }
+      } else {
+        const text = await response.text();
+        console.error("[Admin] Non-JSON response received:", text);
+        setMiniappTestResult(`Error: Unexpected response format\nStatus: ${response.status}\nResponse: ${text}`);
+        return;
+      }
 
       if (response.ok) {
+        console.log("[Admin] Test notification sent successfully:", data);
         setMiniappTestResult(data.message || `Test notification sent! ${data.sent} notification(s) delivered.`);
       } else {
+        console.error("[Admin] Test notification failed:", data);
         let errorMsg = `Error: ${data.error || "Failed to send test notification"}`;
         if (data.errorDetails) {
-          errorMsg += `\nStatus: ${data.errorDetails.status}`;
+          errorMsg += `\nStatus: ${data.errorDetails.status || response.status}`;
+          if (data.errorDetails.statusText) {
+            errorMsg += ` (${data.errorDetails.statusText})`;
+          }
           if (data.errorDetails.data) {
             errorMsg += `\nDetails: ${JSON.stringify(data.errorDetails.data, null, 2)}`;
           }
+        } else {
+          errorMsg += `\nStatus: ${response.status} ${response.statusText}`;
         }
         setMiniappTestResult(errorMsg);
       }
     } catch (error: any) {
+      console.error("[Admin] Network or other error sending test notification:", error);
       let errorMsg = `Error: ${error.message || "Failed to send test notification"}`;
+      
+      // Handle network errors
+      if (error.name === "TypeError" && error.message.includes("fetch")) {
+        errorMsg = `Network error: ${error.message}\nPlease check your connection and try again.`;
+      }
+      
+      // Handle other error types
       if (error.response) {
         errorMsg += `\nResponse: ${JSON.stringify(error.response, null, 2)}`;
       }
+      
       setMiniappTestResult(errorMsg);
     } finally {
       setIsSendingMiniappTest(false);
