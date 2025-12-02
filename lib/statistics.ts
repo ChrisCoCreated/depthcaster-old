@@ -4,6 +4,7 @@ import {
   curatedCasts,
   castReplies,
   curatedCastInteractions,
+  curatorCastCurations,
 } from "./schema";
 
 export interface DailyStats {
@@ -62,4 +63,58 @@ export async function get24HourStats(): Promise<DailyStats> {
     likes: interactionMap.get("like") || 0,
     recasts: interactionMap.get("recast") || 0,
   };
+}
+
+export interface WeeklyContributor {
+  curatorFid: number;
+  curationCount: number;
+  username?: string;
+  displayName?: string;
+  pfpUrl?: string;
+}
+
+export interface WeeklyContributorsStats {
+  topContributors: WeeklyContributor[];
+  allContributors: WeeklyContributor[];
+}
+
+/**
+ * Get weekly contributors statistics (past 7 days)
+ */
+export async function getWeeklyContributorsStats(): Promise<WeeklyContributorsStats> {
+  const now = new Date();
+  const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  // Query curatorCastCurations for past 7 days, grouped by curator
+  const contributors = await db
+    .select({
+      curatorFid: curatorCastCurations.curatorFid,
+      curationCount: sql<number>`count(*)::int`,
+    })
+    .from(curatorCastCurations)
+    .where(sql`created_at >= ${weekStart.toISOString()}`)
+    .groupBy(curatorCastCurations.curatorFid);
+
+  if (contributors.length === 0) {
+    return { topContributors: [], allContributors: [] };
+  }
+
+  // Separate into top contributors (>7) and all others
+  const topContributors: WeeklyContributor[] = [];
+  const allContributors: WeeklyContributor[] = [];
+
+  for (const contributor of contributors) {
+    const curatorInfo: WeeklyContributor = {
+      curatorFid: contributor.curatorFid,
+      curationCount: contributor.curationCount,
+    };
+
+    if (contributor.curationCount > 7) {
+      topContributors.push(curatorInfo);
+    } else {
+      allContributors.push(curatorInfo);
+    }
+  }
+
+  return { topContributors, allContributors };
 }
