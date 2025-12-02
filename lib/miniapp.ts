@@ -1,7 +1,7 @@
 import { neynarClient } from "./neynar";
 import { db } from "./db";
 import { miniappInstallations } from "./schema";
-import { eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 /**
  * Check if a user has the miniapp installed
@@ -28,6 +28,29 @@ export async function getMiniappInstalledFids(): Promise<number[]> {
 }
 
 /**
+ * Build the notification payload (for testing/debugging)
+ */
+export function buildMiniappNotificationPayload(
+  targetFids: number[],
+  title: string,
+  body: string,
+  targetUrl?: string
+): { target_fids: number[]; notification: { title: string; body: string; target_url: string } } {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://depthcaster.vercel.app";
+  const notificationUrl = targetUrl || appUrl;
+  const targetFidsArray = Array.isArray(targetFids) ? targetFids : [];
+  
+  return {
+    target_fids: targetFidsArray,
+    notification: {
+      title,
+      body: body.length > 200 ? body.substring(0, 200) + "..." : body,
+      target_url: notificationUrl,
+    },
+  };
+}
+
+/**
  * Send a Farcaster miniapp notification to specific users
  * Uses Neynar's publishFrameNotifications API which automatically handles:
  * - Token management
@@ -44,32 +67,19 @@ export async function sendMiniappNotification(
   // Non-empty array means send to specific users
   // Both cases should proceed to call the API
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://depthcaster.vercel.app";
-  const notificationUrl = targetUrl || appUrl;
-
   try {
     // Use Neynar's publishFrameNotifications API
     // Neynar automatically filters out disabled tokens and handles rate limits
     // When targetFids is an empty array, Neynar sends to all users with notifications enabled
     // The API requires targetFids to be present as an array (even if empty)
-    // Ensure targetFids is explicitly an array (not undefined)
-    const targetFidsArray = Array.isArray(targetFids) ? targetFids : [];
-    
-    const requestPayload = {
-      target_fids: targetFidsArray, // SDK expects snake_case (TypeScript definitions confirm this)
-      notification: {
-        title,
-        body: body.length > 200 ? body.substring(0, 200) + "..." : body,
-        target_url: notificationUrl,
-      },
-    };
+    const requestPayload = buildMiniappNotificationPayload(targetFids, title, body, targetUrl);
     
     console.log("[Miniapp] Sending notification with payload:", JSON.stringify(requestPayload, null, 2));
-    console.log("[Miniapp] targetFids type:", typeof targetFidsArray, "isArray:", Array.isArray(targetFidsArray), "length:", targetFidsArray.length);
+    console.log("[Miniapp] targetFids type:", typeof requestPayload.target_fids, "isArray:", Array.isArray(requestPayload.target_fids), "length:", requestPayload.target_fids.length);
     
     const response = await neynarClient.publishFrameNotifications(requestPayload);
 
-    const targetCount = targetFids.length === 0 ? "all users" : `${targetFids.length} users`;
+    const targetCount = requestPayload.target_fids.length === 0 ? "all users" : `${requestPayload.target_fids.length} users`;
     console.log(`[Miniapp] Sent notification to ${targetCount} via Neynar`);
     
     // Count successful deliveries
@@ -134,7 +144,7 @@ export async function notifyAllMiniappUsersAboutNewCuratedCast(
   castData: any
 ): Promise<{ sent: number; errors: number }> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://depthcaster.com";
-  const targetUrl = `${appUrl}/miniapp`;
+  const targetUrl = `${appUrl}/`;
 
   // Extract cast preview text
   const castText = castData?.text || "";

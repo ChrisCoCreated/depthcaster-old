@@ -236,7 +236,11 @@ export default function AdminNotificationsPage() {
 
       if (response.ok) {
         console.log("[Admin] Test notification sent successfully:", data);
-        setMiniappTestResult(data.message || `Test notification sent! ${data.sent} notification(s) delivered.`);
+        let resultMsg = data.message || `Test notification sent! ${data.sent} notification(s) delivered.`;
+        if (data.payload) {
+          resultMsg += `\n\nPayload sent:\n${JSON.stringify(data.payload, null, 2)}`;
+        }
+        setMiniappTestResult(resultMsg);
       } else {
         console.error("[Admin] Test notification failed:", data);
         let errorMsg = `Error: ${data.error || "Failed to send test notification"}`;

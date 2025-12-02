@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { notifyAllMiniappUsersAboutNewCuratedCast } from "@/lib/miniapp";
+import { notifyAllMiniappUsersAboutNewCuratedCast, buildMiniappNotificationPayload } from "@/lib/miniapp";
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,6 +16,17 @@ export async function POST(request: NextRequest) {
 
     const testCastHash = `test-${Date.now()}`;
 
+    // Build the payload that will be sent
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://depthcaster.com";
+    const targetUrl = `${appUrl}/`;
+    const castText = testCastData?.text || "";
+    const previewText = castText.length > 150 ? castText.substring(0, 150) + "..." : castText;
+    const authorName = testCastData?.author?.display_name || testCastData?.author?.username || "Someone";
+    const title = "New curated cast";
+    const body = previewText || `${authorName} curated a cast`;
+    
+    const payload = buildMiniappNotificationPayload([], title, body, targetUrl);
+
     // Send test notification
     const result = await notifyAllMiniappUsersAboutNewCuratedCast(
       testCastHash,
@@ -27,6 +38,7 @@ export async function POST(request: NextRequest) {
       sent: result.sent,
       errors: result.errors,
       message: `Test miniapp notification sent! ${result.sent} notification(s) delivered, ${result.errors} error(s).`,
+      payload: payload,
     });
   } catch (error: any) {
     console.error("[Admin] Error sending test miniapp notification:", error);
