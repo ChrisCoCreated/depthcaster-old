@@ -10,3 +10,4 @@ CREATE TABLE IF NOT EXISTS "miniapp_installations" (
 CREATE INDEX IF NOT EXISTS "miniapp_installations_user_fid_idx" ON "miniapp_installations" USING btree ("user_fid");
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "miniapp_installations_installed_at_idx" ON "miniapp_installations" USING btree ("installed_at");
+

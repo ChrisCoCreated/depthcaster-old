@@ -339,11 +339,21 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
           `${filteredCount} displayed${filteredOut > 0 ? ` (${filteredOut} filtered out due to low user score < 0.55)` : ""}.`
         );
       } else {
-        setDebugMessage(
-          notificationCount > 0
-            ? `Found ${notificationCount} notification(s) in database, but all were filtered out (user score < 0.55).`
-            : `No notifications found in database for user ${user.fid}.`
-        );
+        // Provide more detailed debugging information
+        if (notificationCount > 0) {
+          setDebugMessage(
+            `Found ${notificationCount} notification(s) in database, but all were filtered out (user score < 0.55). ` +
+            `This means notifications exist but the users who created them have low reputation scores.`
+          );
+        } else {
+          // Check if API returned empty array (might indicate blocking or no notifications)
+          const isEmptyResponse = JSON.stringify(data) === '{"notifications":[],"next":null}';
+          
+          setDebugMessage(
+            `No notifications found in database for user ${user.fid}. ` +
+            `${isEmptyResponse ? "API returned empty array - if notifications exist in the database, this may indicate a blocking issue was recently removed. Try refreshing." : "Check database directly to verify notifications exist."}`
+          );
+        }
       }
     } catch (err: any) {
       console.error("Force fetch error:", err);

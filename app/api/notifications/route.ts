@@ -24,15 +24,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // TEMPORARY: Block notifications for user 5406
-    const BLOCKED_USER_FID = 5406;
-    if (parseInt(fid) === BLOCKED_USER_FID) {
-      return NextResponse.json({
-        notifications: [],
-        next: null,
-      });
-    }
-
     // Map string types to enum values
     // If types is an empty string, user has disabled all Neynar notification types
     const notificationTypes = types

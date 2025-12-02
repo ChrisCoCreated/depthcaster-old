@@ -118,3 +118,4 @@ export async function getWeeklyContributorsStats(): Promise<WeeklyContributorsSt
 
   return { topContributors, allContributors };
 }
+

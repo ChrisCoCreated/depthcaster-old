@@ -622,10 +622,8 @@ export async function POST(request: NextRequest) {
         console.log(`[Webhook] Found ${existingNotifications.length} existing notification(s) for cast ${castHash}`);
 
         // Only create notifications for users who don't already have one
-        // TEMPORARY: Block notifications for user 5406
-        const BLOCKED_USER_FID = 5406;
         const notificationsToCreate = watchers
-          .filter(w => !existingUserFids.has(w.watcherFid) && w.watcherFid !== BLOCKED_USER_FID)
+          .filter(w => !existingUserFids.has(w.watcherFid))
           .map((w) => ({
             userFid: w.watcherFid,
             type: "cast.created",

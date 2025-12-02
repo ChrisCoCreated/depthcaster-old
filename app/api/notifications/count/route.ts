@@ -24,14 +24,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // TEMPORARY: Block notifications for user 5406
-    const BLOCKED_USER_FID = 5406;
-    if (fidNum === BLOCKED_USER_FID) {
-      return NextResponse.json({
-        unreadCount: 0,
-      });
-    }
-
     // Check for cache-busting parameter - if present, skip cache to ensure fresh data
     const cacheBust = searchParams.get("_t");
     const shouldSkipCache = cacheBust !== null;
