@@ -56,7 +56,7 @@ export async function sendMiniappNotification(
     const targetFidsArray = Array.isArray(targetFids) ? targetFids : [];
     
     const requestPayload = {
-      target_fids: targetFidsArray, // SDK expects snake_case
+      target_fids: targetFidsArray, // SDK expects snake_case (TypeScript definitions confirm this)
       notification: {
         title,
         body: body.length > 200 ? body.substring(0, 200) + "..." : body,
