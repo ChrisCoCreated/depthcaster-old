@@ -61,11 +61,17 @@ export async function sendMiniappNotification(
 
     console.log(`[Miniapp] Sent notification to ${targetFids.length} users via Neynar`);
     
-    // Neynar returns the number of notifications sent
-    // The actual count may be less due to disabled tokens (which Neynar filters automatically)
+    // Count successful deliveries
+    const successfulDeliveries = response?.notification_deliveries?.filter(
+      (delivery) => delivery.status === "success"
+    ) || [];
+    const failedDeliveries = response?.notification_deliveries?.filter(
+      (delivery) => delivery.status !== "success"
+    ) || [];
+    
     return {
-      sent: response?.result?.sent || targetFids.length,
-      errors: 0, // Neynar handles errors internally
+      sent: successfulDeliveries.length,
+      errors: failedDeliveries.length,
     };
   } catch (error: any) {
     console.error("[Miniapp] Error sending notification:", error);
