@@ -24,15 +24,43 @@ function MiniappContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [installed, setInstalled] = useState(false);
+  const [checkingInstall, setCheckingInstall] = useState(true);
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://depthcaster.vercel.app";
 
   useEffect(() => {
-    // Check if miniapp is already installed
+    // Check if miniapp is already installed via SDK
     if (added) {
       setInstalled(true);
+      setCheckingInstall(false);
     }
   }, [added]);
+
+  useEffect(() => {
+    // Check if user has miniapp installed in database
+    const checkInstallation = async () => {
+      if (context?.user?.fid) {
+        try {
+          const response = await fetch(`/api/miniapp/check?fid=${context.user.fid}`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.installed) {
+              setInstalled(true);
+            }
+          }
+        } catch (err) {
+          console.error("Error checking installation:", err);
+        }
+      }
+      setCheckingInstall(false);
+    };
+
+    if (isSDKLoaded && context?.user?.fid) {
+      checkInstallation();
+    } else if (!isSDKLoaded) {
+      setCheckingInstall(false);
+    }
+  }, [isSDKLoaded, context?.user?.fid]);
 
   useEffect(() => {
     // Call ready() when SDK is loaded to signal miniapp is ready
@@ -89,8 +117,8 @@ function MiniappContent() {
   };
 
   const handleCastClick = (castHash: string) => {
-    // Open externally in depthcaster
-    const url = `${appUrl}/cast/${castHash}`;
+    // Open externally in depthcaster conversation view
+    const url = `${appUrl}/conversation/${castHash}`;
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
@@ -120,13 +148,15 @@ function MiniappContent() {
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Quality content, recently curated
           </p>
-          {!installed && isSDKLoaded && (
-            <button
-              onClick={handleInstall}
-              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              Install Miniapp for Notifications
-            </button>
+          {!checkingInstall && !installed && isSDKLoaded && (
+            <div className="mt-4 flex justify-center">
+              <button
+                onClick={handleInstall}
+                className="px-6 py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
+              >
+                Install Miniapp for Notifications
+              </button>
+            </div>
           )}
           {installed && (
             <div className="mt-4 px-4 py-2 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded-lg text-sm">

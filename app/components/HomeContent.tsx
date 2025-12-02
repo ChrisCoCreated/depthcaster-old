@@ -4,7 +4,7 @@ import { Feed } from "./Feed";
 import { CastComposer } from "./CastComposer";
 import { useNeynarContext, useMiniApp, MiniAppProvider } from "@neynar/react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
 
 function FeedContent() {
   const { user } = useNeynarContext();
@@ -27,13 +27,27 @@ function HomeContentInner() {
   const router = useRouter();
   const pathname = usePathname();
   const { isSDKLoaded, context } = useMiniApp();
+  const [isCheckingMiniapp, setIsCheckingMiniapp] = useState(true);
 
   // Redirect to /miniapp if opened in miniapp context
   useEffect(() => {
     if (isSDKLoaded && context && pathname === "/") {
       router.replace("/miniapp");
+    } else {
+      // Only show content after we've confirmed we're not in miniapp context
+      // Give a small delay to ensure SDK has time to load
+      const timer = setTimeout(() => {
+        setIsCheckingMiniapp(false);
+      }, 100);
+      return () => clearTimeout(timer);
     }
   }, [isSDKLoaded, context, pathname, router]);
+
+  // Don't render content until we've checked for miniapp context
+  // This prevents onboarding from showing during redirect
+  if (isCheckingMiniapp && pathname === "/") {
+    return null;
+  }
 
   return (
     <div className="min-h-screen" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
