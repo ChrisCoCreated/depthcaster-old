@@ -1,0 +1,12 @@
+{
+    "frame": {
+      "version": "4.2.0",
+      "name": "Depthcaster",
+      "iconUrl": "https://depthcaster.vercel.app/icon-192x192.webp",
+      "splashImageUrl": "https://depthcaster.vercel.app/icon-512x512.webp",
+      "splashBackgroundColor": "#000000",
+      "homeUrl": "https://depthcaster.vercel.app/miniapp",
+      "webhookUrl": "https://api.neynar.com/f/app/YOUR_CLIENT_ID/event"
+    }
+  }
+  

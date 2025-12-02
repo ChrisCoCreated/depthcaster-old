@@ -367,6 +367,16 @@ export const apiCallStats = pgTable("api_call_stats", {
   callTypeIdx: index("api_call_stats_call_type_idx").on(table.callType),
 }));
 
+export const miniappInstallations = pgTable("miniapp_installations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userFid: bigint("user_fid", { mode: "number" }).notNull().references(() => users.fid, { onDelete: "cascade" }),
+  installedAt: timestamp("installed_at").defaultNow().notNull(),
+}, (table) => ({
+  userFidUnique: uniqueIndex("miniapp_installations_user_fid_unique").on(table.userFid),
+  userFidIdx: index("miniapp_installations_user_fid_idx").on(table.userFid),
+  installedAtIdx: index("miniapp_installations_installed_at_idx").on(table.installedAt),
+}));
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type CuratorPack = typeof curatorPacks.$inferSelect;
@@ -415,4 +425,6 @@ export type UserReactionSyncState = typeof userReactionSyncState.$inferSelect;
 export type NewUserReactionSyncState = typeof userReactionSyncState.$inferInsert;
 export type ApiCallStat = typeof apiCallStats.$inferSelect;
 export type NewApiCallStat = typeof apiCallStats.$inferInsert;
+export type MiniappInstallation = typeof miniappInstallations.$inferSelect;
+export type NewMiniappInstallation = typeof miniappInstallations.$inferInsert;
 

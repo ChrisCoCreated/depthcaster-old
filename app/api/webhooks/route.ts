@@ -688,6 +688,20 @@ export async function POST(request: NextRequest) {
             console.error(`[Webhook] Error sending push notification to user ${notification.userFid}:`, error);
             // Don't fail the webhook if push notification fails
           }
+
+          // Send miniapp notification if user has miniapp installed
+          try {
+            const { sendMiniappNotificationToUser } = await import("@/lib/miniapp");
+            await sendMiniappNotificationToUser(
+              notification.userFid,
+              `${authorUsername} posted a new cast`,
+              previewText || "New cast from someone you're watching",
+              `/cast/${castHash}`
+            );
+          } catch (error) {
+            // Don't fail if miniapp notification fails - it's non-critical
+            console.error(`[Webhook] Error sending miniapp notification to user ${notification.userFid}:`, error);
+          }
         }
       } else {
         console.log(`[Webhook] No watchers found for author ${authorFid}, skipping notification creation`);
