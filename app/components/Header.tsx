@@ -7,6 +7,7 @@ import { FeedbackModal } from "./FeedbackModal";
 import Link from "next/link";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { usePathname } from "next/navigation";
+import { createPortal } from "react-dom";
 import { AvatarImage } from "./AvatarImage";
 import { analytics } from "@/lib/analytics";
 import { HelpCircle, User, Settings, Shield } from "lucide-react";
@@ -25,6 +26,7 @@ export function Header() {
   const [isHelpDropdownOpen, setIsHelpDropdownOpen] = useState(false);
   const [pfpDropdownPosition, setPfpDropdownPosition] = useState({ top: 0, right: 0 });
   const [helpDropdownPosition, setHelpDropdownPosition] = useState({ top: 0, right: 0 });
+  const [mounted, setMounted] = useState(false);
   const pfpDropdownRef = useRef<HTMLDivElement>(null);
   const helpDropdownRef = useRef<HTMLDivElement>(null);
   const pfpButtonRef = useRef<HTMLButtonElement>(null);
@@ -94,6 +96,11 @@ export function Header() {
       setIsAdminUser(false);
     }
   }, [user, checkAdminStatus]);
+
+  // Set mounted flag for portal rendering
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Update browser tab title and favicon based on environment
   useEffect(() => {
@@ -623,7 +630,7 @@ export function Header() {
                   >
                     <HelpCircle className="w-5 h-5 sm:w-6 sm:h-6" />
                   </button>
-                  {isHelpDropdownOpen && (
+                  {isHelpDropdownOpen && mounted && createPortal(
                     <div
                       ref={helpDropdownRef}
                       className="fixed w-48 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 py-1 z-[9998]"
@@ -649,7 +656,8 @@ export function Header() {
                       >
                         Why Depthcaster
                       </Link>
-                    </div>
+                    </div>,
+                    document.body
                   )}
                 </div>
                 <NotificationBell />
