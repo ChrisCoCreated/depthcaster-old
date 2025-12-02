@@ -105,23 +105,28 @@ export async function POST(request: NextRequest) {
       day: "numeric",
     });
 
+    // Separate top contributors (>7) from others, and sort both by curation count (descending)
+    const topContributors = enrichedContributors
+      .filter((c) => c.curationCount > 7)
+      .sort((a, b) => b.curationCount - a.curationCount);
+    const otherContributors = enrichedContributors
+      .filter((c) => c.curationCount <= 7)
+      .sort((a, b) => b.curationCount - a.curationCount);
+
     let messageBody: string;
     if (enrichedContributors.length === 0) {
       messageBody = "No contributors this week yet.";
-    } else if (enrichedContributors.length <= 10) {
-      // List all curators
-      const curatorNames = enrichedContributors.map((c) => 
-        `${formatCuratorName(c)} (${c.curationCount} ${c.curationCount === 1 ? 'cast' : 'casts'})`
-      );
-      messageBody = `Weekly Contributors: ${curatorNames.join(", ")}`;
     } else {
-      // List top 10 + count of remaining
-      const top10 = enrichedContributors.slice(0, 10);
-      const remaining = enrichedContributors.length - 10;
-      const curatorNames = top10.map((c) => 
-        `${formatCuratorName(c)} (${c.curationCount} ${c.curationCount === 1 ? 'cast' : 'casts'})`
-      );
-      messageBody = `Weekly Contributors: ${curatorNames.join(", ")}, and ${remaining} more curator${remaining === 1 ? '' : 's'}`;
+      const topNames = topContributors.map((c) => formatCuratorName(c));
+      const otherNames = otherContributors.map((c) => formatCuratorName(c));
+
+      if (topNames.length > 0 && otherNames.length > 0) {
+        messageBody = `Weekly Contributors: ${topNames.join(" & ")} - plus ${otherNames.join(", ")}`;
+      } else if (topNames.length > 0) {
+        messageBody = `Weekly Contributors: ${topNames.join(" & ")}`;
+      } else {
+        messageBody = `Weekly Contributors: ${otherNames.join(", ")}`;
+      }
     }
 
     const title = `[TEST] Weekly Contributors - ${date}`;
