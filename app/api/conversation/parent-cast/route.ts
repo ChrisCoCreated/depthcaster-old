@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { getRootCastHash } from "@/lib/conversation";
 import { extractCastTimestamp } from "@/lib/cast-timestamp";
 import { meetsCastQualityThreshold } from "@/lib/cast-quality";
+import { upsertUser } from "@/lib/users";
 
 // Special placeholder hash for parent casts saved for display purposes only
 // These are not actual replies to curated casts, just metadata for showing parent context
@@ -160,6 +161,25 @@ export async function POST(request: NextRequest) {
     // We use a special placeholder hash (0x0000...) to mark these as metadata-only
     const { extractCastMetadata } = await import("@/lib/cast-metadata");
     const metadata = extractCastMetadata(parentCastData);
+
+    // Ensure the author exists in the users table before inserting the cast reply
+    let finalAuthorFid = metadata.authorFid;
+    if (metadata.authorFid) {
+      const authorData = parentCastData?.author;
+      try {
+        await upsertUser(metadata.authorFid, {
+          username: authorData?.username,
+          displayName: authorData?.display_name,
+          pfpUrl: authorData?.pfp_url,
+        });
+      } catch (error) {
+        console.error(`[Parent Cast] Failed to upsert author ${metadata.authorFid}:`, error);
+        // If upsert fails, set authorFid to null to avoid foreign key constraint violation
+        // The foreign key constraint has onDelete: "set null", so null is acceptable
+        finalAuthorFid = null;
+      }
+    }
+
     await db.insert(castReplies).values({
       curatedCastHash: PARENT_CAST_PLACEHOLDER_HASH, // Use placeholder, not rootCastHash
       replyCastHash: parentCastHash,
@@ -172,7 +192,7 @@ export async function POST(request: NextRequest) {
       quotedCastHash: null,
       castText: metadata.castText,
       castTextLength: metadata.castTextLength,
-      authorFid: metadata.authorFid,
+      authorFid: finalAuthorFid,
       likesCount: metadata.likesCount,
       recastsCount: metadata.recastsCount,
       repliesCount: metadata.repliesCount,
