@@ -35,6 +35,7 @@ export function BuildIdeasManager() {
   const [error, setError] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [hideCompleted, setHideCompleted] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -227,21 +228,36 @@ export function BuildIdeasManager() {
     );
   }
 
+  const filteredIdeas = hideCompleted
+    ? ideas.filter((idea) => idea.status !== "complete")
+    : ideas;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-          Build Ideas & Feedback ({ideas.length} total)
+          Build Ideas & Feedback ({filteredIdeas.length} {hideCompleted ? "visible" : "total"})
         </h3>
-        {!showAddForm && !editingId && (
-          <button
-            onClick={() => setShowAddForm(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Add Build Idea
-          </button>
-        )}
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={hideCompleted}
+              onChange={(e) => setHideCompleted(e.target.checked)}
+              className="w-4 h-4 rounded border-gray-300 dark:border-gray-700 text-blue-600 focus:ring-blue-500"
+            />
+            <span>Hide completed</span>
+          </label>
+          {!showAddForm && !editingId && (
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Add Build Idea
+            </button>
+          )}
+        </div>
       </div>
 
       {error && (
@@ -316,14 +332,18 @@ export function BuildIdeasManager() {
       )}
 
       <div className="space-y-2">
-        {ideas.length === 0 ? (
+        {filteredIdeas.length === 0 ? (
           <div className="text-gray-500 dark:text-gray-400 text-center py-8">
-            No build ideas or feedback yet. Submit feedback or click "Add Build Idea" to create one.
+            {ideas.length === 0
+              ? "No build ideas or feedback yet. Submit feedback or click \"Add Build Idea\" to create one."
+              : hideCompleted
+              ? "No build ideas or feedback to display (all are completed or filter is active)."
+              : "No build ideas or feedback yet. Submit feedback or click \"Add Build Idea\" to create one."}
           </div>
         ) : (
           <>
             {/* Display all entries from build_ideas table (both build-ideas and feedback) */}
-            {ideas
+            {filteredIdeas
               .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
               .map((idea) => {
                 const isFeedback = idea.type === "feedback";

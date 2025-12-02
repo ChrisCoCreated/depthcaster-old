@@ -231,7 +231,7 @@ export async function GET(request: NextRequest) {
         feedType: feedViewSessions.feedType,
         totalSessions: sql<number>`count(*)::int`,
         totalDuration: sql<number>`COALESCE(sum(duration_seconds), 0)::int`,
-        avgDuration: sql<number>`COALESCE(FLOOR(avg(duration_seconds)), 0)::int`,
+        avgDuration: sql<number>`CASE WHEN count(*) > 0 THEN ROUND(avg(duration_seconds))::int ELSE 0 END`,
         uniqueUsers: sql<number>`count(distinct user_fid)::int`,
       })
       .from(feedViewSessions)

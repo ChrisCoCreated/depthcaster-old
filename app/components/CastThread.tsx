@@ -33,6 +33,15 @@ export function CastThread({ castHash, viewerFid }: CastThreadProps) {
   const router = useRouter();
 
   const [hasConversation, setHasConversation] = useState<boolean | null>(null);
+  const [hideNoEngagement, setHideNoEngagement] = useState(false);
+
+  // Check if a reply has any engagement
+  function hasEngagement(reply: Cast): boolean {
+    const likes = reply.reactions?.likes_count || reply.reactions?.likes?.length || 0;
+    const recasts = reply.reactions?.recasts_count || reply.reactions?.recasts?.length || 0;
+    const replyCount = reply.replies?.count || 0;
+    return likes > 0 || recasts > 0 || replyCount > 0;
+  }
 
   // Fetch user bot preferences
   useEffect(() => {
@@ -223,6 +232,18 @@ export function CastThread({ castHash, viewerFid }: CastThreadProps) {
   const filteredBelowFoldReplies = belowFoldReplies.filter((reply: Cast) => 
     !shouldHideBotCastClient(reply, botPreferences.hiddenBots, botPreferences.hideBots)
   );
+
+  // Filter replies with no engagement if enabled
+  const engagementFilteredAboveFold = hideNoEngagement
+    ? aboveFoldReplies.filter((reply: Cast) => hasEngagement(reply))
+    : aboveFoldReplies;
+  
+  const engagementFilteredBelowFold = hideNoEngagement
+    ? filteredBelowFoldReplies.filter((reply: Cast) => hasEngagement(reply))
+    : filteredBelowFoldReplies;
+
+  // Count how many replies would be hidden if we filtered
+  const hiddenCountWhenFiltering = aboveFoldReplies.filter((reply: Cast) => !hasEngagement(reply)).length;
   
   // Check if there are below-fold replies (total count > above-fold count)
   const hasBelowFoldReplies = totalRepliesCount > allAboveFoldReplies.length;
@@ -303,8 +324,8 @@ export function CastThread({ castHash, viewerFid }: CastThreadProps) {
     return rootReplies;
   }
 
-  const threadedReplies = buildThreadTree(aboveFoldReplies as ThreadedReply[], mainCast.hash);
-  const threadedBelowFoldReplies = buildThreadTree(filteredBelowFoldReplies as ThreadedReply[], mainCast.hash);
+  const threadedReplies = buildThreadTree(engagementFilteredAboveFold as ThreadedReply[], mainCast.hash);
+  const threadedBelowFoldReplies = buildThreadTree(engagementFilteredBelowFold as ThreadedReply[], mainCast.hash);
 
   // Render threaded reply component
   function renderThreadedReply(reply: ThreadedReply, depth: number = 1, isLastChild: boolean = false, parentHasMore: boolean = false, hasChildren: boolean = false) {
@@ -464,6 +485,21 @@ export function CastThread({ castHash, viewerFid }: CastThreadProps) {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Toggle button to hide/show no-engagement replies */}
+      {hiddenCountWhenFiltering > 0 && (
+        <div className="mt-6 px-4 py-3 text-center border-t border-gray-200 dark:border-gray-800">
+          <button
+            onClick={() => setHideNoEngagement(!hideNoEngagement)}
+            className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 underline transition-colors"
+          >
+            {hideNoEngagement 
+              ? `Show ${hiddenCountWhenFiltering} ${hiddenCountWhenFiltering === 1 ? 'reply' : 'replies'} with no engagement`
+              : `Hide ${hiddenCountWhenFiltering} ${hiddenCountWhenFiltering === 1 ? 'reply' : 'replies'} with no engagement`
+            }
+          </button>
         </div>
       )}
 

@@ -152,13 +152,30 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     // Check if it's an expected error from unfurl.js
     const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    // Check for DNS/network errors (expected for invalid/unreachable domains)
+    const errorAny = error as any;
+    const isNetworkError = errorAny?.code === 'ENOTFOUND' || 
+                          errorAny?.code === 'ETIMEDOUT' || 
+                          errorAny?.code === 'ECONNREFUSED' ||
+                          errorAny?.code === 'EHOSTUNREACH' ||
+                          errorAny?.errno === 'ENOTFOUND' ||
+                          errorAny?.errno === 'ETIMEDOUT' ||
+                          errorAny?.errno === 'ECONNREFUSED' ||
+                          errorAny?.type === 'system' ||
+                          errorMessage?.includes('ENOTFOUND') ||
+                          errorMessage?.includes('ETIMEDOUT') ||
+                          errorMessage?.includes('ECONNREFUSED') ||
+                          errorMessage?.includes('getaddrinfo');
+    
     const isHttpStatusError = errorMessage?.includes('BAD_HTTP_STATUS') || 
                               errorMessage?.includes('http status not OK');
     const isContentTypeError = errorMessage?.includes('WRONG_CONTENT_TYPE') ||
                                errorMessage?.includes('Wrong content type header');
     
-    if (isHttpStatusError || isContentTypeError) {
+    if (isNetworkError || isHttpStatusError || isContentTypeError) {
       // Don't log expected errors - they're normal for:
+      // - Invalid/unreachable domains (DNS errors, connection refused, etc.)
       // - Inaccessible URLs (404, 403, etc.)
       // - Non-HTML content (JSON, XML, PDF, images, etc.)
       return NextResponse.json(
