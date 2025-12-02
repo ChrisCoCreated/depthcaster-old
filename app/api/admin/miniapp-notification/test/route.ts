@@ -30,8 +30,31 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error("[Admin] Error sending test miniapp notification:", error);
+    
+    // Extract detailed error information
+    let errorMessage = error.message || "Failed to send test miniapp notification";
+    let errorDetails: any = null;
+    
+    if (error.response) {
+      errorDetails = {
+        status: error.response.status,
+        data: error.response.data,
+      };
+      if (error.response.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+      if (error.response.data?.errors) {
+        errorMessage += `: ${JSON.stringify(error.response.data.errors)}`;
+      }
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    
     return NextResponse.json(
-      { error: error.message || "Failed to send test miniapp notification" },
+      { 
+        error: errorMessage,
+        errorDetails: errorDetails,
+      },
       { status: 500 }
     );
   }

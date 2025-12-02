@@ -52,14 +52,22 @@ export async function sendMiniappNotification(
     // Neynar automatically filters out disabled tokens and handles rate limits
     // When targetFids is an empty array, Neynar sends to all users with notifications enabled
     // The API requires targetFids to be present as an array (even if empty)
-    const response = await neynarClient.publishFrameNotifications({
-      targetFids: targetFids, // Always include, even if empty array
+    // Ensure targetFids is explicitly an array (not undefined)
+    const targetFidsArray = Array.isArray(targetFids) ? targetFids : [];
+    
+    const requestPayload = {
+      target_fids: targetFidsArray, // SDK expects snake_case
       notification: {
         title,
         body: body.length > 200 ? body.substring(0, 200) + "..." : body,
         target_url: notificationUrl,
       },
-    });
+    };
+    
+    console.log("[Miniapp] Sending notification with payload:", JSON.stringify(requestPayload, null, 2));
+    console.log("[Miniapp] targetFids type:", typeof targetFidsArray, "isArray:", Array.isArray(targetFidsArray), "length:", targetFidsArray.length);
+    
+    const response = await neynarClient.publishFrameNotifications(requestPayload);
 
     const targetCount = targetFids.length === 0 ? "all users" : `${targetFids.length} users`;
     console.log(`[Miniapp] Sent notification to ${targetCount} via Neynar`);
@@ -80,8 +88,13 @@ export async function sendMiniappNotification(
     console.error("[Miniapp] Error sending notification:", error);
     // Log more details about the error for debugging
     if (error.response) {
-      console.error("[Miniapp] Error response:", error.response.data);
+      console.error("[Miniapp] Error response:", JSON.stringify(error.response.data, null, 2));
       console.error("[Miniapp] Error status:", error.response.status);
+      if (error.response.data?.errors) {
+        error.response.data.errors.forEach((err: any) => {
+          console.error(`[Miniapp] Validation error - path: ${JSON.stringify(err.path)}, message: ${err.message}, expected: ${err.expected}, received: ${err.received}`);
+        });
+      }
     }
     return {
       sent: 0,

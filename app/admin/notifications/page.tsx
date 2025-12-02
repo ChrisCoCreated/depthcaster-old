@@ -217,10 +217,21 @@ export default function AdminNotificationsPage() {
       if (response.ok) {
         setMiniappTestResult(data.message || `Test notification sent! ${data.sent} notification(s) delivered.`);
       } else {
-        setMiniappTestResult(`Error: ${data.error || "Failed to send test notification"}`);
+        let errorMsg = `Error: ${data.error || "Failed to send test notification"}`;
+        if (data.errorDetails) {
+          errorMsg += `\nStatus: ${data.errorDetails.status}`;
+          if (data.errorDetails.data) {
+            errorMsg += `\nDetails: ${JSON.stringify(data.errorDetails.data, null, 2)}`;
+          }
+        }
+        setMiniappTestResult(errorMsg);
       }
     } catch (error: any) {
-      setMiniappTestResult(`Error: ${error.message || "Failed to send test notification"}`);
+      let errorMsg = `Error: ${error.message || "Failed to send test notification"}`;
+      if (error.response) {
+        errorMsg += `\nResponse: ${JSON.stringify(error.response, null, 2)}`;
+      }
+      setMiniappTestResult(errorMsg);
     } finally {
       setIsSendingMiniappTest(false);
     }
@@ -345,9 +356,11 @@ export default function AdminNotificationsPage() {
                 </button>
               </div>
               {miniappTestResult && (
-                <p className={`mt-2 text-sm ${miniappTestResult.startsWith("Error") ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>
-                  {miniappTestResult}
-                </p>
+                <div className={`mt-2 text-sm ${miniappTestResult.startsWith("Error") ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>
+                  <pre className="whitespace-pre-wrap font-mono text-xs bg-red-50 dark:bg-red-900/20 p-2 rounded border border-red-200 dark:border-red-800">
+                    {miniappTestResult}
+                  </pre>
+                </div>
               )}
             </div>
           </div>
