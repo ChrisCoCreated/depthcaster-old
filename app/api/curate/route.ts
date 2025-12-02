@@ -532,6 +532,20 @@ export async function POST(request: NextRequest) {
         curatorFid,
       }).returning();
 
+      // Send miniapp notification to all users when a cast is first curated
+      if (isNewCuration) {
+        try {
+          const { notifyAllMiniappUsersAboutNewCuratedCast } = await import("@/lib/miniapp");
+          notifyAllMiniappUsersAboutNewCuratedCast(castHash, finalCastData).catch((error) => {
+            console.error(`[Curate] Error sending miniapp notification for new curated cast ${castHash}:`, error);
+            // Don't fail curation if notification fails
+          });
+        } catch (error) {
+          console.error(`[Curate] Error importing miniapp notification function:`, error);
+          // Don't fail curation if import fails
+        }
+      }
+
       // Send notification to admin user 5701 only when a cast is curated for the first time
       const ADMIN_FID = 5701;
       if (curatorFid !== ADMIN_FID && isNewCuration) {

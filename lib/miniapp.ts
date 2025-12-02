@@ -40,9 +40,9 @@ export async function sendMiniappNotification(
   body: string,
   targetUrl?: string
 ): Promise<{ sent: number; errors: number }> {
-  if (targetFids.length === 0) {
-    return { sent: 0, errors: 0 };
-  }
+  // Empty array means send to all users with notifications enabled
+  // Non-empty array means send to specific users
+  // Both cases should proceed to call the API
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://depthcaster.vercel.app";
   const notificationUrl = targetUrl || appUrl;
@@ -50,16 +50,18 @@ export async function sendMiniappNotification(
   try {
     // Use Neynar's publishFrameNotifications API
     // Neynar automatically filters out disabled tokens and handles rate limits
-      const response = await neynarClient.publishFrameNotifications({
-        targetFids,
-        notification: {
-          title,
-          body: body.length > 200 ? body.substring(0, 200) + "..." : body,
-          target_url: notificationUrl,
-        },
-      });
+    // When targetFids is empty, Neynar sends to all users with notifications enabled
+    const response = await neynarClient.publishFrameNotifications({
+      targetFids,
+      notification: {
+        title,
+        body: body.length > 200 ? body.substring(0, 200) + "..." : body,
+        target_url: notificationUrl,
+      },
+    });
 
-    console.log(`[Miniapp] Sent notification to ${targetFids.length} users via Neynar`);
+    const targetCount = targetFids.length === 0 ? "all users" : `${targetFids.length} users`;
+    console.log(`[Miniapp] Sent notification to ${targetCount} via Neynar`);
     
     // Count successful deliveries
     const successfulDeliveries = response?.notification_deliveries?.filter(
@@ -77,7 +79,7 @@ export async function sendMiniappNotification(
     console.error("[Miniapp] Error sending notification:", error);
     return {
       sent: 0,
-      errors: targetFids.length,
+      errors: targetFids.length === 0 ? 0 : targetFids.length,
     };
   }
 }
@@ -98,4 +100,30 @@ export async function sendMiniappNotificationToUser(
 
   const result = await sendMiniappNotification([userFid], title, body, targetUrl);
   return result.sent > 0;
+}
+
+/**
+ * Notify all miniapp users about a new curated cast
+ * Passes empty array for targetFids to send to all users with notifications enabled
+ */
+export async function notifyAllMiniappUsersAboutNewCuratedCast(
+  castHash: string,
+  castData: any
+): Promise<{ sent: number; errors: number }> {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://depthcaster.com";
+  const targetUrl = `${appUrl}/miniapp`;
+
+  // Extract cast preview text
+  const castText = castData?.text || "";
+  const previewText = castText.length > 150 ? castText.substring(0, 150) + "..." : castText;
+  
+  // Extract author name
+  const authorName = castData?.author?.display_name || castData?.author?.username || "Someone";
+
+  const title = "New curated cast";
+  const body = previewText || `${authorName} curated a cast`;
+
+  // Pass empty array to send to all users with notifications enabled for the app
+  // Neynar will automatically filter to only users who have the miniapp installed
+  return await sendMiniappNotification([], title, body, targetUrl);
 }

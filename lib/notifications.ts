@@ -127,40 +127,6 @@ export async function createCuratorNotification(
       console.error(`[Notifications] Error sending badge refresh push to curator ${curatorFid}:`, error);
     }
 
-    // Send miniapp notification if user has miniapp installed
-    try {
-      const castText = castData?.text || "";
-      const previewText = castText.length > 100 ? castText.substring(0, 100) + "..." : castText;
-      const authorName = castData?.author?.display_name || castData?.author?.username || "Someone";
-      
-      let notificationTitle = "New notification";
-      let notificationBody = previewText || "You have a new notification";
-      
-      if (type === "curated.quality_reply") {
-        notificationTitle = "Quality reply";
-        notificationBody = `${authorName}: ${previewText || "New quality reply"}`;
-      } else if (type === "curated.curated") {
-        notificationTitle = "Cast curated";
-        notificationBody = `${authorName} curated a cast`;
-      } else if (type === "curated.liked") {
-        notificationTitle = "Cast liked";
-        notificationBody = `${authorName} liked a cast you curated`;
-      } else if (type === "curated.recast") {
-        notificationTitle = "Cast recast";
-        notificationBody = `${authorName} recast a cast you curated`;
-      }
-
-      await sendMiniappNotificationToUser(
-        curatorFid,
-        notificationTitle,
-        notificationBody,
-        `/cast/${castHash}`
-      );
-    } catch (error) {
-      // Don't fail if miniapp notification fails - it's non-critical
-      console.error(`[Notifications] Error sending miniapp notification to curator ${curatorFid}:`, error);
-    }
-
     console.log(`[Notifications] Created ${type} notification for curator ${curatorFid}, cast ${castHash}`);
   } catch (error: any) {
     // Handle unique constraint violation (duplicate notification)
@@ -450,19 +416,6 @@ export async function createAppUpdateNotification(
     } catch (error) {
       // Don't fail if badge refresh push fails - it's non-critical
       console.error(`[Notifications] Error sending badge refresh push to user ${userFid}:`, error);
-    }
-
-    // Send miniapp notification if user has miniapp installed
-    try {
-      await sendMiniappNotificationToUser(
-        userFid,
-        title,
-        body.length > 200 ? body.substring(0, 200) + "..." : body,
-        url || "/updates"
-      );
-    } catch (error) {
-      // Don't fail if miniapp notification fails - it's non-critical
-      console.error(`[Notifications] Error sending miniapp notification to user ${userFid}:`, error);
     }
 
     console.log(`[Notifications] Created app.update notification for user ${userFid}`);
