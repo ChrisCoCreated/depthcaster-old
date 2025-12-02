@@ -5,7 +5,7 @@ import { cacheNotifications, cacheNotificationCount } from "@/lib/cache";
 import { deduplicateRequest } from "@/lib/neynar-batch";
 import { db } from "@/lib/db";
 import { userNotifications } from "@/lib/schema";
-import { eq, desc, and, lt, inArray } from "drizzle-orm";
+import { eq, desc, and, lt } from "drizzle-orm";
 import { getUserRoles, hasPlusRole } from "@/lib/roles";
 
 export async function GET(request: NextRequest) {
@@ -272,32 +272,11 @@ export async function GET(request: NextRequest) {
     // Limit to requested limit
     const limitedNotifications = allNotifications.slice(0, limit);
 
-    // Mark webhook notifications as read ONLY if they're unread and being returned
-    // This allows them to persist in the feed until explicitly marked as read
-    if (webhookResults.length > 0 && limitedNotifications.length > 0) {
-      const returnedWebhookHashes = new Set(
-        limitedNotifications
-          .filter((n) => n.type === "cast.created" && webhookResults.some((wr) => wr.castHash === n.cast?.hash))
-          .map((n) => n.cast?.hash)
-          .filter(Boolean)
-      );
-
-      // Only mark as read if they were previously unread
-      const readIds = webhookResults
-        .filter((wr) => returnedWebhookHashes.has(wr.castHash) && !wr.isRead)
-        .map((wr) => wr.id);
-
-      if (readIds.length > 0) {
-        console.log(`[Notifications] Marking ${readIds.length} webhook notification(s) as read`);
-        await db
-          .update(userNotifications)
-          .set({ isRead: true })
-          .where(inArray(userNotifications.id, readIds));
-        
-        // Invalidate count cache since unread count changed
-        cacheNotificationCount.invalidateUser(parseInt(fid));
-      }
-    }
+    // Note: Notifications are NOT automatically marked as read when fetched.
+    // They should only be marked as read when:
+    // 1. User explicitly marks them as seen via /api/notifications/seen
+    // 2. User clicks on a notification (which calls markAsSeen)
+    // This ensures notifications persist in the feed until the user actually views them.
 
     // Generate cursor for webhook notifications if there are more available
     // Only generate cursor if we actually have more webhooks beyond what we've shown

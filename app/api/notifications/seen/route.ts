@@ -149,6 +149,33 @@ export async function POST(request: NextRequest) {
             )
           );
       }
+
+      // Handle feedback.new notifications - for ALL users regardless of role
+      if (castHash && notificationType && notificationType === "feedback.new") {
+        // Mark the specific feedback.new notification as read in the database
+        await db
+          .update(userNotifications)
+          .set({ isRead: true })
+          .where(
+            and(
+              eq(userNotifications.userFid, userFid),
+              eq(userNotifications.castHash, castHash),
+              eq(userNotifications.type, "feedback.new")
+            )
+          );
+      } else if (!castHash && !notificationType) {
+        // When panel opens (no specific notification), mark all unread feedback.new notifications as read
+        await db
+          .update(userNotifications)
+          .set({ isRead: true })
+          .where(
+            and(
+              eq(userNotifications.userFid, userFid),
+              eq(userNotifications.isRead, false),
+              eq(userNotifications.type, "feedback.new")
+            )
+          );
+      }
     }
     
     // Invalidate count cache for this user (regardless of roles)
