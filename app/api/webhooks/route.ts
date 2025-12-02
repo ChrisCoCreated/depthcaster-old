@@ -12,6 +12,7 @@ import { LookupCastConversationTypeEnum } from "@neynar/nodejs-sdk/build/api";
 import { analyzeCastQualityAsync } from "@/lib/deepseek-quality";
 import { findOriginalCuratedCast } from "@/lib/interactions";
 import { getUserRoles } from "@/lib/roles";
+import { upsertUser } from "@/lib/users";
 
 // Disable body parsing to read raw body for signature verification
 export const runtime = "nodejs";
@@ -335,6 +336,25 @@ export async function POST(request: NextRequest) {
               const { extractCastTimestamp } = await import("@/lib/cast-timestamp");
               const { extractCastMetadata } = await import("@/lib/cast-metadata");
               const metadata = extractCastMetadata(castData);
+
+              // Ensure the author exists in the users table before inserting the cast reply
+              let finalAuthorFid = metadata.authorFid;
+              if (metadata.authorFid) {
+                const authorData = castData?.author;
+                try {
+                  await upsertUser(metadata.authorFid, {
+                    username: authorData?.username,
+                    displayName: authorData?.display_name,
+                    pfpUrl: authorData?.pfp_url,
+                  });
+                } catch (error) {
+                  console.error(`[Webhook] Failed to upsert author ${metadata.authorFid} for quote cast:`, error);
+                  // If upsert fails, set authorFid to null to avoid foreign key constraint violation
+                  // The foreign key constraint has onDelete: "set null", so null is acceptable
+                  finalAuthorFid = null;
+                }
+              }
+
               await db.insert(castReplies).values({
                 curatedCastHash: quotedCastHash,
                 replyCastHash: castHash,
@@ -347,7 +367,7 @@ export async function POST(request: NextRequest) {
                 quotedCastHash: quotedCastHash,
                 castText: metadata.castText,
                 castTextLength: metadata.castTextLength,
-                authorFid: metadata.authorFid,
+                authorFid: finalAuthorFid,
                 likesCount: metadata.likesCount,
                 recastsCount: metadata.recastsCount,
                 repliesCount: metadata.repliesCount,
@@ -494,6 +514,25 @@ export async function POST(request: NextRequest) {
               const { extractCastTimestamp } = await import("@/lib/cast-timestamp");
               const { extractCastMetadata } = await import("@/lib/cast-metadata");
               const metadata = extractCastMetadata(castData);
+
+              // Ensure the author exists in the users table before inserting the cast reply
+              let finalAuthorFid = metadata.authorFid;
+              if (metadata.authorFid) {
+                const authorData = castData?.author;
+                try {
+                  await upsertUser(metadata.authorFid, {
+                    username: authorData?.username,
+                    displayName: authorData?.display_name,
+                    pfpUrl: authorData?.pfp_url,
+                  });
+                } catch (error) {
+                  console.error(`[Webhook] Failed to upsert author ${metadata.authorFid} for reply:`, error);
+                  // If upsert fails, set authorFid to null to avoid foreign key constraint violation
+                  // The foreign key constraint has onDelete: "set null", so null is acceptable
+                  finalAuthorFid = null;
+                }
+              }
+
               await db.insert(castReplies).values({
                 curatedCastHash,
                 replyCastHash: castHash,
@@ -506,7 +545,7 @@ export async function POST(request: NextRequest) {
                 quotedCastHash: null,
                 castText: metadata.castText,
                 castTextLength: metadata.castTextLength,
-                authorFid: metadata.authorFid,
+                authorFid: finalAuthorFid,
                 likesCount: metadata.likesCount,
                 recastsCount: metadata.recastsCount,
                 repliesCount: metadata.repliesCount,
