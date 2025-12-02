@@ -1286,12 +1286,72 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
                 </span>
               </div>
               <button
-                onClick={() => {
+                onClick={async () => {
                   setHasNewCuratedCasts(false);
                   setLatestNewCast(null);
-                  setSortBy("recently-curated");
-                  localStorage.setItem("curatedFeedSortBy", "recently-curated");
-                  // The useEffect watching sortBy will automatically trigger fetchFeed
+                  const newSortBy = "recently-curated";
+                  setSortBy(newSortBy);
+                  localStorage.setItem("curatedFeedSortBy", newSortBy);
+                  // Update the ref immediately
+                  prevSortByRef.current = newSortBy;
+                  // Clear casts to show loading state
+                  setCasts([]);
+                  setCursor(null);
+                  setHasMore(false);
+                  castsRestoredRef.current = false;
+                  
+                  // Fetch directly with the new sortBy value
+                  try {
+                    setLoading(true);
+                    setError(null);
+                    
+                    const preferences = getFeedPreferences();
+                    const params = new URLSearchParams({
+                      feedType: "curated",
+                      limit: "30",
+                    });
+
+                    if (viewerFid) {
+                      params.append("viewerFid", viewerFid.toString());
+                    }
+
+                    if (preferences.hideDollarCasts) {
+                      params.append("hideDollarCasts", "true");
+                    }
+                    if (preferences.hideShortCasts) {
+                      params.append("hideShortCasts", "true");
+                      params.append("minCastLength", preferences.minCastLength.toString());
+                    }
+                    if (preferences.hideTradingWords && preferences.tradingWords.length > 0) {
+                      params.append("hideTradingWords", "true");
+                      params.append("tradingWords", preferences.tradingWords.join(","));
+                    }
+
+                    params.append("curatorFids", selectedCuratorFids.join(","));
+                    params.append("sortBy", newSortBy);
+                    if (selectedCategory) {
+                      params.append("category", selectedCategory);
+                    }
+                    params.append("minQualityScore", minQualityScore.toString());
+
+                    const response = await fetch(`/api/feed?${params}`);
+                    
+                    if (!response.ok) {
+                      throw new Error("Failed to fetch feed");
+                    }
+
+                    const data = await response.json();
+                    setCasts(data.casts);
+                    castsRestoredRef.current = true;
+                    setCursor(data.next?.cursor || null);
+                    setHasMore(!!data.next?.cursor);
+                  } catch (err: unknown) {
+                    const error = err as { message?: string };
+                    console.error(`[Feed] Error:`, error.message || "Failed to load feed");
+                    setError(error.message || "Failed to load feed");
+                  } finally {
+                    setLoading(false);
+                  }
                 }}
                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 rounded-lg transition-colors flex-shrink-0"
               >
