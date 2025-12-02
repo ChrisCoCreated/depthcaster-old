@@ -125,6 +125,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   });
   const sortByInitializedRef = useRef(false);
   const [hasNewCuratedCasts, setHasNewCuratedCasts] = useState(false);
+  const [latestNewCast, setLatestNewCast] = useState<Cast | null>(null);
   const curatorFilterInitializedRef = useRef(false);
   const [filtersExpanded, setFiltersExpanded] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
@@ -1068,6 +1069,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
 
       params.append("curatorFids", selectedCuratorFids.join(","));
       params.append("sortBy", sortBy);
+      params.append("minQualityScore", minQualityScore.toString());
 
       const response = await fetch(`/api/feed?${params}`);
       if (!response.ok) {
@@ -1086,20 +1088,31 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
         if (newFirstHash !== currentFirstHash) {
           // Check if any of the new top casts are not in current casts
           const currentHashes = new Set(casts.map(c => c.hash));
-          const hasNewContent = newCasts.some((cast: Cast) => !currentHashes.has(cast.hash));
+          const newCastsNotInCurrent = newCasts.filter((cast: Cast) => !currentHashes.has(cast.hash));
           
-          if (hasNewContent) {
+          // Find the first new cast that meets quality threshold
+          const qualifyingNewCast = newCastsNotInCurrent.find((cast: Cast) => {
+            const qualityScore = (cast as Cast & { _qualityScore?: number | null })._qualityScore;
+            return qualityScore === null || qualityScore === undefined || qualityScore >= minQualityScore;
+          });
+          
+          if (qualifyingNewCast) {
             setHasNewCuratedCasts(true);
+            setLatestNewCast(qualifyingNewCast);
+          } else {
+            setHasNewCuratedCasts(false);
+            setLatestNewCast(null);
           }
         } else {
           setHasNewCuratedCasts(false);
+          setLatestNewCast(null);
         }
       }
     } catch (err) {
       // Silently fail - don't show errors for background checks
       console.error("[Feed] Error checking for new curated casts:", err);
     }
-  }, [feedType, loading, casts, viewerFid, selectedCuratorFids, sortBy]);
+  }, [feedType, loading, casts, viewerFid, selectedCuratorFids, sortBy, minQualityScore]);
 
   // Activity-aware polling for curated feed
   const lastCheckTimeRef = useRef(0);
@@ -1110,6 +1123,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   useEffect(() => {
     if (feedType !== "curated") {
       setHasNewCuratedCasts(false);
+      setLatestNewCast(null);
       if (checkTimeoutRef.current) {
         clearTimeout(checkTimeoutRef.current);
         checkTimeoutRef.current = null;
@@ -1185,6 +1199,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   useEffect(() => {
     if (feedType === "curated" && casts.length > 0) {
       setHasNewCuratedCasts(false);
+      setLatestNewCast(null);
     }
   }, [casts, feedType]);
 
@@ -1248,36 +1263,65 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       )}
 
       {/* New curated casts available banner */}
-      {feedType === "curated" && hasNewCuratedCasts && (
+      {feedType === "curated" && hasNewCuratedCasts && latestNewCast && (
         <div className="mb-4 mx-2 sm:mx-4">
-          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <svg
-                className="w-5 h-5 text-blue-600 dark:text-blue-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <div className="flex items-start justify-between gap-4 mb-3">
+              <div className="flex items-center gap-2 flex-1">
+                <svg
+                  className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                  New curated casts available
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  setHasNewCuratedCasts(false);
+                  setLatestNewCast(null);
+                  setSortBy("recently-curated");
+                  localStorage.setItem("curatedFeedSortBy", "recently-curated");
+                  // The useEffect watching sortBy will automatically trigger fetchFeed
+                }}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 rounded-lg transition-colors flex-shrink-0"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                New curated casts available
-              </span>
+                Reload feed with latest
+              </button>
             </div>
-            <button
-              onClick={() => {
-                setHasNewCuratedCasts(false);
-                fetchFeed();
-              }}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 rounded-lg transition-colors"
-            >
-              Refresh
-            </button>
+            {/* Preview of latest new cast */}
+            <div className="mt-3 pl-7 border-l-2 border-blue-200 dark:border-blue-700">
+              <div className="flex gap-3">
+                <AvatarImage
+                  src={latestNewCast.author.pfp_url}
+                  alt={latestNewCast.author.username}
+                  size={32}
+                  className="w-8 h-8 rounded-full flex-shrink-0"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-semibold text-sm text-blue-900 dark:text-blue-100">
+                      {latestNewCast.author.display_name || latestNewCast.author.username}
+                    </span>
+                    <span className="text-xs text-blue-600 dark:text-blue-400">
+                      @{latestNewCast.author.username}
+                    </span>
+                  </div>
+                  <div className="text-sm text-blue-800 dark:text-blue-200 line-clamp-2">
+                    {latestNewCast.text}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
