@@ -7,6 +7,11 @@
       "splashBackgroundColor": "#000000",
       "homeUrl": "https://depthcaster.com",
       "webhookUrl": "https://api.neynar.com/f/app/4f4d94f9-c966-486b-ab8b-d4a33d52e8c2/event"
-    }
+    },
+        "accountAssociation": {
+          "header": "eyJmaWQiOjU3MDEsInR5cGUiOiJhdXRoIiwia2V5IjoiMHgzMDdmOWNDODY1MDg2MkUwODE1QWRmODMzQjkxMjVGNGUwZWQ0MDU1In0",
+          "payload": "eyJkb21haW4iOiJkZXB0aGNhc3Rlci5jb20ifQ",
+          "signature": "E5EYMI/+U2cwM9wANER0UbgyWhU3VYPeW0CsokfdeXZtA8t+TkFxPi7d5Orl++2kd3DpzdYaSjwTWknP6gV1Yhw="
+        }
   }
   
