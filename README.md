@@ -1,6 +1,6 @@
 # Depthcaster
 
-A Farcaster client focused on deep thoughts, philosophy, art, and meaningful conversations. Built with Next.js and Neynar.
+A Long from farcaster client focused on deep thoughts, philosophy, art, and meaningful conversations. Built with Next.js and Neynar.
 
 ## Features
 

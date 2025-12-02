@@ -1,7 +1,7 @@
 {
   "name": "Depthcaster - Deep Thoughts on Farcaster",
   "short_name": "Depthcaster",
-  "description": "A Farcaster client focused on philosophy, art, and meaningful conversations",
+  "description": "A Long from farcaster client focused on philosophy, art, and meaningful conversations",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

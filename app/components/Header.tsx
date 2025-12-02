@@ -9,7 +9,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { AvatarImage } from "./AvatarImage";
 import { analytics } from "@/lib/analytics";
-import { HelpCircle, User, Settings } from "lucide-react";
+import { HelpCircle, User, Settings, Shield } from "lucide-react";
 
 export function Header() {
   const { user } = useNeynarContext();
@@ -20,6 +20,7 @@ export function Header() {
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
   const [environment, setEnvironment] = useState<"local" | "preview" | null>(null);
   const [hasPreviewAccess, setHasPreviewAccess] = useState(false);
+  const [isAdminUser, setIsAdminUser] = useState(false);
   const [isPfpDropdownOpen, setIsPfpDropdownOpen] = useState(false);
   const [isHelpDropdownOpen, setIsHelpDropdownOpen] = useState(false);
   const pfpDropdownRef = useRef<HTMLDivElement>(null);
@@ -33,12 +34,31 @@ export function Header() {
         // Check if user has admin, superadmin, or tester role
         const hasAccess = data.isAdmin || data.roles?.includes("tester");
         setHasPreviewAccess(hasAccess);
+        // Also check if user is admin or superadmin for admin panel access
+        setIsAdminUser(data.isAdmin || data.isSuperAdmin);
       } else {
         setHasPreviewAccess(false);
+        setIsAdminUser(false);
       }
     } catch (error) {
       console.error("Failed to check preview access:", error);
       setHasPreviewAccess(false);
+      setIsAdminUser(false);
+    }
+  }, []);
+
+  const checkAdminStatus = useCallback(async (fid: number) => {
+    try {
+      const response = await fetch(`/api/admin/check?fid=${fid}`);
+      if (response.ok) {
+        const data = await response.json();
+        setIsAdminUser(data.isAdmin || data.isSuperAdmin);
+      } else {
+        setIsAdminUser(false);
+      }
+    } catch (error) {
+      console.error("Failed to check admin status:", error);
+      setIsAdminUser(false);
     }
   }, []);
 
@@ -54,12 +74,22 @@ export function Header() {
           checkPreviewAccess(user.fid);
         } else {
           setHasPreviewAccess(false);
+          setIsAdminUser(false);
         }
       } else {
         setEnvironment(null);
       }
     }
   }, [user, checkPreviewAccess]);
+
+  // Check admin status whenever user changes
+  useEffect(() => {
+    if (user?.fid) {
+      checkAdminStatus(user.fid);
+    } else {
+      setIsAdminUser(false);
+    }
+  }, [user, checkAdminStatus]);
 
   // Update browser tab title and favicon based on environment
   useEffect(() => {
@@ -558,7 +588,7 @@ export function Header() {
                     <HelpCircle className="w-5 h-5 sm:w-6 sm:h-6" />
                   </button>
                   {isHelpDropdownOpen && (
-                    <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 py-1 z-[300]">
+                    <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 py-1 z-[1000]">
                       <button
                         onClick={() => {
                           analytics.trackFeedbackModalOpen();
@@ -594,7 +624,7 @@ export function Header() {
                     />
                   </button>
                   {isPfpDropdownOpen && (
-                    <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 py-1 z-[300]">
+                    <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 py-1 z-[1000]">
                       <Link
                         href={`/profile/${user.fid}`}
                         onClick={() => {
@@ -617,6 +647,18 @@ export function Header() {
                         <Settings className="w-4 h-4" />
                         Settings
                       </Link>
+                      {isAdminUser && (
+                        <Link
+                          href="/admin"
+                          onClick={() => {
+                            setIsPfpDropdownOpen(false);
+                          }}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        >
+                          <Shield className="w-4 h-4" />
+                          Admin Panel
+                        </Link>
+                      )}
                     </div>
                   )}
                 </div>

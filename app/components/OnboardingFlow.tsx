@@ -40,7 +40,7 @@ export function OnboardingFlow() {
       content: (
         <div className="space-y-4">
           <p className="text-gray-600 dark:text-gray-400">
-            A Farcaster client focused on deep thoughts, philosophy, art, and meaningful conversations.
+            A Long from farcaster client focused on deep thoughts, philosophy, art, and meaningful conversations.
           </p>
           <p className="text-gray-600 dark:text-gray-400">
             You&apos;ve installed Depthcaster as a Progressive Web App. Let&apos;s get you started!

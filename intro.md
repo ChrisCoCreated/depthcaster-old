@@ -1,6 +1,6 @@
 # Depthcaster
 
-**A Farcaster client focused on deep thoughts, philosophy, art, and meaningful conversations.**
+**A Long from farcaster client focused on deep thoughts, philosophy, art, and meaningful conversations.**
 
 Depthcaster is a thoughtfully designed social media client built for the Farcaster protocol. Unlike traditional social platforms that prioritize viral content and engagement metrics, Depthcaster is engineered to surface high-quality, substantive content that encourages genuine dialogue and intellectual exchange.
 

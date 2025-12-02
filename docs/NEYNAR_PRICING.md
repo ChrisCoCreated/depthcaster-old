@@ -464,7 +464,7 @@ When sending notifications to mini-app users:
 - **Per token**: 1 notification per 30 seconds
 - **Daily limit**: 100 notifications per day per token
 
-These limits are enforced by Merkle's Farcaster client. Neynar will filter out notifications to disabled tokens to avoid rate limiting.
+These limits are enforced by Merkle's Long from farcaster client. Neynar will filter out notifications to disabled tokens to avoid rate limiting.
 
 ## API Usage Considerations
 

@@ -33,7 +33,7 @@ export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: "Depthcaster - Deep Thoughts on Farcaster",
-  description: "A Farcaster client focused on philosophy, art, and meaningful conversations",
+  description: "A Long from farcaster client focused on philosophy, art, and meaningful conversations",
   keywords: ["Farcaster", "social media", "philosophy", "art", "conversations", "web3", "decentralized"],
   authors: [{ name: "Depthcaster" }],
   creator: "Depthcaster",
@@ -46,7 +46,7 @@ export const metadata: Metadata = {
     url: "/",
     siteName: "Depthcaster",
     title: "Depthcaster - Deep Thoughts on Farcaster",
-    description: "A Farcaster client focused on philosophy, art, and meaningful conversations",
+    description: "A Long from farcaster client focused on philosophy, art, and meaningful conversations",
     images: [
       {
         url: "/icon-512x512.webp",
@@ -59,7 +59,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Depthcaster - Deep Thoughts on Farcaster",
-    description: "A Farcaster client focused on philosophy, art, and meaningful conversations",
+    description: "A Long from farcaster client focused on philosophy, art, and meaningful conversations",
     images: ["/icon-512x512.webp"],
     creator: "@depthcaster",
   },
