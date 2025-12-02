@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { users } from "@/lib/schema";
+import { inArray } from "drizzle-orm";
 import { get24HourStats } from "@/lib/statistics";
 import { sendAppUpdateNotificationToUsers } from "@/lib/notifications";
+import { getAllCuratorFids } from "@/lib/roles";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,15 +50,27 @@ export async function GET(request: NextRequest) {
     const stats = await get24HourStats();
     console.log("[Daily Stats Cron] Stats:", stats);
 
-    // Get all users who have notifyOnDailyStats enabled (default: true)
-    // We need to check users where notifyOnDailyStats is not explicitly false
-    const allUsers = await db
-      .select({ fid: users.fid, preferences: users.preferences })
-      .from(users);
+    // Get all curator FIDs
+    const curatorFids = await getAllCuratorFids();
+    console.log(`[Daily Stats Cron] Found ${curatorFids.length} curators`);
 
-    // Filter users who want daily stats (default: true, so undefined/null = true)
+    if (curatorFids.length === 0) {
+      return NextResponse.json({
+        success: true,
+        message: "No curators found",
+        stats,
+      });
+    }
+
+    // Get preferences for curators
+    const curatorUsers = await db
+      .select({ fid: users.fid, preferences: users.preferences })
+      .from(users)
+      .where(inArray(users.fid, curatorFids));
+
+    // Filter curators who want daily stats (default: true, so undefined/null = true)
     const usersToNotify: number[] = [];
-    for (const user of allUsers) {
+    for (const user of curatorUsers) {
       const preferences = (user.preferences || {}) as { notifyOnDailyStats?: boolean };
       // Default to true if undefined/null, only exclude if explicitly false
       if (preferences.notifyOnDailyStats !== false) {

@@ -117,3 +117,15 @@ export async function getAllAdminFids(): Promise<number[]> {
   return adminRoles.map((r) => r.userFid);
 }
 
+/**
+ * Get all user FIDs that have curator role
+ */
+export async function getAllCuratorFids(): Promise<number[]> {
+  const curatorRoles = await db
+    .select({ userFid: userRoles.userFid })
+    .from(userRoles)
+    .where(inArray(userRoles.role, CURATOR_ROLES));
+  
+  return curatorRoles.map((r) => r.userFid);
+}
+
