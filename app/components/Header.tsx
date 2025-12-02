@@ -6,11 +6,14 @@ import { HeaderUserSearch } from "./HeaderUserSearch";
 import { FeedbackModal } from "./FeedbackModal";
 import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
+import { usePathname } from "next/navigation";
 import { AvatarImage } from "./AvatarImage";
 import { analytics } from "@/lib/analytics";
 
 export function Header() {
   const { user } = useNeynarContext();
+  const pathname = usePathname();
+  const isMiniapp = pathname?.startsWith("/miniapp");
   const [isPasting, setIsPasting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "error" | "success" } | null>(null);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
@@ -571,7 +574,7 @@ export function Header() {
                 </Link>
               </>
             ) : (
-              <NeynarAuthButton />
+              !isMiniapp && <NeynarAuthButton />
             )}
           </div>
         </div>

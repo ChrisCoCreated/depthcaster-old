@@ -3,13 +3,15 @@
 import { useEffect, useState } from "react";
 import { MiniAppProvider, useMiniApp } from "@neynar/react";
 import { formatDistanceToNow } from "date-fns";
+import { AvatarImage } from "@/app/components/AvatarImage";
 
 interface FeedItem {
   castHash: string;
   text: string;
   authorFid: number | null;
-  likesCount: number;
-  recastsCount: number;
+  authorUsername: string | null;
+  authorDisplayName: string | null;
+  authorPfpUrl: string | null;
   repliesCount: number;
   qualityScore: number | null;
   castCreatedAt: string | null;
@@ -145,27 +147,46 @@ function MiniappContent() {
                 onClick={() => handleCastClick(item.castHash)}
                 className="border border-gray-200 dark:border-gray-800 rounded-lg p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
               >
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex-1">
-                    <p className="text-gray-900 dark:text-gray-100 text-sm leading-relaxed line-clamp-4">
-                      {item.text || "No text content"}
-                    </p>
+                {/* Author info */}
+                {item.authorFid && (
+                  <div className="flex items-center gap-2 mb-2">
+                    <AvatarImage
+                      src={item.authorPfpUrl}
+                      alt={item.authorUsername || item.authorDisplayName || "User"}
+                      size={24}
+                      className="w-6 h-6 rounded-full"
+                    />
+                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {item.authorDisplayName || item.authorUsername || `User ${item.authorFid}`}
+                    </span>
                   </div>
-                  {item.qualityScore !== null && (
-                    <div className="ml-4 px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded text-xs font-medium">
-                      {item.qualityScore}
-                    </div>
-                  )}
+                )}
+
+                {/* Cast text */}
+                <div className="mb-2">
+                  <p className="text-gray-900 dark:text-gray-100 text-sm leading-relaxed line-clamp-8">
+                    {item.text || "No text content"}
+                  </p>
                 </div>
 
-                <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 mt-3">
-                  <span>❤️ {item.likesCount}</span>
-                  <span>🔄 {item.recastsCount}</span>
-                  <span>💬 {item.repliesCount}</span>
+                {/* Curated time, quality score, and replies */}
+                <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-3">
                   {item.curatedAt && (
-                    <span>
-                      Curated {formatDistanceToNow(new Date(item.curatedAt), { addSuffix: true })}
-                    </span>
+                    <>
+                      <span>
+                        Curated {formatDistanceToNow(new Date(item.curatedAt), { addSuffix: true })}
+                      </span>
+                      {item.qualityScore !== null && (
+                        <span className="text-gray-400 dark:text-gray-500">
+                          · {item.qualityScore}
+                        </span>
+                      )}
+                      {item.repliesCount > 0 && (
+                        <span>
+                          · {item.repliesCount} {item.repliesCount === 1 ? 'reply' : 'replies'}
+                        </span>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

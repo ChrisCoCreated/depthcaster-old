@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { curatedCasts, curatorCastCurations } from "@/lib/schema";
+import { curatedCasts, curatorCastCurations, users } from "@/lib/schema";
 import { eq, and, sql, gte, desc, inArray } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
@@ -79,18 +79,45 @@ export async function GET(request: NextRequest) {
       return bTime - aTime; // Descending order
     });
 
-    // Step 5: Limit and format response
+    // Step 5: Limit before fetching user info
     const limitedCasts = castsWithCurationTime.slice(0, limit);
+
+    // Step 6: Get author user info from database
+    const authorFids = Array.from(new Set(limitedCasts.map((c) => c.authorFid).filter((fid): fid is number => fid !== null)));
+    const authorUsers = authorFids.length > 0
+      ? await db
+          .select({
+            fid: users.fid,
+            username: users.username,
+            displayName: users.displayName,
+            pfpUrl: users.pfpUrl,
+          })
+          .from(users)
+          .where(inArray(users.fid, authorFids))
+      : [];
+
+    const authorMap = new Map<number, { username?: string | null; displayName?: string | null; pfpUrl?: string | null }>();
+    authorUsers.forEach((user) => {
+      authorMap.set(user.fid, {
+        username: user.username,
+        displayName: user.displayName,
+        pfpUrl: user.pfpUrl,
+      });
+    });
+
+    // Step 7: Format response
     const feedItems = limitedCasts.map((cast) => {
       const castCreatedAtDate = cast.castCreatedAt ? toDate(cast.castCreatedAt, new Date()) : null;
       const curatedAtDate = cast.firstCurationTime;
+      const authorInfo = cast.authorFid ? authorMap.get(cast.authorFid) : null;
       
       return {
         castHash: cast.castHash,
         text: cast.castText || "",
         authorFid: cast.authorFid,
-        likesCount: cast.likesCount || 0,
-        recastsCount: cast.recastsCount || 0,
+        authorUsername: authorInfo?.username || null,
+        authorDisplayName: authorInfo?.displayName || null,
+        authorPfpUrl: authorInfo?.pfpUrl || null,
         repliesCount: cast.repliesCount || 0,
         qualityScore: cast.qualityScore,
         castCreatedAt: castCreatedAtDate?.toISOString() || null,
