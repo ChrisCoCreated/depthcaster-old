@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
     // Step 5: Limit and format response
     const limitedCasts = castsWithCurationTime.slice(0, limit);
     const feedItems = limitedCasts.map((cast) => {
-      const castCreatedAtDate = toDate(cast.castCreatedAt, null);
+      const castCreatedAtDate = cast.castCreatedAt ? toDate(cast.castCreatedAt, new Date()) : null;
       const curatedAtDate = cast.firstCurationTime;
       
       return {
