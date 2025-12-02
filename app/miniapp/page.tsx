@@ -17,7 +17,7 @@ interface FeedItem {
 }
 
 function MiniappContent() {
-  const { isSDKLoaded, context, addMiniApp } = useMiniApp();
+  const { isSDKLoaded, context, actions } = useMiniApp();
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,10 +55,10 @@ function MiniappContent() {
   };
 
   const handleInstall = async () => {
-    if (!isSDKLoaded) return;
+    if (!isSDKLoaded || !actions) return;
 
     try {
-      const result = await addMiniApp();
+      const result = await actions.addFrame();
       if (result.added) {
         setInstalled(true);
         // Track installation on server
