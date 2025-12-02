@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { sql, eq } from "drizzle-orm";
+import { sql, eq, gte } from "drizzle-orm";
 import {
   curatedCasts,
   castReplies,
@@ -94,7 +94,7 @@ export async function getWeeklyContributorsStats(): Promise<WeeklyContributorsSt
     })
     .from(curatorCastCurations)
     .innerJoin(curatedCasts, eq(curatorCastCurations.castHash, curatedCasts.castHash))
-    .where(sql`${curatorCastCurations.created_at} >= ${weekStart.toISOString()}`)
+    .where(gte(curatorCastCurations.createdAt, weekStart))
     .groupBy(curatorCastCurations.curatorFid);
 
   if (contributors.length === 0) {
