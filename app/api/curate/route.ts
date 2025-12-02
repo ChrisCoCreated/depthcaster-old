@@ -159,6 +159,34 @@ export async function POST(request: NextRequest) {
           { status: 401 }
         );
       }
+
+      // For webhook calls, check if the author has curator role
+      // Extract curatorFid from webhook payload (cast author who mentioned @deepbot)
+      const castData = body.data || body.castData;
+      const curatorFid = castData?.author?.fid;
+
+      if (!curatorFid) {
+        return NextResponse.json(
+          { error: "curatorFid is required" },
+          { status: 400 }
+        );
+      }
+
+      // Check if user has curator role
+      const user = await db.select().from(users).where(eq(users.fid, curatorFid)).limit(1);
+      if (user.length === 0) {
+        return NextResponse.json(
+          { error: "User not found" },
+          { status: 404 }
+        );
+      }
+      const roles = await getUserRoles(curatorFid);
+      if (!hasCuratorOrAdminRole(roles)) {
+        return NextResponse.json(
+          { error: "User does not have curator role" },
+          { status: 403 }
+        );
+      }
     } else if (!isWebhook) {
       // Direct API call - check curator role
       const curatorFid = body.curatorFid;
