@@ -33,7 +33,7 @@ export function CastThread({ castHash, viewerFid }: CastThreadProps) {
   const router = useRouter();
 
   const [hasConversation, setHasConversation] = useState<boolean | null>(null);
-  const [hideNoEngagement, setHideNoEngagement] = useState(false);
+  const [hideNoEngagement, setHideNoEngagement] = useState(true);
 
   // Check if a reply has any engagement
   function hasEngagement(reply: Cast): boolean {
@@ -441,29 +441,53 @@ export function CastThread({ castHash, viewerFid }: CastThreadProps) {
             )
           )}
 
-          {/* Below the fold toggle */}
-          {hasBelowFoldReplies && (
-            <div className="px-4 py-3 mt-4">
-              {!showBelowFold ? (
-                <button
-                  onClick={handleShowBelowFold}
-                  disabled={loadingBelowFold}
-                  className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 underline disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {loadingBelowFold 
-                    ? "Loading..." 
-                    : `Show ${totalRepliesCount - allAboveFoldReplies.length} lower quality ${totalRepliesCount - allAboveFoldReplies.length === 1 ? 'reply' : 'replies'}`
-                  }
-                </button>
-              ) : (
+          {/* Below the fold toggle and no engagement toggle */}
+          {(hasBelowFoldReplies || hiddenCountWhenFiltering > 0) && (
+            <div className="px-4 py-3 mt-4 border-t border-gray-200 dark:border-gray-800">
+              <div className="flex items-center gap-4 flex-wrap">
+                {/* No engagement toggle - first */}
+                {hiddenCountWhenFiltering > 0 && (
+                  <button
+                    onClick={() => setHideNoEngagement(!hideNoEngagement)}
+                    className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 underline transition-colors"
+                  >
+                    {hideNoEngagement 
+                      ? `Show ${hiddenCountWhenFiltering} ${hiddenCountWhenFiltering === 1 ? 'reply' : 'replies'} with no engagement`
+                      : `Hide ${hiddenCountWhenFiltering} ${hiddenCountWhenFiltering === 1 ? 'reply' : 'replies'} with no engagement`
+                    }
+                  </button>
+                )}
+
+                {/* Below the fold toggle */}
+                {hasBelowFoldReplies && (
+                  <>
+                    {!showBelowFold ? (
+                      <button
+                        onClick={handleShowBelowFold}
+                        disabled={loadingBelowFold}
+                        className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 underline disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {loadingBelowFold 
+                          ? "Loading..." 
+                          : `Show ${totalRepliesCount - allAboveFoldReplies.length} lower quality ${totalRepliesCount - allAboveFoldReplies.length === 1 ? 'reply' : 'replies'}`
+                        }
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setShowBelowFold(false)}
+                        className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 underline transition-colors"
+                      >
+                        Hide lower quality replies
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Below fold content when expanded */}
+              {showBelowFold && hasBelowFoldReplies && (
                 <>
                   <div className="border-t border-gray-200 dark:border-gray-800 my-3"></div>
-                  <button
-                    onClick={() => setShowBelowFold(false)}
-                    className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 underline mb-3 transition-colors"
-                  >
-                    Hide lower quality replies
-                  </button>
                   {loadingBelowFold ? (
                     <div className="p-4 text-center text-gray-500 dark:text-gray-400 text-sm">
                       Loading lower quality replies...
@@ -485,21 +509,6 @@ export function CastThread({ castHash, viewerFid }: CastThreadProps) {
               )}
             </div>
           )}
-        </div>
-      )}
-
-      {/* Toggle button to hide/show no-engagement replies */}
-      {hiddenCountWhenFiltering > 0 && (
-        <div className="mt-6 px-4 py-3 text-center border-t border-gray-200 dark:border-gray-800">
-          <button
-            onClick={() => setHideNoEngagement(!hideNoEngagement)}
-            className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 underline transition-colors"
-          >
-            {hideNoEngagement 
-              ? `Show ${hiddenCountWhenFiltering} ${hiddenCountWhenFiltering === 1 ? 'reply' : 'replies'} with no engagement`
-              : `Hide ${hiddenCountWhenFiltering} ${hiddenCountWhenFiltering === 1 ? 'reply' : 'replies'} with no engagement`
-            }
-          </button>
         </div>
       )}
 
