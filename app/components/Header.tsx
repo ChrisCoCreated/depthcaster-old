@@ -23,8 +23,12 @@ export function Header() {
   const [isAdminUser, setIsAdminUser] = useState(false);
   const [isPfpDropdownOpen, setIsPfpDropdownOpen] = useState(false);
   const [isHelpDropdownOpen, setIsHelpDropdownOpen] = useState(false);
+  const [pfpDropdownPosition, setPfpDropdownPosition] = useState({ top: 0, right: 0 });
+  const [helpDropdownPosition, setHelpDropdownPosition] = useState({ top: 0, right: 0 });
   const pfpDropdownRef = useRef<HTMLDivElement>(null);
   const helpDropdownRef = useRef<HTMLDivElement>(null);
+  const pfpButtonRef = useRef<HTMLButtonElement>(null);
+  const helpButtonRef = useRef<HTMLButtonElement>(null);
 
   const checkPreviewAccess = useCallback(async (fid: number) => {
     try {
@@ -227,10 +231,36 @@ export function Header() {
     };
   }, []);
 
+  // Update dropdown positions when they open
+  useEffect(() => {
+    if (isPfpDropdownOpen && pfpButtonRef.current) {
+      const rect = pfpButtonRef.current.getBoundingClientRect();
+      setPfpDropdownPosition({
+        top: rect.bottom + 8,
+        right: window.innerWidth - rect.right,
+      });
+    }
+  }, [isPfpDropdownOpen]);
+
+  useEffect(() => {
+    if (isHelpDropdownOpen && helpButtonRef.current) {
+      const rect = helpButtonRef.current.getBoundingClientRect();
+      setHelpDropdownPosition({
+        top: rect.bottom + 8,
+        right: window.innerWidth - rect.right,
+      });
+    }
+  }, [isHelpDropdownOpen]);
+
   // Close PFP dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (pfpDropdownRef.current && !pfpDropdownRef.current.contains(event.target as Node)) {
+      if (
+        pfpDropdownRef.current &&
+        !pfpDropdownRef.current.contains(event.target as Node) &&
+        pfpButtonRef.current &&
+        !pfpButtonRef.current.contains(event.target as Node)
+      ) {
         setIsPfpDropdownOpen(false);
       }
     };
@@ -247,7 +277,12 @@ export function Header() {
   // Close help dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (helpDropdownRef.current && !helpDropdownRef.current.contains(event.target as Node)) {
+      if (
+        helpDropdownRef.current &&
+        !helpDropdownRef.current.contains(event.target as Node) &&
+        helpButtonRef.current &&
+        !helpButtonRef.current.contains(event.target as Node)
+      ) {
         setIsHelpDropdownOpen(false);
       }
     };
@@ -578,8 +613,9 @@ export function Header() {
                     </svg>
                   )}
                 </button>
-                <div className="relative" ref={helpDropdownRef}>
+                <div className="relative">
                   <button
+                    ref={helpButtonRef}
                     onClick={() => setIsHelpDropdownOpen(!isHelpDropdownOpen)}
                     className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
                     aria-label="Help"
@@ -588,7 +624,14 @@ export function Header() {
                     <HelpCircle className="w-5 h-5 sm:w-6 sm:h-6" />
                   </button>
                   {isHelpDropdownOpen && (
-                    <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 py-1 z-[1000]">
+                    <div
+                      ref={helpDropdownRef}
+                      className="fixed w-48 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 py-1 z-[9998]"
+                      style={{
+                        top: `${helpDropdownPosition.top}px`,
+                        right: `${helpDropdownPosition.right}px`,
+                      }}
+                    >
                       <button
                         onClick={() => {
                           analytics.trackFeedbackModalOpen();
@@ -610,8 +653,9 @@ export function Header() {
                   )}
                 </div>
                 <NotificationBell />
-                <div className="relative" ref={pfpDropdownRef}>
+                <div className="relative">
                   <button
+                    ref={pfpButtonRef}
                     onClick={() => setIsPfpDropdownOpen(!isPfpDropdownOpen)}
                     className="flex items-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors p-1"
                     aria-label="User menu"
@@ -624,7 +668,14 @@ export function Header() {
                     />
                   </button>
                   {isPfpDropdownOpen && (
-                    <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 py-1 z-[1000]">
+                    <div
+                      ref={pfpDropdownRef}
+                      className="fixed w-48 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 py-1 z-[9998]"
+                      style={{
+                        top: `${pfpDropdownPosition.top}px`,
+                        right: `${pfpDropdownPosition.right}px`,
+                      }}
+                    >
                       <Link
                         href={`/profile/${user.fid}`}
                         onClick={() => {
