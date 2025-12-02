@@ -33,6 +33,15 @@ function MiniappContent() {
   }, [context]);
 
   useEffect(() => {
+    // Call ready() when SDK is loaded to signal miniapp is ready
+    if (isSDKLoaded && actions) {
+      actions.ready().catch((err) => {
+        console.error("Error calling ready():", err);
+      });
+    }
+  }, [isSDKLoaded, actions]);
+
+  useEffect(() => {
     fetchFeed();
   }, []);
 
