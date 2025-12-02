@@ -675,7 +675,7 @@ export function Header() {
                       className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover"
                     />
                   </button>
-                  {isPfpDropdownOpen && (
+                  {isPfpDropdownOpen && mounted && createPortal(
                     <div
                       ref={pfpDropdownRef}
                       className="fixed w-48 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 py-1 z-[9998]"
@@ -718,7 +718,8 @@ export function Header() {
                           Admin Panel
                         </Link>
                       )}
-                    </div>
+                    </div>,
+                    document.body
                   )}
                 </div>
               </>
