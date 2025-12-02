@@ -50,24 +50,16 @@ export async function sendMiniappNotification(
   try {
     // Use Neynar's publishFrameNotifications API
     // Neynar automatically filters out disabled tokens and handles rate limits
-    // When targetFids is empty, Neynar sends to all users with notifications enabled
-    // Build the request object conditionally
-    const requestBody: any = {
+    // When targetFids is an empty array, Neynar sends to all users with notifications enabled
+    // The API requires targetFids to be present as an array (even if empty)
+    const response = await neynarClient.publishFrameNotifications({
+      targetFids: targetFids, // Always include, even if empty array
       notification: {
         title,
         body: body.length > 200 ? body.substring(0, 200) + "..." : body,
         target_url: notificationUrl,
       },
-    };
-    
-    // Include targetFids only if it's not empty
-    // When empty, omit the field entirely - Neynar will send to all users with notifications enabled
-    if (targetFids.length > 0) {
-      requestBody.targetFids = targetFids;
-    }
-    // When empty, don't include targetFids field at all
-    
-    const response = await neynarClient.publishFrameNotifications(requestBody);
+    });
 
     const targetCount = targetFids.length === 0 ? "all users" : `${targetFids.length} users`;
     console.log(`[Miniapp] Sent notification to ${targetCount} via Neynar`);
