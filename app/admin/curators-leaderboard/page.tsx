@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useNeynarContext } from "@neynar/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 type CuratorLeaderboardEntry = {
   fid: number;
@@ -14,6 +15,14 @@ type CuratorLeaderboardEntry = {
   lastCuration: string;
 };
 
+type WeeklyContributor = {
+  curatorFid: number;
+  curationCount: number;
+  username?: string;
+  displayName?: string;
+  pfpUrl?: string;
+};
+
 export default function CuratorsLeaderboardPage() {
   const { user } = useNeynarContext();
   const router = useRouter();
@@ -21,6 +30,8 @@ export default function CuratorsLeaderboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [leaderboard, setLeaderboard] = useState<CuratorLeaderboardEntry[]>([]);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(true);
+  const [weeklyContributors, setWeeklyContributors] = useState<WeeklyContributor[]>([]);
+  const [loadingWeeklyContributors, setLoadingWeeklyContributors] = useState(true);
 
   useEffect(() => {
     const checkAdminAccess = async () => {
@@ -66,7 +77,23 @@ export default function CuratorsLeaderboardPage() {
       }
     };
 
+    const fetchWeeklyContributors = async () => {
+      try {
+        const response = await fetch("/api/curators/weekly-contributors");
+        const data = await response.json();
+        // Combine top and all contributors, sorted by curation count
+        const all = [...(data.topContributors || []), ...(data.allContributors || [])];
+        all.sort((a, b) => b.curationCount - a.curationCount);
+        setWeeklyContributors(all);
+      } catch (error) {
+        console.error("Failed to fetch weekly contributors:", error);
+      } finally {
+        setLoadingWeeklyContributors(false);
+      }
+    };
+
     fetchLeaderboard();
+    fetchWeeklyContributors();
   }, [isAdmin]);
 
   if (!user || isLoading) {
@@ -103,6 +130,92 @@ export default function CuratorsLeaderboardPage() {
         <p className="text-gray-600 dark:text-gray-400">
           Top curators ranked by their curation activity
         </p>
+      </div>
+
+      {/* Weekly Contributors Section */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">
+              Weekly Contributors
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400">
+              Curators who have contributed in the past 7 days
+            </p>
+          </div>
+          <Link
+            href="/contributors"
+            className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
+          >
+            View Contributors Page →
+          </Link>
+        </div>
+
+        {loadingWeeklyContributors ? (
+          <div className="text-center py-8">
+            <div className="text-gray-500">Loading weekly contributors...</div>
+          </div>
+        ) : weeklyContributors.length === 0 ? (
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
+            <p className="text-gray-600 dark:text-gray-400">No weekly contributors found.</p>
+          </div>
+        ) : (
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 dark:bg-gray-800">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Rank
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Curator
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Weekly Curations
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {weeklyContributors.map((contributor, index) => (
+                    <tr
+                      key={contributor.curatorFid}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-800"
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                        #{index + 1}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          {contributor.pfpUrl && (
+                            <img
+                              src={contributor.pfpUrl}
+                              alt={contributor.displayName || contributor.username || `User ${contributor.curatorFid}`}
+                              className="h-10 w-10 rounded-full mr-3"
+                            />
+                          )}
+                          <div>
+                            <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                              {contributor.displayName || contributor.username || `@user${contributor.curatorFid}`}
+                            </div>
+                            {contributor.username && (
+                              <div className="text-sm text-gray-500 dark:text-gray-400">
+                                @{contributor.username}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                        {contributor.curationCount.toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
 
         {loadingLeaderboard ? (

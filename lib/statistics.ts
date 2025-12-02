@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { sql } from "drizzle-orm";
+import { sql, eq } from "drizzle-orm";
 import {
   curatedCasts,
   castReplies,
@@ -86,13 +86,15 @@ export async function getWeeklyContributorsStats(): Promise<WeeklyContributorsSt
   const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
   // Query curatorCastCurations for past 7 days, grouped by curator
+  // Join with curatedCasts to ensure we only count curations for casts that still exist
   const contributors = await db
     .select({
       curatorFid: curatorCastCurations.curatorFid,
       curationCount: sql<number>`count(*)::int`,
     })
     .from(curatorCastCurations)
-    .where(sql`created_at >= ${weekStart.toISOString()}`)
+    .innerJoin(curatedCasts, eq(curatorCastCurations.castHash, curatedCasts.castHash))
+    .where(sql`${curatorCastCurations.created_at} >= ${weekStart.toISOString()}`)
     .groupBy(curatorCastCurations.curatorFid);
 
   if (contributors.length === 0) {
