@@ -4,7 +4,7 @@ import { castReplies } from "./schema";
 import { LookupCastConversationTypeEnum, FetchCastQuotesTypeEnum } from "@neynar/nodejs-sdk/build/api";
 import { meetsCastQualityThreshold } from "./cast-quality";
 import { Cast } from "@neynar/nodejs-sdk/build/api";
-import { sql } from "drizzle-orm";
+import { sql, eq } from "drizzle-orm";
 import { upsertBulkUsers } from "./users";
 
 /**
@@ -202,6 +202,26 @@ export async function fetchAndStoreConversation(
             engagementScore: sql`excluded.engagement_score`,
           },
         });
+
+      // Trigger async quality analysis for stored replies (non-blocking)
+      const { analyzeCastQualityAsync } = await import("./deepseek-quality");
+      for (const reply of qualityReplies) {
+        analyzeCastQualityAsync(reply.cast.hash, reply.cast, async (hash, result) => {
+          try {
+            await db
+              .update(castReplies)
+              .set({
+                qualityScore: result.qualityScore,
+                category: result.category,
+                qualityAnalyzedAt: new Date(),
+              })
+              .where(eq(castReplies.replyCastHash, hash));
+            console.log(`[fetchAndStoreConversation] Quality analysis completed for reply ${hash}: score=${result.qualityScore}, category=${result.category}`);
+          } catch (error: any) {
+            console.error(`[fetchAndStoreConversation] Error updating quality analysis for reply ${hash}:`, error.message);
+          }
+        });
+      }
     }
 
     // Fetch and store existing quote casts
@@ -311,6 +331,26 @@ export async function fetchAndStoreConversation(
           });
         quotesStored = storedQuotes.length;
         console.log(`[fetchAndStoreConversation] Successfully stored ${quotesStored} quote casts for cast ${castHash}`);
+
+        // Trigger async quality analysis for stored quote casts (non-blocking)
+        const { analyzeCastQualityAsync: analyzeQuoteQualityAsync } = await import("./deepseek-quality");
+        for (const quote of qualityQuotes) {
+          analyzeQuoteQualityAsync(quote.hash, quote, async (hash, result) => {
+            try {
+              await db
+                .update(castReplies)
+                .set({
+                  qualityScore: result.qualityScore,
+                  category: result.category,
+                  qualityAnalyzedAt: new Date(),
+                })
+                .where(eq(castReplies.replyCastHash, hash));
+              console.log(`[fetchAndStoreConversation] Quality analysis completed for quote cast ${hash}: score=${result.qualityScore}, category=${result.category}`);
+            } catch (error: any) {
+              console.error(`[fetchAndStoreConversation] Error updating quality analysis for quote cast ${hash}:`, error.message);
+            }
+          });
+        }
 
         // Fetch and store replies to each quote cast (treat them the same as replies to the original curated cast)
         for (const quoteCast of qualityQuotes) {
@@ -424,6 +464,26 @@ export async function fetchAndStoreConversation(
                 });
               quoteRepliesStored += storedQuoteReplies.length;
               console.log(`[fetchAndStoreConversation] Stored ${storedQuoteReplies.length} replies to quote cast ${quoteCast.hash}`);
+
+              // Trigger async quality analysis for stored replies to quote casts (non-blocking)
+              const { analyzeCastQualityAsync: analyzeQuoteReplyQualityAsync } = await import("./deepseek-quality");
+              for (const reply of qualityQuoteReplies) {
+                analyzeQuoteReplyQualityAsync(reply.cast.hash, reply.cast, async (hash, result) => {
+                  try {
+                    await db
+                      .update(castReplies)
+                      .set({
+                        qualityScore: result.qualityScore,
+                        category: result.category,
+                        qualityAnalyzedAt: new Date(),
+                      })
+                      .where(eq(castReplies.replyCastHash, hash));
+                    console.log(`[fetchAndStoreConversation] Quality analysis completed for reply to quote cast ${hash}: score=${result.qualityScore}, category=${result.category}`);
+                  } catch (error: any) {
+                    console.error(`[fetchAndStoreConversation] Error updating quality analysis for reply to quote cast ${hash}:`, error.message);
+                  }
+                });
+              }
             }
           } catch (error: any) {
             console.error(`[fetchAndStoreConversation] Error fetching replies for quote cast ${quoteCast.hash}:`, error);
