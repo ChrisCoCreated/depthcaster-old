@@ -1,4 +1,15 @@
+"use client";
+
+import { useNeynarContext } from "@neynar/react";
+
+const ADMIN_FID = 5701;
+
 export default function WhyPage() {
+  const { user } = useNeynarContext();
+  const farcasterDmLink = user?.fid 
+    ? `https://farcaster.xyz/~/inbox/${user.fid}-${ADMIN_FID}`
+    : `https://farcaster.xyz/~/inbox/${ADMIN_FID}`;
+
   return (
     <div className="min-h-screen">
       <main className="max-w-4xl mx-auto px-4 py-8">
@@ -57,9 +68,17 @@ export default function WhyPage() {
             <p className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
               We're moving into private beta.
             </p>
-            <p className="text-gray-700 dark:text-gray-300">
+            <p className="text-gray-700 dark:text-gray-300 mb-4">
               If you'd like to join, you're welcome to tell us why.
             </p>
+            <a
+              href={farcasterDmLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block px-6 py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
+            >
+              DM ChrisCoCreated
+            </a>
           </div>
         </div>
       </main>
