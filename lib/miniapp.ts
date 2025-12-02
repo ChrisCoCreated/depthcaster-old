@@ -50,14 +50,14 @@ export async function sendMiniappNotification(
   try {
     // Use Neynar's publishFrameNotifications API
     // Neynar automatically filters out disabled tokens and handles rate limits
-    const response = await neynarClient.publishFrameNotifications({
-      targetFids,
-      notification: {
-        title,
-        body: body.length > 200 ? body.substring(0, 200) + "..." : body,
-        targetUrl: notificationUrl,
-      },
-    });
+      const response = await neynarClient.publishFrameNotifications({
+        targetFids,
+        notification: {
+          title,
+          body: body.length > 200 ? body.substring(0, 200) + "..." : body,
+          target_url: notificationUrl,
+        },
+      });
 
     console.log(`[Miniapp] Sent notification to ${targetFids.length} users via Neynar`);
     

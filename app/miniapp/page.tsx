@@ -17,7 +17,7 @@ interface FeedItem {
 }
 
 function MiniappContent() {
-  const { isSDKLoaded, context, actions } = useMiniApp();
+  const { isSDKLoaded, context, actions, added, notificationDetails } = useMiniApp();
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,10 +27,10 @@ function MiniappContent() {
 
   useEffect(() => {
     // Check if miniapp is already installed
-    if (context?.added) {
+    if (added) {
       setInstalled(true);
     }
-  }, [context]);
+  }, [added]);
 
   useEffect(() => {
     // Call ready() when SDK is loaded to signal miniapp is ready
@@ -68,7 +68,9 @@ function MiniappContent() {
 
     try {
       const result = await actions.addFrame();
-      if (result.added) {
+      // If we get a result (no error thrown), the miniapp was added
+      // The 'added' state is managed by the hook and will update automatically
+      if (result?.notificationDetails) {
         setInstalled(true);
         // Track installation on server
         if (context?.user?.fid) {
