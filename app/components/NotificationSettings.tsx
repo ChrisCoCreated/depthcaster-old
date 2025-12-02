@@ -52,7 +52,7 @@ export function NotificationSettings() {
   const [saving, setSaving] = useState(false);
   const [hasPlus, setHasPlus] = useState(false);
   const [isCheckingPlus, setIsCheckingPlus] = useState(true);
-  const { isSupported, isGranted, isDenied, requestPermission } = useNotificationPermission();
+  const { isSupported, isGranted, isDenied, requestPermission, isServiceWorkerSupported } = useNotificationPermission();
 
   useEffect(() => {
     // Load preferences from localStorage (for Neynar notification types)
@@ -173,11 +173,12 @@ export function NotificationSettings() {
         setDeviceNotificationsEnabled(true);
         localStorage.setItem("deviceNotificationsEnabled", "true");
       } else {
-        // Permission denied, don't enable
+        // Permission denied or not granted, don't enable
         setDeviceNotificationsEnabled(false);
         localStorage.setItem("deviceNotificationsEnabled", "false");
       }
     } else {
+      // Always allow toggling off, even if permission is denied
       setDeviceNotificationsEnabled(false);
       localStorage.setItem("deviceNotificationsEnabled", "false");
     }
@@ -194,6 +195,7 @@ export function NotificationSettings() {
       </h2>
       
       {/* Device Notifications Toggle */}
+      {/* Note: This setting only controls OS-level device notifications, not what appears in the notification panel */}
       {isSupported && (
         <div className="mb-6 p-4 border border-gray-200 dark:border-gray-800 rounded-lg bg-gray-50 dark:bg-gray-900">
           <label className="flex items-center justify-between cursor-pointer">
@@ -205,18 +207,20 @@ export function NotificationSettings() {
                 </span>
               </div>
               <p className="text-xs text-gray-600 dark:text-gray-400">
-                {isGranted
-                  ? "Receive notifications on your device when you're not using the app"
+                {!isServiceWorkerSupported
+                  ? "Service worker not available. Notifications will work once service worker is ready."
+                  : isGranted
+                  ? "Receive OS-level notifications on your device when you're not using the app. This does not affect what appears in the notification panel."
                   : isDenied
-                  ? "Permission denied. Please enable notifications in your browser settings."
-                  : "Enable to receive notifications on your device"}
+                  ? "Permission denied. You can still toggle this setting off. To enable, allow notifications in your browser settings."
+                  : "Enable to receive OS-level notifications on your device. This only controls system notifications, not the notification panel."}
               </p>
             </div>
             <input
               type="checkbox"
-              checked={deviceNotificationsEnabled && isGranted}
+              checked={deviceNotificationsEnabled}
               onChange={(e) => handleDeviceNotificationsToggle(e.target.checked)}
-              disabled={isDenied}
+              disabled={isDenied && !deviceNotificationsEnabled}
               className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 disabled:opacity-50"
             />
           </label>

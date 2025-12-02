@@ -11,8 +11,9 @@ export function useNotificationPermission() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // Check if notifications are supported
-    const supported = "Notification" in window && "serviceWorker" in navigator;
+    // Check if notifications are supported (only need Notification API, not service worker)
+    // Service worker is needed for actually showing notifications, but not for the toggle itself
+    const supported = "Notification" in window;
     setIsSupported(supported);
 
     if (supported) {
@@ -71,6 +72,8 @@ export function useNotificationPermission() {
     isGranted: permission === "granted",
     isDenied: permission === "denied",
     requestPermission,
+    // Helper to check if service worker is available (needed for actually showing notifications)
+    isServiceWorkerSupported: typeof navigator !== "undefined" && "serviceWorker" in navigator,
   };
 }
 

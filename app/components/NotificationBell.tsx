@@ -273,14 +273,17 @@ export function NotificationBell() {
           const unread = data.unreadCount || 0;
           
           // Check if device notifications are enabled
+          // NOTE: deviceNotificationsEnabled only controls OS-level device notifications,
+          // NOT what appears in the notification panel. The panel always shows all unread notifications.
           const deviceNotificationsEnabled = localStorage.getItem("deviceNotificationsEnabled") === "true";
           
-          // Trigger device notifications if:
-          // 1. Device notifications are enabled
-          // 2. Permission is granted
-          // 3. New unread notifications appeared
+          // Trigger OS-level device notifications if:
+          // 1. Device notifications are enabled (user preference)
+          // 2. Permission is granted (browser permission)
+          // 3. New unread notifications appeared (count increased)
           // Note: We can't show device notifications from count endpoint,
           // but we can trigger a full fetch if count increased
+          // This only affects OS notifications, not the notification panel display
           if (deviceNotificationsEnabled && isGranted && unread > previousUnreadCountRef.current) {
             // Fetch full notifications to show device notifications
             const types = getNotificationPreferences();
