@@ -12,6 +12,10 @@ export default function AdminNotificationsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [isSendingDailyTest, setIsSendingDailyTest] = useState(false);
+  const [isSendingWeeklyTest, setIsSendingWeeklyTest] = useState(false);
+  const [dailyTestResult, setDailyTestResult] = useState<string | null>(null);
+  const [weeklyTestResult, setWeeklyTestResult] = useState<string | null>(null);
 
   // Form state
   const [title, setTitle] = useState("");
@@ -132,6 +136,68 @@ export default function AdminNotificationsPage() {
     }
   };
 
+  const sendDailyStatsTest = async () => {
+    if (!user?.fid) return;
+
+    setIsSendingDailyTest(true);
+    setDailyTestResult(null);
+
+    try {
+      const response = await fetch("/api/admin/statistics/send-test", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ fid: user.fid }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setDailyTestResult(
+          `Test notification sent! ${data.pushNotificationsSent} push notifications sent to ${data.usersNotified} admin(s).`
+        );
+      } else {
+        setDailyTestResult(`Error: ${data.error || "Failed to send test notification"}`);
+      }
+    } catch (error: any) {
+      setDailyTestResult(`Error: ${error.message || "Failed to send test notification"}`);
+    } finally {
+      setIsSendingDailyTest(false);
+    }
+  };
+
+  const sendWeeklyContributorsTest = async () => {
+    if (!user?.fid) return;
+
+    setIsSendingWeeklyTest(true);
+    setWeeklyTestResult(null);
+
+    try {
+      const response = await fetch("/api/curators/weekly-contributors/send-test", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ fid: user.fid }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setWeeklyTestResult(
+          `Test notification sent! ${data.pushNotificationsSent} push notifications sent to ${data.usersNotified} admin(s).`
+        );
+      } else {
+        setWeeklyTestResult(`Error: ${data.error || "Failed to send test notification"}`);
+      }
+    } catch (error: any) {
+      setWeeklyTestResult(`Error: ${error.message || "Failed to send test notification"}`);
+    } finally {
+      setIsSendingWeeklyTest(false);
+    }
+  };
+
   if (!user || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -174,6 +240,66 @@ export default function AdminNotificationsPage() {
             {message.text}
           </div>
         )}
+
+        {/* Test Automated Notifications Section */}
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 mb-6">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+            Test Automated Notifications
+          </h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            Send test notifications for automated notification systems. These will be sent to all admins and superadmins.
+          </p>
+          <div className="space-y-4">
+            <div>
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-1">
+                    Daily Stats Notification
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Test the daily statistics notification sent to curators at 6 AM UTC
+                  </p>
+                </div>
+                <button
+                  onClick={sendDailyStatsTest}
+                  disabled={isSendingDailyTest}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                >
+                  {isSendingDailyTest ? "Sending..." : "Send Test"}
+                </button>
+              </div>
+              {dailyTestResult && (
+                <p className={`mt-2 text-sm ${dailyTestResult.startsWith("Error") ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>
+                  {dailyTestResult}
+                </p>
+              )}
+            </div>
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-1">
+                    Weekly Contributors Notification
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Test the weekly contributors notification sent to curators on Mondays at 12 PM UTC
+                  </p>
+                </div>
+                <button
+                  onClick={sendWeeklyContributorsTest}
+                  disabled={isSendingWeeklyTest}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                >
+                  {isSendingWeeklyTest ? "Sending..." : "Send Test"}
+                </button>
+              </div>
+              {weeklyTestResult && (
+                <p className={`mt-2 text-sm ${weeklyTestResult.startsWith("Error") ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>
+                  {weeklyTestResult}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
 
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
