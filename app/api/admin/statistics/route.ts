@@ -230,13 +230,18 @@ export async function GET(request: NextRequest) {
       .select({
         feedType: feedViewSessions.feedType,
         totalSessions: sql<number>`count(*)::int`,
-        totalDuration: sql<number>`COALESCE(sum(duration_seconds), 0)::int`,
-        avgDuration: sql<number>`CASE WHEN count(*) > 0 THEN ROUND(avg(duration_seconds))::int ELSE 0 END`,
+        totalDuration: sql<number>`COALESCE(sum(duration_seconds), 0)::bigint`,
+        avgDuration: sql<number | null>`ROUND(COALESCE(avg(duration_seconds), 0))::bigint`,
         uniqueUsers: sql<number>`count(distinct user_fid)::int`,
       })
       .from(feedViewSessions)
       .where(timeFilter ? sql`created_at >= ${timeFilter.toISOString()}` : sql`1=1`)
-      .groupBy(feedViewSessions.feedType);
+      .groupBy(feedViewSessions.feedType)
+      .then((results) => results.map((r) => ({
+        ...r,
+        totalDuration: typeof r.totalDuration === 'string' ? parseInt(r.totalDuration) : r.totalDuration,
+        avgDuration: r.avgDuration ? (typeof r.avgDuration === 'string' ? parseInt(r.avgDuration) : r.avgDuration) : 0,
+      })));
 
     const castViewStats = await db
       .select({
@@ -411,7 +416,7 @@ export async function GET(request: NextRequest) {
           feedType: f.feedType,
           totalSessions: f.totalSessions,
           totalDurationSeconds: f.totalDuration,
-          avgDurationSeconds: f.avgDuration,
+          avgDurationSeconds: f.avgDuration || 0,
           uniqueUsers: f.uniqueUsers,
         })),
         castViews: castViewStats.map((c) => ({
@@ -449,10 +454,12 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error: unknown) {
-    const err = error as { message?: string };
-    console.error("Statistics API error:", err.message || err);
+    const err = error as { message?: string; cause?: any };
+    const errorMessage = err.message || String(err);
+    const errorDetails = err.cause ? ` Cause: ${err.cause}` : '';
+    console.error("Statistics API error:", errorMessage, errorDetails, error);
     return NextResponse.json(
-      { error: err.message || "Failed to fetch statistics" },
+      { error: `Failed query: ${errorMessage}${errorDetails}` },
       { status: 500 }
     );
   }
