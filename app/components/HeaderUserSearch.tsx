@@ -249,7 +249,7 @@ export function HeaderUserSearch() {
 
       {/* Dropdown Results */}
       {isExpanded && showDropdown && searchResults.length > 0 && (
-        <div className="absolute z-[250] w-48 sm:w-64 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl max-h-80 overflow-y-auto transition-all duration-200 ease-out opacity-100 translate-y-0">
+        <div className="absolute z-[9998] w-48 sm:w-64 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl max-h-80 overflow-y-auto transition-all duration-200 ease-out opacity-100 translate-y-0">
           {searchResults.map((resultUser, index) => (
             <button
               key={resultUser.fid}

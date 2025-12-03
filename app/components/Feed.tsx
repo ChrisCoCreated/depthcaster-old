@@ -10,6 +10,7 @@ import { shouldHideCast, getFeedPreferences, FeedSettingsInline, CuratorFilterIn
 import { AvatarImage } from "./AvatarImage";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { saveFeedState, getFeedState, isStateStale, throttle } from "@/lib/feedState";
+import { getPreviousNavigation } from "@/lib/navigationHistory";
 import { NeynarAuthButton } from "@neynar/react";
 import { analytics } from "@/lib/analytics";
 import { useActivityMonitor } from "@/lib/hooks/useActivityMonitor";
@@ -639,52 +640,29 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
     };
   }, [feedType, my37PackId, my37HasUsers, fetchFeed]);
 
-  // Reset restoration refs and restore casts when pathname changes to home page
-  // Use sessionStorage to persist pathname across remounts
-  const getPrevPathname = () => {
-    if (typeof window === "undefined") return null;
-    try {
-      return sessionStorage.getItem("feedPrevPathname");
-    } catch {
-      return null;
-    }
-  };
-  
-  const setPrevPathname = (pathname: string | null) => {
-    if (typeof window === "undefined") return;
-    try {
-      if (pathname) {
-        sessionStorage.setItem("feedPrevPathname", pathname);
-      } else {
-        sessionStorage.removeItem("feedPrevPathname");
-      }
-    } catch {}
-  };
-  
-  const prevPathnameRef = useRef<string | null>(getPrevPathname());
-  
+  // Early restoration effect - runs before fetch logic to restore casts when returning to home
   useEffect(() => {
-    const prevPathname = prevPathnameRef.current || getPrevPathname();
+    // Only attempt restoration if we're on home page
+    if (pathname !== "/") {
+      return;
+    }
     
-    console.log("[Feed] Pathname effect running", {
-      prevPathname,
-      currentPathname: pathname,
-      willCheckRestoration: prevPathname !== null && prevPathname !== "/" && pathname === "/",
+    // Check if we're returning to home using NavigationHistory
+    // previousNav.pathname is the page we came FROM (not the page we're going to)
+    const previousNav = getPreviousNavigation();
+    const isReturningToHome = previousNav !== null && previousNav.pathname !== "/";
+    
+    console.log("[Feed] Early restoration check", {
+      pathname,
+      previousNav,
+      isReturningToHome,
       castsRestored: castsRestoredRef.current,
+      loading,
+      castsLength: casts.length,
     });
     
-    // If pathname changed to "/" (returning to home), try to restore immediately
-    if (prevPathname !== null && prevPathname !== "/" && pathname === "/") {
-      console.log("[Feed] Pathname changed to home page, attempting restoration", {
-        prevPathname: prevPathnameRef.current,
-        currentPathname: pathname,
-        feedType,
-        loading,
-        castsLength: casts.length,
-        castsRestored: castsRestoredRef.current,
-        scrollRestored: scrollRestoredRef.current,
-      });
-      
+    // If we're returning to home and haven't restored yet, try to restore
+    if (isReturningToHome && !castsRestoredRef.current) {
       castsRestoredRef.current = false;
       scrollRestoredRef.current = false;
       
@@ -762,10 +740,6 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
         console.log("[Feed] Skipping restoration - feed type or sort changed");
       }
     }
-    
-    // Update ref and sessionStorage
-    prevPathnameRef.current = pathname;
-    setPrevPathname(pathname);
   }, [pathname, feedType, sortBy, fetchFeed]);
 
   // Separate effect for feed type changes and other dependencies
@@ -779,7 +753,12 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
     const curatorFidsChanged = JSON.stringify(prevFidsSorted) !== JSON.stringify(currentFidsSorted);
     const categoryChanged = prevSelectedCategoryRef.current !== selectedCategory;
     const qualityScoreChanged = prevMinQualityScoreRef.current !== minQualityScore;
-    const isInitialMount = !hasInitialFetchRef.current;
+    
+    // Check if we're returning to home (not a true initial mount)
+    // previousNav.pathname is the page we came FROM (not the page we're going to)
+    const previousNav = getPreviousNavigation();
+    const isReturningToHome = pathname === "/" && previousNav !== null && previousNav.pathname !== "/";
+    const isInitialMount = !hasInitialFetchRef.current && !isReturningToHome;
     // Check if we need to fetch based on what we last fetched, not what we last saw
     const needsFetch = lastFetchedFeedTypeRef.current !== feedType || 
                       (sortByChanged && feedType === "curated" && !isInitialMount) ||
@@ -867,9 +846,10 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       // Check if feed type actually changed by comparing with lastFetchedFeedTypeRef
       const actualFeedTypeChanged = lastFetchedFeedTypeRef.current !== feedType && lastFetchedFeedTypeRef.current !== "";
       
-      // Check if we're returning to home page (pathname just changed to "/")
-      const prevPathnameForFetch = prevPathnameRef.current || getPrevPathname();
-      const isReturningToHome = pathname === "/" && prevPathnameForFetch !== null && prevPathnameForFetch !== "/";
+    // Check if we're returning to home page using NavigationHistory
+    // previousNav.pathname is the page we came FROM (not the page we're going to)
+    const previousNavForFetch = getPreviousNavigation();
+    const isReturningToHome = pathname === "/" && previousNavForFetch !== null && previousNavForFetch.pathname !== "/";
       
       const condition1 = isInitialMount && !isReturningToHome; // Don't treat return as initial mount
       const condition2 = feedTypeChanged || actualFeedTypeChanged;
@@ -903,7 +883,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
         shouldFetch,
         castsLength: casts.length,
         loading,
-        prevPathname: prevPathnameForFetch,
+        prevPathname: previousNavForFetch?.pathname || null,
         currentPathname: pathname,
       });
       
