@@ -25,9 +25,11 @@ function MiniappContent() {
   const { isSDKLoaded, context, actions, added, notificationDetails } = useMiniApp();
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [installed, setInstalled] = useState(false);
-  const [checkingInstall, setCheckingInstall] = useState(true);
+  const [checkingInstall, setCheckingInstall] = useState(false); // Start as false, don't block
   const [showInstallMessage, setShowInstallMessage] = useState(false);
   const [isPasting, setIsPasting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "error" | "success" } | null>(null);
@@ -45,9 +47,10 @@ function MiniappContent() {
   }, [added]);
 
   useEffect(() => {
-    // Check if user has miniapp installed in database
+    // Check if user has miniapp installed in database (non-blocking)
     const checkInstallation = async () => {
       if (context?.user?.fid) {
+        setCheckingInstall(true);
         try {
           const response = await fetch(`/api/miniapp/check?fid=${context.user.fid}`);
           if (response.ok) {
@@ -58,15 +61,15 @@ function MiniappContent() {
           }
         } catch (err) {
           console.error("Error checking installation:", err);
+        } finally {
+          setCheckingInstall(false);
         }
       }
-      setCheckingInstall(false);
     };
 
+    // Don't block on SDK load - check in background
     if (isSDKLoaded && context?.user?.fid) {
       checkInstallation();
-    } else if (!isSDKLoaded) {
-      setCheckingInstall(false);
     }
   }, [isSDKLoaded, context?.user?.fid]);
 
@@ -79,9 +82,21 @@ function MiniappContent() {
     }
   }, [isSDKLoaded, actions]);
 
+  // Fetch initial feed immediately on mount (don't wait for anything)
   useEffect(() => {
-    fetchFeed();
+    fetchFeed(3); // Load only 3 items initially
   }, []);
+
+  // Lazy load remaining items after initial render
+  useEffect(() => {
+    if (!loading && feedItems.length > 0 && hasMore && feedItems.length < 30) {
+      // Load remaining items after a short delay to ensure initial render is complete
+      const timer = setTimeout(() => {
+        loadMoreItems();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [loading, feedItems.length, hasMore]);
 
   useEffect(() => {
     if (toast) {
@@ -230,9 +245,9 @@ function MiniappContent() {
       setShowCurateConfirm(false);
       setPendingCastData(null);
 
-      // Refresh the feed after a short delay
+      // Refresh the feed after a short delay (load all 30 items)
       setTimeout(() => {
-        fetchFeed();
+        fetchFeed(30);
       }, 1000);
     } catch (error: any) {
       console.error("Curate error:", error);
@@ -242,21 +257,45 @@ function MiniappContent() {
     }
   };
 
-  const fetchFeed = async () => {
+  const fetchFeed = async (limit: number = 3) => {
     try {
       setLoading(true);
-      const response = await fetch("/api/miniapp/feed?limit=30");
+      const response = await fetch(`/api/miniapp/feed?limit=${limit}`);
       if (!response.ok) {
         throw new Error("Failed to fetch feed");
       }
       const data = await response.json();
       setFeedItems(data.items || []);
+      setHasMore((data.items || []).length >= limit && limit < 30);
       setError(null);
     } catch (err) {
       console.error("Error fetching feed:", err);
       setError("Failed to load feed");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMoreItems = async () => {
+    if (loadingMore || !hasMore || feedItems.length >= 30) return;
+
+    try {
+      setLoadingMore(true);
+      const response = await fetch(`/api/miniapp/feed?limit=30`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch more items");
+      }
+      const data = await response.json();
+      const newItems = data.items || [];
+      // Only add items we don't already have
+      const existingHashes = new Set(feedItems.map(item => item.castHash));
+      const itemsToAdd = newItems.filter((item: FeedItem) => !existingHashes.has(item.castHash));
+      setFeedItems(prev => [...prev, ...itemsToAdd]);
+      setHasMore(itemsToAdd.length > 0 && feedItems.length + itemsToAdd.length < 30);
+    } catch (err) {
+      console.error("Error loading more items:", err);
+    } finally {
+      setLoadingMore(false);
     }
   };
 
