@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useNeynarContext } from "@neynar/react";
 import Link from "next/link";
+import Image from "next/image";
 import { FeedbackModal } from "../components/FeedbackModal";
 
 export const dynamic = 'force-dynamic';
@@ -154,7 +155,29 @@ export default function CuratorsPage() {
                       <li>Add the <a href="https://farcaster.xyz/miniapps/HtUwgAw4iQ2x/depthcaster" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">Depthcaster Mini-App</a> to Farcaster</li>
                       <li>Open the Depthcaster Mini-App in Farcaster</li>
                       <li>Click the <strong>paste button</strong> (clipboard icon) in the top right of the mini-app</li>
+                    </ol>
+                    <div className="mt-3 mb-3">
+                      <Image 
+                        src="/images/instructions/paste_mini-app.png" 
+                        alt="Paste button in Depthcaster Mini-App" 
+                        width={600} 
+                        height={400}
+                        className="rounded-lg border border-gray-200 dark:border-gray-700"
+                      />
+                    </div>
+                    <ol className="list-decimal list-inside text-gray-700 dark:text-gray-300 space-y-1 ml-4" start={4}>
                       <li>Alternatively, click the <strong>share button</strong> on any cast and select <strong>Depthcaster</strong> from the share menu</li>
+                    </ol>
+                    <div className="mt-3 mb-3">
+                      <Image 
+                        src="/images/instructions/share_extentesnion.png" 
+                        alt="Share menu with Depthcaster option" 
+                        width={600} 
+                        height={400}
+                        className="rounded-lg border border-gray-200 dark:border-gray-700"
+                      />
+                    </div>
+                    <ol className="list-decimal list-inside text-gray-700 dark:text-gray-300 space-y-1 ml-4" start={5}>
                       <li>The cast will be automatically curated</li>
                     </ol>
                     <p className="text-gray-600 dark:text-gray-400 text-sm mt-2">
