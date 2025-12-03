@@ -102,6 +102,11 @@ export function Header() {
   // Set mounted flag for portal rendering
   useEffect(() => {
     setMounted(true);
+    return () => {
+      // Cleanup: ensure portals are closed on unmount
+      setIsPfpDropdownOpen(false);
+      setIsHelpDropdownOpen(false);
+    };
   }, []);
 
   // Update browser tab title and favicon based on environment
@@ -281,7 +286,15 @@ export function Header() {
 
   // Close PFP dropdown when clicking outside
   useEffect(() => {
+    if (!isPfpDropdownOpen) return;
+
     const handleClickOutside = (event: MouseEvent) => {
+      // Safety check: ensure document.body still exists
+      if (typeof document === "undefined" || !document.body) {
+        setIsPfpDropdownOpen(false);
+        return;
+      }
+
       if (
         pfpDropdownRef.current &&
         !pfpDropdownRef.current.contains(event.target as Node) &&
@@ -292,9 +305,7 @@ export function Header() {
       }
     };
 
-    if (isPfpDropdownOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
+    document.addEventListener("mousedown", handleClickOutside);
 
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
@@ -303,7 +314,15 @@ export function Header() {
 
   // Close help dropdown when clicking outside
   useEffect(() => {
+    if (!isHelpDropdownOpen) return;
+
     const handleClickOutside = (event: MouseEvent) => {
+      // Safety check: ensure document.body still exists
+      if (typeof document === "undefined" || !document.body) {
+        setIsHelpDropdownOpen(false);
+        return;
+      }
+
       if (
         helpDropdownRef.current &&
         !helpDropdownRef.current.contains(event.target as Node) &&
@@ -314,9 +333,7 @@ export function Header() {
       }
     };
 
-    if (isHelpDropdownOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
+    document.addEventListener("mousedown", handleClickOutside);
 
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);

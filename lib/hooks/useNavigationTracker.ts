@@ -67,12 +67,19 @@ export function useNavigationTracker() {
       // Set the previous pathname for back button functionality
       setPreviousPathname(previousPathnameRef.current);
 
-      // Check if we have a saved scroll position for the page we're navigating to
-      const savedScrollY = getScrollPosition(pathname);
-
       // Update ref
       previousPathnameRef.current = pathname;
       scrollRestoredRef.current = false;
+
+      // Skip scroll restoration on home page - let Feed component handle it
+      if (pathname === "/") {
+        // Don't restore scroll or scroll to top - Feed will handle restoration
+        scrollRestoredRef.current = true;
+        return;
+      }
+
+      // Check if we have a saved scroll position for the page we're navigating to
+      const savedScrollY = getScrollPosition(pathname);
 
       if (savedScrollY !== null && savedScrollY > 0) {
         // Restore scroll position after page renders

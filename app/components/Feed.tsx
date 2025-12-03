@@ -639,6 +639,17 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
     };
   }, [feedType, my37PackId, my37HasUsers, fetchFeed]);
 
+  // Reset restoration refs when pathname changes to home page (allows restoration when navigating back)
+  const prevPathnameRef = useRef<string | null>(null);
+  useEffect(() => {
+    // If pathname changed to "/" (returning to home), reset restoration refs
+    if (prevPathnameRef.current !== null && prevPathnameRef.current !== "/" && pathname === "/") {
+      castsRestoredRef.current = false;
+      scrollRestoredRef.current = false;
+    }
+    prevPathnameRef.current = pathname;
+  }, [pathname]);
+
   // Restore casts from saved state when returning to feed (before fetching)
   useEffect(() => {
     // Only restore if we're on the home page and haven't restored casts yet
