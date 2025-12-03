@@ -40,11 +40,35 @@ export function buildMiniappNotificationPayload(
   const notificationUrl = targetUrl || appUrl;
   const targetFidsArray = Array.isArray(targetFids) ? targetFids : [];
   
+  // Validate inputs
+  if (!title || title.trim().length === 0) {
+    throw new Error("Notification title cannot be empty");
+  }
+  if (!body || body.trim().length === 0) {
+    throw new Error("Notification body cannot be empty");
+  }
+  if (!notificationUrl || typeof notificationUrl !== "string") {
+    throw new Error("Notification target_url must be a valid URL string");
+  }
+  
+  // Validate URL format
+  try {
+    new URL(notificationUrl);
+  } catch (e) {
+    throw new Error(`Invalid target_url format: ${notificationUrl}`);
+  }
+  
+  // Truncate title to 32 characters (Neynar limit)
+  const truncatedTitle = title.trim().length > 32 ? title.trim().substring(0, 32) + "..." : title.trim();
+  
+  // Truncate body to 128 characters (Neynar limit)
+  const truncatedBody = body.trim().length > 128 ? body.trim().substring(0, 128) + "..." : body.trim();
+  
   return {
     target_fids: targetFidsArray,
     notification: {
-      title,
-      body: body.length > 200 ? body.substring(0, 200) + "..." : body,
+      title: truncatedTitle,
+      body: truncatedBody,
       target_url: notificationUrl,
     },
   };
@@ -98,13 +122,18 @@ export async function sendMiniappNotification(
     console.error("[Miniapp] Error sending notification:", error);
     // Log more details about the error for debugging
     if (error.response) {
-      console.error("[Miniapp] Error response:", JSON.stringify(error.response.data, null, 2));
-      console.error("[Miniapp] Error status:", error.response.status);
+      console.error("[Miniapp] Error response status:", error.response.status);
+      console.error("[Miniapp] Error response data:", JSON.stringify(error.response.data, null, 2));
       if (error.response.data?.errors) {
         error.response.data.errors.forEach((err: any) => {
           console.error(`[Miniapp] Validation error - path: ${JSON.stringify(err.path)}, message: ${err.message}, expected: ${err.expected}, received: ${err.received}`);
         });
       }
+      if (error.response.data?.message) {
+        console.error("[Miniapp] Error message:", error.response.data.message);
+      }
+    } else if (error.message) {
+      console.error("[Miniapp] Error message:", error.message);
     }
     // Re-throw the error so calling code can handle it properly
     throw error;
@@ -143,17 +172,19 @@ export async function notifyAllMiniappUsersAboutNewCuratedCast(
   castHash: string,
   castData: any
 ): Promise<{ sent: number; errors: number }> {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://depthcaster.com";
-  const targetUrl = `${appUrl}/`;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://depthcaster.vercel.app";
+  // Use miniapp URL to direct users to the feed
+  const targetUrl = `${appUrl}/miniapp`;
 
-  // Extract cast preview text
-  const castText = castData?.text || "";
-  const previewText = castText.length > 150 ? castText.substring(0, 150) + "..." : castText;
+  // Extract cast preview text (truncate to 128 chars to match notification body limit)
+  const castText = (castData?.text || "").trim();
+  const previewText = castText.length > 128 ? castText.substring(0, 128) + "..." : castText;
   
   // Extract author name
   const authorName = castData?.author?.display_name || castData?.author?.username || "Someone";
 
   const title = "New curated cast";
+  // Ensure body always has content - use preview text if available, otherwise fallback
   const body = previewText || `${authorName} curated a cast`;
 
   // Pass empty array to send to all users with notifications enabled for the app
