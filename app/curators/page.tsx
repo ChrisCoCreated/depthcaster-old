@@ -203,6 +203,11 @@ export default function CuratorsPage() {
                   resonates with multiple curators. When you curate a cast that&apos;s already been curated 
                   by others, it helps validate the quality of the content.
                 </p>
+                <p className="text-gray-700 dark:text-gray-300 mb-2">
+                  <strong>Tip:</strong> Curating casts that have already been curated by others is encouraged! 
+                  This helps the cast appear in your own curated feed and increases the signal for other users, 
+                  making it more likely to be seen and engaged with.
+                </p>
               </div>
 
               <div>
@@ -285,6 +290,20 @@ export default function CuratorsPage() {
                   <p className="text-gray-700 dark:text-gray-300 text-sm">
                     Try to curate regularly to keep the feed fresh and active. Even a few curations per week 
                     can make a big difference.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <span className="text-2xl">✍️</span>
+                <div>
+                  <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">
+                    Curate Your Own Deep Casts
+                  </h4>
+                  <p className="text-gray-700 dark:text-gray-300 text-sm">
+                    Don&apos;t hesitate to curate your own thoughtful casts! If you&apos;ve written something 
+                    meaningful, philosophical, or that sparks deep conversation, curating it helps others discover 
+                    your work and contributes to the quality of the feed.
                   </p>
                 </div>
               </div>
