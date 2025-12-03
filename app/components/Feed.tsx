@@ -661,8 +661,14 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       castsLength: casts.length,
     });
     
+    // Only attempt restoration if we're actually returning to home (not initial mount)
+    if (!isReturningToHome) {
+      // Not returning, so don't interfere with normal loading
+      return;
+    }
+    
     // If we're returning to home and haven't restored yet, try to restore
-    if (isReturningToHome && !castsRestoredRef.current) {
+    if (!castsRestoredRef.current) {
       castsRestoredRef.current = false;
       scrollRestoredRef.current = false;
       
@@ -733,11 +739,12 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
             fetchFeed().catch(console.error);
           }
         } else {
-          console.log("[Feed] No saved state to restore");
-          castsRestoredRef.current = true; // Mark as checked even if no saved state
+          console.log("[Feed] No saved state to restore - will allow normal fetch");
+          // Don't set castsRestoredRef to true here - let normal fetch logic run
         }
       } else {
         console.log("[Feed] Skipping restoration - feed type or sort changed");
+        // Don't set castsRestoredRef to true here - let normal fetch logic run
       }
     }
   }, [pathname, feedType, sortBy, fetchFeed]);
@@ -851,17 +858,19 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
     const previousNavForFetch = getPreviousNavigation();
     const isReturningToHome = pathname === "/" && previousNavForFetch !== null && previousNavForFetch.pathname !== "/";
       
-      const condition1 = isInitialMount && !isReturningToHome; // Don't treat return as initial mount
+      // Always fetch on true initial mount (never fetched before, not returning)
+      const trueInitialMount = !hasInitialFetchRef.current && !isReturningToHome;
+      const condition1 = trueInitialMount; // Always fetch on true initial mount
       const condition2 = feedTypeChanged || actualFeedTypeChanged;
-      const condition3 = (sortByChanged && feedType === "curated" && !isInitialMount);
-      const condition4 = (curatorFidsChanged && feedType === "curated" && !isInitialMount);
-      const condition5 = (categoryChanged && feedType === "curated" && !isInitialMount);
-      const condition6 = (qualityScoreChanged && feedType === "curated" && !isInitialMount);
-      const condition7 = (lastFetchedFeedTypeRef.current !== feedType && !fetchingRef.current);
+      const condition3 = (sortByChanged && feedType === "curated" && hasInitialFetchRef.current);
+      const condition4 = (curatorFidsChanged && feedType === "curated" && hasInitialFetchRef.current);
+      const condition5 = (categoryChanged && feedType === "curated" && hasInitialFetchRef.current);
+      const condition6 = (qualityScoreChanged && feedType === "curated" && hasInitialFetchRef.current);
+      const condition7 = (lastFetchedFeedTypeRef.current !== feedType && !fetchingRef.current && hasInitialFetchRef.current);
       const fetchCondition = condition1 || condition2 || condition3 || condition4 || condition5 || condition6 || condition7;
       // Only skip if we have restored casts AND state is not stale AND feed type hasn't actually changed
-      // OR if we're returning to home (give restoration a chance)
-      const skipCondition = (hasRestoredCasts && !isStateStaleResult && !actualFeedTypeChanged && !curatorFidsChanged && !categoryChanged && !qualityScoreChanged) || isReturningToHome;
+      // Don't skip on true initial mount - always fetch
+      const skipCondition = !trueInitialMount && hasRestoredCasts && !isStateStaleResult && !actualFeedTypeChanged && !curatorFidsChanged && !categoryChanged && !qualityScoreChanged;
       const shouldFetch = fetchCondition && !skipCondition;
       
       console.log("[Feed] Fetch decision", {
