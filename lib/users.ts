@@ -3,6 +3,7 @@ import { users } from "./schema";
 import { eq, inArray } from "drizzle-orm";
 import { neynarClient } from "./neynar";
 import { cacheUser } from "./cache";
+import { retryWithBackoff } from "./retry";
 
 export async function upsertUser(fid: number, userData?: { username?: string; displayName?: string; pfpUrl?: string }, signerUuid?: string) {
   // Try to fetch user data from Neynar if not provided
@@ -189,8 +190,10 @@ export async function upsertBulkUsers(
 }
 
 export async function getUser(fid: number) {
-  const [user] = await db.select().from(users).where(eq(users.fid, fid)).limit(1);
-  return user;
+  return await retryWithBackoff(async () => {
+    const [user] = await db.select().from(users).where(eq(users.fid, fid)).limit(1);
+    return user;
+  });
 }
 
 export async function updateUserPreferences(fid: number, preferences: Record<string, any>) {

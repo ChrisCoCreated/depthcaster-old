@@ -6,6 +6,7 @@ import { getUser } from "./users";
 import { cacheNotificationCount } from "./cache";
 import { getAllAdminFids } from "./roles";
 import { sendMiniappNotificationToUser } from "./miniapp";
+import { retryWithBackoff } from "./retry";
 
 export interface NotificationPreferences {
   notifyOnQualityReply?: boolean;
@@ -83,17 +84,19 @@ export async function createCuratorNotification(
 ): Promise<void> {
   try {
     // Check for existing notification to prevent duplicates
-    const existing = await db
-      .select()
-      .from(userNotifications)
-      .where(
-        and(
-          eq(userNotifications.userFid, curatorFid),
-          eq(userNotifications.castHash, castHash),
-          eq(userNotifications.type, type)
+    const existing = await retryWithBackoff(async () => {
+      return await db
+        .select()
+        .from(userNotifications)
+        .where(
+          and(
+            eq(userNotifications.userFid, curatorFid),
+            eq(userNotifications.castHash, castHash),
+            eq(userNotifications.type, type)
+          )
         )
-      )
-      .limit(1);
+        .limit(1);
+    });
 
     if (existing.length > 0) {
       console.log(`[Notifications] Notification already exists for curator ${curatorFid}, cast ${castHash}, type ${type}`);
@@ -101,13 +104,15 @@ export async function createCuratorNotification(
     }
 
     // Create notification
-    await db.insert(userNotifications).values({
-      userFid: curatorFid,
-      type,
-      castHash,
-      castData,
-      authorFid,
-      isRead: false,
+    await retryWithBackoff(async () => {
+      await db.insert(userNotifications).values({
+        userFid: curatorFid,
+        type,
+        castHash,
+        castData,
+        authorFid,
+        isRead: false,
+      });
     });
 
     // Invalidate count cache
@@ -511,17 +516,19 @@ async function createFeedbackNotification(
     const notificationCastHash = `feedback-${feedbackId}`;
 
     // Check for existing notification to prevent duplicates
-    const existing = await db
-      .select()
-      .from(userNotifications)
-      .where(
-        and(
-          eq(userNotifications.userFid, adminFid),
-          eq(userNotifications.castHash, notificationCastHash),
-          eq(userNotifications.type, "feedback.new")
+    const existing = await retryWithBackoff(async () => {
+      return await db
+        .select()
+        .from(userNotifications)
+        .where(
+          and(
+            eq(userNotifications.userFid, adminFid),
+            eq(userNotifications.castHash, notificationCastHash),
+            eq(userNotifications.type, "feedback.new")
+          )
         )
-      )
-      .limit(1);
+        .limit(1);
+    });
 
     if (existing.length > 0) {
       console.log(`[Notifications] Feedback notification already exists for admin/superadmin ${adminFid}, feedback ${feedbackId}`);
@@ -541,13 +548,15 @@ async function createFeedbackNotification(
     };
 
     // Create notification
-    await db.insert(userNotifications).values({
-      userFid: adminFid,
-      type: "feedback.new",
-      castHash: notificationCastHash,
-      castData,
-      authorFid: submitterFid,
-      isRead: false,
+    await retryWithBackoff(async () => {
+      await db.insert(userNotifications).values({
+        userFid: adminFid,
+        type: "feedback.new",
+        castHash: notificationCastHash,
+        castData,
+        authorFid: submitterFid,
+        isRead: false,
+      });
     });
 
     // Invalidate count cache
