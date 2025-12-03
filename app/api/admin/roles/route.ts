@@ -262,6 +262,32 @@ export async function POST(request: NextRequest) {
       role: role,
     });
 
+    // Auto-assign plus role when curator role is assigned
+    if (role === "curator") {
+      // Check if user already has plus role
+      const existingPlusRole = await db
+        .select()
+        .from(userRoles)
+        .where(and(eq(userRoles.userFid, userFidNum), eq(userRoles.role, "plus")))
+        .limit(1);
+
+      if (existingPlusRole.length === 0) {
+        // Add plus role
+        try {
+          await db.insert(userRoles).values({
+            userFid: userFidNum,
+            role: "plus",
+          });
+        } catch (error: unknown) {
+          // Ignore if plus role already exists (race condition)
+          const err = error as { message?: string };
+          if (!err.message?.includes("user_role_unique")) {
+            console.error("Failed to auto-assign plus role:", err.message || err);
+          }
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: `Role "${role}" added to user ${userFidNum}`,

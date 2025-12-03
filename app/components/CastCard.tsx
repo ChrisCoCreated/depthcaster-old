@@ -18,6 +18,7 @@ import { AvatarImage } from "./AvatarImage";
 import { analytics } from "@/lib/analytics";
 import { hasActiveProSubscription } from "@/lib/castLimits";
 import { VideoPlayer } from "./VideoPlayer";
+import { CuratorBadge } from "./CuratorBadge";
 
 const CURATED_FEED_COLLAPSE_LINE_LIMIT = 8;
 
@@ -830,6 +831,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
   const { user } = useNeynarContext();
   const router = useRouter();
   const [preferencesVersion, setPreferencesVersion] = useState(0);
+  const [isAuthorCurator, setIsAuthorCurator] = useState(false);
   const [tags, setTags] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showTagMenu, setShowTagMenu] = useState(false);
@@ -1031,6 +1033,25 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
       setRepliesLoaded(true);
     }
   }, [cast._topReplies]);
+
+  // Check if author is curator
+  useEffect(() => {
+    const checkAuthorCuratorStatus = async () => {
+      if (!author?.fid) return;
+      try {
+        const response = await fetch(`/api/admin/check?fid=${author.fid}`);
+        if (response.ok) {
+          const data = await response.json();
+          const roles = data.roles || [];
+          setIsAuthorCurator(roles.includes("curator"));
+        }
+      } catch (error) {
+        console.error("Failed to check curator status:", error);
+      }
+    };
+
+    checkAuthorCuratorStatus();
+  }, [author?.fid]);
 
   // Lazy load replies when cast comes into viewport
   useEffect(() => {
@@ -1982,6 +2003,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                   ⚡
                 </span>
               )}
+              <CuratorBadge userFid={author.fid} viewerFid={user?.fid} isCurator={isAuthorCurator} className="ml-1" />
               <span className="text-gray-400 dark:text-gray-500 text-xs sm:text-sm">
                 · {timeAgo}
               </span>

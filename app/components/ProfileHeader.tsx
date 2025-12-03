@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useNeynarContext } from "@neynar/react";
 import { AvatarImage } from "./AvatarImage";
+import { CuratorBadge } from "./CuratorBadge";
 
 interface ProfileHeaderProps {
   fid: number;
@@ -38,6 +39,7 @@ export function ProfileHeader({
   const [updateLoading, setUpdateLoading] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [updateSuccess, setUpdateSuccess] = useState(false);
+  const [isCurator, setIsCurator] = useState(false);
 
   const isOwnProfile = user?.fid === fid;
 
@@ -47,6 +49,24 @@ export function ProfileHeader({
       checkWatchStatus();
     }
   }, [fid, viewerFid, isOwnProfile]);
+
+  // Check curator status on mount
+  useEffect(() => {
+    const checkCuratorStatus = async () => {
+      try {
+        const response = await fetch(`/api/admin/check?fid=${fid}`);
+        if (response.ok) {
+          const data = await response.json();
+          const roles = data.roles || [];
+          setIsCurator(roles.includes("curator"));
+        }
+      } catch (error) {
+        console.error("Failed to check curator status:", error);
+      }
+    };
+
+    checkCuratorStatus();
+  }, [fid]);
 
   // Update local state when props change
   useEffect(() => {
@@ -212,6 +232,7 @@ export function ProfileHeader({
                     </svg>
                   </span>
                 )}
+                <CuratorBadge userFid={fid} viewerFid={viewerFid} isCurator={isCurator} />
               </div>
               <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-2">
                 <span>@{username || `fid:${fid}`}</span>

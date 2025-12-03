@@ -19,6 +19,7 @@ import {
   ChevronRight,
   Lightbulb,
   FileText,
+  UserPlus,
 } from "lucide-react";
 import { AvatarImage } from "@/app/components/AvatarImage";
 
@@ -33,6 +34,7 @@ const navItems: NavItem[] = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, section: "main" },
   { href: "/admin/statistics", label: "Statistics", icon: BarChart3, section: "analytics" },
   { href: "/admin/roles", label: "User Roles", icon: Users, section: "users" },
+  { href: "/admin/curator-recommendations", label: "Curator Recommendations", icon: UserPlus, section: "users" },
   { href: "/admin/tags", label: "Cast Tags", icon: TagIcon, section: "content" },
   { href: "/admin/curators-leaderboard", label: "Curators Leaderboard", icon: Award, section: "content" },
   { href: "/admin/quality", label: "Quality Filter", icon: Filter, section: "content" },
