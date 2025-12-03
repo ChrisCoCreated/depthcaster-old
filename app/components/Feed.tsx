@@ -595,12 +595,37 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
         setCursor(savedState.cursor);
         setHasMore(!!savedState.cursor);
         setLoading(false);
-        // Reset scroll restoration flag so scroll can be restored after casts render
-        scrollRestoredRef.current = false;
         
         // Update refs to match current state
         prevFeedTypeRef.current = feedType;
         prevSortByRef.current = sortBy;
+        
+        // Trigger scroll restoration directly after casts are restored
+        // Use setTimeout + requestAnimationFrame to ensure DOM is updated
+        if (savedState.scrollY > 0) {
+          console.log("[Feed] Triggering scroll restoration after casts restored", {
+            scrollY: savedState.scrollY,
+          });
+          
+          isRestoringScrollRef.current = true;
+          
+          // Wait for React to update the DOM with the restored casts
+          setTimeout(() => {
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                window.scrollTo({ top: savedState.scrollY, behavior: "auto" });
+                console.log("[Feed] Scroll restored after casts", {
+                  scrollY: savedState.scrollY,
+                  actualScroll: window.scrollY,
+                });
+                isRestoringScrollRef.current = false;
+                scrollRestoredRef.current = true;
+              });
+            });
+          }, 150);
+        } else {
+          scrollRestoredRef.current = true;
+        }
         
         // If state is stale, refresh in background
         if (isStateStale(feedType)) {
