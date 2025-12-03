@@ -7,6 +7,8 @@
       "splashBackgroundColor": "#000000",
       "homeUrl": "https://depthcaster.com",
       "webhookUrl": "https://api.neynar.com/f/app/4f4d94f9-c966-486b-ab8b-d4a33d52e8c2/event",
+      "appUrl": "https://depthcaster.com",
+      "icon": "https://depthcaster.com/icon-192x192.webp",
       "castShareUrl": "https://depthcaster.com/share"
 
     },
