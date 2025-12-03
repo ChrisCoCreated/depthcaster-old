@@ -100,10 +100,18 @@ export function Header() {
   }, [user, checkAdminStatus]);
 
   // Set mounted flag for portal rendering
+  const canRenderPortalsRef = useRef(false);
+  
   useEffect(() => {
     setMounted(true);
+    // Only allow portal rendering after mount and when document.body exists
+    if (typeof document !== "undefined" && document.body) {
+      canRenderPortalsRef.current = true;
+    }
+    
     return () => {
-      // Cleanup: ensure portals are closed on unmount
+      // Cleanup: ensure portals are closed on unmount BEFORE React tries to clean them up
+      canRenderPortalsRef.current = false;
       setIsPfpDropdownOpen(false);
       setIsHelpDropdownOpen(false);
     };
@@ -689,7 +697,7 @@ export function Header() {
                   >
                     <HelpCircle className="w-5 h-5 sm:w-6 sm:h-6" />
                   </button>
-                  {isHelpDropdownOpen && mounted && typeof document !== "undefined" && document.body && createPortal(
+                  {isHelpDropdownOpen && mounted && canRenderPortalsRef.current && typeof document !== "undefined" && document.body && createPortal(
                     <div
                       ref={helpDropdownRef}
                       className="fixed w-48 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 py-1 z-[9998]"
@@ -741,7 +749,7 @@ export function Header() {
                       className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover"
                     />
                   </button>
-                  {isPfpDropdownOpen && mounted && typeof document !== "undefined" && document.body && createPortal(
+                  {isPfpDropdownOpen && mounted && canRenderPortalsRef.current && typeof document !== "undefined" && document.body && createPortal(
                     <div
                       ref={pfpDropdownRef}
                       className="fixed w-48 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 py-1 z-[9998]"

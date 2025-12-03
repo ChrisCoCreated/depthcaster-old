@@ -34,6 +34,7 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
   const fetchNotificationsRef = useRef<((newCursor?: string | null) => Promise<void>) | null>(null);
   const markAsSeenRef = useRef<((notificationType?: string, castHash?: string) => Promise<void>) | null>(null);
   const onNotificationsSeenRef = useRef(onNotificationsSeen);
+  const canRenderPortalRef = useRef(false);
 
   const getNotificationPreferences = (): string[] => {
     const saved = localStorage.getItem("notificationPreferences");
@@ -899,6 +900,15 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
 
   useEffect(() => {
     setMounted(true);
+    // Only allow portal rendering after mount and when document.body exists
+    if (typeof document !== "undefined" && document.body) {
+      canRenderPortalRef.current = true;
+    }
+    
+    return () => {
+      // Cleanup: prevent portal rendering during unmount
+      canRenderPortalRef.current = false;
+    };
   }, []);
 
   // State change logging removed - was causing excessive logs
@@ -1312,8 +1322,8 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
     </div>
   );
 
-  // Only render portal if document.body exists (prevents errors in React Strict Mode)
-  if (typeof document === "undefined" || !document.body) {
+  // Only render portal if document.body exists and we're allowed to render (prevents errors in React Strict Mode)
+  if (!isOpen || !mounted || !canRenderPortalRef.current || typeof document === "undefined" || !document.body) {
     return null;
   }
 

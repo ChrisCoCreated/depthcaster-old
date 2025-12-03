@@ -10,6 +10,7 @@ import { UpdateNotification } from "./components/UpdateNotification";
 import { PushSubscriptionManager } from "./components/PushSubscriptionManager";
 import { SessionTracker } from "./components/SessionTracker";
 import { NavigationManager } from "./components/NavigationManager";
+import { PortalErrorHandler } from "./components/PortalErrorHandler";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -112,6 +113,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white dark:bg-black text-gray-900 dark:text-gray-100`}
       >
         {/* <Analytics /> */}
+        <PortalErrorHandler />
         <ServiceWorkerRegistration />
         <AuthProvider>
           <SessionTracker />

@@ -151,7 +151,8 @@ export default function CuratorsPage() {
                       Method 3: Depthcaster Mini-App
                     </h4>
                     <ol className="list-decimal list-inside text-gray-700 dark:text-gray-300 space-y-1 ml-4">
-                      <li>Open the <a href="https://farcaster.xyz/miniapps/HtUwgAw4iQ2x/depthcaster" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">Depthcaster Mini-App</a> in Farcaster</li>
+                      <li>Add the <a href="https://farcaster.xyz/miniapps/HtUwgAw4iQ2x/depthcaster" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">Depthcaster Mini-App</a> to Farcaster</li>
+                      <li>Open the Depthcaster Mini-App in Farcaster</li>
                       <li>Click the <strong>paste button</strong> (clipboard icon) in the top right of the mini-app</li>
                       <li>Alternatively, click the <strong>share button</strong> on any cast and select <strong>Depthcaster</strong> from the share menu</li>
                       <li>The cast will be automatically curated</li>
@@ -169,7 +170,7 @@ export default function CuratorsPage() {
                       <li>Reply to a cast mentioning <strong>@deepbot</strong> in any client — the cast you&apos;re replying to will be automatically curated</li>
                     </ol>
                     <p className="text-gray-600 dark:text-gray-400 text-sm mt-2 italic">
-                      <strong>Important:</strong> Any cast that mentions @deepbot — this applies regardless of cast quality, length, or any other factors. This means:
+                      <strong>Important:</strong> Replies that mention @deepbot will not be added as a reply. The parent cast you&apos;re replying to will be curated, but your reply itself won&apos;t appear in the conversation thread.
                     </p>
                   </div>
                 </div>
