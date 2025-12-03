@@ -3,7 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 // import { Analytics } from "@vercel/analytics/next";
 import { AuthProvider } from "./components/AuthProvider";
-import { Header } from "./components/Header";
+import { ConditionalHeader } from "./components/ConditionalHeader";
 import { ServiceWorkerRegistration } from "./components/ServiceWorkerRegistration";
 import { OnboardingFlow } from "./components/OnboardingFlow";
 import { UpdateNotification } from "./components/UpdateNotification";
@@ -117,7 +117,7 @@ export default function RootLayout({
           <PushSubscriptionManager />
           <OnboardingFlow />
           <UpdateNotification />
-          <Header />
+          <ConditionalHeader />
           {children}
         </AuthProvider>
       </body>

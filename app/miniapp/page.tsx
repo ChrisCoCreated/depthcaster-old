@@ -395,58 +395,63 @@ function MiniappContent() {
         </div>
       )}
 
-      {/* Top bar with paste button and help icon */}
-      {context?.user?.fid && (
-        <div className="sticky top-0 z-[200] bg-white/80 dark:bg-black/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
-          <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-end gap-2">
-            <Link
-              href="/why"
-              className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-              aria-label="Why Depthcaster"
-              title="Why Depthcaster"
-            >
-              <HelpCircle className="w-5 h-5" />
-            </Link>
-            <button
-              onClick={handlePasteToCurate}
-              disabled={isPasting}
-              className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label="Paste to curate"
-              title="Paste cast link to curate"
-            >
-              {isPasting ? (
-                <svg
-                  className="w-5 h-5 animate-spin"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                  />
-                </svg>
-              ) : (
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                  />
-                </svg>
-              )}
-            </button>
-          </div>
+      {/* Thin consolidated miniapp header */}
+      <div className="sticky top-0 z-[200] bg-white/80 dark:bg-black/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
+        <div className="max-w-2xl mx-auto px-4 py-2 flex items-center justify-between">
+          <Link href="/" className="text-lg font-bold text-gray-900 dark:text-gray-100">
+            Depthcaster
+          </Link>
+          {context?.user?.fid && (
+            <div className="flex items-center gap-1">
+              <Link
+                href="/why"
+                className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+                aria-label="Why Depthcaster"
+                title="Why Depthcaster"
+              >
+                <HelpCircle className="w-4 h-4" />
+              </Link>
+              <button
+                onClick={handlePasteToCurate}
+                disabled={isPasting}
+                className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Paste to curate"
+                title="Paste cast link to curate"
+              >
+                {isPasting ? (
+                  <svg
+                    className="w-4 h-4 animate-spin"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                ) : (
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                    />
+                  </svg>
+                )}
+              </button>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       <div className="max-w-2xl mx-auto px-4 py-6">
         <div className="mb-6">
