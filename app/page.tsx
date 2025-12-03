@@ -18,6 +18,7 @@ export const metadata: Metadata = {
           splashBackgroundColor: "#000000",
         },
       },
+      castShareUrl: `${appUrl}/share`,
     }),
   },
 };

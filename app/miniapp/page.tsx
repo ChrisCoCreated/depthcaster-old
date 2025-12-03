@@ -7,6 +7,7 @@ import { AvatarImage } from "@/app/components/AvatarImage";
 import Link from "next/link";
 import { HelpCircle } from "lucide-react";
 import { analytics } from "@/lib/analytics";
+import { useSearchParams } from "next/navigation";
 
 interface FeedItem {
   castHash: string;
@@ -23,6 +24,7 @@ interface FeedItem {
 
 function MiniappContent() {
   const { isSDKLoaded, context, actions, added, notificationDetails } = useMiniApp();
+  const searchParams = useSearchParams();
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -37,6 +39,7 @@ function MiniappContent() {
   const [pendingCastData, setPendingCastData] = useState<any>(null);
   const [showPasteInput, setShowPasteInput] = useState(false);
   const [pasteInputValue, setPasteInputValue] = useState("");
+  const [hasCheckedShare, setHasCheckedShare] = useState(false);
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://depthcaster.vercel.app";
 
@@ -107,6 +110,34 @@ function MiniappContent() {
     }
   }, [toast]);
 
+  // Handle share extension context
+  useEffect(() => {
+    // Only check once
+    if (hasCheckedShare) return;
+
+    // Check URL params for castHash (from share extension redirect)
+    const castHashFromUrl = searchParams.get("castHash");
+    if (castHashFromUrl) {
+      setHasCheckedShare(true);
+      fetchAndShowCast(castHashFromUrl);
+      return;
+    }
+
+    // Check SDK context for cast_share location type (available after SDK loads)
+    if (isSDKLoaded && context) {
+      // Check if context has location info (Neynar wrapper may expose this differently)
+      const location = (context as any).location;
+      if (location?.type === "cast_share" && location?.cast?.hash) {
+        setHasCheckedShare(true);
+        // Use enriched cast data from SDK if available
+        const castData = location.cast;
+        setPendingCastData(castData);
+        setShowCurateConfirm(true);
+        return;
+      }
+    }
+  }, [isSDKLoaded, context, searchParams, hasCheckedShare]);
+
   const showToast = (message: string, type: "error" | "success" = "error") => {
     setToast({ message, type });
   };
@@ -152,6 +183,40 @@ function MiniappContent() {
     // In miniapp, clipboard access always fails, so show text input directly
     setShowPasteInput(true);
     setPasteInputValue("");
+  };
+
+  const fetchAndShowCast = async (castHash: string) => {
+    if (isPasting || !castHash) return;
+
+    try {
+      setIsPasting(true);
+
+      // Fetch cast data using Neynar
+      const conversationResponse = await fetch(
+        `/api/conversation?identifier=${encodeURIComponent(castHash)}&type=hash&replyDepth=0`
+      );
+
+      if (!conversationResponse.ok) {
+        throw new Error("Failed to fetch cast data");
+      }
+
+      const conversationData = await conversationResponse.json();
+      const castData = conversationData?.conversation?.cast;
+
+      if (!castData) {
+        showToast("Cast not found");
+        return;
+      }
+
+      // Show confirmation modal with cast preview
+      setPendingCastData(castData);
+      setShowCurateConfirm(true);
+    } catch (error: any) {
+      console.error("Error fetching cast:", error);
+      showToast(error.message || "Failed to fetch cast");
+    } finally {
+      setIsPasting(false);
+    }
   };
 
   const handlePasteInputSubmit = async () => {
