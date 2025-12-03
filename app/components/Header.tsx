@@ -146,15 +146,21 @@ export function Header() {
       // Remove ALL existing dynamic favicons
       const existingDynamic = document.querySelectorAll("link[data-dynamic-favicon]");
       existingDynamic.forEach(link => {
-        link.remove();
+        // Check if element still has a parent before removing (prevents errors in Strict Mode)
+        if (link.parentNode) {
+          link.remove();
+        }
       });
 
       // Remove all existing icon links to ensure our new one takes precedence
       const allIconLinks = document.querySelectorAll("link[rel*='icon']");
       allIconLinks.forEach(link => {
-        const rel = (link as HTMLLinkElement).rel;
-        if (rel === "icon" || rel === "shortcut icon") {
-          link.remove();
+        // Check if element still has a parent before removing
+        if (link.parentNode) {
+          const rel = (link as HTMLLinkElement).rel;
+          if (rel === "icon" || rel === "shortcut icon") {
+            link.remove();
+          }
         }
       });
 
@@ -166,10 +172,19 @@ export function Header() {
       newLink.setAttribute("data-dynamic-favicon", "true");
       
       // Insert at the very beginning of head to take precedence
-      if (document.head.firstChild) {
-        document.head.insertBefore(newLink, document.head.firstChild);
-      } else {
-        document.head.appendChild(newLink);
+      // Use a safer approach that checks if head still exists
+      if (document.head) {
+        const firstChild = document.head.firstChild;
+        if (firstChild) {
+          try {
+            document.head.insertBefore(newLink, firstChild);
+          } catch (e) {
+            // Fallback if insertBefore fails
+            document.head.appendChild(newLink);
+          }
+        } else {
+          document.head.appendChild(newLink);
+        }
       }
     };
 
@@ -208,7 +223,10 @@ export function Header() {
       // Remove dynamic favicon to restore original
       const dynamicFavicon = document.querySelectorAll("link[data-dynamic-favicon]");
       dynamicFavicon.forEach(link => {
-        link.remove();
+        // Check if element still has a parent before removing (prevents errors in Strict Mode)
+        if (link.parentNode) {
+          link.remove();
+        }
       });
     }
     

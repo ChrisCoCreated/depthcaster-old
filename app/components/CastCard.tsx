@@ -1436,7 +1436,10 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
       document.body.appendChild(textArea);
       textArea.select();
       document.execCommand('copy');
-      document.body.removeChild(textArea);
+      // Check if element still has a parent before removing (prevents errors in Strict Mode)
+      if (textArea.parentNode) {
+        document.body.removeChild(textArea);
+      }
       setShowShareMenu(false);
     }
   };
@@ -1454,7 +1457,10 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
       document.body.appendChild(textArea);
       textArea.select();
       document.execCommand('copy');
-      document.body.removeChild(textArea);
+      // Check if element still has a parent before removing (prevents errors in Strict Mode)
+      if (textArea.parentNode) {
+        document.body.removeChild(textArea);
+      }
       setShowShareMenu(false);
     }
   };
@@ -1473,7 +1479,10 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
       document.body.appendChild(textArea);
       textArea.select();
       document.execCommand('copy');
-      document.body.removeChild(textArea);
+      // Check if element still has a parent before removing (prevents errors in Strict Mode)
+      if (textArea.parentNode) {
+        document.body.removeChild(textArea);
+      }
       setShowShareMenu(false);
     }
   };
