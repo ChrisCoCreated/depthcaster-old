@@ -7,7 +7,6 @@ import { AvatarImage } from "@/app/components/AvatarImage";
 import Link from "next/link";
 import { HelpCircle } from "lucide-react";
 import { analytics } from "@/lib/analytics";
-import { useSearchParams } from "next/navigation";
 
 interface FeedItem {
   castHash: string;
@@ -26,7 +25,6 @@ const ADMIN_FID = 5701;
 
 function MiniappContent() {
   const { isSDKLoaded, context, actions, added, notificationDetails } = useMiniApp();
-  const searchParams = useSearchParams();
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -41,7 +39,6 @@ function MiniappContent() {
   const [pendingCastData, setPendingCastData] = useState<any>(null);
   const [showPasteInput, setShowPasteInput] = useState(false);
   const [pasteInputValue, setPasteInputValue] = useState("");
-  const [hasCheckedShare, setHasCheckedShare] = useState(false);
   const [isCurator, setIsCurator] = useState<boolean | null>(null);
   const [checkingCurator, setCheckingCurator] = useState(false);
 
@@ -96,25 +93,13 @@ function MiniappContent() {
   }, [isSDKLoaded, actions]);
 
   // Fetch initial feed immediately on mount (don't wait for anything)
-  // Skip if we're in a share context - feed will load after modal closes
   useEffect(() => {
-    // Check if we're in a share context
-    const castHashFromUrl = searchParams.get("castHash");
-    const isShareContext = !!castHashFromUrl || 
-      (isSDKLoaded && context && (context as any).location?.type === "cast_share");
-    
-    // Only fetch feed if not in share context
-    if (!isShareContext) {
-      // Small delay to ensure page is fully loaded
-      const timer = setTimeout(() => {
-        fetchFeed(3); // Load only 3 items initially
-      }, 100);
-      return () => clearTimeout(timer);
-    } else {
-      // In share context, set loading to false immediately so modal can show
-      setLoading(false);
-    }
-  }, [searchParams, isSDKLoaded, context]);
+    // Small delay to ensure page is fully loaded
+    const timer = setTimeout(() => {
+      fetchFeed(3); // Load only 3 items initially
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Lazy load remaining items after initial render
   useEffect(() => {
@@ -133,37 +118,6 @@ function MiniappContent() {
       return () => clearTimeout(timer);
     }
   }, [toast]);
-
-  // Handle share extension context
-  useEffect(() => {
-    // Only check once
-    if (hasCheckedShare) return;
-
-    // Check URL params for castHash (from share extension redirect)
-    const castHashFromUrl = searchParams.get("castHash");
-    if (castHashFromUrl) {
-      setHasCheckedShare(true);
-      fetchAndShowCast(castHashFromUrl);
-      return;
-    }
-
-    // Check SDK context for cast_share location type (available after SDK loads)
-    if (isSDKLoaded && context) {
-      // Check if context has location info (Neynar wrapper may expose this differently)
-      const location = (context as any).location;
-      if (location?.type === "cast_share" && location?.cast?.hash) {
-        setHasCheckedShare(true);
-        // Use enriched cast data from SDK if available
-        const castData = location.cast;
-        // Check curator status before showing modal
-        checkCuratorStatus().then(() => {
-          setPendingCastData(castData);
-          setShowCurateConfirm(true);
-        });
-        return;
-      }
-    }
-  }, [isSDKLoaded, context, searchParams, hasCheckedShare]);
 
   const showToast = (message: string, type: "error" | "success" = "error") => {
     setToast({ message, type });
@@ -237,43 +191,6 @@ function MiniappContent() {
       return false;
     } finally {
       setCheckingCurator(false);
-    }
-  };
-
-  const fetchAndShowCast = async (castHash: string) => {
-    if (isPasting || !castHash) return;
-
-    try {
-      setIsPasting(true);
-
-      // Check curator status first
-      const hasCuratorRole = await checkCuratorStatus();
-
-      // Fetch cast data using Neynar
-      const conversationResponse = await fetch(
-        `/api/conversation?identifier=${encodeURIComponent(castHash)}&type=hash&replyDepth=0`
-      );
-
-      if (!conversationResponse.ok) {
-        throw new Error("Failed to fetch cast data");
-      }
-
-      const conversationData = await conversationResponse.json();
-      const castData = conversationData?.conversation?.cast;
-
-      if (!castData) {
-        showToast("Cast not found");
-        return;
-      }
-
-      // Show confirmation modal with cast preview (will show different content based on curator status)
-      setPendingCastData(castData);
-      setShowCurateConfirm(true);
-    } catch (error: any) {
-      console.error("Error fetching cast:", error);
-      showToast(error.message || "Failed to fetch cast");
-    } finally {
-      setIsPasting(false);
     }
   };
 
@@ -372,15 +289,10 @@ function MiniappContent() {
       setShowCurateConfirm(false);
       setPendingCastData(null);
 
-      // Load feed after curating (if not already loaded)
-      if (feedItems.length === 0) {
-        fetchFeed(3); // Initial load
-      } else {
-        // Refresh the feed after a short delay (load all 30 items)
-        setTimeout(() => {
-          fetchFeed(30);
-        }, 1000);
-      }
+      // Refresh the feed after a short delay (load all 30 items)
+      setTimeout(() => {
+        fetchFeed(30);
+      }, 1000);
     } catch (error: any) {
       console.error("Curate error:", error);
       showToast(error.message || "Failed to curate cast");
@@ -732,10 +644,6 @@ function MiniappContent() {
           onClick={() => {
             setShowCurateConfirm(false);
             setPendingCastData(null);
-            // Load feed after closing modal if not already loaded
-            if (feedItems.length === 0) {
-              fetchFeed(3);
-            }
           }}
         >
           <div
@@ -753,10 +661,6 @@ function MiniappContent() {
                   onClick={() => {
                     setShowCurateConfirm(false);
                     setPendingCastData(null);
-                    // Load feed after closing modal if not already loaded
-                    if (feedItems.length === 0) {
-                      fetchFeed(3);
-                    }
                   }}
                   className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                 >
