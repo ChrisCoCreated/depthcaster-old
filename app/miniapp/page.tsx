@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import { MiniAppProvider, useMiniApp } from "@neynar/react";
 import { formatDistanceToNow } from "date-fns";
 import { AvatarImage } from "@/app/components/AvatarImage";
+import Link from "next/link";
+import { HelpCircle } from "lucide-react";
+import { analytics } from "@/lib/analytics";
 
 interface FeedItem {
   castHash: string;
@@ -26,6 +29,10 @@ function MiniappContent() {
   const [installed, setInstalled] = useState(false);
   const [checkingInstall, setCheckingInstall] = useState(true);
   const [showInstallMessage, setShowInstallMessage] = useState(false);
+  const [isPasting, setIsPasting] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: "error" | "success" } | null>(null);
+  const [showCurateConfirm, setShowCurateConfirm] = useState(false);
+  const [pendingCastData, setPendingCastData] = useState<any>(null);
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://depthcaster.vercel.app";
 
@@ -75,6 +82,165 @@ function MiniappContent() {
   useEffect(() => {
     fetchFeed();
   }, []);
+
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
+  const showToast = (message: string, type: "error" | "success" = "error") => {
+    setToast({ message, type });
+  };
+
+  const extractCastIdentifier = (text: string): { identifier: string; type: "url" | "hash" } | null => {
+    // Check if it's a full URL that Neynar can handle directly
+    const urlPatterns = [
+      /https?:\/\/farcaster\.xyz\/[^\s]+/i, // Full farcaster.xyz URLs
+      /https?:\/\/base\.app\/post\/[^\s]+/i, // Full base.app URLs
+      /https?:\/\/warpcast\.com\/[^\s]+/i, // Full warpcast.com URLs
+    ];
+
+    for (const pattern of urlPatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        return { identifier: match[0], type: "url" };
+      }
+    }
+
+    // Try to extract hash from various URL formats
+    // Cast hashes can vary in length (typically 40 hex chars after 0x, but can be shorter)
+    const hashPatterns = [
+      /\/cast\/(0x[a-fA-F0-9]{8,})/i, // /cast/0x... (at least 8 hex chars)
+      /warpcast\.com\/.*\/cast\/(0x[a-fA-F0-9]{8,})/i, // warpcast.com URLs
+      /farcaster\.xyz\/[^\/]+\/(0x[a-fA-F0-9]{8,})/i, // farcaster.xyz URLs (e.g., /cassie/0x...)
+      /base\.app\/post\/(0x[a-fA-F0-9]{8,})/i, // base.app URLs
+      /(?:^|\s|"|')(0x[a-fA-F0-9]{8,})(?:\s|$|"|')/, // Standalone hash (at least 8 hex chars)
+    ];
+
+    for (const pattern of hashPatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        return { identifier: match[1], type: "hash" };
+      }
+    }
+
+    return null;
+  };
+
+  const handlePasteToCurate = async () => {
+    if (!context?.user?.fid || isPasting) return;
+
+    try {
+      setIsPasting(true);
+      
+      // Read clipboard
+      let clipboardText: string;
+      try {
+        clipboardText = await navigator.clipboard.readText();
+      } catch (clipboardError: any) {
+        // Clipboard API might fail if permission denied or not HTTPS
+        showToast("Unable to access clipboard. Please ensure you're on HTTPS and have granted clipboard permissions.");
+        return;
+      }
+      
+      // Extract cast identifier (URL or hash)
+      const castIdentifier = extractCastIdentifier(clipboardText);
+      
+      if (!castIdentifier) {
+        showToast("Clipboard doesn't contain a valid cast link or hash");
+        return;
+      }
+
+      // Fetch cast data using Neynar (supports both URL and hash lookups)
+      const conversationResponse = await fetch(
+        `/api/conversation?identifier=${encodeURIComponent(castIdentifier.identifier)}&type=${castIdentifier.type}&replyDepth=0`
+      );
+
+      if (!conversationResponse.ok) {
+        throw new Error("Failed to fetch cast data");
+      }
+
+      const conversationData = await conversationResponse.json();
+      const castData = conversationData?.conversation?.cast;
+
+      if (!castData) {
+        showToast("Cast not found");
+        return;
+      }
+
+      // Use the hash from the fetched cast data (Neynar returns the full cast with hash)
+      const castHash = castData.hash;
+      if (!castHash) {
+        showToast("Cast hash not found in response");
+        return;
+      }
+
+      // Show confirmation modal with cast preview
+      setPendingCastData(castData);
+      setShowCurateConfirm(true);
+    } catch (error: any) {
+      console.error("Paste to curate error:", error);
+      showToast(error.message || "Failed to fetch cast");
+    } finally {
+      setIsPasting(false);
+    }
+  };
+
+  const handleConfirmCurate = async () => {
+    if (!context?.user?.fid || !pendingCastData) return;
+
+    try {
+      setIsPasting(true);
+      const castHash = pendingCastData.hash;
+
+      // Curate the cast
+      const curateResponse = await fetch("/api/curate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          castHash,
+          curatorFid: context.user.fid,
+          castData: pendingCastData,
+        }),
+      });
+
+      if (!curateResponse.ok) {
+        const errorData = await curateResponse.json();
+        if (curateResponse.status === 403) {
+          showToast("You don't have permission to curate casts");
+        } else if (curateResponse.status === 409) {
+          showToast("This cast is already curated");
+        } else {
+          showToast(errorData.error || "Failed to curate cast");
+        }
+        return;
+      }
+
+      // Success - show success message
+      showToast("Curated", "success");
+
+      // Track analytics
+      analytics.trackCuratePaste(castHash, context.user.fid);
+
+      // Close modal and reset state
+      setShowCurateConfirm(false);
+      setPendingCastData(null);
+
+      // Refresh the feed after a short delay
+      setTimeout(() => {
+        fetchFeed();
+      }, 1000);
+    } catch (error: any) {
+      console.error("Curate error:", error);
+      showToast(error.message || "Failed to curate cast");
+    } finally {
+      setIsPasting(false);
+    }
+  };
 
   const fetchFeed = async () => {
     try {
@@ -155,6 +321,94 @@ function MiniappContent() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-black">
+      {/* Toast Notification */}
+      {toast && (
+        <div
+          className={`fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-96 z-[300] px-4 py-3 rounded-lg shadow-lg transition-all duration-300 ${
+            toast.type === "success"
+              ? "bg-green-500 text-white"
+              : "bg-red-500 text-white"
+          }`}
+          role="alert"
+        >
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium">{toast.message}</p>
+            <button
+              onClick={() => setToast(null)}
+              className="ml-4 text-white hover:text-gray-200"
+              aria-label="Close"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Top bar with paste button and help icon */}
+      {context?.user?.fid && (
+        <div className="sticky top-0 z-[200] bg-white/80 dark:bg-black/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
+          <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-end gap-2">
+            <Link
+              href="/why"
+              className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+              aria-label="Why Depthcaster"
+              title="Why Depthcaster"
+            >
+              <HelpCircle className="w-5 h-5" />
+            </Link>
+            <button
+              onClick={handlePasteToCurate}
+              disabled={isPasting}
+              className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Paste to curate"
+              title="Paste cast link to curate"
+            >
+              {isPasting ? (
+                <svg
+                  className="w-5 h-5 animate-spin"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
+                </svg>
+              ) : (
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                  />
+                </svg>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-2xl mx-auto px-4 py-6">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
@@ -239,6 +493,75 @@ function MiniappContent() {
           )}
         </div>
       </div>
+
+      {/* Curate Confirmation Modal */}
+      {showCurateConfirm && pendingCastData && (
+        <div
+          className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={() => {
+            setShowCurateConfirm(false);
+            setPendingCastData(null);
+          }}
+        >
+          <div
+            className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                Curate this cast?
+              </h3>
+              
+              {/* Cast Preview */}
+              <div className="border border-gray-200 dark:border-gray-800 rounded-lg p-4 mb-4">
+                {/* Author */}
+                <div className="flex items-center gap-3 mb-3">
+                  <AvatarImage
+                    src={pendingCastData.author?.pfp_url}
+                    alt={pendingCastData.author?.username || pendingCastData.author?.display_name || "User"}
+                    size={40}
+                    className="w-10 h-10 rounded-full"
+                  />
+                  <div>
+                    <div className="font-semibold text-gray-900 dark:text-gray-100">
+                      {pendingCastData.author?.display_name || pendingCastData.author?.username || `User ${pendingCastData.author?.fid}`}
+                    </div>
+                    {pendingCastData.author?.username && (
+                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                        @{pendingCastData.author.username}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Cast Text */}
+                <div className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words">
+                  {pendingCastData.text || "No text content"}
+                </div>
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowCurateConfirm(false);
+                    setPendingCastData(null);
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmCurate}
+                  disabled={isPasting}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isPasting ? "Curating..." : "Curate"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

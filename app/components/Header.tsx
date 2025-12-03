@@ -19,6 +19,8 @@ export function Header() {
   const [isPasting, setIsPasting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "error" | "success" } | null>(null);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
+  const [showCurateConfirm, setShowCurateConfirm] = useState(false);
+  const [pendingCastData, setPendingCastData] = useState<any>(null);
   const [environment, setEnvironment] = useState<"local" | "preview" | null>(null);
   const [hasPreviewAccess, setHasPreviewAccess] = useState(false);
   const [isAdminUser, setIsAdminUser] = useState(false);
@@ -390,6 +392,24 @@ export function Header() {
         return;
       }
 
+      // Show confirmation modal with cast preview
+      setPendingCastData(castData);
+      setShowCurateConfirm(true);
+    } catch (error: any) {
+      console.error("Paste to curate error:", error);
+      showToast(error.message || "Failed to fetch cast");
+    } finally {
+      setIsPasting(false);
+    }
+  };
+
+  const handleConfirmCurate = async () => {
+    if (!user?.fid || !pendingCastData) return;
+
+    try {
+      setIsPasting(true);
+      const castHash = pendingCastData.hash;
+
       // Curate the cast
       const curateResponse = await fetch("/api/curate", {
         method: "POST",
@@ -399,7 +419,7 @@ export function Header() {
         body: JSON.stringify({
           castHash,
           curatorFid: user.fid,
-          castData,
+          castData: pendingCastData,
         }),
       });
 
@@ -460,7 +480,7 @@ export function Header() {
                     signerUuid: user.signer_uuid,
                     reactionType: "like",
                     target: castHash,
-                    targetAuthorFid: castData.author?.fid,
+                    targetAuthorFid: pendingCastData.author?.fid,
                   }),
                 });
               } catch (error) {
@@ -493,11 +513,15 @@ export function Header() {
         }
       }
 
+      // Close modal and reset state
+      setShowCurateConfirm(false);
+      setPendingCastData(null);
+
       setTimeout(() => {
         window.location.reload();
       }, 1000);
     } catch (error: any) {
-      console.error("Paste to curate error:", error);
+      console.error("Curate error:", error);
       showToast(error.message || "Failed to curate cast");
     } finally {
       setIsPasting(false);
@@ -724,12 +748,81 @@ export function Header() {
                 </div>
               </>
             ) : (
-              !isMiniapp && <NeynarAuthButton />
+              pathname && !isMiniapp && <NeynarAuthButton />
             )}
           </div>
         </div>
       </header>
       <FeedbackModal isOpen={isFeedbackModalOpen} onClose={() => setIsFeedbackModalOpen(false)} />
+      
+      {/* Curate Confirmation Modal */}
+      {showCurateConfirm && pendingCastData && (
+        <div
+          className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={() => {
+            setShowCurateConfirm(false);
+            setPendingCastData(null);
+          }}
+        >
+          <div
+            className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                Curate this cast?
+              </h3>
+              
+              {/* Cast Preview */}
+              <div className="border border-gray-200 dark:border-gray-800 rounded-lg p-4 mb-4">
+                {/* Author */}
+                <div className="flex items-center gap-3 mb-3">
+                  <AvatarImage
+                    src={pendingCastData.author?.pfp_url}
+                    alt={pendingCastData.author?.username || pendingCastData.author?.display_name || "User"}
+                    size={40}
+                    className="w-10 h-10 rounded-full"
+                  />
+                  <div>
+                    <div className="font-semibold text-gray-900 dark:text-gray-100">
+                      {pendingCastData.author?.display_name || pendingCastData.author?.username || `User ${pendingCastData.author?.fid}`}
+                    </div>
+                    {pendingCastData.author?.username && (
+                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                        @{pendingCastData.author.username}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Cast Text */}
+                <div className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words">
+                  {pendingCastData.text || "No text content"}
+                </div>
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowCurateConfirm(false);
+                    setPendingCastData(null);
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmCurate}
+                  disabled={isPasting}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isPasting ? "Curating..." : "Curate"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
