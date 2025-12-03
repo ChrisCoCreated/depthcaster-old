@@ -640,10 +640,41 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   }, [feedType, my37PackId, my37HasUsers, fetchFeed]);
 
   // Reset restoration refs and restore casts when pathname changes to home page
-  const prevPathnameRef = useRef<string | null>(null);
+  // Use sessionStorage to persist pathname across remounts
+  const getPrevPathname = () => {
+    if (typeof window === "undefined") return null;
+    try {
+      return sessionStorage.getItem("feedPrevPathname");
+    } catch {
+      return null;
+    }
+  };
+  
+  const setPrevPathname = (pathname: string | null) => {
+    if (typeof window === "undefined") return;
+    try {
+      if (pathname) {
+        sessionStorage.setItem("feedPrevPathname", pathname);
+      } else {
+        sessionStorage.removeItem("feedPrevPathname");
+      }
+    } catch {}
+  };
+  
+  const prevPathnameRef = useRef<string | null>(getPrevPathname());
+  
   useEffect(() => {
+    const prevPathname = prevPathnameRef.current || getPrevPathname();
+    
+    console.log("[Feed] Pathname effect running", {
+      prevPathname,
+      currentPathname: pathname,
+      willCheckRestoration: prevPathname !== null && prevPathname !== "/" && pathname === "/",
+      castsRestored: castsRestoredRef.current,
+    });
+    
     // If pathname changed to "/" (returning to home), try to restore immediately
-    if (prevPathnameRef.current !== null && prevPathnameRef.current !== "/" && pathname === "/") {
+    if (prevPathname !== null && prevPathname !== "/" && pathname === "/") {
       console.log("[Feed] Pathname changed to home page, attempting restoration", {
         prevPathname: prevPathnameRef.current,
         currentPathname: pathname,
@@ -731,7 +762,10 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
         console.log("[Feed] Skipping restoration - feed type or sort changed");
       }
     }
+    
+    // Update ref and sessionStorage
     prevPathnameRef.current = pathname;
+    setPrevPathname(pathname);
   }, [pathname, feedType, sortBy, fetchFeed]);
 
   // Separate effect for feed type changes and other dependencies
@@ -833,11 +867,11 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       // Check if feed type actually changed by comparing with lastFetchedFeedTypeRef
       const actualFeedTypeChanged = lastFetchedFeedTypeRef.current !== feedType && lastFetchedFeedTypeRef.current !== "";
       
-      // Always fetch when feed type changes, or on initial mount, or when sortBy changes for curated
-      // or when curator FIDs change for curated feed, or when category changes for curated feed
-      // Also check if we haven't fetched this feed type yet (defensive check)
-      // Skip fetch if we just restored casts and state is not stale, BUT only if feed type hasn't changed
-      const condition1 = isInitialMount;
+      // Check if we're returning to home page (pathname just changed to "/")
+      const prevPathnameForFetch = prevPathnameRef.current || getPrevPathname();
+      const isReturningToHome = pathname === "/" && prevPathnameForFetch !== null && prevPathnameForFetch !== "/";
+      
+      const condition1 = isInitialMount && !isReturningToHome; // Don't treat return as initial mount
       const condition2 = feedTypeChanged || actualFeedTypeChanged;
       const condition3 = (sortByChanged && feedType === "curated" && !isInitialMount);
       const condition4 = (curatorFidsChanged && feedType === "curated" && !isInitialMount);
@@ -846,7 +880,8 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       const condition7 = (lastFetchedFeedTypeRef.current !== feedType && !fetchingRef.current);
       const fetchCondition = condition1 || condition2 || condition3 || condition4 || condition5 || condition6 || condition7;
       // Only skip if we have restored casts AND state is not stale AND feed type hasn't actually changed
-      const skipCondition = hasRestoredCasts && !isStateStaleResult && !actualFeedTypeChanged && !curatorFidsChanged && !categoryChanged && !qualityScoreChanged;
+      // OR if we're returning to home (give restoration a chance)
+      const skipCondition = (hasRestoredCasts && !isStateStaleResult && !actualFeedTypeChanged && !curatorFidsChanged && !categoryChanged && !qualityScoreChanged) || isReturningToHome;
       const shouldFetch = fetchCondition && !skipCondition;
       
       console.log("[Feed] Fetch decision", {
@@ -855,6 +890,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
         isStateStaleResult,
         actualFeedTypeChanged,
         isInitialMount,
+        isReturningToHome,
         feedTypeChanged,
         sortByChanged,
         curatorFidsChanged,
@@ -867,6 +903,8 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
         shouldFetch,
         castsLength: casts.length,
         loading,
+        prevPathname: prevPathnameForFetch,
+        currentPathname: pathname,
       });
       
       if (shouldFetch && !fetchingRef.current) {
@@ -896,7 +934,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       // Update ref even if we can't fetch (e.g., my-37 without pack)
       prevFeedTypeRef.current = feedType;
     }
-  }, [feedType, selectedCuratorFids, selectedCategory, minQualityScore, preferencesVersion, fetchFeed, my37PackId, my37HasUsers, viewerFid, fetchMy37PackId, sortBy, casts.length]);
+  }, [feedType, selectedCuratorFids, selectedCategory, minQualityScore, preferencesVersion, fetchFeed, my37PackId, my37HasUsers, viewerFid, fetchMy37PackId, sortBy, casts.length, pathname]);
   
   // Separate effect for when My 37 pack becomes ready
   useEffect(() => {
