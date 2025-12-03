@@ -5,7 +5,6 @@ import { MiniAppProvider, useMiniApp } from "@neynar/react";
 import { formatDistanceToNow } from "date-fns";
 import { AvatarImage } from "@/app/components/AvatarImage";
 import Link from "next/link";
-import { HelpCircle } from "lucide-react";
 import { analytics } from "@/lib/analytics";
 
 interface FeedItem {
@@ -459,14 +458,6 @@ function MiniappContent() {
             </Link>
           {context?.user?.fid && (
             <div className="relative flex items-center gap-1">
-              <Link
-                href="/why"
-                className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-                aria-label="Why Depthcaster"
-                title="Why Depthcaster"
-              >
-                <HelpCircle className="w-4 h-4" />
-              </Link>
               <button
                 onClick={handlePasteToCurate}
                 disabled={isPasting}
