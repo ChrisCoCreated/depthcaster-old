@@ -216,6 +216,47 @@ function ShareContent() {
           </h1>
         </div>
 
+        {/* Action Buttons */}
+        {isCurator ? (
+          <div className="flex gap-3 mb-6">
+            <button
+              onClick={handleCancel}
+              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleCurate}
+              disabled={isPasting}
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isPasting ? "Curating..." : "Curate"}
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4 mb-6">
+            <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+              <p className="text-sm text-amber-800 dark:text-amber-200 mb-3">
+                You need curator access to curate casts. Contact Chris to request curator access.
+              </p>
+              <a
+                href={farcasterDmLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+              >
+                Message Chris
+              </a>
+            </div>
+            <button
+              onClick={handleCancel}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            >
+              Go to Feed
+            </button>
+          </div>
+        )}
+
         {/* Cast Preview */}
         <div className="border border-gray-200 dark:border-gray-800 rounded-lg p-6 mb-6">
           {/* Author */}
@@ -248,47 +289,6 @@ function ShareContent() {
         {error && (
           <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
             <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
-          </div>
-        )}
-
-        {/* Action Buttons */}
-        {isCurator ? (
-          <div className="flex gap-3">
-            <button
-              onClick={handleCancel}
-              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleCurate}
-              disabled={isPasting}
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isPasting ? "Curating..." : "Curate"}
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-              <p className="text-sm text-amber-800 dark:text-amber-200 mb-3">
-                You need curator access to curate casts. Contact Chris to request curator access.
-              </p>
-              <a
-                href={farcasterDmLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-              >
-                Message Chris
-              </a>
-            </div>
-            <button
-              onClick={handleCancel}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            >
-              Go to Feed
-            </button>
           </div>
         )}
       </div>

@@ -30,9 +30,17 @@ async function runMigration() {
     // Add foreign key constraint
     console.log("Adding foreign key constraint...");
     await db.execute(sql`
-      ALTER TABLE "user_reaction_sync_state" 
-      ADD CONSTRAINT IF NOT EXISTS "user_reaction_sync_state_user_fid_users_fid_fk" 
-      FOREIGN KEY ("user_fid") REFERENCES "users"("fid") ON DELETE CASCADE;
+      DO $$ 
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint 
+          WHERE conname = 'user_reaction_sync_state_user_fid_users_fid_fk'
+        ) THEN
+          ALTER TABLE "user_reaction_sync_state" 
+          ADD CONSTRAINT "user_reaction_sync_state_user_fid_users_fid_fk" 
+          FOREIGN KEY ("user_fid") REFERENCES "users"("fid") ON DELETE CASCADE;
+        END IF;
+      END $$;
     `);
 
     // Create unique index on user_fid

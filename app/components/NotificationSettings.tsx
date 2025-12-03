@@ -326,18 +326,36 @@ export function NotificationSettings() {
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Quality Threshold: {curatedPreferences.qualityReplyThreshold}
                 </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={curatedPreferences.qualityReplyThreshold}
-                  onChange={(e) => {
-                    const threshold = parseInt(e.target.value, 10);
-                    saveCuratedPreferences({ qualityReplyThreshold: threshold });
-                  }}
-                  disabled={saving}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 disabled:opacity-50"
-                />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="5"
+                    value={curatedPreferences.qualityReplyThreshold}
+                    onChange={(e) => {
+                      const threshold = parseInt(e.target.value, 10);
+                      saveCuratedPreferences({ qualityReplyThreshold: threshold });
+                    }}
+                    disabled={saving}
+                    className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 disabled:opacity-50"
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="5"
+                    value={curatedPreferences.qualityReplyThreshold}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === "") return;
+                      const threshold = Math.max(0, Math.min(100, parseInt(value, 10)));
+                      saveCuratedPreferences({ qualityReplyThreshold: threshold });
+                    }}
+                    disabled={saving}
+                    className="w-16 px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50"
+                  />
+                </div>
                 <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
                   <span>0</span>
                   <span>100</span>
