@@ -773,8 +773,28 @@ export function Header() {
                 Curate this cast?
               </h3>
               
+              {/* Action Buttons */}
+              <div className="flex gap-3 mb-4">
+                <button
+                  onClick={() => {
+                    setShowCurateConfirm(false);
+                    setPendingCastData(null);
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmCurate}
+                  disabled={isPasting}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isPasting ? "Curating..." : "Curate"}
+                </button>
+              </div>
+              
               {/* Cast Preview */}
-              <div className="border border-gray-200 dark:border-gray-800 rounded-lg p-4 mb-4">
+              <div className="border border-gray-200 dark:border-gray-800 rounded-lg p-4">
                 {/* Author */}
                 <div className="flex items-center gap-3 mb-3">
                   <AvatarImage
@@ -799,25 +819,6 @@ export function Header() {
                 <div className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words">
                   {pendingCastData.text || "No text content"}
                 </div>
-              </div>
-              
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setShowCurateConfirm(false);
-                    setPendingCastData(null);
-                  }}
-                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleConfirmCurate}
-                  disabled={isPasting}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isPasting ? "Curating..." : "Curate"}
-                </button>
               </div>
             </div>
           </div>

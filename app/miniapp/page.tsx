@@ -22,6 +22,8 @@ interface FeedItem {
   curatedAt: string | null;
 }
 
+const ADMIN_FID = 5701;
+
 function MiniappContent() {
   const { isSDKLoaded, context, actions, added, notificationDetails } = useMiniApp();
   const searchParams = useSearchParams();
@@ -40,8 +42,14 @@ function MiniappContent() {
   const [showPasteInput, setShowPasteInput] = useState(false);
   const [pasteInputValue, setPasteInputValue] = useState("");
   const [hasCheckedShare, setHasCheckedShare] = useState(false);
+  const [isCurator, setIsCurator] = useState<boolean | null>(null);
+  const [checkingCurator, setCheckingCurator] = useState(false);
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://depthcaster.vercel.app";
+  
+  const farcasterDmLink = context?.user?.fid 
+    ? `https://farcaster.xyz/~/inbox/${context.user.fid}-${ADMIN_FID}`
+    : `https://farcaster.xyz/~/inbox/${ADMIN_FID}`;
 
   useEffect(() => {
     // Check if miniapp is already installed via SDK
@@ -88,9 +96,25 @@ function MiniappContent() {
   }, [isSDKLoaded, actions]);
 
   // Fetch initial feed immediately on mount (don't wait for anything)
+  // Skip if we're in a share context - feed will load after modal closes
   useEffect(() => {
-    fetchFeed(3); // Load only 3 items initially
-  }, []);
+    // Check if we're in a share context
+    const castHashFromUrl = searchParams.get("castHash");
+    const isShareContext = !!castHashFromUrl || 
+      (isSDKLoaded && context && (context as any).location?.type === "cast_share");
+    
+    // Only fetch feed if not in share context
+    if (!isShareContext) {
+      // Small delay to ensure page is fully loaded
+      const timer = setTimeout(() => {
+        fetchFeed(3); // Load only 3 items initially
+      }, 100);
+      return () => clearTimeout(timer);
+    } else {
+      // In share context, set loading to false immediately so modal can show
+      setLoading(false);
+    }
+  }, [searchParams, isSDKLoaded, context]);
 
   // Lazy load remaining items after initial render
   useEffect(() => {
@@ -131,8 +155,11 @@ function MiniappContent() {
         setHasCheckedShare(true);
         // Use enriched cast data from SDK if available
         const castData = location.cast;
-        setPendingCastData(castData);
-        setShowCurateConfirm(true);
+        // Check curator status before showing modal
+        checkCuratorStatus().then(() => {
+          setPendingCastData(castData);
+          setShowCurateConfirm(true);
+        });
         return;
       }
     }
@@ -185,11 +212,42 @@ function MiniappContent() {
     setPasteInputValue("");
   };
 
+  const checkCuratorStatus = async (): Promise<boolean> => {
+    if (!context?.user?.fid) return false;
+    
+    if (isCurator !== null) {
+      return isCurator;
+    }
+
+    try {
+      setCheckingCurator(true);
+      const response = await fetch(`/api/admin/check?fid=${context.user.fid}`);
+      if (response.ok) {
+        const data = await response.json();
+        const roles = data.roles || [];
+        const hasCuratorRole = roles.includes("curator");
+        setIsCurator(hasCuratorRole);
+        return hasCuratorRole;
+      }
+      setIsCurator(false);
+      return false;
+    } catch (error) {
+      console.error("Failed to check curator status:", error);
+      setIsCurator(false);
+      return false;
+    } finally {
+      setCheckingCurator(false);
+    }
+  };
+
   const fetchAndShowCast = async (castHash: string) => {
     if (isPasting || !castHash) return;
 
     try {
       setIsPasting(true);
+
+      // Check curator status first
+      const hasCuratorRole = await checkCuratorStatus();
 
       // Fetch cast data using Neynar
       const conversationResponse = await fetch(
@@ -208,7 +266,7 @@ function MiniappContent() {
         return;
       }
 
-      // Show confirmation modal with cast preview
+      // Show confirmation modal with cast preview (will show different content based on curator status)
       setPendingCastData(castData);
       setShowCurateConfirm(true);
     } catch (error: any) {
@@ -314,10 +372,15 @@ function MiniappContent() {
       setShowCurateConfirm(false);
       setPendingCastData(null);
 
-      // Refresh the feed after a short delay (load all 30 items)
-      setTimeout(() => {
-        fetchFeed(30);
-      }, 1000);
+      // Load feed after curating (if not already loaded)
+      if (feedItems.length === 0) {
+        fetchFeed(3); // Initial load
+      } else {
+        // Refresh the feed after a short delay (load all 30 items)
+        setTimeout(() => {
+          fetchFeed(30);
+        }, 1000);
+      }
     } catch (error: any) {
       console.error("Curate error:", error);
       showToast(error.message || "Failed to curate cast");
@@ -329,17 +392,28 @@ function MiniappContent() {
   const fetchFeed = async (limit: number = 3) => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/miniapp/feed?limit=${limit}`);
+      const response = await fetch(`/api/miniapp/feed?limit=${limit}`, {
+        // Add signal to allow cancellation if component unmounts
+        signal: AbortSignal.timeout(30000), // 30 second timeout
+      });
       if (!response.ok) {
-        throw new Error("Failed to fetch feed");
+        throw new Error(`Failed to fetch feed: ${response.status}`);
       }
       const data = await response.json();
       setFeedItems(data.items || []);
       setHasMore((data.items || []).length >= limit && limit < 30);
       setError(null);
-    } catch (err) {
+    } catch (err: any) {
+      // Ignore abort errors (component unmounted or timeout)
+      if (err.name === 'AbortError' || err.name === 'TimeoutError') {
+        console.log("Feed fetch cancelled or timed out");
+        return;
+      }
       console.error("Error fetching feed:", err);
-      setError("Failed to load feed");
+      // Only set error if we don't have any items yet (initial load)
+      if (feedItems.length === 0) {
+        setError("Failed to load feed");
+      }
     } finally {
       setLoading(false);
     }
@@ -657,6 +731,10 @@ function MiniappContent() {
           onClick={() => {
             setShowCurateConfirm(false);
             setPendingCastData(null);
+            // Load feed after closing modal if not already loaded
+            if (feedItems.length === 0) {
+              fetchFeed(3);
+            }
           }}
         >
           <div
@@ -668,8 +746,32 @@ function MiniappContent() {
                 Curate this cast?
               </h3>
               
+              {/* Action Buttons */}
+              <div className="flex gap-3 mb-4">
+                <button
+                  onClick={() => {
+                    setShowCurateConfirm(false);
+                    setPendingCastData(null);
+                    // Load feed after closing modal if not already loaded
+                    if (feedItems.length === 0) {
+                      fetchFeed(3);
+                    }
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmCurate}
+                  disabled={isPasting}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isPasting ? "Curating..." : "Curate"}
+                </button>
+              </div>
+              
               {/* Cast Preview */}
-              <div className="border border-gray-200 dark:border-gray-800 rounded-lg p-4 mb-4">
+              <div className="border border-gray-200 dark:border-gray-800 rounded-lg p-4">
                 {/* Author */}
                 <div className="flex items-center gap-3 mb-3">
                   <AvatarImage
@@ -694,25 +796,6 @@ function MiniappContent() {
                 <div className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words">
                   {pendingCastData.text || "No text content"}
                 </div>
-              </div>
-              
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setShowCurateConfirm(false);
-                    setPendingCastData(null);
-                  }}
-                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleConfirmCurate}
-                  disabled={isPasting}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isPasting ? "Curating..." : "Curate"}
-                </button>
               </div>
             </div>
           </div>
