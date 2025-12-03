@@ -843,6 +843,8 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
 
   const [localCompressedView, setLocalCompressedView] = useState(compressedView);
   
+  const author = cast.author;
+  
   // Listen for preference changes
   useEffect(() => {
     const handlePreferencesChange = () => {
@@ -1753,7 +1755,6 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
     }
   };
 
-  const author = cast.author;
   const timestamp = new Date(cast.timestamp);
   const timeAgo = formatDistanceToNow(timestamp, { addSuffix: true });
   
