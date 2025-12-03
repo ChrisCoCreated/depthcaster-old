@@ -549,7 +549,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
     }, 500);
   }, [saveScrollPosition]);
 
-  // Restore feed state (casts and scroll) when returning to home page
+  // Restore casts when returning to home page (runs early, before fetch)
   useEffect(() => {
     // Only restore if we're on the home page
     if (pathname !== "/") return;
@@ -563,12 +563,11 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       previousNav,
       isReturning,
       castsRestored: castsRestoredRef.current,
-      scrollRestored: scrollRestoredRef.current,
       loading,
       castsLength: casts.length,
     });
 
-    // If returning and haven't restored casts yet, restore them first
+    // If returning and haven't restored casts yet, restore them immediately
     if (isReturning && !castsRestoredRef.current) {
       const feedTypeChanged = prevFeedTypeRef.current !== feedType;
       const sortByChanged = prevSortByRef.current !== sortBy;
@@ -590,12 +589,14 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
             scrollY: savedState.scrollY,
           });
           
+          // Mark as restored FIRST to prevent fetch from running
+          castsRestoredRef.current = true;
+          
           // Restore casts
           setCasts(savedState.casts);
           setCursor(savedState.cursor);
           setHasMore(!!savedState.cursor);
           setLoading(false);
-          castsRestoredRef.current = true;
           // Reset scroll restoration flag so scroll can be restored after casts render
           scrollRestoredRef.current = false;
           
@@ -612,32 +613,56 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
         console.log("[Feed] Skipping restoration - feed type or sort changed");
         castsRestoredRef.current = true; // Mark as checked
       }
+    } else if (!isReturning && !castsRestoredRef.current) {
+      // Not returning, so mark as checked to allow normal fetch
+      castsRestoredRef.current = false;
     }
+  }, [pathname, feedType, sortBy, fetchFeed]);
 
-    // Restore scroll position after casts are loaded (or if not returning)
-    if (scrollRestoredRef.current || loading || casts.length === 0) return;
+  // Restore scroll position after casts are loaded and rendered
+  useEffect(() => {
+    // Only restore if we're on the home page
+    if (pathname !== "/") return;
+    
+    // Don't restore if already restored, still loading, or no casts
+    if (scrollRestoredRef.current || loading || casts.length === 0) {
+      return;
+    }
 
     const savedState = getFeedState(feedType);
     if (savedState && savedState.scrollY > 0) {
-      console.log("[Feed] Restoring scroll position", { scrollY: savedState.scrollY });
+      console.log("[Feed] Preparing to restore scroll position", { 
+        scrollY: savedState.scrollY,
+        castsLength: casts.length,
+        loading,
+        scrollRestored: scrollRestoredRef.current,
+      });
       
       // Mark that we're restoring to prevent saving during restoration
       isRestoringScrollRef.current = true;
       scrollRestoredRef.current = true;
       
-      // Restore scroll position after DOM is ready
-      // Use requestAnimationFrame to ensure layout is complete
+      // Wait for DOM to update after casts are rendered
+      // Use multiple requestAnimationFrame calls to ensure layout is complete
+      // and casts are actually rendered in the DOM
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          window.scrollTo({ top: savedState.scrollY, behavior: "auto" });
-          console.log("[Feed] Scroll restored", { scrollY: savedState.scrollY, actualScroll: window.scrollY });
+          // Double-check that casts are still there (in case component unmounted)
+          if (casts.length > 0) {
+            window.scrollTo({ top: savedState.scrollY, behavior: "auto" });
+            console.log("[Feed] Scroll restored", { 
+              scrollY: savedState.scrollY, 
+              actualScroll: window.scrollY,
+              castsLength: casts.length,
+            });
+          }
           isRestoringScrollRef.current = false;
         });
       });
     } else {
       scrollRestoredRef.current = true;
     }
-  }, [feedType, pathname, loading, casts.length, sortBy, fetchFeed]);
+  }, [feedType, pathname, loading, casts.length, casts]);
 
   // Save state when casts or cursor changes
   useEffect(() => {
@@ -796,12 +821,22 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
     // Only fetch if not my-37 feed, or if my-37 feed has saved pack with users
     if (feedType !== "my-37" || (my37PackId && my37HasUsers)) {
       // Check if we already restored casts from saved state
-      // If feed type changed, we should always fetch, so don't check hasRestoredCasts
+      // This check happens early to prevent fetching when casts are restored
       const hasRestoredCasts = castsRestoredRef.current && casts.length > 0;
       const isStateStaleResult = isStateStale(feedType);
       
       // Check if feed type actually changed by comparing with lastFetchedFeedTypeRef
       const actualFeedTypeChanged = lastFetchedFeedTypeRef.current !== feedType && lastFetchedFeedTypeRef.current !== "";
+      
+      // If casts were restored and state is fresh, skip fetch entirely (unless feed type changed)
+      if (hasRestoredCasts && !isStateStaleResult && !actualFeedTypeChanged && !feedTypeChanged && !curatorFidsChanged && !categoryChanged && !qualityScoreChanged && !(sortByChanged && feedType === "curated")) {
+        console.log("[Feed] Skipping fetch - casts already restored", {
+          hasRestoredCasts,
+          castsLength: casts.length,
+          isStateStale: isStateStaleResult,
+        });
+        return;
+      }
       
       // Simple fetch conditions
       const condition1 = isInitialMount; // Always fetch on initial mount
