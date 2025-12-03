@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useNeynarContext } from "@neynar/react";
 import Link from "next/link";
-import Image from "next/image";
 import { FeedbackModal } from "../components/FeedbackModal";
 
 export const dynamic = 'force-dynamic';
@@ -157,24 +156,20 @@ export default function CuratorsPage() {
                       <li>Click the <strong>paste button</strong> (clipboard icon) in the top right of the mini-app</li>
                     </ol>
                     <div className="mt-3 mb-3">
-                      <Image 
+                      <img 
                         src="/images/instructions/paste_mini-app.png" 
                         alt="Paste button in Depthcaster Mini-App" 
-                        width={600} 
-                        height={400}
-                        className="rounded-lg border border-gray-200 dark:border-gray-700"
+                        className="rounded-lg border border-gray-200 dark:border-gray-700 max-w-full h-auto"
                       />
                     </div>
                     <ol className="list-decimal list-inside text-gray-700 dark:text-gray-300 space-y-1 ml-4" start={4}>
                       <li>Alternatively, click the <strong>share button</strong> on any cast and select <strong>Depthcaster</strong> from the share menu</li>
                     </ol>
                     <div className="mt-3 mb-3">
-                      <Image 
+                      <img 
                         src="/images/instructions/share_extentesnion.png" 
                         alt="Share menu with Depthcaster option" 
-                        width={600} 
-                        height={400}
-                        className="rounded-lg border border-gray-200 dark:border-gray-700"
+                        className="rounded-lg border border-gray-200 dark:border-gray-700 max-w-full h-auto"
                       />
                     </div>
                     <ol className="list-decimal list-inside text-gray-700 dark:text-gray-300 space-y-1 ml-4" start={5}>

@@ -639,60 +639,60 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
     };
   }, [feedType, my37PackId, my37HasUsers, fetchFeed]);
 
-  // Reset restoration refs when pathname changes to home page (allows restoration when navigating back)
+  // Reset restoration refs and restore casts when pathname changes to home page
   const prevPathnameRef = useRef<string | null>(null);
   useEffect(() => {
-    // If pathname changed to "/" (returning to home), reset restoration refs
+    // If pathname changed to "/" (returning to home), try to restore immediately
     if (prevPathnameRef.current !== null && prevPathnameRef.current !== "/" && pathname === "/") {
       castsRestoredRef.current = false;
       scrollRestoredRef.current = false;
-    }
-    prevPathnameRef.current = pathname;
-  }, [pathname]);
-
-  // Restore casts from saved state when returning to feed (before fetching)
-  useEffect(() => {
-    // Only restore if we're on the home page and haven't restored casts yet
-    if (pathname !== "/" || castsRestoredRef.current) return;
-    
-    // Don't restore if we're currently loading or if casts are empty (we're switching feeds)
-    if (loading || casts.length === 0) {
-      // If feed type changed, mark that we've checked and shouldn't restore
+      
+      // Try to restore immediately, even if loading or casts are empty
+      // Only check if feed type or sort changed - don't wait for loading/casts state
       const feedTypeChanged = prevFeedTypeRef.current !== feedType;
       const sortByChanged = prevSortByRef.current !== sortBy;
-      if (feedTypeChanged || (sortByChanged && feedType === "curated")) {
-        castsRestoredRef.current = false; // Reset for new feed type
-      }
-      return;
-    }
-    
-    // Don't restore if feed type changed or sortBy changed (for curated)
-    const feedTypeChanged = prevFeedTypeRef.current !== feedType;
-    const sortByChanged = prevSortByRef.current !== sortBy;
-    if (feedTypeChanged || (sortByChanged && feedType === "curated")) {
-      castsRestoredRef.current = false; // Reset for new feed type
-      return;
-    }
-    
-    const savedState = getFeedState(feedType);
-    if (savedState?.casts && savedState.casts.length > 0) {
-      setCasts(savedState.casts);
-      setCursor(savedState.cursor);
-      setHasMore(!!savedState.cursor);
-      setLoading(false);
-      castsRestoredRef.current = true;
-      // Reset scroll restoration flag so it can restore after casts are rendered
-      scrollRestoredRef.current = false;
       
-      // If state is stale, refresh in background
-      if (isStateStale(feedType)) {
-        // Refresh in background without showing loading state
-        fetchFeed().catch(console.error);
+      if (!feedTypeChanged && !(sortByChanged && feedType === "curated")) {
+        const savedState = getFeedState(feedType);
+        if (savedState?.casts && savedState.casts.length > 0) {
+          // Restore casts immediately
+          setCasts(savedState.casts);
+          setCursor(savedState.cursor);
+          setHasMore(!!savedState.cursor);
+          setLoading(false);
+          castsRestoredRef.current = true;
+          // Reset scroll restoration flag so it can restore after casts are rendered
+          scrollRestoredRef.current = false;
+          
+          // Trigger scroll restoration after casts are rendered
+          // Use a small delay to ensure DOM is updated
+          setTimeout(() => {
+            if (savedState.scrollY > 0) {
+              isRestoringScrollRef.current = true;
+              requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                  window.scrollTo({ top: savedState.scrollY, behavior: "auto" });
+                  isRestoringScrollRef.current = false;
+                  scrollRestoredRef.current = true;
+                });
+              });
+            } else {
+              scrollRestoredRef.current = true;
+            }
+          }, 50);
+          
+          // If state is stale, refresh in background
+          if (isStateStale(feedType)) {
+            // Refresh in background without showing loading state
+            fetchFeed().catch(console.error);
+          }
+        } else {
+          castsRestoredRef.current = true; // Mark as checked even if no saved state
+        }
       }
-    } else {
-      castsRestoredRef.current = true; // Mark as checked even if no saved state
     }
-  }, [pathname, feedType, sortBy, fetchFeed, loading, casts.length]);
+    prevPathnameRef.current = pathname;
+  }, [pathname, feedType, sortBy, fetchFeed]);
 
   // Separate effect for feed type changes and other dependencies
   useEffect(() => {
