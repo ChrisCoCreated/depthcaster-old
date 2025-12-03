@@ -2744,20 +2744,14 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                 </div>
               )}
 
-              {/* Thread link */}
-              {showThread && cast.hash && (
+              {/* Thread link - only show "View conversation" on curated feed */}
+              {showThread && cast.hash && (feedType === "curated" || cast._curatorFid) && (
                 <div className="flex items-center gap-3 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                   <Link
-                    href={(feedType === "curated" || cast._curatorFid) ? `/conversation/${cast.hash}` : `/cast/${cast.hash}`}
+                    href={`/conversation/${cast.hash}`}
                     className="text-blue-600 dark:text-blue-400 hover:underline hidden sm:inline font-medium"
                   >
                     {topReplies.length === 0 && !cast._topReplies?.length ? "Start conversation →" : "View conversation →"}
-                  </Link>
-                  <Link
-                    href={`/cast/${cast.hash}`}
-                    className="hover:underline hidden sm:inline"
-                  >
-                    View Neynar algo thread →
                   </Link>
                 </div>
               )}
@@ -3005,9 +2999,9 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                                 )
                               )}
                             </div>
-                      {cast.hash && (
+                      {cast.hash && (feedType === "curated" || cast._curatorFid) && (
                         <Link
-                          href={`${(feedType === "curated" || cast._curatorFid) ? `/conversation/${cast.hash}` : `/cast/${cast.hash}`}${cluster.rootReplyHash ? `?replyHash=${cluster.rootReplyHash}` : ""}`}
+                          href={`/conversation/${cast.hash}${cluster.rootReplyHash ? `?replyHash=${cluster.rootReplyHash}` : ""}`}
                           onClick={(e) => e.stopPropagation()}
                           className="mt-3 inline-flex text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
                         >

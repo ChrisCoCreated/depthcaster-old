@@ -131,9 +131,9 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   const [filtersExpanded, setFiltersExpanded] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("filtersExpanded");
-      return saved === null ? true : saved === "true"; // Default to expanded
+      return saved === null ? false : saved === "true"; // Default to collapsed
     }
-    return true;
+    return false;
   });
   const [allCurators, setAllCurators] = useState<Curator[]>([]);
   
