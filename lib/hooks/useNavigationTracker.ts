@@ -1,0 +1,111 @@
+"use client";
+
+import { useEffect, useRef, useCallback } from "react";
+import { usePathname } from "next/navigation";
+import { saveNavigationState, getScrollPosition, setPreviousPathname } from "@/lib/navigationHistory";
+import { throttle } from "@/lib/feedState";
+
+/**
+ * Hook to track navigation history and scroll positions
+ * Saves scroll position continuously and restores it when returning to a page
+ */
+export function useNavigationTracker() {
+  const pathname = usePathname();
+  const previousPathnameRef = useRef<string | null>(null);
+  const scrollRestoredRef = useRef(false);
+  const isRestoringScrollRef = useRef(false);
+  const throttledSaveScrollRef = useRef<ReturnType<typeof throttle> | null>(null);
+
+  // Save scroll position for current page (throttled)
+  const saveScrollPosition = useCallback(() => {
+    if (isRestoringScrollRef.current || !previousPathnameRef.current) return;
+
+    const scrollY = window.scrollY || document.documentElement.scrollTop;
+    saveNavigationState(previousPathnameRef.current, scrollY);
+  }, []);
+
+  // Initialize throttled save function
+  useEffect(() => {
+    throttledSaveScrollRef.current = throttle(() => {
+      saveScrollPosition();
+    }, 500);
+  }, [saveScrollPosition]);
+
+  // Save scroll position on scroll (throttled) for current page
+  useEffect(() => {
+    if (!previousPathnameRef.current) return;
+
+    const handleScroll = () => {
+      if (throttledSaveScrollRef.current && !isRestoringScrollRef.current) {
+        throttledSaveScrollRef.current();
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [pathname, previousPathnameRef.current]);
+
+  // Handle pathname changes and scroll restoration
+  useEffect(() => {
+    // On initial mount
+    if (previousPathnameRef.current === null) {
+      previousPathnameRef.current = pathname;
+      scrollRestoredRef.current = true;
+      return;
+    }
+
+    // Pathname changed
+    if (previousPathnameRef.current !== pathname) {
+      // Save scroll position of the page we're leaving
+      const scrollY = window.scrollY || document.documentElement.scrollTop;
+      if (previousPathnameRef.current) {
+        saveNavigationState(previousPathnameRef.current, scrollY);
+      }
+
+      // Set the previous pathname for back button functionality
+      setPreviousPathname(previousPathnameRef.current);
+
+      // Check if we have a saved scroll position for the page we're navigating to
+      const savedScrollY = getScrollPosition(pathname);
+
+      // Update ref
+      previousPathnameRef.current = pathname;
+      scrollRestoredRef.current = false;
+
+      if (savedScrollY !== null && savedScrollY > 0) {
+        // Restore scroll position after page renders
+        isRestoringScrollRef.current = true;
+        setTimeout(() => {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              window.scrollTo({ top: savedScrollY, behavior: "auto" });
+              isRestoringScrollRef.current = false;
+              scrollRestoredRef.current = true;
+            });
+          });
+        }, 100);
+      } else {
+        // New page or no saved position, scroll to top
+        window.scrollTo({ top: 0, behavior: "auto" });
+        scrollRestoredRef.current = true;
+      }
+    }
+  }, [pathname]);
+
+  // Save scroll position before page unload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (previousPathnameRef.current) {
+        const scrollY = window.scrollY || document.documentElement.scrollTop;
+        saveNavigationState(previousPathnameRef.current, scrollY);
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [pathname]);
+}

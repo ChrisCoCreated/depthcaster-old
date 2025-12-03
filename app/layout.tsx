@@ -9,6 +9,7 @@ import { OnboardingFlow } from "./components/OnboardingFlow";
 import { UpdateNotification } from "./components/UpdateNotification";
 import { PushSubscriptionManager } from "./components/PushSubscriptionManager";
 import { SessionTracker } from "./components/SessionTracker";
+import { NavigationManager } from "./components/NavigationManager";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -117,6 +118,7 @@ export default function RootLayout({
           <PushSubscriptionManager />
           <OnboardingFlow />
           <UpdateNotification />
+          <NavigationManager />
           <ConditionalHeader />
           {children}
         </AuthProvider>
