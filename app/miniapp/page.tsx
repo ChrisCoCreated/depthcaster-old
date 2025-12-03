@@ -35,6 +35,8 @@ function MiniappContent() {
   const [toast, setToast] = useState<{ message: string; type: "error" | "success" } | null>(null);
   const [showCurateConfirm, setShowCurateConfirm] = useState(false);
   const [pendingCastData, setPendingCastData] = useState<any>(null);
+  const [showPasteInput, setShowPasteInput] = useState(false);
+  const [pasteInputValue, setPasteInputValue] = useState("");
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://depthcaster.vercel.app";
 
@@ -144,27 +146,25 @@ function MiniappContent() {
     return null;
   };
 
-  const handlePasteToCurate = async () => {
+  const handlePasteToCurate = () => {
     if (!context?.user?.fid || isPasting) return;
+    
+    // In miniapp, clipboard access always fails, so show text input directly
+    setShowPasteInput(true);
+    setPasteInputValue("");
+  };
+
+  const handlePasteInputSubmit = async () => {
+    if (!context?.user?.fid || isPasting || !pasteInputValue.trim()) return;
 
     try {
       setIsPasting(true);
       
-      // Read clipboard
-      let clipboardText: string;
-      try {
-        clipboardText = await navigator.clipboard.readText();
-      } catch (clipboardError: any) {
-        // Clipboard API might fail if permission denied or not HTTPS
-        showToast("Unable to access clipboard. Please ensure you're on HTTPS and have granted clipboard permissions.");
-        return;
-      }
-      
       // Extract cast identifier (URL or hash)
-      const castIdentifier = extractCastIdentifier(clipboardText);
+      const castIdentifier = extractCastIdentifier(pasteInputValue.trim());
       
       if (!castIdentifier) {
-        showToast("Clipboard doesn't contain a valid cast link or hash");
+        showToast("Text doesn't contain a valid cast link or hash");
         return;
       }
 
@@ -191,6 +191,10 @@ function MiniappContent() {
         showToast("Cast hash not found in response");
         return;
       }
+
+      // Close text input
+      setShowPasteInput(false);
+      setPasteInputValue("");
 
       // Show confirmation modal with cast preview
       setPendingCastData(castData);
@@ -402,7 +406,7 @@ function MiniappContent() {
             Depthcaster
           </Link>
           {context?.user?.fid && (
-            <div className="flex items-center gap-1">
+            <div className="relative flex items-center gap-1">
               <Link
                 href="/why"
                 className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
@@ -448,6 +452,49 @@ function MiniappContent() {
                   </svg>
                 )}
               </button>
+              
+              {/* Expandable text input */}
+              {showPasteInput && (
+                <div className="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-lg p-3 z-[250] transition-all duration-300">
+                  <input
+                    type="text"
+                    value={pasteInputValue}
+                    onChange={(e) => setPasteInputValue(e.target.value)}
+                    placeholder="Paste cast link or hash"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handlePasteInputSubmit();
+                      }
+                      if (e.key === 'Escape') {
+                        e.preventDefault();
+                        setShowPasteInput(false);
+                        setPasteInputValue("");
+                      }
+                    }}
+                  />
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      onClick={handlePasteInputSubmit}
+                      disabled={isPasting || !pasteInputValue.trim()}
+                      className="flex-1 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Submit
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowPasteInput(false);
+                        setPasteInputValue("");
+                      }}
+                      className="px-3 py-1.5 border border-gray-300 dark:border-gray-700 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

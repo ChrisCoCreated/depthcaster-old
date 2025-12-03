@@ -377,6 +377,18 @@ export const miniappInstallations = pgTable("miniapp_installations", {
   installedAtIdx: index("miniapp_installations_installed_at_idx").on(table.installedAt),
 }));
 
+export const curatorRecommendations = pgTable("curator_recommendations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  recommendedUserFid: bigint("recommended_user_fid", { mode: "number" }).notNull().references(() => users.fid, { onDelete: "cascade" }),
+  recommenderFid: bigint("recommender_fid", { mode: "number" }).notNull().references(() => users.fid, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  recommendedRecommenderUnique: uniqueIndex("curator_recommendations_recommended_recommender_unique").on(table.recommendedUserFid, table.recommenderFid),
+  recommendedUserFidIdx: index("curator_recommendations_recommended_user_fid_idx").on(table.recommendedUserFid),
+  recommenderFidIdx: index("curator_recommendations_recommender_fid_idx").on(table.recommenderFid),
+  createdAtIdx: index("curator_recommendations_created_at_idx").on(table.createdAt),
+}));
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type CuratorPack = typeof curatorPacks.$inferSelect;
