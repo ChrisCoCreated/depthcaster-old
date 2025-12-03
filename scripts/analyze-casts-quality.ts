@@ -18,6 +18,7 @@ import { db } from "../lib/db";
 import { curatedCasts, castReplies } from "../lib/schema";
 import { isNull, eq } from "drizzle-orm";
 import { analyzeBatch } from "../lib/deepseek-quality";
+import { sendPushNotificationToUser } from "../lib/pushNotifications";
 
 /**
  * Analyze quality for curated casts
@@ -57,6 +58,30 @@ async function analyzeCuratedCasts() {
             qualityAnalyzedAt: new Date(),
           })
           .where(eq(curatedCasts.castHash, castHash));
+        
+        // Notify cast author about quality score
+        const castRecord = await db
+          .select({ authorFid: curatedCasts.authorFid })
+          .from(curatedCasts)
+          .where(eq(curatedCasts.castHash, castHash))
+          .limit(1);
+        
+        if (castRecord[0]?.authorFid) {
+          sendPushNotificationToUser(castRecord[0].authorFid, {
+            title: "Your cast has been curated",
+            body: `Quality score: ${analysisResult.qualityScore}. DM @chris if this doesn't seem right.`,
+            icon: "/icon-192x192.webp",
+            badge: "/icon-96x96.webp",
+            data: {
+              type: "cast_curated_quality",
+              castHash: castHash,
+              qualityScore: analysisResult.qualityScore,
+              url: `/cast/${castHash}`
+            },
+          }).catch((error) => {
+            console.error(`[Analyze] Error sending quality score notification to author ${castRecord[0].authorFid}:`, error);
+          });
+        }
       },
       {
         batchSize: 5,

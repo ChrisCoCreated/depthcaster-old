@@ -352,6 +352,30 @@ export async function POST(request: NextRequest) {
               })
               .where(eq(curatedCasts.castHash, hash));
             console.log(`[Curate] Quality analysis completed for cast ${hash}: score=${result.qualityScore}, category=${result.category}`);
+            
+            // Notify cast author about quality score
+            const castRecord = await db
+              .select({ authorFid: curatedCasts.authorFid })
+              .from(curatedCasts)
+              .where(eq(curatedCasts.castHash, hash))
+              .limit(1);
+            
+            if (castRecord[0]?.authorFid) {
+              sendPushNotificationToUser(castRecord[0].authorFid, {
+                title: "Your cast has been curated",
+                body: `Quality score: ${result.qualityScore}. DM @chris if this doesn't seem right.`,
+                icon: "/icon-192x192.webp",
+                badge: "/icon-96x96.webp",
+                data: {
+                  type: "cast_curated_quality",
+                  castHash: hash,
+                  qualityScore: result.qualityScore,
+                  url: `/cast/${hash}`
+                },
+              }).catch((error) => {
+                console.error(`[Curate] Error sending quality score notification to author ${castRecord[0].authorFid}:`, error);
+              });
+            }
           } catch (error: any) {
             console.error(`[Curate] Error updating quality analysis for cast ${hash}:`, error.message);
           }
@@ -438,6 +462,30 @@ export async function POST(request: NextRequest) {
                     })
                     .where(eq(curatedCasts.castHash, hash));
                   console.log(`[Curate] Quality analysis completed for cast ${hash}: score=${result.qualityScore}, category=${result.category}`);
+                  
+                  // Notify cast author about quality score
+                  const castRecord = await db
+                    .select({ authorFid: curatedCasts.authorFid })
+                    .from(curatedCasts)
+                    .where(eq(curatedCasts.castHash, hash))
+                    .limit(1);
+                  
+                  if (castRecord[0]?.authorFid) {
+                    sendPushNotificationToUser(castRecord[0].authorFid, {
+                      title: "Your cast has been curated",
+                      body: `Quality score: ${result.qualityScore}. DM @chris if this doesn't seem right.`,
+                      icon: "/icon-192x192.webp",
+                      badge: "/icon-96x96.webp",
+                      data: {
+                        type: "cast_curated_quality",
+                        castHash: hash,
+                        qualityScore: result.qualityScore,
+                        url: `/cast/${hash}`
+                      },
+                    }).catch((error) => {
+                      console.error(`[Curate] Error sending quality score notification to author ${castRecord[0].authorFid}:`, error);
+                    });
+                  }
                 } catch (error: any) {
                   console.error(`[Curate] Error updating quality analysis for cast ${hash}:`, error.message);
                 }

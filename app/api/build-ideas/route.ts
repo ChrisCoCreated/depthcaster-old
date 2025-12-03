@@ -6,6 +6,19 @@ import { isAdmin, getUserRoles } from "@/lib/roles";
 import { getUser } from "@/lib/users";
 import { notifyAdminsAboutFeedback } from "@/lib/notifications";
 
+export async function OPTIONS(request: NextRequest) {
+  // Handle CORS preflight requests
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Max-Age": "86400",
+    },
+  });
+}
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;

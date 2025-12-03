@@ -672,7 +672,7 @@ export function Header() {
                   >
                     <HelpCircle className="w-5 h-5 sm:w-6 sm:h-6" />
                   </button>
-                  {isHelpDropdownOpen && mounted && createPortal(
+                  {isHelpDropdownOpen && mounted && typeof document !== "undefined" && document.body && createPortal(
                     <div
                       ref={helpDropdownRef}
                       className="fixed w-48 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 py-1 z-[9998]"
@@ -724,7 +724,7 @@ export function Header() {
                       className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover"
                     />
                   </button>
-                  {isPfpDropdownOpen && mounted && createPortal(
+                  {isPfpDropdownOpen && mounted && typeof document !== "undefined" && document.body && createPortal(
                     <div
                       ref={pfpDropdownRef}
                       className="fixed w-48 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 py-1 z-[9998]"

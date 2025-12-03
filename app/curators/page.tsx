@@ -148,7 +148,22 @@ export default function CuratorsPage() {
 
                   <div>
                     <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">
-                      Method 3: Mention @deepbot
+                      Method 3: Depthcaster Mini-App
+                    </h4>
+                    <ol className="list-decimal list-inside text-gray-700 dark:text-gray-300 space-y-1 ml-4">
+                      <li>Open the <a href="https://farcaster.xyz/miniapps/HtUwgAw4iQ2x/depthcaster" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">Depthcaster Mini-App</a> in Farcaster</li>
+                      <li>Click the <strong>paste button</strong> (clipboard icon) in the top right of the mini-app</li>
+                      <li>Alternatively, click the <strong>share button</strong> on any cast and select <strong>Depthcaster</strong> from the share menu</li>
+                      <li>The cast will be automatically curated</li>
+                    </ol>
+                    <p className="text-gray-600 dark:text-gray-400 text-sm mt-2">
+                      This is the easiest way to curate directly from Farcaster without leaving the app.
+                    </p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">
+                      Method 4: Mention @deepbot
                     </h4>
                     <ol className="list-decimal list-inside text-gray-700 dark:text-gray-300 space-y-1 ml-4">
                       <li>Reply to a cast mentioning <strong>@deepbot</strong> in any client — the cast you&apos;re replying to will be automatically curated</li>

@@ -1312,6 +1312,11 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
     </div>
   );
 
+  // Only render portal if document.body exists (prevents errors in React Strict Mode)
+  if (typeof document === "undefined" || !document.body) {
+    return null;
+  }
+
   return createPortal(content, document.body);
 }
 
