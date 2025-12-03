@@ -6,7 +6,7 @@ import { CastCard } from "./CastCard";
 interface UserActivitySectionProps {
   fid: number;
   viewerFid?: number;
-  type: "casts" | "replies-recasts" | "popular-casts" | "interactions";
+  type: "casts" | "replies-recasts" | "popular-casts" | "interactions" | "curated-casts";
   title: string;
   icon?: string;
   autoExpand?: boolean;
@@ -112,7 +112,7 @@ export function UserActivitySection({
       );
     }
 
-    // For casts, replies-recasts, and popular-casts, item is the cast
+    // For casts, replies-recasts, popular-casts, and curated-casts, item is the cast
     return (
       <CastCard
         key={item.hash || `item-${index}`}

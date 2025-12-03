@@ -34,7 +34,14 @@ export function BackButton() {
   const handleBack = () => {
     const previousNav = getPreviousNavigation();
     
+    console.log("[BackButton] Back button clicked", {
+      currentPathname: pathname,
+      currentScrollY: window.scrollY || document.documentElement.scrollTop,
+      previousNav,
+    });
+    
     if (!previousNav) {
+      console.log("[BackButton] No previous navigation, using browser back");
       // Fallback to browser back if no saved history
       router.back();
       return;
@@ -43,6 +50,11 @@ export function BackButton() {
     // Save current page's scroll position before navigating
     const currentScrollY = window.scrollY || document.documentElement.scrollTop;
     saveNavigationState(pathname, currentScrollY);
+
+    console.log("[BackButton] Navigating to previous page", {
+      previousPathname: previousNav.pathname,
+      previousScrollY: previousNav.scrollY,
+    });
 
     // Navigate to previous page
     // The useNavigationTracker hook will detect the pathname change and restore scroll position

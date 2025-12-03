@@ -6,7 +6,7 @@ import Link from "next/link";
 import { ProfileHeader } from "../../components/ProfileHeader";
 import { UserActivitySection } from "../../components/UserActivitySection";
 
-type ActivityType = "popular-casts" | "casts" | "replies-recasts" | "interactions";
+type ActivityType = "curated-casts" | "popular-casts" | "casts" | "replies-recasts" | "interactions";
 
 interface UserProfile {
   fid: number;
@@ -29,7 +29,7 @@ export default function ProfilePage({
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<ActivityType>("popular-casts");
+  const [activeTab, setActiveTab] = useState<ActivityType>("curated-casts");
   const fid = parseInt(fidParam);
 
   useEffect(() => {
@@ -137,6 +137,7 @@ export default function ProfilePage({
           <div className="sticky top-0 bg-white dark:bg-black border-b border-gray-200 dark:border-gray-800 z-40">
             <div className="flex gap-1 overflow-x-auto px-2 sm:px-4 scrollbar-hide overscroll-x-contain">
               {[
+                { id: "curated-casts" as ActivityType, label: "Curated Casts" },
                 { id: "popular-casts" as ActivityType, label: "Popular Casts" },
                 { id: "casts" as ActivityType, label: "Casts" },
                 { id: "replies-recasts" as ActivityType, label: "Replies & Recasts" },
@@ -159,6 +160,16 @@ export default function ProfilePage({
 
           {/* Activity content */}
           <div className="mt-4">
+            {activeTab === "curated-casts" && (
+              <UserActivitySection
+                fid={fid}
+                viewerFid={viewerFid}
+                type="curated-casts"
+                title="Curated Casts"
+                icon="✨"
+                autoExpand={true}
+              />
+            )}
             {activeTab === "popular-casts" && (
               <UserActivitySection
                 fid={fid}

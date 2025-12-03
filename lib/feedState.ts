@@ -46,6 +46,12 @@ export function saveFeedState(feedType: string, state: Partial<FeedState>): void
 
     const key = getStorageKey(feedType);
     sessionStorage.setItem(key, JSON.stringify(newState));
+    console.log("[FeedState] Saved feed state", {
+      feedType,
+      scrollY: newState.scrollY,
+      castsCount: castsToSave?.length || 0,
+      cursor: newState.cursor,
+    });
   } catch (error) {
     console.error("Failed to save feed state:", error);
   }
@@ -60,17 +66,28 @@ export function getFeedState(feedType: string): FeedState | null {
   try {
     const key = getStorageKey(feedType);
     const stored = sessionStorage.getItem(key);
-    if (!stored) return null;
+    if (!stored) {
+      console.log("[FeedState] No saved state found", { feedType });
+      return null;
+    }
 
     const state: FeedState = JSON.parse(stored);
     
     // Check if state is too old
     const age = Date.now() - state.timestamp;
     if (age > MAX_STATE_AGE_MS) {
+      console.log("[FeedState] State too old, clearing", { feedType, age });
       clearFeedState(feedType);
       return null;
     }
 
+    console.log("[FeedState] Retrieved feed state", {
+      feedType,
+      scrollY: state.scrollY,
+      castsCount: state.casts?.length || 0,
+      cursor: state.cursor,
+      age,
+    });
     return state;
   } catch (error) {
     console.error("Failed to get feed state:", error);

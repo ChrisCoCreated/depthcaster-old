@@ -64,6 +64,12 @@ export function useNavigationTracker() {
         saveNavigationState(previousPathnameRef.current, scrollY);
       }
 
+      console.log("[NavigationTracker] Pathname changed", {
+        from: previousPathnameRef.current,
+        to: pathname,
+        savedScrollY: scrollY,
+      });
+
       // Set the previous pathname for back button functionality
       setPreviousPathname(previousPathnameRef.current);
 
@@ -73,6 +79,7 @@ export function useNavigationTracker() {
 
       // Skip scroll restoration on home page - let Feed component handle it
       if (pathname === "/") {
+        console.log("[NavigationTracker] Skipping scroll restoration on home page - Feed will handle it");
         // Don't restore scroll or scroll to top - Feed will handle restoration
         scrollRestoredRef.current = true;
         return;

@@ -644,6 +644,16 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   useEffect(() => {
     // If pathname changed to "/" (returning to home), try to restore immediately
     if (prevPathnameRef.current !== null && prevPathnameRef.current !== "/" && pathname === "/") {
+      console.log("[Feed] Pathname changed to home page, attempting restoration", {
+        prevPathname: prevPathnameRef.current,
+        currentPathname: pathname,
+        feedType,
+        loading,
+        castsLength: casts.length,
+        castsRestored: castsRestoredRef.current,
+        scrollRestored: scrollRestoredRef.current,
+      });
+      
       castsRestoredRef.current = false;
       scrollRestoredRef.current = false;
       
@@ -652,9 +662,32 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       const feedTypeChanged = prevFeedTypeRef.current !== feedType;
       const sortByChanged = prevSortByRef.current !== sortBy;
       
+      console.log("[Feed] Checking restoration conditions", {
+        feedTypeChanged,
+        sortByChanged,
+        prevFeedType: prevFeedTypeRef.current,
+        currentFeedType: feedType,
+        prevSortBy: prevSortByRef.current,
+        currentSortBy: sortBy,
+      });
+      
       if (!feedTypeChanged && !(sortByChanged && feedType === "curated")) {
         const savedState = getFeedState(feedType);
+        console.log("[Feed] Saved state check", {
+          hasSavedState: !!savedState,
+          savedCastsCount: savedState?.casts?.length || 0,
+          savedScrollY: savedState?.scrollY || 0,
+          savedCursor: savedState?.cursor || null,
+          isStale: savedState ? isStateStale(feedType) : null,
+        });
+        
         if (savedState?.casts && savedState.casts.length > 0) {
+          console.log("[Feed] Restoring casts from saved state", {
+            castsCount: savedState.casts.length,
+            cursor: savedState.cursor,
+            scrollY: savedState.scrollY,
+          });
+          
           // Restore casts immediately
           setCasts(savedState.casts);
           setCursor(savedState.cursor);
@@ -668,27 +701,34 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
           // Use a small delay to ensure DOM is updated
           setTimeout(() => {
             if (savedState.scrollY > 0) {
+              console.log("[Feed] Restoring scroll position", { scrollY: savedState.scrollY });
               isRestoringScrollRef.current = true;
               requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
                   window.scrollTo({ top: savedState.scrollY, behavior: "auto" });
+                  console.log("[Feed] Scroll restored", { scrollY: savedState.scrollY, actualScroll: window.scrollY });
                   isRestoringScrollRef.current = false;
                   scrollRestoredRef.current = true;
                 });
               });
             } else {
+              console.log("[Feed] No scroll position to restore");
               scrollRestoredRef.current = true;
             }
           }, 50);
           
           // If state is stale, refresh in background
           if (isStateStale(feedType)) {
+            console.log("[Feed] State is stale, refreshing in background");
             // Refresh in background without showing loading state
             fetchFeed().catch(console.error);
           }
         } else {
+          console.log("[Feed] No saved state to restore");
           castsRestoredRef.current = true; // Mark as checked even if no saved state
         }
+      } else {
+        console.log("[Feed] Skipping restoration - feed type or sort changed");
       }
     }
     prevPathnameRef.current = pathname;
@@ -809,7 +849,28 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       const skipCondition = hasRestoredCasts && !isStateStaleResult && !actualFeedTypeChanged && !curatorFidsChanged && !categoryChanged && !qualityScoreChanged;
       const shouldFetch = fetchCondition && !skipCondition;
       
+      console.log("[Feed] Fetch decision", {
+        feedType,
+        hasRestoredCasts,
+        isStateStaleResult,
+        actualFeedTypeChanged,
+        isInitialMount,
+        feedTypeChanged,
+        sortByChanged,
+        curatorFidsChanged,
+        categoryChanged,
+        qualityScoreChanged,
+        lastFetchedFeedType: lastFetchedFeedTypeRef.current,
+        fetchingRef: fetchingRef.current,
+        fetchCondition,
+        skipCondition,
+        shouldFetch,
+        castsLength: casts.length,
+        loading,
+      });
+      
       if (shouldFetch && !fetchingRef.current) {
+        console.log("[Feed] Fetching feed", { feedType });
         fetchingRef.current = true;
         hasInitialFetchRef.current = true;
         // Update the last fetched ref BEFORE fetching to prevent duplicate fetches

@@ -75,6 +75,7 @@ export function saveNavigationState(pathname: string, scrollY: number): void {
     history.scrollPositions[pathname] = scrollY;
     history.timestamps[pathname] = Date.now();
     saveHistory(history);
+    console.log("[NavigationHistory] Saved scroll position", { pathname, scrollY });
   } catch (error) {
     console.error("Failed to save navigation state:", error);
   }
@@ -85,7 +86,9 @@ export function saveNavigationState(pathname: string, scrollY: number): void {
  */
 export function getScrollPosition(pathname: string): number | null {
   const history = getHistory();
-  return history.scrollPositions[pathname] ?? null;
+  const scrollY = history.scrollPositions[pathname] ?? null;
+  console.log("[NavigationHistory] Get scroll position", { pathname, scrollY });
+  return scrollY;
 }
 
 /**
