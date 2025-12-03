@@ -20,6 +20,7 @@ function ShareContent() {
   const [isPasting, setIsPasting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasCheckedShare, setHasCheckedShare] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   const farcasterDmLink = context?.user?.fid 
     ? `https://farcaster.xyz/~/inbox/${context.user.fid}-${ADMIN_FID}`
@@ -86,10 +87,15 @@ function ShareContent() {
     }
   };
 
+  // Set mounted to true on client side to prevent flicker
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Handle share extension context
   useEffect(() => {
     // Only check once
-    if (hasCheckedShare) return;
+    if (hasCheckedShare || !mounted) return;
 
     // Check URL params for castHash (from share extension redirect)
     const castHashFromUrl = searchParams.get("castHash");
@@ -115,11 +121,11 @@ function ShareContent() {
       }
     }
 
-    // If no castHash found, redirect to miniapp
+    // If no castHash found and SDK is loaded, redirect to miniapp
     if (!castHashFromUrl && isSDKLoaded) {
       router.replace("/miniapp");
     }
-  }, [isSDKLoaded, context, searchParams, hasCheckedShare, router]);
+  }, [mounted, isSDKLoaded, context, searchParams, hasCheckedShare, router]);
 
   const handleCancel = () => {
     router.push("/miniapp");
@@ -168,7 +174,8 @@ function ShareContent() {
     }
   };
 
-  if (loading || checkingCurator) {
+  // Don't render anything until mounted to prevent flicker
+  if (!mounted || loading || checkingCurator) {
     return (
       <div className="min-h-screen bg-white dark:bg-black flex items-center justify-center">
         <div className="text-gray-600 dark:text-gray-400">Loading...</div>
