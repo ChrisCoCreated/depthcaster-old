@@ -544,9 +544,9 @@ function MiniappContent() {
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 py-6">
-        <div className="mb-6">
-          <p className="text-xs text-gray-600 dark:text-gray-400 mb-4">
+      <div className="max-w-2xl mx-auto px-4 pt-2 pb-6">
+        <div className="mb-2">
+          <p className="text-xs text-gray-600 dark:text-gray-400 mb-0">
             Latest Quality Curations
           </p>
           {!checkingInstall && !installed && isSDKLoaded && (
