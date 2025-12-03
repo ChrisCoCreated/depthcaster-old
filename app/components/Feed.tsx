@@ -569,48 +569,46 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
 
     // If returning and haven't restored casts yet, restore them immediately
     if (isReturning && !castsRestoredRef.current) {
-      const feedTypeChanged = prevFeedTypeRef.current !== feedType;
-      const sortByChanged = prevSortByRef.current !== sortBy;
+      // Check if there's saved state for the current feed type
+      // The saved state is already keyed by feed type, so if it exists, it's for this feed type
+      const savedState = getFeedState(feedType);
       
-      // Only restore if feed type and sort haven't changed
-      if (!feedTypeChanged && !(sortByChanged && feedType === "curated")) {
-        const savedState = getFeedState(feedType);
-        
-        console.log("[Feed] Attempting to restore casts", {
-          hasSavedState: !!savedState,
-          savedCastsCount: savedState?.casts?.length || 0,
-          savedScrollY: savedState?.scrollY || 0,
+      console.log("[Feed] Attempting to restore casts", {
+        hasSavedState: !!savedState,
+        savedCastsCount: savedState?.casts?.length || 0,
+        savedScrollY: savedState?.scrollY || 0,
+        currentFeedType: feedType,
+      });
+      
+      if (savedState?.casts && savedState.casts.length > 0) {
+        console.log("[Feed] Restoring casts from saved state", {
+          castsCount: savedState.casts.length,
+          cursor: savedState.cursor,
+          scrollY: savedState.scrollY,
         });
         
-        if (savedState?.casts && savedState.casts.length > 0) {
-          console.log("[Feed] Restoring casts from saved state", {
-            castsCount: savedState.casts.length,
-            cursor: savedState.cursor,
-            scrollY: savedState.scrollY,
-          });
-          
-          // Mark as restored FIRST to prevent fetch from running
-          castsRestoredRef.current = true;
-          
-          // Restore casts
-          setCasts(savedState.casts);
-          setCursor(savedState.cursor);
-          setHasMore(!!savedState.cursor);
-          setLoading(false);
-          // Reset scroll restoration flag so scroll can be restored after casts render
-          scrollRestoredRef.current = false;
-          
-          // If state is stale, refresh in background
-          if (isStateStale(feedType)) {
-            console.log("[Feed] State is stale, refreshing in background");
-            fetchFeed().catch(console.error);
-          }
-        } else {
-          console.log("[Feed] No saved casts to restore");
-          castsRestoredRef.current = true; // Mark as checked
+        // Mark as restored FIRST to prevent fetch from running
+        castsRestoredRef.current = true;
+        
+        // Restore casts
+        setCasts(savedState.casts);
+        setCursor(savedState.cursor);
+        setHasMore(!!savedState.cursor);
+        setLoading(false);
+        // Reset scroll restoration flag so scroll can be restored after casts render
+        scrollRestoredRef.current = false;
+        
+        // Update refs to match current state
+        prevFeedTypeRef.current = feedType;
+        prevSortByRef.current = sortBy;
+        
+        // If state is stale, refresh in background
+        if (isStateStale(feedType)) {
+          console.log("[Feed] State is stale, refreshing in background");
+          fetchFeed().catch(console.error);
         }
       } else {
-        console.log("[Feed] Skipping restoration - feed type or sort changed");
+        console.log("[Feed] No saved casts to restore");
         castsRestoredRef.current = true; // Mark as checked
       }
     } else if (!isReturning && !castsRestoredRef.current) {
@@ -643,22 +641,23 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       scrollRestoredRef.current = true;
       
       // Wait for DOM to update after casts are rendered
-      // Use multiple requestAnimationFrame calls to ensure layout is complete
-      // and casts are actually rendered in the DOM
-      requestAnimationFrame(() => {
+      // Use setTimeout + requestAnimationFrame to ensure layout is complete
+      setTimeout(() => {
         requestAnimationFrame(() => {
-          // Double-check that casts are still there (in case component unmounted)
-          if (casts.length > 0) {
-            window.scrollTo({ top: savedState.scrollY, behavior: "auto" });
-            console.log("[Feed] Scroll restored", { 
-              scrollY: savedState.scrollY, 
-              actualScroll: window.scrollY,
-              castsLength: casts.length,
-            });
-          }
-          isRestoringScrollRef.current = false;
+          requestAnimationFrame(() => {
+            // Double-check that casts are still there (in case component unmounted)
+            if (casts.length > 0) {
+              window.scrollTo({ top: savedState.scrollY, behavior: "auto" });
+              console.log("[Feed] Scroll restored", { 
+                scrollY: savedState.scrollY, 
+                actualScroll: window.scrollY,
+                castsLength: casts.length,
+              });
+            }
+            isRestoringScrollRef.current = false;
+          });
         });
-      });
+      }, 100); // Increased delay to ensure DOM is ready
     } else {
       scrollRestoredRef.current = true;
     }
