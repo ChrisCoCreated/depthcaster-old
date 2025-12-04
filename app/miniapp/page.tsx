@@ -557,53 +557,47 @@ function MiniappContent() {
 
       <div className="max-w-2xl mx-auto px-4 pt-2 pb-6">
         <div className="mb-2">
-          <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-            Latest Quality Curations
-          </p>
-          
-          {/* Quality Filter Buttons - Collapsible */}
-          <div className="mb-3">
-            <button
-              onClick={() => setShowQualityFilters(!showQualityFilters)}
-              className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
-            >
-              <span>Quality: {minQualityScore}+</span>
-              <svg
-                className={`w-3 h-3 transition-transform ${showQualityFilters ? "rotate-180" : ""}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <p className="text-xs text-gray-600 dark:text-gray-400">
+              Latest Quality Curations
+            </p>
+            
+            {/* Quality Filter - Collapsible */}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setShowQualityFilters(!showQualityFilters)}
+                className="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            {showQualityFilters && (
-              <div className="flex items-center gap-1 mt-1">
-                {[
-                  { value: 70, label: "70+" },
-                  { value: 60, label: "60+" },
-                  { value: 50, label: "50+" },
-                  { value: 20, label: "20+" },
-                ].map((filter) => (
-                  <button
-                    key={filter.value}
-                    onClick={() => {
-                      setMinQualityScore(filter.value);
-                      localStorage.setItem("miniappMinQualityScore", filter.value.toString());
-                      // Refresh feed with new quality filter
-                      fetchFeed(3);
-                    }}
-                    className={`px-1.5 py-0.5 text-[10px] rounded transition-colors ${
-                      minQualityScore === filter.value
-                        ? "bg-blue-600 text-white"
-                        : "bg-black text-white hover:bg-gray-800"
-                    }`}
-                  >
-                    {filter.label}
-                  </button>
-                ))}
-              </div>
-            )}
+                {showQualityFilters ? "Hide" : `Q: ${minQualityScore}+`}
+              </button>
+              {showQualityFilters && (
+                <div className="flex items-center gap-1">
+                  {[
+                    { value: 70, label: "70+" },
+                    { value: 60, label: "60+" },
+                    { value: 50, label: "50+" },
+                    { value: 20, label: "20+" },
+                  ].map((filter) => (
+                    <button
+                      key={filter.value}
+                      onClick={() => {
+                        setMinQualityScore(filter.value);
+                        localStorage.setItem("miniappMinQualityScore", filter.value.toString());
+                        // Refresh feed with new quality filter
+                        fetchFeed(3);
+                      }}
+                      className={`px-1.5 py-0.5 text-[10px] rounded transition-colors ${
+                        minQualityScore === filter.value
+                          ? "bg-black text-white dark:bg-white dark:text-black"
+                          : "bg-black text-gray-400 dark:bg-gray-800 dark:text-gray-500 hover:text-white dark:hover:text-gray-300"
+                      }`}
+                    >
+                      {filter.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {!checkingInstall && !installed && isSDKLoaded && (

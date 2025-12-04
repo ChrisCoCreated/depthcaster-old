@@ -1486,11 +1486,11 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
           <div className="flex gap-1 overflow-x-auto scrollbar-hide overscroll-x-contain flex-1">
             {[
               { id: "curated", label: "Curated", requiresAuth: false },
+              { id: "my-37", label: myFeedLabel, requiresAuth: true },
               { id: "1500+", label: "1500+", requiresAuth: false },
               { id: "trending", label: "Trending", requiresAuth: true },
               { id: "for-you", label: "For You", requiresAuth: true },
               { id: "following", label: "Following", requiresAuth: true },
-              { id: "my-37", label: myFeedLabel, requiresAuth: true },
             ].map((tab) => {
             const isDisabled = tab.requiresAuth && !viewerFid;
             const isActive = feedType === tab.id;

@@ -24,29 +24,9 @@ export async function GET(request: NextRequest) {
       ? parseInt(searchParams.get("minQualityScore")!)
       : 70; // Default to 70+ for miniapp
 
-    // Get first curation times using aggregation query (more reliable date parsing)
-    const firstCurationTimes = await db
-      .select({
-        castHash: curatorCastCurations.castHash,
-        firstCurationTime: sql<Date>`MIN(${curatorCastCurations.createdAt})`.as("first_curation_time"),
-      })
-      .from(curatorCastCurations)
-      .groupBy(curatorCastCurations.castHash);
-
-    const firstCurationTimeMap = new Map<string, Date>();
-    firstCurationTimes.forEach((row) => {
-      // PostgreSQL returns timestamps as strings, so we need to parse them
-      const dateValue = row.firstCurationTime;
-      if (dateValue) {
-        const parsedDate = dateValue instanceof Date ? dateValue : new Date(dateValue as any);
-        if (!isNaN(parsedDate.getTime())) {
-          firstCurationTimeMap.set(row.castHash, parsedDate);
-        }
-      }
-    });
-
-    // Get curated casts with quality score filter
-    const curatedCastsList = await db
+    // Optimized single query with subquery for first curation time
+    // This uses a subquery to get MIN(createdAt) and applies LIMIT early in the database
+    const castsWithCurationTime = await db
       .select({
         castHash: curatedCasts.castHash,
         castText: curatedCasts.castText,
@@ -54,6 +34,12 @@ export async function GET(request: NextRequest) {
         repliesCount: curatedCasts.repliesCount,
         qualityScore: curatedCasts.qualityScore,
         castCreatedAt: curatedCasts.castCreatedAt,
+        firstCurationTime: sql<Date>`COALESCE(
+          (SELECT MIN(${curatorCastCurations.createdAt}) 
+           FROM ${curatorCastCurations} 
+           WHERE ${curatorCastCurations.castHash} = ${curatedCasts.castHash}),
+          ${curatedCasts.castCreatedAt}
+        )`.as("first_curation_time"),
       })
       .from(curatedCasts)
       .where(
@@ -62,24 +48,13 @@ export async function GET(request: NextRequest) {
           sql`${curatedCasts.qualityScore} IS NOT NULL`
         )
       )
-      .limit(limit * 2); // Get more to account for sorting by curation time
-
-    // Sort by first curation time (or castCreatedAt if no curation) and limit
-    const castsWithCurationTime = curatedCastsList
-      .map((cast) => {
-        const firstCuration = firstCurationTimeMap.get(cast.castHash);
-        const castCreatedAtDate = cast.castCreatedAt ? toDate(cast.castCreatedAt, new Date()) : null;
-        return {
-          ...cast,
-          firstCurationTime: firstCuration || castCreatedAtDate || new Date(),
-        };
-      })
-      .sort((a, b) => {
-        const timeA = a.firstCurationTime.getTime();
-        const timeB = b.firstCurationTime.getTime();
-        return timeB - timeA; // Descending order (newest first)
-      })
-      .slice(0, limit);
+      .orderBy(sql`COALESCE(
+        (SELECT MIN(${curatorCastCurations.createdAt}) 
+         FROM ${curatorCastCurations} 
+         WHERE ${curatorCastCurations.castHash} = ${curatedCasts.castHash}),
+        ${curatedCasts.castCreatedAt}
+      ) DESC`)
+      .limit(limit);
 
     if (castsWithCurationTime.length === 0) {
       return NextResponse.json(
@@ -124,8 +99,7 @@ export async function GET(request: NextRequest) {
     // Format response
     const feedItems = castsWithCurationTime.map((cast) => {
       const castCreatedAtDate = cast.castCreatedAt ? toDate(cast.castCreatedAt, new Date()) : null;
-      // firstCurationTime is already a Date object from our sorting logic
-      const curatedAtDate = cast.firstCurationTime;
+      const curatedAtDate = toDate(cast.firstCurationTime, new Date());
       const authorInfo = cast.authorFid ? authorMap.get(cast.authorFid) : null;
       
       return {
@@ -138,7 +112,7 @@ export async function GET(request: NextRequest) {
         repliesCount: cast.repliesCount || 0,
         qualityScore: cast.qualityScore,
         castCreatedAt: castCreatedAtDate?.toISOString() || null,
-        curatedAt: curatedAtDate.toISOString(),
+        curatedAt: curatedAtDate?.toISOString() || null,
       };
     });
 
