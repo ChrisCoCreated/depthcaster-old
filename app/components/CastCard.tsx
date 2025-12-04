@@ -2713,7 +2713,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                   className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors py-1 px-1 sm:px-0"
                 >
                   <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5" />
-                  <span>{cast.replies?.count || 0}</span>
+                  {(cast.replies?.count || 0) > 0 && <span>{cast.replies?.count || 0}</span>}
                 </button>
               </div>
 
@@ -2731,7 +2731,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 <Heart className={`w-4 h-4 sm:w-5 sm:h-5 ${isLiked ? "fill-current" : ""}`} />
-                <span>{likesCount}</span>
+                {likesCount > 0 && <span>{likesCount}</span>}
               </button>
 
               {/* Recast menu */}
@@ -2750,7 +2750,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                   } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   <Repeat2 className={`w-4 h-4 sm:w-5 sm:h-5 ${isRecasted ? "stroke-[3]" : "stroke-[2]"}`} />
-                  <span>{recastsCount}</span>
+                  {recastsCount > 0 && <span>{recastsCount}</span>}
                 </button>
 
                 {/* Dropdown menu */}

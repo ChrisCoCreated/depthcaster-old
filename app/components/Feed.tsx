@@ -97,9 +97,9 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   const [compressedView, setCompressedView] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("curatedFeedCompressedView");
-      return saved === "true";
+      return saved === null ? true : saved === "true"; // Default to compact view
     }
-    return false; // Default to full text
+    return true; // Default to compact view
   });
   const [selectedCategory, setSelectedCategory] = useState<string | null>(() => {
     if (typeof window !== "undefined") {
@@ -1482,15 +1482,16 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
 
       {/* Feed type tabs */}
       <div className="sticky top-0 bg-white dark:bg-black border-b border-gray-200 dark:border-gray-800 z-40">
-        <div className="flex gap-1 overflow-x-auto px-2 sm:px-4 scrollbar-hide overscroll-x-contain">
-          {[
-            { id: "curated", label: "Curated", requiresAuth: false },
-            { id: "1500+", label: "1500+", requiresAuth: false },
-            { id: "trending", label: "Trending", requiresAuth: true },
-            { id: "for-you", label: "For You", requiresAuth: true },
-            { id: "following", label: "Following", requiresAuth: true },
-            { id: "my-37", label: myFeedLabel, requiresAuth: true },
-          ].map((tab) => {
+        <div className="flex items-center justify-between px-2 sm:px-4 py-2 border-b border-gray-200 dark:border-gray-800">
+          <div className="flex gap-1 overflow-x-auto scrollbar-hide overscroll-x-contain flex-1">
+            {[
+              { id: "curated", label: "Curated", requiresAuth: false },
+              { id: "1500+", label: "1500+", requiresAuth: false },
+              { id: "trending", label: "Trending", requiresAuth: true },
+              { id: "for-you", label: "For You", requiresAuth: true },
+              { id: "following", label: "Following", requiresAuth: true },
+              { id: "my-37", label: myFeedLabel, requiresAuth: true },
+            ].map((tab) => {
             const isDisabled = tab.requiresAuth && !viewerFid;
             const isActive = feedType === tab.id;
             
@@ -1523,6 +1524,32 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
               </button>
             );
           })}
+          </div>
+          
+          {/* Compact view toggle - shown for all feeds */}
+          <div className="flex items-center gap-2 px-2 sm:px-3 flex-shrink-0">
+            <span className="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">Compact</span>
+            <button
+              type="button"
+              onClick={() => {
+                const newValue = !compressedView;
+                setCompressedView(newValue);
+                localStorage.setItem("curatedFeedCompressedView", String(newValue));
+                window.dispatchEvent(new CustomEvent("feedPreferencesChanged"));
+              }}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                compressedView
+                  ? "bg-blue-600"
+                  : "bg-gray-200 dark:bg-gray-700"
+              }`}
+            >
+              <span
+                className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                  compressedView ? "translate-x-5" : "translate-x-0.5"
+                }`}
+              />
+            </button>
+          </div>
         </div>
         
         {/* Filter settings - shown for all feeds except curated */}
@@ -1745,32 +1772,6 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
                   </div>
                 </div>
 
-                {/* Compressed view toggle - LAST */}
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-600 dark:text-gray-400">
-                    Compressed View
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newValue = !compressedView;
-                      setCompressedView(newValue);
-                      localStorage.setItem("curatedFeedCompressedView", String(newValue));
-                      window.dispatchEvent(new CustomEvent("feedPreferencesChanged"));
-                    }}
-                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                      compressedView
-                        ? "bg-blue-600"
-                        : "bg-gray-200 dark:bg-gray-700"
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                        compressedView ? "translate-x-5" : "translate-x-0.5"
-                      }`}
-                    />
-                  </button>
-                </div>
               </div>
             )}
           </div>
@@ -1828,7 +1829,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
                   showThread
                   feedType={feedType}
                   sortBy={feedType === "curated" ? sortBy : undefined}
-                  compressedView={feedType === "curated" ? compressedView : false}
+                  compressedView={compressedView}
                   onUpdate={() => {
                     // Refresh the feed to get updated reaction counts
                     fetchFeed();
