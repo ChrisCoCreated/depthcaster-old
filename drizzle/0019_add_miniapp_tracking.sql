@@ -13,3 +13,4 @@ CREATE INDEX IF NOT EXISTS "miniapp_installations_installed_at_idx" ON "miniapp_
 
 
 
+
