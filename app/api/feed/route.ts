@@ -862,6 +862,115 @@ export async function GET(request: NextRequest) {
       );
       casts = feed.casts || [];
       neynarCursor = feed.next?.cursor || null;
+    } else if (feedType === "1500+") {
+      // 1500+ feed - casts longer than 1500 characters from the past week
+      // Fetch from Neynar query API endpoint
+      try {
+        const queryUrl = `https://data.hubs.neynar.com/api/queries/2075/results.json?api_key=vfOGD4oehaVNbKjwh9kh3t1N1NLtYOIGX8DT4JGH`;
+        
+        // Use deduplication to prevent concurrent duplicate requests
+        const queryResponse = await deduplicateRequest(
+          `feed-1500plus-${cursor || "initial"}-${limit}`,
+          async () => {
+            const response = await fetch(queryUrl);
+            if (!response.ok) {
+              throw new Error(`Neynar query API returned ${response.status}`);
+            }
+            return await response.json();
+          }
+        );
+        
+        // The query API may return data in a different format
+        // Try to extract casts from the response
+        // Common formats: { data: [...], results: [...], rows: [...] }
+        let rawCasts: any[] = [];
+        
+        if (Array.isArray(queryResponse)) {
+          rawCasts = queryResponse;
+        } else if (queryResponse.data && Array.isArray(queryResponse.data)) {
+          rawCasts = queryResponse.data;
+        } else if (queryResponse.results && Array.isArray(queryResponse.results)) {
+          rawCasts = queryResponse.results;
+        } else if (queryResponse.rows && Array.isArray(queryResponse.rows)) {
+          rawCasts = queryResponse.rows;
+        } else if (queryResponse.casts && Array.isArray(queryResponse.casts)) {
+          rawCasts = queryResponse.casts;
+        }
+        
+        // Transform the raw data to match Cast format
+        // The query might return cast hashes or full cast objects
+        casts = await Promise.all(
+          rawCasts.map(async (item: any) => {
+            // If the item already looks like a cast (has hash, author, text), use it directly
+            if (item.hash && item.author && item.text) {
+              return item;
+            }
+            
+            // If it's a cast hash, fetch the full cast from Neynar
+            const castHash = item.hash || item.cast_hash || item.castHash;
+            if (castHash) {
+              try {
+                const conversation = await neynarClient.lookupCastConversation({
+                  identifier: castHash,
+                  type: LookupCastConversationTypeEnum.Hash,
+                  replyDepth: 0,
+                });
+                return conversation.conversation?.cast || null;
+              } catch (error) {
+                console.error(`Error fetching cast ${castHash}:`, error);
+                return null;
+              }
+            }
+            
+            // If it's a cast object with different field names, map them
+            if (item.cast) {
+              return item.cast;
+            }
+            
+            return null;
+          })
+        );
+        
+        // Filter out nulls (failed fetches)
+        casts = casts.filter((cast): cast is any => cast !== null);
+        
+        // Sort by timestamp (most recent first) if available
+        casts.sort((a, b) => {
+          const aTime = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+          const bTime = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+          return bTime - aTime;
+        });
+        
+        // Apply pagination using cursor (if provided)
+        // For simplicity, we'll use offset-based pagination if cursor is a number
+        if (cursor) {
+          try {
+            const cursorOffset = parseInt(cursor, 10);
+            if (!isNaN(cursorOffset)) {
+              casts = casts.slice(cursorOffset);
+            }
+          } catch {
+            // Invalid cursor, ignore it
+          }
+        }
+        
+        // Limit results
+        const hasMoreResults = casts.length > limit;
+        casts = casts.slice(0, limit);
+        
+        // Set cursor for next page (offset-based)
+        if (hasMoreResults) {
+          const currentOffset = cursor ? parseInt(cursor, 10) : 0;
+          neynarCursor = (currentOffset + limit).toString();
+        } else {
+          neynarCursor = null;
+        }
+      } catch (error: any) {
+        console.error("Error fetching 1500+ feed:", error);
+        // Return empty results rather than crashing
+        casts = [];
+        neynarCursor = null;
+      }
     } else {
       // Default: Optimize to use single GlobalTrending call instead of 3 parallel calls
       // This reduces API calls significantly while still providing good content
@@ -893,8 +1002,8 @@ export async function GET(request: NextRequest) {
       filteredCasts = casts.filter((cast) => {
         return !shouldHideBotCastClient(cast, userBotPreferences.hiddenBots, userBotPreferences.hideBots);
       });
-    } else if (feedType === "following" || feedType === "for-you") {
-      // For following and for-you feeds: apply bot filtering and user preferences
+    } else if (feedType === "following" || feedType === "for-you" || feedType === "1500+") {
+      // For following, for-you, and 1500+ feeds: apply bot filtering and user preferences
       // Always check for default bots, even if user has disabled bot hiding
       filteredCasts = casts.filter((cast) => {
         const shouldHide = shouldHideBotCastClient(cast, userBotPreferences.hiddenBots, userBotPreferences.hideBots);
@@ -950,9 +1059,10 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Sort by quality score (skip for curated, for-you, and my-37 feeds)
+    // Sort by quality score (skip for curated, for-you, my-37, and 1500+ feeds)
     // my-37 uses Neynar's default sorting, curated and for-you are already sorted by algorithm
-    const sortedCasts = feedType === "curated" || feedType === "for-you" || feedType === "my-37"
+    // 1500+ is already sorted by timestamp (most recent first)
+    const sortedCasts = feedType === "curated" || feedType === "for-you" || feedType === "my-37" || feedType === "1500+"
       ? filteredCasts
       : sortCastsByQuality(filteredCasts);
 

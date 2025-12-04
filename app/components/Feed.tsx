@@ -24,7 +24,7 @@ interface Curator {
   pfpUrl?: string;
 }
 
-type FeedType = "curated" | "deep-thoughts" | "conversations" | "art" | "following" | "trending" | "packs" | "for-you" | "my-37";
+type FeedType = "curated" | "deep-thoughts" | "conversations" | "art" | "following" | "trending" | "packs" | "for-you" | "my-37" | "1500+";
 
 interface Pack {
   id: string;
@@ -43,11 +43,14 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   const router = useRouter();
   const pathname = usePathname();
   
-  // Only allow visible feed types: "curated", "following", "for-you", "trending", or "my-37"
-  // When not logged in, only allow "curated" feed
-  const normalizeFeedType = useCallback((type: FeedType): "curated" | "following" | "for-you" | "trending" | "my-37" => {
-    // If not logged in, only allow curated feed
+  // Only allow visible feed types: "curated", "following", "for-you", "trending", "my-37", or "1500+"
+  // When not logged in, only allow "curated" and "1500+" feeds
+  const normalizeFeedType = useCallback((type: FeedType): "curated" | "following" | "for-you" | "trending" | "my-37" | "1500+" => {
+    // Public feeds available without auth: "curated" and "1500+"
     if (!viewerFid) {
+      if (type === "1500+") {
+        return "1500+";
+      }
       return "curated";
     }
     
@@ -67,6 +70,9 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
     if (type === "trending") {
       return "trending";
     }
+    if (type === "1500+") {
+      return "1500+";
+    }
     // Default to curated for any unrecognized types
     return "curated";
   }, [viewerFid]);
@@ -75,7 +81,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   const urlFeedType = searchParams.get("feed") as FeedType | null;
   const effectiveInitialType = urlFeedType || initialFeedType;
   
-  const [feedType, setFeedType] = useState<"curated" | "following" | "for-you" | "trending" | "my-37">(() => normalizeFeedType(effectiveInitialType));
+  const [feedType, setFeedType] = useState<"curated" | "following" | "for-you" | "trending" | "my-37" | "1500+">(() => normalizeFeedType(effectiveInitialType));
   const [casts, setCasts] = useState<Cast[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1558,6 +1564,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
         <div className="flex gap-1 overflow-x-auto px-2 sm:px-4 scrollbar-hide overscroll-x-contain">
           {[
             { id: "curated", label: "Curated", requiresAuth: false },
+            { id: "1500+", label: "1500+", requiresAuth: false },
             { id: "trending", label: "Trending", requiresAuth: true },
             { id: "for-you", label: "For You", requiresAuth: true },
             { id: "following", label: "Following", requiresAuth: true },
@@ -1574,7 +1581,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
                     setShowLoginPrompt(true);
                     return;
                   }
-                  const newType = tab.id as "curated" | "following" | "for-you" | "trending" | "my-37";
+                  const newType = tab.id as "curated" | "following" | "for-you" | "trending" | "my-37" | "1500+";
                   // Update state optimistically for immediate UI feedback
                   const normalized = normalizeFeedType(newType);
                   setFeedType(normalized);
