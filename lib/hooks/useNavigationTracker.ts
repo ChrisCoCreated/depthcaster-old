@@ -59,21 +59,30 @@ export function useNavigationTracker() {
     // Pathname changed
     if (previousPathnameRef.current !== pathname) {
       // Save scroll position of the page we're leaving
-      // For home page, get the scroll position from FeedState instead of window.scrollY
-      // because Next.js might have already scrolled to top
       let scrollY = window.scrollY || document.documentElement.scrollTop;
       
       if (previousPathnameRef.current === "/") {
-        // For home page, try to get the last saved scroll position from FeedState
-        // This is more reliable than window.scrollY which might already be wrong
+        // For home page, ALWAYS use FeedState's scroll position
+        // window.scrollY is unreliable because Next.js might have already scrolled to top
         try {
           const { getFeedState } = require("@/lib/feedState");
-          const savedState = getFeedState("curated") || getFeedState("following") || getFeedState("my-37");
-          if (savedState?.scrollY && savedState.scrollY > scrollY) {
+          // Try all feed types to find the one with saved state
+          const curatedState = getFeedState("curated");
+          const followingState = getFeedState("following");
+          const my37State = getFeedState("my-37");
+          const savedState = curatedState || followingState || my37State;
+          
+          if (savedState?.scrollY !== undefined) {
             scrollY = savedState.scrollY;
-            console.log("[NavigationTracker] Using FeedState scroll position", { scrollY });
+            console.log("[NavigationTracker] Using FeedState scroll position for home page", { 
+              scrollY,
+              feedType: curatedState ? "curated" : followingState ? "following" : "my-37"
+            });
+          } else {
+            console.log("[NavigationTracker] No FeedState found, using window.scrollY", { scrollY });
           }
         } catch (e) {
+          console.error("[NavigationTracker] Error getting FeedState", e);
           // Fall back to window.scrollY if FeedState is not available
         }
       }

@@ -729,7 +729,11 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       if (link) {
         // Save scroll position immediately before navigation
         const scrollY = window.scrollY || document.documentElement.scrollTop;
-        console.log("[Feed] Saving scroll position before navigation", { scrollY });
+        console.log("[Feed] Click interceptor: Saving scroll position before navigation", { 
+          scrollY,
+          href: (link as HTMLAnchorElement).href 
+        });
+        // Force save immediately (don't rely on throttled save)
         saveScrollPosition();
       }
     };
