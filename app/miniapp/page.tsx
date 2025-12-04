@@ -23,7 +23,7 @@ interface FeedItem {
 const ADMIN_FID = 5701;
 
 function MiniappContent() {
-  const { isSDKLoaded, context, actions, added, notificationDetails, openUrl } = useMiniApp();
+  const { isSDKLoaded, context, actions, added, notificationDetails } = useMiniApp();
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -394,25 +394,13 @@ function MiniappContent() {
     // Open externally in depthcaster conversation view using Farcaster miniapp SDK
     const url = `${appUrl}/conversation/${castHash}`;
     
-    // Only use SDK in browser context
+    // Only proceed in browser context (avoids SSR/hydration issues)
     if (typeof window === "undefined") {
       return;
     }
     
     try {
-      // Try using openUrl directly from useMiniApp hook (preferred)
-      if (openUrl) {
-        await openUrl(url);
-        return;
-      }
-      
-      // Fallback: try actions.openUrl if available
-      if (actions?.openUrl) {
-        await actions.openUrl(url);
-        return;
-      }
-      
-      // Final fallback: dynamically import SDK only when needed
+      // Dynamically import SDK only when needed (avoids SSR/hydration issues)
       const { sdk } = await import("@farcaster/miniapp-sdk");
       await sdk.actions.openUrl(url);
     } catch (error) {
