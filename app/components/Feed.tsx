@@ -551,9 +551,6 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
     // Prevent overwriting click-saved position for 500ms after click
     const now = Date.now();
     if (now - justSavedOnClickRef.current < 500) {
-      console.log("[Feed] Skipping scroll save - recently saved on click", {
-        timeSinceClick: now - justSavedOnClickRef.current
-      });
       return;
     }
     
@@ -585,15 +582,6 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
     // Detect if we're returning to home (not initial mount)
     const previousNav = getPreviousNavigation();
     const isReturning = previousNav !== null && previousNav.pathname !== "/";
-    
-    console.log("[Feed] Restoration check", {
-      pathname,
-      previousNav,
-      isReturning,
-      castsRestored: castsRestoredRef.current,
-      loading,
-      castsLength: casts.length,
-    });
 
     // If returning and haven't restored casts yet, restore them immediately
     if (isReturning && !castsRestoredRef.current) {
@@ -601,19 +589,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       // The saved state is already keyed by feed type, so if it exists, it's for this feed type
       const savedState = getFeedState(feedType);
       
-      console.log("[Feed] Attempting to restore casts", {
-        hasSavedState: !!savedState,
-        savedCastsCount: savedState?.casts?.length || 0,
-        savedScrollY: savedState?.scrollY || 0,
-        currentFeedType: feedType,
-      });
-      
       if (savedState?.casts && savedState.casts.length > 0) {
-        console.log("[Feed] Restoring casts from saved state", {
-          castsCount: savedState.casts.length,
-          cursor: savedState.cursor,
-          scrollY: savedState.scrollY,
-        });
         
         // Mark as restored FIRST to prevent fetch from running
         castsRestoredRef.current = true;
@@ -631,10 +607,6 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
         // Trigger scroll restoration directly after casts are restored
         // Use setTimeout + requestAnimationFrame to ensure DOM is updated
         if (savedState.scrollY > 0) {
-          console.log("[Feed] Triggering scroll restoration after casts restored", {
-            scrollY: savedState.scrollY,
-          });
-          
           isRestoringScrollRef.current = true;
           
           // Wait for React to update the DOM with the restored casts
@@ -642,10 +614,6 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
             requestAnimationFrame(() => {
               requestAnimationFrame(() => {
                 window.scrollTo({ top: savedState.scrollY, behavior: "auto" });
-                console.log("[Feed] Scroll restored after casts", {
-                  scrollY: savedState.scrollY,
-                  actualScroll: window.scrollY,
-                });
                 isRestoringScrollRef.current = false;
                 scrollRestoredRef.current = true;
               });
@@ -657,11 +625,9 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
         
         // If state is stale, refresh in background
         if (isStateStale(feedType)) {
-          console.log("[Feed] State is stale, refreshing in background");
           fetchFeed().catch(console.error);
         }
       } else {
-        console.log("[Feed] No saved casts to restore");
         castsRestoredRef.current = true; // Mark as checked
       }
     } else if (!isReturning && !castsRestoredRef.current) {
@@ -682,13 +648,6 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
 
     const savedState = getFeedState(feedType);
     if (savedState && savedState.scrollY > 0) {
-      console.log("[Feed] Preparing to restore scroll position", { 
-        scrollY: savedState.scrollY,
-        castsLength: casts.length,
-        loading,
-        scrollRestored: scrollRestoredRef.current,
-      });
-      
       // Mark that we're restoring to prevent saving during restoration
       isRestoringScrollRef.current = true;
       scrollRestoredRef.current = true;
@@ -701,11 +660,6 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
             // Double-check that casts are still there (in case component unmounted)
             if (casts.length > 0) {
               window.scrollTo({ top: savedState.scrollY, behavior: "auto" });
-              console.log("[Feed] Scroll restored", { 
-                scrollY: savedState.scrollY, 
-                actualScroll: window.scrollY,
-                castsLength: casts.length,
-              });
             }
             isRestoringScrollRef.current = false;
           });
@@ -723,7 +677,6 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
     // Prevent overwriting click-saved position for 500ms after click
     const now = Date.now();
     if (now - justSavedOnClickRef.current < 500) {
-      console.log("[Feed] Skipping save on casts/cursor change - recently saved on click");
       return;
     }
     
@@ -772,12 +725,6 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       
       // Only save if we have casts (to avoid saving on initial load)
       if (currentCasts.length > 0 && scrollY > 0) {
-        console.log("[Feed] Click interceptor: Saving scroll position on click", { 
-          scrollY,
-          castsCount: currentCasts.length,
-          feedType: currentFeedType
-        });
-        
         // Save directly with captured value
         saveFeedState(currentFeedType, {
           scrollY,  // Use captured value, not window.scrollY
@@ -927,11 +874,6 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       
       // If casts were restored and state is fresh, skip fetch entirely (unless feed type changed)
       if (hasRestoredCasts && !isStateStaleResult && !actualFeedTypeChanged && !feedTypeChanged && !curatorFidsChanged && !categoryChanged && !qualityScoreChanged && !(sortByChanged && feedType === "curated")) {
-        console.log("[Feed] Skipping fetch - casts already restored", {
-          hasRestoredCasts,
-          castsLength: casts.length,
-          isStateStale: isStateStaleResult,
-        });
         return;
       }
       
@@ -950,28 +892,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       const skipCondition = !isInitialMount && hasRestoredCasts && !isStateStaleResult && !actualFeedTypeChanged && !curatorFidsChanged && !categoryChanged && !qualityScoreChanged;
       const shouldFetch = fetchCondition && !skipCondition;
       
-      console.log("[Feed] Fetch decision", {
-        feedType,
-        hasRestoredCasts,
-        isStateStaleResult,
-        actualFeedTypeChanged,
-        isInitialMount,
-        feedTypeChanged,
-        sortByChanged,
-        curatorFidsChanged,
-        categoryChanged,
-        qualityScoreChanged,
-        lastFetchedFeedType: lastFetchedFeedTypeRef.current,
-        fetchingRef: fetchingRef.current,
-        fetchCondition,
-        skipCondition,
-        shouldFetch,
-        castsLength: casts.length,
-        loading,
-      });
-      
       if (shouldFetch && !fetchingRef.current) {
-        console.log("[Feed] Fetching feed", { feedType });
         fetchingRef.current = true;
         hasInitialFetchRef.current = true;
         // Update the last fetched ref BEFORE fetching to prevent duplicate fetches

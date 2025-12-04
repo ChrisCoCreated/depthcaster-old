@@ -865,6 +865,7 @@ export async function GET(request: NextRequest) {
     } else if (feedType === "1500+") {
       // 1500+ feed - casts longer than 1500 characters from the past week
       // Fetch from Neynar query API endpoint
+      // The query returns cast IDs, not hashes, so we need to fetch casts by FID and match by text/timestamp
       try {
         const queryUrl = `https://data.hubs.neynar.com/api/queries/2075/results.json?api_key=vfOGD4oehaVNbKjwh9kh3t1N1NLtYOIGX8DT4JGH`;
         
@@ -880,83 +881,202 @@ export async function GET(request: NextRequest) {
           }
         );
         
-        // The query API may return data in a different format
-        // Try to extract casts from the response
-        // Common formats: { data: [...], results: [...], rows: [...] }
-        let rawCasts: any[] = [];
+        // Parse the query result format: { query_result: { data: { rows: [...] } } }
+        let rawRows: any[] = [];
         
-        if (Array.isArray(queryResponse)) {
-          rawCasts = queryResponse;
-        } else if (queryResponse.data && Array.isArray(queryResponse.data)) {
-          rawCasts = queryResponse.data;
-        } else if (queryResponse.results && Array.isArray(queryResponse.results)) {
-          rawCasts = queryResponse.results;
+        if (queryResponse.query_result?.data?.rows && Array.isArray(queryResponse.query_result.data.rows)) {
+          rawRows = queryResponse.query_result.data.rows;
+        } else if (Array.isArray(queryResponse)) {
+          rawRows = queryResponse;
+        } else if (queryResponse.data?.rows && Array.isArray(queryResponse.data.rows)) {
+          rawRows = queryResponse.data.rows;
         } else if (queryResponse.rows && Array.isArray(queryResponse.rows)) {
-          rawCasts = queryResponse.rows;
-        } else if (queryResponse.casts && Array.isArray(queryResponse.casts)) {
-          rawCasts = queryResponse.casts;
+          rawRows = queryResponse.rows;
         }
         
-        // Transform the raw data to match Cast format
-        // The query might return cast hashes or full cast objects
-        casts = await Promise.all(
-          rawCasts.map(async (item: any) => {
-            // If the item already looks like a cast (has hash, author, text), use it directly
-            if (item.hash && item.author && item.text) {
-              return item;
-            }
-            
-            // If it's a cast hash, fetch the full cast from Neynar
-            const castHash = item.hash || item.cast_hash || item.castHash;
-            if (castHash) {
-              try {
-                const conversation = await neynarClient.lookupCastConversation({
-                  identifier: castHash,
-                  type: LookupCastConversationTypeEnum.Hash,
-                  replyDepth: 0,
-                });
-                return conversation.conversation?.cast || null;
-              } catch (error) {
-                console.error(`Error fetching cast ${castHash}:`, error);
-                return null;
-              }
-            }
-            
-            // If it's a cast object with different field names, map them
-            if (item.cast) {
-              return item.cast;
-            }
-            
-            return null;
-          })
-        );
-        
-        // Filter out nulls (failed fetches)
-        casts = casts.filter((cast): cast is any => cast !== null);
-        
-        // Sort by timestamp (most recent first) if available
-        casts.sort((a, b) => {
-          const aTime = a.timestamp ? new Date(a.timestamp).getTime() : 0;
-          const bTime = b.timestamp ? new Date(b.timestamp).getTime() : 0;
-          return bTime - aTime;
-        });
-        
-        // Apply pagination using cursor (if provided)
-        // For simplicity, we'll use offset-based pagination if cursor is a number
+        // Apply pagination before fetching (to reduce API calls)
+        let paginatedRows = rawRows;
         if (cursor) {
           try {
             const cursorOffset = parseInt(cursor, 10);
             if (!isNaN(cursorOffset)) {
-              casts = casts.slice(cursorOffset);
+              paginatedRows = rawRows.slice(cursorOffset);
             }
           } catch {
             // Invalid cursor, ignore it
           }
         }
         
-        // Limit results
-        const hasMoreResults = casts.length > limit;
-        casts = casts.slice(0, limit);
+        // Limit before fetching to reduce API calls
+        const rowsToFetch = paginatedRows.slice(0, limit);
+        const hasMoreResults = paginatedRows.length > limit;
+        
+        // Build minimal cast objects from query data (no Neynar fetch needed for display)
+        // Fetch user data for the FIDs to populate author information
+        const uniqueFids = [...new Set(rowsToFetch.map((row: any) => row.fid).filter(Boolean))];
+        
+        // Fetch user data for all FIDs in one call (2 CU per bulk user fetch)
+        let usersMap = new Map<number, any>();
+        if (uniqueFids.length > 0) {
+          try {
+            const usersResponse = await neynarClient.fetchBulkUsers({ fids: uniqueFids });
+            for (const user of usersResponse.users || []) {
+              usersMap.set(user.fid, user);
+            }
+          } catch (error) {
+            console.error("Error fetching users for 1500+ feed:", error);
+          }
+        }
+        
+        // Build cast objects from query data
+        const minimalCasts = rowsToFetch.map((row: any) => {
+          const user = usersMap.get(row.fid);
+          const timestamp = row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString();
+          
+          // Construct minimal cast object from query data
+          return {
+            hash: `query-${row.id}`, // Temporary hash for display
+            text: row.text || "",
+            timestamp,
+            author: user ? {
+              fid: user.fid,
+              username: user.username,
+              display_name: user.display_name,
+              pfp_url: user.pfp_url,
+            } : {
+              fid: row.fid,
+              username: `user${row.fid}`,
+            },
+            _queryData: {
+              id: row.id,
+              fid: row.fid,
+              text_length: row.text_length,
+              created_at: row.created_at,
+            },
+            _isQueryCast: true, // Flag to indicate this is from query data
+          };
+        });
+        
+        // If viewer is logged in, check which casts they curated and fetch hashes for those only
+        if (viewerFid) {
+          const oneWeekAgo = new Date();
+          oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+          
+          // Get curator curations for the viewer from the past week
+          const viewerCurations = await db
+            .select({
+              castHash: curatorCastCurations.castHash,
+            })
+            .from(curatorCastCurations)
+            .where(
+              and(
+                eq(curatorCastCurations.curatorFid, viewerFid),
+                gte(curatorCastCurations.createdAt, oneWeekAgo)
+              )
+            );
+          
+          if (viewerCurations.length > 0) {
+            const curatedCastHashes = new Set(viewerCurations.map(c => c.castHash));
+            
+            // Get curated cast data for matching
+            const curatedCastsData = await db
+              .select({
+                castHash: curatedCasts.castHash,
+                castData: curatedCasts.castData,
+                castCreatedAt: curatedCasts.castCreatedAt,
+              })
+              .from(curatedCasts)
+              .where(inArray(curatedCasts.castHash, Array.from(curatedCastHashes)));
+            
+            // Match query rows to curated casts and fetch full data only for matched ones
+            const castsToFetchMap = new Map<number, string>(); // Map row index to cast hash
+            
+            for (let i = 0; i < rowsToFetch.length; i++) {
+              const row = rowsToFetch[i];
+              const rowText = row.text;
+              const rowCreatedAt = row.created_at ? new Date(row.created_at).getTime() : null;
+              
+              // Find matching curated cast
+              const matchedCurated = curatedCastsData.find((curated: any) => {
+                const castData = curated.castData as any;
+                const castFid = castData?.author?.fid;
+                const castText = castData?.text || "";
+                
+                // FID must match
+                if (castFid !== row.fid) return false;
+                
+                // Text match - check if texts are similar
+                const castTextSnippet = castText.substring(0, 200);
+                const rowTextSnippet = rowText?.substring(0, 200) || "";
+                const textMatches = castText === rowText || 
+                                  castText.includes(rowTextSnippet) ||
+                                  rowText?.includes(castTextSnippet);
+                
+                if (!textMatches) return false;
+                
+                // Timestamp match (within 2 minutes tolerance)
+                if (rowCreatedAt && curated.castCreatedAt) {
+                  const castTime = new Date(curated.castCreatedAt).getTime();
+                  const timeDiff = Math.abs(castTime - rowCreatedAt);
+                  return timeDiff < 120000; // 2 minute tolerance
+                }
+                
+                return textMatches;
+              });
+              
+              if (matchedCurated && curatedCastHashes.has(matchedCurated.castHash)) {
+                castsToFetchMap.set(i, matchedCurated.castHash);
+              }
+            }
+            
+            // Only fetch full cast data from Neynar for casts curated by the viewer
+            const castHashesToFetch = Array.from(castsToFetchMap.values());
+            if (castHashesToFetch.length > 0) {
+              const fetchedCasts = await Promise.all(
+                castHashesToFetch.map(async (castHash) => {
+                  try {
+                    const conversation = await neynarClient.lookupCastConversation({
+                      identifier: castHash,
+                      type: LookupCastConversationTypeEnum.Hash,
+                      replyDepth: 0,
+                      viewerFid,
+                    });
+                    return conversation.conversation?.cast || null;
+                  } catch (error) {
+                    console.error(`Error fetching cast ${castHash}:`, error);
+                    return null;
+                  }
+                })
+              );
+              
+              // Create a map of cast hash to full cast data
+              const fetchedCastsMap = new Map<string, any>();
+              for (let i = 0; i < castHashesToFetch.length; i++) {
+                const fetchedCast = fetchedCasts[i];
+                if (fetchedCast) {
+                  fetchedCastsMap.set(castHashesToFetch[i], fetchedCast);
+                }
+              }
+              
+              // Replace minimal casts with full casts where available
+              for (let i = 0; i < minimalCasts.length; i++) {
+                const castHash = castsToFetchMap.get(i);
+                if (castHash && fetchedCastsMap.has(castHash)) {
+                  minimalCasts[i] = fetchedCastsMap.get(castHash)!;
+                }
+              }
+            }
+          }
+        }
+        
+        casts = minimalCasts;
+        
+        // Sort by timestamp (most recent first) - already sorted by query, but ensure consistency
+        casts.sort((a, b) => {
+          const aTime = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+          const bTime = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+          return bTime - aTime;
+        });
         
         // Set cursor for next page (offset-based)
         if (hasMoreResults) {
