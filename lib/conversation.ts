@@ -590,3 +590,57 @@ export function extractQuotedCastHashes(cast: Cast): string[] {
   return hashes;
 }
 
+/**
+ * Extract URLs from link embeds (not cast embeds)
+ */
+export function extractLinkUrls(cast: Cast): string[] {
+  if (!cast.embeds || !Array.isArray(cast.embeds)) {
+    return [];
+  }
+
+  const urls: string[] = [];
+  for (const embed of cast.embeds) {
+    const embedAny = embed as any;
+    // Only include embeds that are links (have url but not cast_id/cast)
+    if (embedAny.url && !embedAny.cast_id && !embedAny.cast) {
+      urls.push(embedAny.url);
+    }
+  }
+
+  return urls;
+}
+
+/**
+ * Extract text from embedded casts
+ * Fetches cast data for each quoted cast hash and extracts the text
+ */
+export async function extractEmbeddedCastTexts(
+  cast: Cast,
+  neynarClient: any
+): Promise<string[]> {
+  const quotedCastHashes = extractQuotedCastHashes(cast);
+  if (quotedCastHashes.length === 0) {
+    return [];
+  }
+
+  const texts: string[] = [];
+  for (const hash of quotedCastHashes) {
+    try {
+      const response = await neynarClient.lookupCastConversation({
+        identifier: hash,
+        type: LookupCastConversationTypeEnum.Hash,
+        replyDepth: 0,
+        includeChronologicalParentCasts: false,
+      });
+      if (response?.conversation?.cast?.text) {
+        texts.push(response.conversation.cast.text);
+      }
+    } catch (error) {
+      console.error(`Failed to fetch embedded cast ${hash}:`, error);
+      // Continue with other casts even if one fails
+    }
+  }
+
+  return texts;
+}
+

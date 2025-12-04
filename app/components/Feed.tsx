@@ -717,6 +717,31 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
     prevFeedTypeRef.current = feedType;
   }, [feedType, cursor, casts]);
 
+  // Save scroll position before navigation happens
+  // Intercept clicks on links to save scroll position before Next.js navigates
+  useEffect(() => {
+    if (pathname !== "/") return; // Only on home page
+    
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const link = target.closest('a[href^="/conversation"], a[href^="/cast"]');
+      
+      if (link) {
+        // Save scroll position immediately before navigation
+        const scrollY = window.scrollY || document.documentElement.scrollTop;
+        console.log("[Feed] Saving scroll position before navigation", { scrollY });
+        saveScrollPosition();
+      }
+    };
+    
+    // Use capture phase to catch clicks before they bubble
+    document.addEventListener("click", handleClick, true);
+    
+    return () => {
+      document.removeEventListener("click", handleClick, true);
+    };
+  }, [pathname, saveScrollPosition]);
+
   // Save state before navigating away
   useEffect(() => {
     const handleBeforeUnload = () => {
@@ -724,8 +749,6 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
-    // Note: Next.js App Router doesn't have router events like Pages Router
-    // We'll rely on beforeunload and the pathname change effect
     
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
@@ -733,13 +756,6 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       saveScrollPosition();
     };
   }, [saveScrollPosition]);
-
-  // Save state when pathname changes (user navigates away)
-  useEffect(() => {
-    if (pathname !== "/") {
-      saveScrollPosition();
-    }
-  }, [pathname, saveScrollPosition]);
   
   // Listen for my37 preferences changes
   useEffect(() => {

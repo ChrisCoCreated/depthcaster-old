@@ -8,6 +8,7 @@ import { formatDistanceToNow } from "date-fns";
 import { ImageModal } from "./ImageModal";
 import { useNeynarContext } from "@neynar/react";
 import { QuoteCastModal } from "./QuoteCastModal";
+import { QualityFeedbackModal } from "./QualityFeedbackModal";
 import { CastComposer } from "./CastComposer";
 import { AutoLikeNotification } from "./AutoLikeNotification";
 import { MessageCircle, Heart, Repeat2, Star, Share2, Tag, Trash2 } from "lucide-react";
@@ -840,6 +841,8 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isCuratedCastExpanded, setIsCuratedCastExpanded] = useState(false);
+  const [showQualityFeedbackModal, setShowQualityFeedbackModal] = useState(false);
+  const [showCurateFirstMessage, setShowCurateFirstMessage] = useState(false);
 
   const [localCompressedView, setLocalCompressedView] = useState(compressedView);
   
@@ -2737,10 +2740,50 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                 )}
               </div>
 
-              {/* Quality score indicator */}
+              {/* Quality score indicator and feedback button */}
               {qualityScore !== null && qualityScore !== undefined && (
-                <div className={`px-2 py-1 rounded text-xs font-medium ${getQualityColor(qualityScore)}`} title={`Quality score: ${qualityScore}/100`}>
-                  Q: {qualityScore}
+                <div className="flex items-center gap-2 relative">
+                  <div className={`px-2 py-1 rounded text-xs font-medium ${getQualityColor(qualityScore)}`} title={`Quality score: ${qualityScore}/100`}>
+                    Q: {qualityScore}
+                  </div>
+                  {user && (
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        // Check if user has curated this cast
+                        const isCuratedByCurrentUser = curators.some(c => c.fid === user.fid);
+                        if (!isCuratedByCurrentUser) {
+                          setShowCurateFirstMessage(true);
+                          setTimeout(() => setShowCurateFirstMessage(false), 3000);
+                        } else {
+                          setShowQualityFeedbackModal(true);
+                        }
+                      }}
+                      className="px-1.5 py-1 rounded text-xs text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                      title="Provide feedback on quality score"
+                    >
+                      <svg
+                        className="w-3.5 h-3.5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                        />
+                      </svg>
+                    </button>
+                  )}
+                  {showCurateFirstMessage && (
+                    <div className="absolute z-50 top-full left-0 mt-2 px-3 py-2 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg whitespace-nowrap">
+                      Please curate this cast first to provide quality feedback
+                      <div className="absolute -top-1 left-4 w-2 h-2 bg-gray-900 dark:bg-gray-800 rotate-45"></div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -3117,6 +3160,24 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
           onClose={() => setShowQuoteModal(false)}
           onSuccess={() => {
             setShowQuoteModal(false);
+            if (onUpdate) {
+              onUpdate();
+            }
+          }}
+        />
+      )}
+
+      {/* Quality Feedback Modal */}
+      {showQualityFeedbackModal && qualityScore !== null && qualityScore !== undefined && (
+        <QualityFeedbackModal
+          castHash={cast.hash || ""}
+          currentQualityScore={qualityScore}
+          isOpen={showQualityFeedbackModal}
+          onClose={() => setShowQualityFeedbackModal(false)}
+          onSuccess={(newScore) => {
+            setShowQualityFeedbackModal(false);
+            // Update the quality score in the cast object
+            (cast as any)._qualityScore = newScore;
             if (onUpdate) {
               onUpdate();
             }

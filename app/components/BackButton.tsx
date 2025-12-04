@@ -13,6 +13,12 @@ export function BackButton() {
   const pathname = usePathname();
   const [hasHistory, setHasHistory] = useState(false);
 
+  // Don't show back button in miniapp context
+  const isMiniapp = pathname?.startsWith("/miniapp");
+  if (isMiniapp) {
+    return null;
+  }
+
   // Check if there's previous navigation history
   useEffect(() => {
     const checkHistory = () => {

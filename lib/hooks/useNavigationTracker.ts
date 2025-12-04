@@ -59,7 +59,25 @@ export function useNavigationTracker() {
     // Pathname changed
     if (previousPathnameRef.current !== pathname) {
       // Save scroll position of the page we're leaving
-      const scrollY = window.scrollY || document.documentElement.scrollTop;
+      // For home page, get the scroll position from FeedState instead of window.scrollY
+      // because Next.js might have already scrolled to top
+      let scrollY = window.scrollY || document.documentElement.scrollTop;
+      
+      if (previousPathnameRef.current === "/") {
+        // For home page, try to get the last saved scroll position from FeedState
+        // This is more reliable than window.scrollY which might already be wrong
+        try {
+          const { getFeedState } = require("@/lib/feedState");
+          const savedState = getFeedState("curated") || getFeedState("following") || getFeedState("my-37");
+          if (savedState?.scrollY && savedState.scrollY > scrollY) {
+            scrollY = savedState.scrollY;
+            console.log("[NavigationTracker] Using FeedState scroll position", { scrollY });
+          }
+        } catch (e) {
+          // Fall back to window.scrollY if FeedState is not available
+        }
+      }
+      
       if (previousPathnameRef.current) {
         saveNavigationState(previousPathnameRef.current, scrollY);
       }

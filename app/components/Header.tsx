@@ -471,7 +471,7 @@ export function Header() {
         if (curateResponse.status === 403) {
           showToast("You don't have permission to curate casts");
         } else if (curateResponse.status === 409) {
-          showToast("This cast is already curated");
+          showToast("You have already curated this cast");
         } else {
           showToast(errorData.error || "Failed to curate cast");
         }

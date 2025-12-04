@@ -6,6 +6,7 @@ import { formatDistanceToNow } from "date-fns";
 import { AvatarImage } from "@/app/components/AvatarImage";
 import Link from "next/link";
 import { analytics } from "@/lib/analytics";
+import { sdk } from "@farcaster/miniapp-sdk";
 
 interface FeedItem {
   castHash: string;
@@ -271,7 +272,7 @@ function MiniappContent() {
         if (curateResponse.status === 403) {
           showToast("You don't have permission to curate casts");
         } else if (curateResponse.status === 409) {
-          showToast("This cast is already curated");
+          showToast("You have already curated this cast");
         } else {
           showToast(errorData.error || "Failed to curate cast");
         }
@@ -390,10 +391,16 @@ function MiniappContent() {
     }
   };
 
-  const handleCastClick = (castHash: string) => {
-    // Open externally in depthcaster conversation view
+  const handleCastClick = async (castHash: string) => {
+    // Open externally in depthcaster conversation view using Farcaster miniapp SDK
     const url = `${appUrl}/conversation/${castHash}`;
-    window.open(url, "_blank", "noopener,noreferrer");
+    try {
+      await sdk.actions.openUrl(url);
+    } catch (error) {
+      console.error("Error opening URL:", error);
+      // Fallback to window.open if SDK fails
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
   };
 
   if (loading) {

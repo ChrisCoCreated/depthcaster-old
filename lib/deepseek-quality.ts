@@ -664,6 +664,160 @@ Respond in JSON format:
 }
 
 /**
+ * Analyze cast quality with curator feedback for re-evaluation
+ * @param params - Object containing cast text, embedded cast texts, links, curator feedback, and current score
+ */
+export async function analyzeCastQualityWithFeedback(params: {
+  castText: string;
+  embeddedCastTexts: string[];
+  links: string[];
+  curatorFeedback: string;
+  currentQualityScore: number;
+}): Promise<QualityAnalysisResult | null> {
+  if (!DEEPSEEK_API_KEY) {
+    console.warn("[DeepSeek] DEEPSEEK_API_KEY not configured, skipping quality analysis");
+    return null;
+  }
+
+  const { castText, embeddedCastTexts, links, curatorFeedback, currentQualityScore } = params;
+
+  if (!castText || castText.trim().length === 0) {
+    console.warn("[DeepSeek] Cast has no text, skipping analysis");
+    return null;
+  }
+
+  // Build context string with embedded casts
+  let embeddedCastsContext = "";
+  if (embeddedCastTexts.length > 0) {
+    embeddedCastsContext = "\n\nEmbedded Casts:\n";
+    embeddedCastTexts.forEach((text, index) => {
+      embeddedCastsContext += `\n--- Embedded Cast ${index + 1} ---\n${text.substring(0, 1000)}${text.length > 1000 ? "..." : ""}\n`;
+    });
+  }
+
+  // Build links context
+  let linksContext = "";
+  if (links.length > 0) {
+    linksContext = "\n\nLinks:\n";
+    links.forEach((url, index) => {
+      linksContext += `${index + 1}. ${url}\n`;
+    });
+  }
+
+  const prompt = `You are re-evaluating a cast's quality score based on curator feedback.
+
+Current Quality Score: ${currentQualityScore}/100
+
+Curator Feedback:
+${curatorFeedback}
+
+Cast Text:
+${castText.substring(0, 2000)}${castText.length > 2000 ? "..." : ""}${embeddedCastsContext}${linksContext}
+
+Please re-analyze the quality considering the curator's feedback. The curator has already curated this cast and is providing specific feedback about why the quality score should change.
+
+Provide:
+1. A new quality score from 0-100 based on the curator's feedback and the full context
+   - Extremely low-effort content (single emoji, "gm", "lol", "👀", or similar) should be scored between 0 and 5
+   - Very short acknowledgements that add only a tiny bit of signal (e.g. "that's fair", "ok true") should typically be scored between 5 and 20
+   - Reserve scores above 60 for posts with substantial thought, argument, reflection, or original perspective
+2. A category from this list: crypto-critique, platform-analysis, creator-economy, art-culture, ai-philosophy, community-culture, life-reflection, market-news, playful, other
+3. Brief reasoning for the new score
+
+Respond in JSON format:
+{
+  "qualityScore": <number 0-100>,
+  "category": "<one of the categories above>",
+  "reasoning": "<brief explanation of the new score considering curator feedback>"
+}`;
+
+  try {
+    const response = await fetch(`${DEEPSEEK_API_URL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "deepseek-chat",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are an expert at analyzing social media content quality and re-evaluating scores based on curator feedback. Always respond with valid JSON only.",
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        max_tokens: 300,
+        temperature: 0.3,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(
+        `[DeepSeek] API error: ${response.status} ${response.statusText}`,
+        errorText
+      );
+      return null;
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) {
+      console.error("[DeepSeek] No content in API response", data);
+      return null;
+    }
+
+    // Parse JSON from response (may be wrapped in markdown code blocks)
+    let jsonContent = content.trim();
+    if (jsonContent.startsWith("```json")) {
+      jsonContent = jsonContent.replace(/^```json\n?/, "").replace(/\n?```$/, "");
+    } else if (jsonContent.startsWith("```")) {
+      jsonContent = jsonContent.replace(/^```\n?/, "").replace(/\n?```$/, "");
+    }
+
+    const result = JSON.parse(jsonContent) as {
+      qualityScore?: number;
+      category?: string;
+      reasoning?: string;
+    };
+
+    // Validate and normalize quality score
+    let qualityScore = result.qualityScore;
+    if (typeof qualityScore !== "number") {
+      qualityScore = parseInt(String(qualityScore || "0"), 10);
+    }
+    if (isNaN(qualityScore) || qualityScore < 0) qualityScore = 0;
+    if (qualityScore > 100) qualityScore = 100;
+
+    // Validate and normalize category
+    let category = result.category?.toLowerCase().trim();
+    if (!category || !VALID_CATEGORIES.includes(category as Category)) {
+      // Try to match partial category names
+      const matchedCategory = VALID_CATEGORIES.find((cat) =>
+        category?.includes(cat) || cat.includes(category || "")
+      );
+      category = matchedCategory || "other";
+    }
+
+    console.log(`[DeepSeek] Quality re-analysis completed: score=${qualityScore}, category=${category}, previous=${currentQualityScore}`);
+
+    return {
+      qualityScore: Math.round(qualityScore),
+      category,
+      reasoning: result.reasoning,
+    };
+  } catch (error: any) {
+    console.error("[DeepSeek] Error analyzing cast quality with feedback:", error.message);
+    return null;
+  }
+}
+
+/**
  * Analyze cast quality asynchronously (fire-and-forget)
  * This function doesn't block and handles errors internally
  */
