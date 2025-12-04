@@ -525,15 +525,29 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   const prevSelectedCuratorFidsRef = useRef<number[]>([]);
   const fetchingRef = useRef<boolean>(false);
   const hasInitialFetchRef = useRef<boolean>(false);
+  
+  // Refs for click handler to avoid recreating it on every change
+  const feedTypeRef = useRef(feedType);
+  const cursorRef = useRef(cursor);
+  const castsRef = useRef(casts);
+  
+  // Keep refs in sync
+  useEffect(() => {
+    feedTypeRef.current = feedType;
+    cursorRef.current = cursor;
+    castsRef.current = casts;
+  }, [feedType, cursor, casts]);
 
   // Save scroll position and feed state (throttled)
   const saveScrollPosition = useCallback(() => {
     if (isRestoringScrollRef.current) return;
     
-    // Prevent overwriting click-saved position for 200ms after click
+    // Prevent overwriting click-saved position for 500ms after click
     const now = Date.now();
-    if (now - justSavedOnClickRef.current < 200) {
-      console.log("[Feed] Skipping scroll save - recently saved on click");
+    if (now - justSavedOnClickRef.current < 500) {
+      console.log("[Feed] Skipping scroll save - recently saved on click", {
+        timeSinceClick: now - justSavedOnClickRef.current
+      });
       return;
     }
     
@@ -699,6 +713,14 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   // Save state when casts or cursor changes
   useEffect(() => {
     if (!scrollRestoredRef.current || isRestoringScrollRef.current) return;
+    
+    // Prevent overwriting click-saved position for 500ms after click
+    const now = Date.now();
+    if (now - justSavedOnClickRef.current < 500) {
+      console.log("[Feed] Skipping save on casts/cursor change - recently saved on click");
+      return;
+    }
+    
     if (casts.length > 0) {
       saveScrollPosition();
     }
@@ -726,32 +748,36 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   }, [feedType, cursor, casts]);
 
   // Save scroll position before navigation happens
-  // Intercept clicks on links to save scroll position before Next.js navigates
+  // Intercept clicks on links and buttons that trigger navigation
   useEffect(() => {
     if (pathname !== "/") return; // Only on home page
     
     const handleClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      const link = target.closest('a[href^="/conversation"], a[href^="/cast"]');
+      // Save scroll position on ANY click in the feed area
+      // This ensures we capture the position before any navigation happens
+      // (whether via <a> tag or router.push)
+      const scrollY = window.scrollY || document.documentElement.scrollTop;
       
-      if (link) {
-        // Capture scroll position IMMEDIATELY at click time (before any navigation/scroll happens)
-        const scrollY = window.scrollY || document.documentElement.scrollTop;
-        const castHashes = casts.map((cast) => cast.hash || "").filter(Boolean);
-        
-        console.log("[Feed] Click interceptor: Saving scroll position before navigation", { 
+      // Use refs to get current values without recreating handler
+      const currentCasts = castsRef.current;
+      const currentFeedType = feedTypeRef.current;
+      const currentCursor = cursorRef.current;
+      const castHashes = currentCasts.map((cast) => cast.hash || "").filter(Boolean);
+      
+      // Only save if we have casts (to avoid saving on initial load)
+      if (currentCasts.length > 0 && scrollY > 0) {
+        console.log("[Feed] Click interceptor: Saving scroll position on click", { 
           scrollY,
-          href: (link as HTMLAnchorElement).href,
-          castsCount: casts.length
+          castsCount: currentCasts.length,
+          feedType: currentFeedType
         });
         
-        // Save directly with captured value, don't use saveScrollPosition() which reads window.scrollY later
-        // This ensures we save the position at click time, not after potential scroll events
-        saveFeedState(feedType, {
+        // Save directly with captured value
+        saveFeedState(currentFeedType, {
           scrollY,  // Use captured value, not window.scrollY
-          cursor,
+          cursor: currentCursor,
           castHashes,
-          casts: casts, // Save full cast objects for instant restoration
+          casts: currentCasts, // Save full cast objects for instant restoration
         });
         
         // Mark that we just saved on click to prevent scroll handler from overwriting
@@ -765,7 +791,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
     return () => {
       document.removeEventListener("click", handleClick, true);
     };
-  }, [pathname, saveScrollPosition]);
+  }, [pathname]); // Only depend on pathname, use refs for other values
 
   // Save state before navigating away
   useEffect(() => {
