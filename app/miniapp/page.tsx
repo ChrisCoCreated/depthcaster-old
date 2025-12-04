@@ -6,7 +6,6 @@ import { formatDistanceToNow } from "date-fns";
 import { AvatarImage } from "@/app/components/AvatarImage";
 import Link from "next/link";
 import { analytics } from "@/lib/analytics";
-import { sdk } from "@farcaster/miniapp-sdk";
 
 interface FeedItem {
   castHash: string;
@@ -24,7 +23,7 @@ interface FeedItem {
 const ADMIN_FID = 5701;
 
 function MiniappContent() {
-  const { isSDKLoaded, context, actions, added, notificationDetails } = useMiniApp();
+  const { isSDKLoaded, context, actions, added, notificationDetails, openUrl } = useMiniApp();
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -394,7 +393,27 @@ function MiniappContent() {
   const handleCastClick = async (castHash: string) => {
     // Open externally in depthcaster conversation view using Farcaster miniapp SDK
     const url = `${appUrl}/conversation/${castHash}`;
+    
+    // Only use SDK in browser context
+    if (typeof window === "undefined") {
+      return;
+    }
+    
     try {
+      // Try using openUrl directly from useMiniApp hook (preferred)
+      if (openUrl) {
+        await openUrl(url);
+        return;
+      }
+      
+      // Fallback: try actions.openUrl if available
+      if (actions?.openUrl) {
+        await actions.openUrl(url);
+        return;
+      }
+      
+      // Final fallback: dynamically import SDK only when needed
+      const { sdk } = await import("@farcaster/miniapp-sdk");
       await sdk.actions.openUrl(url);
     } catch (error) {
       console.error("Error opening URL:", error);
