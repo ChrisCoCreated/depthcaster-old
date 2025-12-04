@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
         });
       } else {
         // Fall back to direct HTTP call
-        // Neynar API requires signer_uuid for authentication (not fid)
+        // Neynar API requires fid, signer_uuid, and muted_fid
         const response = await fetch("https://api.neynar.com/v2/farcaster/mute", {
           method: "POST",
           headers: {
@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
             "x-api-key": process.env.NEYNAR_API_KEY!,
           },
           body: JSON.stringify({
+            fid: userFid,
             signer_uuid: signerUuid,
             muted_fid: parseInt(targetFid),
           }),
