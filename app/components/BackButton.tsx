@@ -13,15 +13,15 @@ export function BackButton() {
   const pathname = usePathname();
   const [hasHistory, setHasHistory] = useState(false);
 
-  // Don't show back button in miniapp context
-  const isMiniapp = pathname?.startsWith("/miniapp");
-  if (isMiniapp) {
-    return null;
-  }
-
   // Check if there's previous navigation history
   useEffect(() => {
     const checkHistory = () => {
+      // Don't show back button in miniapp context
+      if (pathname?.startsWith("/miniapp")) {
+        setHasHistory(false);
+        return;
+      }
+      
       const previousNav = getPreviousNavigation();
       // Show button if there's history and we're not on the home page
       // Or if there's history and the previous page is different from current

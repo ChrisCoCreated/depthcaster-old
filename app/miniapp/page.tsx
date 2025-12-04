@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { MiniAppProvider, useMiniApp } from "@neynar/react";
 import { formatDistanceToNow } from "date-fns";
 import { AvatarImage } from "@/app/components/AvatarImage";
@@ -91,65 +91,6 @@ function MiniappContent() {
     }
   }, [isSDKLoaded, actions]);
 
-  const fetchFeed = useCallback(async (limit: number = 3) => {
-    try {
-      setLoading(true);
-      const response = await fetch(`/api/miniapp/feed?limit=${limit}`, {
-        // Add signal to allow cancellation if component unmounts
-        signal: AbortSignal.timeout(30000), // 30 second timeout
-      });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch feed: ${response.status}`);
-      }
-      const data = await response.json();
-      setFeedItems(data.items || []);
-      setHasMore((data.items || []).length >= limit && limit < 30);
-      setError(null);
-    } catch (err: any) {
-      // Ignore abort errors (component unmounted or timeout)
-      if (err.name === 'AbortError' || err.name === 'TimeoutError') {
-        console.log("Feed fetch cancelled or timed out");
-        return;
-      }
-      console.error("Error fetching feed:", err);
-      // Only set error if we don't have any items yet (initial load)
-      setFeedItems((prev) => {
-        if (prev.length === 0) {
-          setError("Failed to load feed");
-        }
-        return prev;
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const loadMoreItems = useCallback(async () => {
-    if (loadingMore) return;
-    
-    setLoadingMore(true);
-    try {
-      const response = await fetch(`/api/miniapp/feed?limit=30`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch more items");
-      }
-      const data = await response.json();
-      const newItems = data.items || [];
-      // Only add items we don't already have
-      setFeedItems((prev) => {
-        if (prev.length >= 30) return prev;
-        const existingHashes = new Set(prev.map(item => item.castHash));
-        const itemsToAdd = newItems.filter((item: FeedItem) => !existingHashes.has(item.castHash));
-        setHasMore(itemsToAdd.length > 0 && prev.length + itemsToAdd.length < 30);
-        return [...prev, ...itemsToAdd];
-      });
-    } catch (err) {
-      console.error("Error loading more items:", err);
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [loadingMore]);
-
   // Fetch initial feed immediately on mount (don't wait for anything)
   useEffect(() => {
     // Small delay to ensure page is fully loaded
@@ -157,18 +98,18 @@ function MiniappContent() {
       fetchFeed(3); // Load only 3 items initially
     }, 100);
     return () => clearTimeout(timer);
-  }, [fetchFeed]);
+  }, []);
 
   // Lazy load remaining items after initial render
   useEffect(() => {
-    if (!loading && feedItems.length > 0 && hasMore && feedItems.length < 30 && !loadingMore) {
+    if (!loading && feedItems.length > 0 && hasMore && feedItems.length < 30) {
       // Load remaining items after a short delay to ensure initial render is complete
       const timer = setTimeout(() => {
         loadMoreItems();
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [loading, feedItems.length, hasMore, loadMoreItems, loadingMore]);
+  }, [loading, feedItems.length, hasMore]);
 
   useEffect(() => {
     if (toast) {
@@ -359,6 +300,58 @@ function MiniappContent() {
     }
   };
 
+  const fetchFeed = async (limit: number = 3) => {
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/miniapp/feed?limit=${limit}`, {
+        // Add signal to allow cancellation if component unmounts
+        signal: AbortSignal.timeout(30000), // 30 second timeout
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch feed: ${response.status}`);
+      }
+      const data = await response.json();
+      setFeedItems(data.items || []);
+      setHasMore((data.items || []).length >= limit && limit < 30);
+      setError(null);
+    } catch (err: any) {
+      // Ignore abort errors (component unmounted or timeout)
+      if (err.name === 'AbortError' || err.name === 'TimeoutError') {
+        console.log("Feed fetch cancelled or timed out");
+        return;
+      }
+      console.error("Error fetching feed:", err);
+      // Only set error if we don't have any items yet (initial load)
+      if (feedItems.length === 0) {
+        setError("Failed to load feed");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadMoreItems = async () => {
+    if (loadingMore || !hasMore || feedItems.length >= 30) return;
+
+    try {
+      setLoadingMore(true);
+      const response = await fetch(`/api/miniapp/feed?limit=30`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch more items");
+      }
+      const data = await response.json();
+      const newItems = data.items || [];
+      // Only add items we don't already have
+      const existingHashes = new Set(feedItems.map(item => item.castHash));
+      const itemsToAdd = newItems.filter((item: FeedItem) => !existingHashes.has(item.castHash));
+      setFeedItems(prev => [...prev, ...itemsToAdd]);
+      setHasMore(itemsToAdd.length > 0 && feedItems.length + itemsToAdd.length < 30);
+    } catch (err) {
+      console.error("Error loading more items:", err);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const handleInstall = async () => {
     if (!isSDKLoaded || !actions) return;
@@ -397,22 +390,13 @@ function MiniappContent() {
     }
   };
 
-  const handleCastClick = async (castHash: string) => {
-    // Open externally in depthcaster conversation view using Farcaster miniapp SDK
+  const handleCastClick = (castHash: string) => {
+    // Open externally in depthcaster conversation view
     const url = `${appUrl}/conversation/${castHash}`;
-    
-    // Only proceed in browser context (avoids SSR/hydration issues)
-    if (typeof window === "undefined") {
-      return;
-    }
-    
-    try {
-      // Dynamically import SDK only when needed (avoids SSR/hydration issues)
-      const { sdk } = await import("@farcaster/miniapp-sdk");
-      await sdk.actions.openUrl(url);
-    } catch (error) {
-      console.error("Error opening URL:", error);
-      // Fallback to window.open if SDK fails
+    if (actions?.openUrl) {
+      actions.openUrl(url);
+    } else {
+      // Fallback to window.open if SDK not ready
       window.open(url, "_blank", "noopener,noreferrer");
     }
   };
@@ -475,7 +459,7 @@ function MiniappContent() {
         <div className="max-w-2xl mx-auto px-4 py-2">
           <div className="flex items-center justify-between">
             <Link href="/" className="text-lg font-bold text-gray-900 dark:text-gray-100">
-              Depthcaster <span className="text-xs font-normal text-gray-500 dark:text-gray-400">Beta</span>
+              Depthcaster <span className="text-xs font-normal text-gray-500 dark:text-gray-400">Alpha</span>
             </Link>
           {context?.user?.fid && (
             <div className="relative flex items-center gap-1">

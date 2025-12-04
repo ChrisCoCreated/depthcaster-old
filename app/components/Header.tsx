@@ -637,7 +637,7 @@ export function Header() {
                   Depthcaster
                 </Link>
                 <span className="text-[10px] sm:text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider">
-                  Beta
+                  Alpha
                 </span>
               </div>
             </div>

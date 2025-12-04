@@ -62,11 +62,15 @@ function ShareContent() {
       const response = await fetch(`/api/curate?castHash=${castHash}`);
       if (response.ok) {
         const data = await response.json();
-        return data.curatorFids?.includes(userFid) || false;
+        const hasCurated = data.curatorFids?.includes(userFid) || false;
+        setHasCuratedByUser(hasCurated);
+        return hasCurated;
       }
+      setHasCuratedByUser(false);
       return false;
     } catch (error) {
       console.error("Error checking curation status:", error);
+      setHasCuratedByUser(false);
       return false;
     } finally {
       setCheckingCurationStatus(false);
@@ -101,8 +105,7 @@ function ShareContent() {
       
       // Check if user has already curated this cast
       if (context?.user?.fid) {
-        const hasCurated = await checkCurationStatus(fetchedCastData.hash, context.user.fid);
-        setHasCuratedByUser(hasCurated);
+        await checkCurationStatus(fetchedCastData.hash, context.user.fid);
       }
     } catch (error: any) {
       console.error("Error fetching cast:", error);
@@ -144,9 +147,7 @@ function ShareContent() {
         checkCuratorStatus().then(() => {
           // Check if user has already curated this cast
           if (context?.user?.fid && castData?.hash) {
-            checkCurationStatus(castData.hash, context.user.fid).then((hasCurated) => {
-              setHasCuratedByUser(hasCurated);
-            });
+            checkCurationStatus(castData.hash, context.user.fid);
           }
         });
         return;
@@ -196,8 +197,7 @@ function ShareContent() {
         return;
       }
 
-      // Success - track analytics, update state, and navigate to feed
-      setHasCuratedByUser(true);
+      // Success - track analytics and navigate to feed
       analytics.trackCuratePaste(castHash, context.user.fid);
       router.push("/miniapp");
     } catch (error: any) {
@@ -252,25 +252,29 @@ function ShareContent() {
 
         {/* Action Buttons */}
         {isCurator ? (
-          <div className="flex gap-3 mb-6">
-            <button
-              onClick={handleCancel}
-              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            >
-              Cancel
-            </button>
+          <div className="mb-6">
             {hasCuratedByUser === true ? (
-              <div className="flex-1 px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg text-center text-sm text-gray-600 dark:text-gray-400 flex items-center justify-center">
-                You have already curated this cast
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg mb-3">
+                <p className="text-sm text-blue-800 dark:text-blue-200">
+                  You have already curated this cast
+                </p>
               </div>
             ) : (
-              <button
-                onClick={handleCurate}
-                disabled={isPasting || checkingCurationStatus}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isPasting ? "Curating..." : checkingCurationStatus ? "Checking..." : "Curate"}
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleCancel}
+                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCurate}
+                  disabled={isPasting || checkingCurationStatus}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isPasting ? "Curating..." : checkingCurationStatus ? "Checking..." : "Curate"}
+                </button>
+              </div>
             )}
           </div>
         ) : (
@@ -297,18 +301,10 @@ function ShareContent() {
           </div>
         )}
 
-        {/* Error/Info Message */}
+        {/* Error Message */}
         {error && (
-          <div className={`mb-6 p-4 rounded-lg ${
-            error.includes("already curated") 
-              ? "bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-800"
-              : "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800"
-          }`}>
-            <p className={`text-sm ${
-              error.includes("already curated")
-                ? "text-gray-800 dark:text-gray-200"
-                : "text-red-800 dark:text-red-200"
-            }`}>{error}</p>
+          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
           </div>
         )}
 
