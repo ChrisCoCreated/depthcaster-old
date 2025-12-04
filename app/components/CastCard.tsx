@@ -843,6 +843,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
   const [isCuratedCastExpanded, setIsCuratedCastExpanded] = useState(false);
   const [showQualityFeedbackModal, setShowQualityFeedbackModal] = useState(false);
   const [showCurateFirstMessage, setShowCurateFirstMessage] = useState(false);
+  const [isQualityScoreHovered, setIsQualityScoreHovered] = useState(false);
 
   const [localCompressedView, setLocalCompressedView] = useState(compressedView);
   
@@ -1784,6 +1785,13 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
     if (score >= 80) return "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20";
     if (score >= 60) return "text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20";
     return "text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800";
+  };
+
+  // Helper function to get quality score text color for button highlighting
+  const getQualityTextColor = (score: number): string => {
+    if (score >= 80) return "text-green-600 dark:text-green-400";
+    if (score >= 60) return "text-yellow-600 dark:text-yellow-400";
+    return "text-gray-600 dark:text-gray-400";
   };
 
   const handleCardClick = (e: React.MouseEvent) => {
@@ -2743,7 +2751,32 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
               {/* Quality score indicator and feedback button */}
               {qualityScore !== null && qualityScore !== undefined && (
                 <div className="flex items-center gap-2 relative">
-                  <div className={`px-2 py-1 rounded text-xs font-medium ${getQualityColor(qualityScore)}`} title={`Quality score: ${qualityScore}/100`}>
+                  <div
+                    className={`px-2 py-1 rounded text-xs font-medium ${getQualityColor(qualityScore)} cursor-pointer transition-all`}
+                    title={`Quality score: ${qualityScore}/100`}
+                    onMouseEnter={() => setIsQualityScoreHovered(true)}
+                    onMouseLeave={() => setIsQualityScoreHovered(false)}
+                    onTouchStart={() => setIsQualityScoreHovered(true)}
+                    onTouchEnd={() => {
+                      setTimeout(() => setIsQualityScoreHovered(false), 200);
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      // Trigger the edit button click if user has curated
+                      if (user) {
+                        const isCuratedByCurrentUser = curators.some(c => c.fid === user.fid);
+                        if (isCuratedByCurrentUser) {
+                          setShowQualityFeedbackModal(true);
+                        } else {
+                          setShowCurateFirstMessage(true);
+                          setTimeout(() => setShowCurateFirstMessage(false), 3000);
+                        }
+                      }
+                      // Reset hover state after click
+                      setTimeout(() => setIsQualityScoreHovered(false), 300);
+                    }}
+                  >
                     Q: {qualityScore}
                   </div>
                   {user && (
@@ -2760,7 +2793,13 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                           setShowQualityFeedbackModal(true);
                         }
                       }}
-                      className="px-1.5 py-1 rounded text-xs text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                      onMouseEnter={() => setIsQualityScoreHovered(false)}
+                      onMouseLeave={() => setIsQualityScoreHovered(false)}
+                      className={`px-1.5 py-1 rounded text-xs transition-colors ${
+                        isQualityScoreHovered
+                          ? `${getQualityTextColor(qualityScore)} bg-gray-100 dark:bg-gray-800`
+                          : "text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                      }`}
                       title="Provide feedback on quality score"
                     >
                       <svg
@@ -3173,14 +3212,22 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
           castHash={cast.hash || ""}
           currentQualityScore={qualityScore}
           isOpen={showQualityFeedbackModal}
-          onClose={() => setShowQualityFeedbackModal(false)}
-          onSuccess={(newScore) => {
+          onClose={() => {
             setShowQualityFeedbackModal(false);
-            // Update the quality score in the cast object
-            (cast as any)._qualityScore = newScore;
+            // Refresh the cast to get updated quality score
             if (onUpdate) {
               onUpdate();
             }
+          }}
+          onSuccess={(newScore, reasoning) => {
+            // Update the quality score in the cast object
+            (cast as any)._qualityScore = newScore;
+            // Store reasoning if available (could be displayed in tooltip or elsewhere)
+            if (reasoning) {
+              (cast as any)._qualityReasoning = reasoning;
+            }
+            // Don't close immediately - let the modal show the result
+            // The modal will close itself after showing the result
           }}
         />
       )}
