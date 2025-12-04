@@ -614,7 +614,7 @@ function MiniappContent() {
                       </span>
                       {item.qualityScore !== null && (
                         <span className="text-gray-400 dark:text-gray-500">
-                          · {item.qualityScore}
+                          · Q: {item.qualityScore}
                         </span>
                       )}
                       {item.repliesCount > 0 && (

@@ -9,7 +9,7 @@ import { analyzeCastQualityWithFeedback } from "@/lib/deepseek-quality";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { castHash, curatorFid, feedback } = body;
+    const { castHash, curatorFid, feedback, rootCastHash } = body;
 
     if (!castHash) {
       return NextResponse.json(
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify that the user has curated this cast
+    // Verify that the user has curated this cast OR the root cast
     const curation = await db
       .select()
       .from(curatorCastCurations)
@@ -44,9 +44,27 @@ export async function POST(request: NextRequest) {
       )
       .limit(1);
 
-    if (curation.length === 0) {
+    let hasCuration = curation.length > 0;
+
+    // If not curated current cast, check root cast (if provided and different)
+    if (!hasCuration && rootCastHash && rootCastHash !== castHash) {
+      const rootCuration = await db
+        .select()
+        .from(curatorCastCurations)
+        .where(
+          and(
+            eq(curatorCastCurations.castHash, rootCastHash),
+            eq(curatorCastCurations.curatorFid, curatorFid)
+          )
+        )
+        .limit(1);
+      
+      hasCuration = rootCuration.length > 0;
+    }
+
+    if (!hasCuration) {
       return NextResponse.json(
-        { error: "You must curate this cast before providing quality feedback" },
+        { error: "You must curate this cast or the root cast before providing quality feedback" },
         { status: 403 }
       );
     }

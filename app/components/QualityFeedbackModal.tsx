@@ -5,6 +5,7 @@ import { useNeynarContext } from "@neynar/react";
 
 interface QualityFeedbackModalProps {
   castHash: string;
+  rootCastHash?: string;
   currentQualityScore: number;
   isOpen: boolean;
   onClose: () => void;
@@ -13,6 +14,7 @@ interface QualityFeedbackModalProps {
 
 export function QualityFeedbackModal({
   castHash,
+  rootCastHash,
   currentQualityScore,
   isOpen,
   onClose,
@@ -85,6 +87,7 @@ export function QualityFeedbackModal({
         },
         body: JSON.stringify({
           castHash,
+          rootCastHash: rootCastHash,
           curatorFid: user.fid,
           feedback: feedback.trim(),
         }),

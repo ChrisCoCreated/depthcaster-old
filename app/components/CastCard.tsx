@@ -844,6 +844,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
   const [showQualityFeedbackModal, setShowQualityFeedbackModal] = useState(false);
   const [showCurateFirstMessage, setShowCurateFirstMessage] = useState(false);
   const [isQualityScoreHovered, setIsQualityScoreHovered] = useState(false);
+  const [hasCuratedRootCast, setHasCuratedRootCast] = useState(false);
 
   const [localCompressedView, setLocalCompressedView] = useState(compressedView);
   
@@ -1193,6 +1194,37 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
 
     checkIfCurated();
   }, [cast.hash, user?.fid]);
+
+  // Check if user has curated the root cast (for replies)
+  useEffect(() => {
+    if (!rootCastHash || !user?.fid || !cast.hash) {
+      setHasCuratedRootCast(false);
+      return;
+    }
+
+    // Only check if this is a reply and rootCastHash is different from current cast hash
+    if (rootCastHash === cast.hash) {
+      setHasCuratedRootCast(false);
+      return;
+    }
+
+    const checkRootCastCuration = async () => {
+      try {
+        const response = await fetch(`/api/curate?castHash=${rootCastHash}`);
+        if (response.ok) {
+          const data = await response.json();
+          const hasCurated = data.curatorFids?.includes(user.fid) || false;
+          setHasCuratedRootCast(hasCurated);
+        } else {
+          setHasCuratedRootCast(false);
+        }
+      } catch (error) {
+        setHasCuratedRootCast(false);
+      }
+    };
+
+    checkRootCastCuration();
+  }, [rootCastHash, user?.fid, cast.hash]);
 
   // Check if user is admin and fetch tags
   useEffect(() => {
@@ -2763,10 +2795,11 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      // Trigger the edit button click if user has curated
+                      // Trigger the edit button click if user has curated current cast or root cast
                       if (user) {
                         const isCuratedByCurrentUser = curators.some(c => c.fid === user.fid);
-                        if (isCuratedByCurrentUser) {
+                        const canProvideFeedback = isCuratedByCurrentUser || hasCuratedRootCast;
+                        if (canProvideFeedback) {
                           setShowQualityFeedbackModal(true);
                         } else {
                           setShowCurateFirstMessage(true);
@@ -2784,9 +2817,10 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        // Check if user has curated this cast
+                        // Check if user has curated this cast or the root cast
                         const isCuratedByCurrentUser = curators.some(c => c.fid === user.fid);
-                        if (!isCuratedByCurrentUser) {
+                        const canProvideFeedback = isCuratedByCurrentUser || hasCuratedRootCast;
+                        if (!canProvideFeedback) {
                           setShowCurateFirstMessage(true);
                           setTimeout(() => setShowCurateFirstMessage(false), 3000);
                         } else {
@@ -2819,7 +2853,9 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                   )}
                   {showCurateFirstMessage && (
                     <div className="absolute z-50 top-full left-0 mt-2 px-3 py-2 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg whitespace-nowrap">
-                      Please curate this cast first to provide quality feedback
+                      {rootCastHash && rootCastHash !== cast.hash
+                        ? "Please curate this cast or the root cast first to provide quality feedback"
+                        : "Please curate this cast first to provide quality feedback"}
                       <div className="absolute -top-1 left-4 w-2 h-2 bg-gray-900 dark:bg-gray-800 rotate-45"></div>
                     </div>
                   )}
@@ -3210,6 +3246,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
       {showQualityFeedbackModal && qualityScore !== null && qualityScore !== undefined && (
         <QualityFeedbackModal
           castHash={cast.hash || ""}
+          rootCastHash={rootCastHash}
           currentQualityScore={qualityScore}
           isOpen={showQualityFeedbackModal}
           onClose={() => {
