@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { MiniAppProvider, useMiniApp } from "@neynar/react";
 import { formatDistanceToNow } from "date-fns";
 import { AvatarImage } from "@/app/components/AvatarImage";
@@ -40,6 +40,13 @@ function MiniappContent() {
   const [pasteInputValue, setPasteInputValue] = useState("");
   const [isCurator, setIsCurator] = useState<boolean | null>(null);
   const [checkingCurator, setCheckingCurator] = useState(false);
+  const [minQualityScore, setMinQualityScore] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("miniappMinQualityScore");
+      return saved ? parseInt(saved, 10) : 70;
+    }
+    return 70;
+  });
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://depthcaster.vercel.app";
   
@@ -91,6 +98,34 @@ function MiniappContent() {
     }
   }, [isSDKLoaded, actions]);
 
+  const fetchFeed = useCallback(async (limit: number = 3) => {
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/miniapp/feed?limit=${limit}&minQualityScore=${minQualityScore}`, {
+        // Add signal to allow cancellation if component unmounts
+        signal: AbortSignal.timeout(30000), // 30 second timeout
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch feed: ${response.status}`);
+      }
+      const data = await response.json();
+      setFeedItems(data.items || []);
+      setHasMore((data.items || []).length >= limit && limit < 30);
+      setError(null);
+    } catch (err: any) {
+      // Ignore abort errors (component unmounted or timeout)
+      if (err.name === 'AbortError' || err.name === 'TimeoutError') {
+        console.log("Feed fetch cancelled or timed out");
+        return;
+      }
+      console.error("Error fetching feed:", err);
+      // Only set error if we don't have any items yet (initial load)
+      setError("Failed to load feed");
+    } finally {
+      setLoading(false);
+    }
+  }, [minQualityScore]);
+
   // Fetch initial feed immediately on mount (don't wait for anything)
   useEffect(() => {
     // Small delay to ensure page is fully loaded
@@ -98,7 +133,7 @@ function MiniappContent() {
       fetchFeed(3); // Load only 3 items initially
     }, 100);
     return () => clearTimeout(timer);
-  }, []);
+  }, [fetchFeed]);
 
   // Lazy load remaining items after initial render
   useEffect(() => {
@@ -300,42 +335,12 @@ function MiniappContent() {
     }
   };
 
-  const fetchFeed = async (limit: number = 3) => {
-    try {
-      setLoading(true);
-      const response = await fetch(`/api/miniapp/feed?limit=${limit}`, {
-        // Add signal to allow cancellation if component unmounts
-        signal: AbortSignal.timeout(30000), // 30 second timeout
-      });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch feed: ${response.status}`);
-      }
-      const data = await response.json();
-      setFeedItems(data.items || []);
-      setHasMore((data.items || []).length >= limit && limit < 30);
-      setError(null);
-    } catch (err: any) {
-      // Ignore abort errors (component unmounted or timeout)
-      if (err.name === 'AbortError' || err.name === 'TimeoutError') {
-        console.log("Feed fetch cancelled or timed out");
-        return;
-      }
-      console.error("Error fetching feed:", err);
-      // Only set error if we don't have any items yet (initial load)
-      if (feedItems.length === 0) {
-        setError("Failed to load feed");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const loadMoreItems = async () => {
     if (loadingMore || !hasMore || feedItems.length >= 30) return;
 
     try {
       setLoadingMore(true);
-      const response = await fetch(`/api/miniapp/feed?limit=30`);
+      const response = await fetch(`/api/miniapp/feed?limit=30&minQualityScore=${minQualityScore}`);
       if (!response.ok) {
         throw new Error("Failed to fetch more items");
       }
@@ -551,9 +556,40 @@ function MiniappContent() {
 
       <div className="max-w-2xl mx-auto px-4 pt-2 pb-6">
         <div className="mb-2">
-          <p className="text-xs text-gray-600 dark:text-gray-400 mb-0">
+          <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
             Latest Quality Curations
           </p>
+          
+          {/* Quality Filter Buttons */}
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-xs text-gray-600 dark:text-gray-400">Quality:</span>
+            <div className="flex items-center gap-1">
+              {[
+                { value: 70, label: "70+" },
+                { value: 60, label: "60+" },
+                { value: 50, label: "50+" },
+                { value: 20, label: "20+" },
+              ].map((filter) => (
+                <button
+                  key={filter.value}
+                  onClick={() => {
+                    setMinQualityScore(filter.value);
+                    localStorage.setItem("miniappMinQualityScore", filter.value.toString());
+                    // Refresh feed with new quality filter
+                    fetchFeed(3);
+                  }}
+                  className={`px-2 py-1 text-xs rounded transition-colors ${
+                    minQualityScore === filter.value
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {!checkingInstall && !installed && isSDKLoaded && (
             <div className="mt-4 flex justify-center">
               <button

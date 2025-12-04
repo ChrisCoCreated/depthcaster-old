@@ -11,26 +11,8 @@ export const dynamic = 'force-dynamic';
 // Helper function to ensure we have a Date object
 const toDate = (value: Date | string | null | undefined, fallback: Date): Date => {
   if (!value) return fallback;
-  if (value instanceof Date) {
-    // Validate Date object
-    if (isNaN(value.getTime())) return fallback;
-    return value;
-  }
-  if (typeof value === 'string') {
-    const date = new Date(value);
-    // Validate parsed date
-    if (isNaN(date.getTime())) {
-      console.warn(`[Miniapp Feed] Invalid date string: ${value}`);
-      return fallback;
-    }
-    return date;
-  }
-  // Handle other types (e.g., number timestamps)
-  if (typeof value === 'number') {
-    const date = new Date(value);
-    if (isNaN(date.getTime())) return fallback;
-    return date;
-  }
+  if (value instanceof Date) return value;
+  if (typeof value === 'string') return new Date(value);
   return fallback;
 };
 
@@ -38,26 +20,12 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const limit = parseInt(searchParams.get("limit") || "30");
-    const minQualityScore = 70; // Fixed at 70+ for miniapp
+    const minQualityScore = searchParams.get("minQualityScore")
+      ? parseInt(searchParams.get("minQualityScore")!)
+      : 70; // Default to 70+ for miniapp
 
-    // Get first curation times using aggregation query (more reliable than subquery)
-    const firstCurationTimes = await db
-      .select({
-        castHash: curatorCastCurations.castHash,
-        firstCurationTime: sql<Date>`MIN(${curatorCastCurations.createdAt})`.as("first_curation_time"),
-      })
-      .from(curatorCastCurations)
-      .groupBy(curatorCastCurations.castHash);
-
-    const firstCurationTimeMap = new Map<string, Date>();
-    firstCurationTimes.forEach((row) => {
-      const date = toDate(row.firstCurationTime, new Date());
-      if (!isNaN(date.getTime())) {
-        firstCurationTimeMap.set(row.castHash, date);
-      }
-    });
-
-    // Get curated casts with quality score filter
+    // Optimized single query with subquery for first curation time
+    // This uses a subquery to get MIN(createdAt) and applies LIMIT early in the database
     const castsWithCurationTime = await db
       .select({
         castHash: curatedCasts.castHash,
@@ -66,6 +34,12 @@ export async function GET(request: NextRequest) {
         repliesCount: curatedCasts.repliesCount,
         qualityScore: curatedCasts.qualityScore,
         castCreatedAt: curatedCasts.castCreatedAt,
+        firstCurationTime: sql<Date>`COALESCE(
+          (SELECT MIN(${curatorCastCurations.createdAt}) 
+           FROM ${curatorCastCurations} 
+           WHERE ${curatorCastCurations.castHash} = ${curatedCasts.castHash}),
+          ${curatedCasts.castCreatedAt}
+        )`.as("first_curation_time"),
       })
       .from(curatedCasts)
       .where(
@@ -74,27 +48,15 @@ export async function GET(request: NextRequest) {
           sql`${curatedCasts.qualityScore} IS NOT NULL`
         )
       )
-      .orderBy(desc(curatedCasts.castCreatedAt))
-      .limit(limit * 2); // Get more to account for filtering by curation time
+      .orderBy(sql`COALESCE(
+        (SELECT MIN(${curatorCastCurations.createdAt}) 
+         FROM ${curatorCastCurations} 
+         WHERE ${curatorCastCurations.castHash} = ${curatedCasts.castHash}),
+        ${curatedCasts.castCreatedAt}
+      ) DESC`)
+      .limit(limit);
 
-    // Sort by first curation time (or castCreatedAt if no curation) and limit
-    const sortedCasts = castsWithCurationTime
-      .map((cast) => {
-        const firstCuration = firstCurationTimeMap.get(cast.castHash);
-        const castCreatedAtDate = cast.castCreatedAt ? toDate(cast.castCreatedAt, new Date()) : null;
-        return {
-          ...cast,
-          firstCurationTime: firstCuration || castCreatedAtDate || new Date(),
-        };
-      })
-      .sort((a, b) => {
-        const timeA = a.firstCurationTime.getTime();
-        const timeB = b.firstCurationTime.getTime();
-        return timeB - timeA; // Descending order (newest first)
-      })
-      .slice(0, limit);
-
-    if (sortedCasts.length === 0) {
+    if (castsWithCurationTime.length === 0) {
       return NextResponse.json(
         {
           items: [],
@@ -110,7 +72,7 @@ export async function GET(request: NextRequest) {
 
     // Get author user info from database (only for the limited set)
     const authorFids = Array.from(
-      new Set(sortedCasts.map((c) => c.authorFid).filter((fid): fid is number => fid !== null))
+      new Set(castsWithCurationTime.map((c) => c.authorFid).filter((fid): fid is number => fid !== null))
     );
     
     const authorUsers = authorFids.length > 0
@@ -135,13 +97,10 @@ export async function GET(request: NextRequest) {
     });
 
     // Format response
-    const feedItems = sortedCasts.map((cast) => {
+    const feedItems = castsWithCurationTime.map((cast) => {
       const castCreatedAtDate = cast.castCreatedAt ? toDate(cast.castCreatedAt, new Date()) : null;
+      const curatedAtDate = toDate(cast.firstCurationTime, new Date());
       const authorInfo = cast.authorFid ? authorMap.get(cast.authorFid) : null;
-      
-      // Use the firstCurationTime we calculated during sorting
-      // This is already a Date object from the map
-      const curatedAtDate = cast.firstCurationTime;
       
       return {
         castHash: cast.castHash,
@@ -153,7 +112,7 @@ export async function GET(request: NextRequest) {
         repliesCount: cast.repliesCount || 0,
         qualityScore: cast.qualityScore,
         castCreatedAt: castCreatedAtDate?.toISOString() || null,
-        curatedAt: curatedAtDate.toISOString(),
+        curatedAt: curatedAtDate?.toISOString() || null,
       };
     });
 
