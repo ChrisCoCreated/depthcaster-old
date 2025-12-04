@@ -3243,10 +3243,10 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-              Remove from curated feed?
+              Remove your curation?
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-              Are you sure you want to remove this cast from the curated feed?
+              Are you sure you want to remove your curation? If other curators have curated this cast, it will remain in the curated feed.
             </p>
             <div className="flex gap-3">
               <button
