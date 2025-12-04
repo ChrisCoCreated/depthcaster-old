@@ -162,6 +162,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   const isRestoringScrollRef = useRef<boolean>(false);
   const scrollRestoredRef = useRef<boolean>(false);
   const castsRestoredRef = useRef<boolean>(false);
+  const justSavedOnClickRef = useRef<number>(0); // Timestamp of last click save
   const feedViewStartTimeRef = useRef<number | null>(null);
   const feedViewIntervalRef = useRef<NodeJS.Timeout | null>(null);
   // Rate limiting: minimum 2 seconds between API calls
@@ -529,6 +530,13 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   const saveScrollPosition = useCallback(() => {
     if (isRestoringScrollRef.current) return;
     
+    // Prevent overwriting click-saved position for 200ms after click
+    const now = Date.now();
+    if (now - justSavedOnClickRef.current < 200) {
+      console.log("[Feed] Skipping scroll save - recently saved on click");
+      return;
+    }
+    
     const scrollY = window.scrollY || document.documentElement.scrollTop;
     const castHashes = casts.map((cast) => cast.hash || "").filter(Boolean);
     
@@ -727,14 +735,27 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       const link = target.closest('a[href^="/conversation"], a[href^="/cast"]');
       
       if (link) {
-        // Save scroll position immediately before navigation
+        // Capture scroll position IMMEDIATELY at click time (before any navigation/scroll happens)
         const scrollY = window.scrollY || document.documentElement.scrollTop;
+        const castHashes = casts.map((cast) => cast.hash || "").filter(Boolean);
+        
         console.log("[Feed] Click interceptor: Saving scroll position before navigation", { 
           scrollY,
-          href: (link as HTMLAnchorElement).href 
+          href: (link as HTMLAnchorElement).href,
+          castsCount: casts.length
         });
-        // Force save immediately (don't rely on throttled save)
-        saveScrollPosition();
+        
+        // Save directly with captured value, don't use saveScrollPosition() which reads window.scrollY later
+        // This ensures we save the position at click time, not after potential scroll events
+        saveFeedState(feedType, {
+          scrollY,  // Use captured value, not window.scrollY
+          cursor,
+          castHashes,
+          casts: casts, // Save full cast objects for instant restoration
+        });
+        
+        // Mark that we just saved on click to prevent scroll handler from overwriting
+        justSavedOnClickRef.current = Date.now();
       }
     };
     

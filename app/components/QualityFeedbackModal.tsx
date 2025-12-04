@@ -99,7 +99,7 @@ export function QualityFeedbackModal({
       const newScore = data.qualityScore;
       const reasoning = data.reasoning;
 
-      // Show result before closing
+      // Show result - user can read it and close when ready
       setResult({
         newScore,
         reasoning,
@@ -110,12 +110,7 @@ export function QualityFeedbackModal({
         onSuccess(newScore, reasoning);
       }
       
-      // Close after 5 seconds or when user clicks close
-      setTimeout(() => {
-        setFeedback("");
-        setResult(null);
-        onClose();
-      }, 5000);
+      // Don't auto-close - let user read the feedback and close manually
     } catch (err: any) {
       setError(err.message || "Failed to submit quality feedback");
     } finally {
