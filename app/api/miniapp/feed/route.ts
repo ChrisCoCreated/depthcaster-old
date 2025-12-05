@@ -68,10 +68,11 @@ export async function GET(request: NextRequest) {
       .where(inArray(curatorCastCurations.castHash, castHashArray))
       .groupBy(curatorCastCurations.castHash);
 
-    // Create map for quick lookup
+    // Create map for quick lookup (ensure dates are Date objects)
     const firstCurationTimeMap = new Map<string, Date>();
     firstCurationTimes.forEach((row) => {
-      firstCurationTimeMap.set(row.castHash, row.firstCurationTime);
+      const date = toDate(row.firstCurationTime, new Date());
+      firstCurationTimeMap.set(row.castHash, date);
     });
 
     // Sort by first curation time (or castCreatedAt if no curation) and limit
@@ -79,14 +80,15 @@ export async function GET(request: NextRequest) {
       .map((cast) => {
         const firstCuration = firstCurationTimeMap.get(cast.castHash);
         const castCreatedAtDate = cast.castCreatedAt ? toDate(cast.castCreatedAt, new Date()) : null;
+        const fallbackDate = castCreatedAtDate || toDate(cast.createdAt, new Date());
         return {
           ...cast,
-          firstCurationTime: firstCuration || castCreatedAtDate || toDate(cast.createdAt, new Date()),
+          firstCurationTime: firstCuration || fallbackDate,
         };
       })
       .sort((a, b) => {
-        const timeA = a.firstCurationTime.getTime();
-        const timeB = b.firstCurationTime.getTime();
+        const timeA = a.firstCurationTime instanceof Date ? a.firstCurationTime.getTime() : toDate(a.firstCurationTime, new Date()).getTime();
+        const timeB = b.firstCurationTime instanceof Date ? b.firstCurationTime.getTime() : toDate(b.firstCurationTime, new Date()).getTime();
         return timeB - timeA; // Descending order (newest first)
       })
       .slice(0, limit);
