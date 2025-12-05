@@ -62,6 +62,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Only HTTP(S) protocols are supported by unfurl.js
+    if (targetUrl.protocol !== 'http:' && targetUrl.protocol !== 'https:') {
+      return NextResponse.json(
+        { error: "Only HTTP(S) protocols are supported" },
+        { status: 400 }
+      );
+    }
+
     const isXEmbed = targetUrl.hostname === 'x.com' || targetUrl.hostname === 'twitter.com' || targetUrl.hostname === 'www.twitter.com' || targetUrl.hostname === 'www.x.com';
 
     // Use Twitter oEmbed API for Twitter/X links (unfurl.js doesn't handle oEmbed directly)
@@ -172,8 +180,9 @@ export async function GET(request: NextRequest) {
                               errorMessage?.includes('http status not OK');
     const isContentTypeError = errorMessage?.includes('WRONG_CONTENT_TYPE') ||
                                errorMessage?.includes('Wrong content type header');
+    const isProtocolError = errorMessage?.includes('Only HTTP(S) protocols are supported');
     
-    if (isNetworkError || isHttpStatusError || isContentTypeError) {
+    if (isNetworkError || isHttpStatusError || isContentTypeError || isProtocolError) {
       // Don't log expected errors - they're normal for:
       // - Invalid/unreachable domains (DNS errors, connection refused, etc.)
       // - Inaccessible URLs (404, 403, etc.)

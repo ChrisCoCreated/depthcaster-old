@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-// import { Analytics } from "@vercel/analytics/next";
+import { Analytics } from "@vercel/analytics/next";
 import { AuthProvider } from "./components/AuthProvider";
 import { ConditionalHeader } from "./components/ConditionalHeader";
 import { ServiceWorkerRegistration } from "./components/ServiceWorkerRegistration";
@@ -112,7 +112,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white dark:bg-black text-gray-900 dark:text-gray-100`}
       >
-        {/* <Analytics /> */}
+        <Analytics />
         <PortalErrorHandler />
         <ServiceWorkerRegistration />
         <AuthProvider>
