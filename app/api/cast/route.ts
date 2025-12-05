@@ -26,10 +26,35 @@ export async function POST(request: NextRequest) {
     if (embeds && Array.isArray(embeds)) {
       embeds = embeds.map((embed: any) => {
         if (embed.cast_id && !embed.castId) {
-          return {
+          const normalizedEmbed = {
             castId: embed.cast_id,
             ...(embed.url ? { url: embed.url } : {}),
           };
+          // Log hash details for debugging
+          if (embed.cast_id?.hash) {
+            const hash = embed.cast_id.hash;
+            const hexLength = hash.startsWith('0x') || hash.startsWith('0X') ? hash.length - 2 : hash.length;
+            console.log(`[Cast API] Embed hash details:`, {
+              original: hash,
+              length: hash.length,
+              hexLength: hexLength,
+              has0xPrefix: hash.startsWith('0x') || hash.startsWith('0X'),
+              fid: embed.cast_id.fid,
+            });
+          }
+          return normalizedEmbed;
+        }
+        // Log if castId already exists
+        if (embed.castId?.hash) {
+          const hash = embed.castId.hash;
+          const hexLength = hash.startsWith('0x') || hash.startsWith('0X') ? hash.length - 2 : hash.length;
+          console.log(`[Cast API] Embed hash details (castId):`, {
+            original: hash,
+            length: hash.length,
+            hexLength: hexLength,
+            has0xPrefix: hash.startsWith('0x') || hash.startsWith('0X'),
+            fid: embed.castId.fid,
+          });
         }
         return embed;
       });
