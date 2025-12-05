@@ -19,7 +19,20 @@ import { analyzeCastQualityAsync } from "@/lib/deepseek-quality";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { signerUuid, text, parent, embeds, channelId, parentAuthorFid } = body;
+    let { signerUuid, text, parent, embeds, channelId, parentAuthorFid } = body;
+
+    // Normalize embeds format - Neynar API expects castId (camelCase) not cast_id (snake_case)
+    if (embeds && Array.isArray(embeds)) {
+      embeds = embeds.map((embed: any) => {
+        if (embed.cast_id && !embed.castId) {
+          return {
+            castId: embed.cast_id,
+            ...(embed.url ? { url: embed.url } : {}),
+          };
+        }
+        return embed;
+      });
+    }
 
     if (!signerUuid) {
       return NextResponse.json(
@@ -68,14 +81,46 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: errorMessage }, { status: 400 });
     }
 
-    const castResponse = await neynarClient.publishCast({
-      signerUuid,
-      text: trimmedText,
-      parent,
-      embeds,
-      channelId,
-      parentAuthorFid,
-    });
+    // Log request details for debugging quote casts
+    if (embeds?.some((embed: any) => embed.castId || embed.cast_id)) {
+      console.log("[Cast API] Publishing quote cast:", {
+        signerUuid,
+        textLength: trimmedText.length,
+        embeds,
+        parent,
+        channelId,
+        parentAuthorFid,
+      });
+    }
+
+    let castResponse;
+    try {
+      castResponse = await neynarClient.publishCast({
+        signerUuid,
+        text: trimmedText,
+        parent,
+        embeds,
+        channelId,
+        parentAuthorFid,
+      });
+    } catch (error: any) {
+      // Log detailed error information for debugging
+      console.error("[Cast API] Neynar publishCast error:", {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        requestData: {
+          signerUuid,
+          textLength: trimmedText.length,
+          hasParent: !!parent,
+          embeds,
+          channelId,
+          parentAuthorFid,
+        },
+      });
+      throw error;
+    }
 
     // Extract cast from PostCastResponse
     const cast = (castResponse as any).cast || castResponse;
@@ -83,14 +128,15 @@ export async function POST(request: NextRequest) {
 
     // Track interaction if this is a reply or quote to a curated cast thread
     if (userFid) {
-      // Check if this is a quote (has embeds with cast_id)
-      const isQuote = embeds?.some((embed: any) => embed.cast_id);
+      // Check if this is a quote (has embeds with castId or cast_id)
+      const isQuote = embeds?.some((embed: any) => embed.castId || embed.cast_id);
       
       if (isQuote && embeds) {
         // Track quote interactions for each quoted cast
         for (const embed of embeds) {
-          if (embed.cast_id?.hash) {
-            trackCuratedCastInteraction(embed.cast_id.hash, "quote", userFid).catch((error) => {
+          const castId = embed.castId || embed.cast_id;
+          if (castId?.hash) {
+            trackCuratedCastInteraction(castId.hash, "quote", userFid).catch((error) => {
               console.error("Error tracking quote interaction:", error);
             });
           }

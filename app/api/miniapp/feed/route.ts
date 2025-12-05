@@ -24,9 +24,8 @@ export async function GET(request: NextRequest) {
       ? parseInt(searchParams.get("minQualityScore")!)
       : 70; // Default to 70+ for miniapp
 
-    // Optimized single query with subquery for first curation time
-    // This uses a subquery to get MIN(createdAt) and applies LIMIT early in the database
-    const castsWithCurationTime = await db
+    // Get curated casts matching quality filter
+    const curatedCastsList = await db
       .select({
         castHash: curatedCasts.castHash,
         castText: curatedCasts.castText,
@@ -34,12 +33,7 @@ export async function GET(request: NextRequest) {
         repliesCount: curatedCasts.repliesCount,
         qualityScore: curatedCasts.qualityScore,
         castCreatedAt: curatedCasts.castCreatedAt,
-        firstCurationTime: sql<Date>`COALESCE(
-          (SELECT MIN(${curatorCastCurations.createdAt}) 
-           FROM ${curatorCastCurations} 
-           WHERE ${curatorCastCurations.castHash} = ${curatedCasts.castHash}),
-          ${curatedCasts.castCreatedAt}
-        )`.as("first_curation_time"),
+        createdAt: curatedCasts.createdAt,
       })
       .from(curatedCasts)
       .where(
@@ -47,14 +41,55 @@ export async function GET(request: NextRequest) {
           gte(curatedCasts.qualityScore, minQualityScore),
           sql`${curatedCasts.qualityScore} IS NOT NULL`
         )
-      )
-      .orderBy(sql`COALESCE(
-        (SELECT MIN(${curatorCastCurations.createdAt}) 
-         FROM ${curatorCastCurations} 
-         WHERE ${curatorCastCurations.castHash} = ${curatedCasts.castHash}),
-        ${curatedCasts.castCreatedAt}
-      ) DESC`)
-      .limit(limit);
+      );
+
+    if (curatedCastsList.length === 0) {
+      return NextResponse.json(
+        {
+          items: [],
+          count: 0,
+        },
+        {
+          headers: {
+            "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60",
+          },
+        }
+      );
+    }
+
+    // Get first curation times using aggregation query (same approach as main feed)
+    const castHashArray = curatedCastsList.map(c => c.castHash);
+    const firstCurationTimes = await db
+      .select({
+        castHash: curatorCastCurations.castHash,
+        firstCurationTime: sql<Date>`MIN(${curatorCastCurations.createdAt})`.as("first_curation_time"),
+      })
+      .from(curatorCastCurations)
+      .where(inArray(curatorCastCurations.castHash, castHashArray))
+      .groupBy(curatorCastCurations.castHash);
+
+    // Create map for quick lookup
+    const firstCurationTimeMap = new Map<string, Date>();
+    firstCurationTimes.forEach((row) => {
+      firstCurationTimeMap.set(row.castHash, row.firstCurationTime);
+    });
+
+    // Sort by first curation time (or castCreatedAt if no curation) and limit
+    const castsWithCurationTime = curatedCastsList
+      .map((cast) => {
+        const firstCuration = firstCurationTimeMap.get(cast.castHash);
+        const castCreatedAtDate = cast.castCreatedAt ? toDate(cast.castCreatedAt, new Date()) : null;
+        return {
+          ...cast,
+          firstCurationTime: firstCuration || castCreatedAtDate || toDate(cast.createdAt, new Date()),
+        };
+      })
+      .sort((a, b) => {
+        const timeA = a.firstCurationTime.getTime();
+        const timeB = b.firstCurationTime.getTime();
+        return timeB - timeA; // Descending order (newest first)
+      })
+      .slice(0, limit);
 
     if (castsWithCurationTime.length === 0) {
       return NextResponse.json(

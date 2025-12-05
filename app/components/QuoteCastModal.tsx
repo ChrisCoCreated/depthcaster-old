@@ -233,6 +233,12 @@ export function QuoteCastModal({ cast, isOpen, onClose, onSuccess }: QuoteCastMo
       setIsPosting(true);
       setError(null);
 
+      // Validate cast hash and FID
+      if (!cast.hash || !cast.author?.fid) {
+        setError("Invalid cast data. Please try again.");
+        return;
+      }
+
       const response = await fetch("/api/cast", {
         method: "POST",
         headers: {
