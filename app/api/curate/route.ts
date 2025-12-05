@@ -594,9 +594,9 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Send notification to admin user 5701 only when a cast is curated for the first time
+      // Send notification to admin user 5701 when a cast is curated for the first time
       const ADMIN_FID = 5701;
-      if (curatorFid !== ADMIN_FID && isNewCuration) {
+      if (isNewCuration) {
         // Get curator's name for the notification
         // Try database first, then castData, then fallback to FID
         let curatorName = `User ${curatorFid}`;
