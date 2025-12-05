@@ -2,7 +2,6 @@
 
 import { useEffect, useState, use } from "react";
 import { useNeynarContext } from "@neynar/react";
-import Link from "next/link";
 import { ProfileHeader } from "../../components/ProfileHeader";
 import { UserActivitySection } from "../../components/UserActivitySection";
 
@@ -85,14 +84,6 @@ export default function ProfilePage({
     return (
       <div className="min-h-screen">
         <main className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
-          <div className="mb-6 sm:mb-8">
-            <Link
-              href="/"
-              className="text-xs sm:text-sm text-blue-600 dark:text-blue-400 hover:underline"
-            >
-              ← Back to feed
-            </Link>
-          </div>
           <div className="p-4 sm:p-6 border border-red-200 dark:border-red-800 rounded-lg bg-red-50 dark:bg-red-900/20">
             <p className="text-red-600 dark:text-red-400">
               {error || "Profile not found"}
@@ -108,15 +99,6 @@ export default function ProfilePage({
   return (
     <div className="min-h-screen">
       <main className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
-        <div className="mb-6 sm:mb-8">
-          <Link
-            href="/"
-            className="text-xs sm:text-sm text-blue-600 dark:text-blue-400 hover:underline"
-          >
-            ← Back to feed
-          </Link>
-        </div>
-
         {/* Profile Header */}
         <ProfileHeader
           fid={profile.fid}
