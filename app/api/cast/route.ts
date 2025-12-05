@@ -22,11 +22,44 @@ export async function POST(request: NextRequest) {
     let { signerUuid, text, parent, embeds, channelId, parentAuthorFid } = body;
 
     // Normalize embeds format - Neynar API expects castId (camelCase) not cast_id (snake_case)
+    // Also normalize cast hash to exactly 20 bytes (40 hex characters)
     if (embeds && Array.isArray(embeds)) {
       embeds = embeds.map((embed: any) => {
-        if (embed.cast_id && !embed.castId) {
+        const castId = embed.castId || embed.cast_id;
+        if (castId) {
+          // Get the hash - could be castId.hash or just castId if it's a string
+          let hash = typeof castId === 'string' ? castId : (castId.hash || castId);
+          const fid = typeof castId === 'object' ? (castId.fid || embed.cast_id?.fid) : undefined;
+          
+          // Log original hash for debugging
+          if (typeof hash === 'string') {
+            console.log(`[Cast API] Original hash: "${hash}", length: ${hash.length}, hex length: ${hash.replace(/^0x/i, '').length}`);
+            
+            // Normalize hash: ensure it's exactly 40 hex characters (20 bytes)
+            // Remove 0x prefix if present
+            let hexHash = hash.startsWith('0x') || hash.startsWith('0X') ? hash.slice(2) : hash;
+            
+            // Pad to exactly 40 hex characters (20 bytes) if needed
+            // Farcaster hashes should be exactly 20 bytes = 40 hex chars
+            if (hexHash.length < 40) {
+              console.log(`[Cast API] Hash too short (${hexHash.length} chars), padding to 40`);
+              hexHash = hexHash.padStart(40, '0');
+            } else if (hexHash.length > 40) {
+              // If longer, take the last 40 characters (in case of extra padding)
+              console.log(`[Cast API] Hash too long (${hexHash.length} chars), truncating to 40`);
+              hexHash = hexHash.slice(-40);
+            }
+            
+            // Add 0x prefix back
+            hash = '0x' + hexHash;
+            console.log(`[Cast API] Normalized hash: "${hash}", hex length: ${hexHash.length}`);
+          }
+          
           return {
-            castId: embed.cast_id,
+            castId: {
+              hash,
+              fid,
+            },
             ...(embed.url ? { url: embed.url } : {}),
           };
         }
