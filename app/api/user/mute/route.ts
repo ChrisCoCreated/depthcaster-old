@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
       // Check if publishMute exists on the client
       if (typeof (neynarClient as any).publishMute === 'function') {
         result = await (neynarClient as any).publishMute({
+          fid: userFid,
           signerUuid,
           mutedFid: parseInt(targetFid),
         });

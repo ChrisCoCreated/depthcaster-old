@@ -74,7 +74,7 @@ export function BackButton() {
   return (
     <button
       onClick={handleBack}
-      className="fixed top-20 left-4 z-[150] p-2 rounded-full bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border border-gray-200 dark:border-gray-800 shadow-lg hover:bg-white dark:hover:bg-gray-900 transition-colors"
+      className="fixed top-20 left-4 z-[250] p-2 rounded-full bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border border-gray-200 dark:border-gray-800 shadow-lg hover:bg-white dark:hover:bg-gray-900 transition-colors"
       aria-label="Go back"
       style={{
         paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.5rem)',
