@@ -2992,6 +2992,81 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
           </div>
         </div>
 
+        {/* Reply box - shown right after cast for curated feed */}
+        {showReplyBox && (feedType === "curated" || cast._curatorFid) && (
+          <div className="mt-2 pl-0 sm:pl-14 border-t border-gray-200 dark:border-gray-800 pt-3 sm:pt-4" onClick={(e) => e.stopPropagation()}>
+            <CastComposer
+              parentHash={cast.hash}
+              onSuccess={(newCast) => {
+                setShowReplyBox(false);
+                
+                // Optimistically add the new reply to topReplies immediately
+                if (newCast && cast.hash) {
+                  // Add metadata to match the format expected by the reply display
+                  const optimisticReply = {
+                    ...newCast,
+                    _replyDepth: 1,
+                    _parentCastHash: cast.hash,
+                    _isQuoteCast: false,
+                    _rootCastHash: cast.hash,
+                  };
+                  
+                  setTopReplies((prev) => {
+                    // Check if reply already exists (avoid duplicates)
+                    const exists = prev.some((r) => r.hash === newCast.hash);
+                    if (exists) {
+                      return prev;
+                    }
+                    // Add to the beginning for newest-first, or end for oldest-first
+                    // Based on replySortBy
+                    const sortOrder = replySortBy === "recent-reply" ? "newest" : "oldest";
+                    if (sortOrder === "newest") {
+                      return [optimisticReply, ...prev];
+                    } else {
+                      return [...prev, optimisticReply];
+                    }
+                  });
+                  
+                  // Mark replies as loaded if they weren't already
+                  if (!repliesLoaded) {
+                    setRepliesLoaded(true);
+                  }
+                  
+                  // Refetch replies after a short delay to ensure we have the latest data
+                  // This handles cases where the reply needs to be stored in the database
+                  setTimeout(async () => {
+                    try {
+                      const params = new URLSearchParams({
+                        castHash: cast.hash!,
+                        sortBy: replySortBy,
+                        minQualityScore: replyMinQuality.toString(),
+                      });
+                      if (user?.fid) {
+                        params.append("viewerFid", user.fid.toString());
+                      }
+                      
+                      const res = await fetch(`/api/feed/replies?${params}`);
+                      if (res.ok) {
+                        const data = await res.json();
+                        if (data.replies) {
+                          setTopReplies(data.replies);
+                          setHasAnyReplies(data.hasAnyReplies !== undefined ? data.hasAnyReplies : true);
+                        }
+                      }
+                    } catch (error) {
+                      console.error("Error refetching replies:", error);
+                    }
+                  }, 2000); // Wait 2 seconds for webhook to process
+                }
+                
+                if (onUpdate) {
+                  onUpdate();
+                }
+              }}
+            />
+          </div>
+        )}
+
         {/* Top Replies Section */}
         {showTopReplies && (feedType === "curated" || cast._curatorFid) && (
           <div className={`mt-3 border-t ${(cast as any)._isQuoteCast && (cast as any)._parentCast ? 'border-gray-200 dark:border-gray-700 bg-gray-50/30 dark:bg-gray-800/20' : 'border-gray-200 dark:border-gray-800'} pt-3 rounded-b-lg transition-colors group/replies hover:bg-gray-50 dark:hover:bg-gray-800/30`} onClick={(e) => e.stopPropagation()}>
@@ -3142,72 +3217,13 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
           </div>
         )}
 
-        {/* Reply box */}
-        {showReplyBox && (
+        {/* Reply box - shown after replies for non-curated feeds */}
+        {showReplyBox && feedType !== "curated" && !cast._curatorFid && (
           <div className="mt-2 pl-0 sm:pl-14 border-t border-gray-200 dark:border-gray-800 pt-3 sm:pt-4" onClick={(e) => e.stopPropagation()}>
             <CastComposer
               parentHash={cast.hash}
               onSuccess={(newCast) => {
                 setShowReplyBox(false);
-                
-                // Optimistically add the new reply to topReplies immediately
-                if (newCast && cast.hash) {
-                  // Add metadata to match the format expected by the reply display
-                  const optimisticReply = {
-                    ...newCast,
-                    _replyDepth: 1,
-                    _parentCastHash: cast.hash,
-                    _isQuoteCast: false,
-                    _rootCastHash: cast.hash,
-                  };
-                  
-                  setTopReplies((prev) => {
-                    // Check if reply already exists (avoid duplicates)
-                    const exists = prev.some((r) => r.hash === newCast.hash);
-                    if (exists) {
-                      return prev;
-                    }
-                    // Add to the beginning for newest-first, or end for oldest-first
-                    // Based on replySortBy
-                    const sortOrder = replySortBy === "recent-reply" ? "newest" : "oldest";
-                    if (sortOrder === "newest") {
-                      return [optimisticReply, ...prev];
-                    } else {
-                      return [...prev, optimisticReply];
-                    }
-                  });
-                  
-                  // Mark replies as loaded if they weren't already
-                  if (!repliesLoaded) {
-                    setRepliesLoaded(true);
-                  }
-                  
-                  // Refetch replies after a short delay to ensure we have the latest data
-                  // This handles cases where the reply needs to be stored in the database
-                  setTimeout(async () => {
-                    try {
-                      const params = new URLSearchParams({
-                        castHash: cast.hash!,
-                        sortBy: replySortBy,
-                        minQualityScore: replyMinQuality.toString(),
-                      });
-                      if (user?.fid) {
-                        params.append("viewerFid", user.fid.toString());
-                      }
-                      
-                      const res = await fetch(`/api/feed/replies?${params}`);
-                      if (res.ok) {
-                        const data = await res.json();
-                        if (data.replies) {
-                          setTopReplies(data.replies);
-                          setHasAnyReplies(data.hasAnyReplies !== undefined ? data.hasAnyReplies : true);
-                        }
-                      }
-                    } catch (error) {
-                      console.error("Error refetching replies:", error);
-                    }
-                  }, 2000); // Wait 2 seconds for webhook to process
-                }
                 
                 if (onUpdate) {
                   onUpdate();
