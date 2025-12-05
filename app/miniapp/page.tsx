@@ -315,7 +315,7 @@ function MiniappContent() {
       }
 
       // Success - show success message
-      showToast("Curated", "success");
+      showToast("Curated to your feed", "success");
 
       // Track analytics
       analytics.trackCuratePaste(castHash, context.user.fid);
@@ -692,7 +692,7 @@ function MiniappContent() {
           >
             <div className="p-6">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                Curate this cast?
+                Curate to your feed?
               </h3>
               
               {/* Action Buttons */}
@@ -711,7 +711,7 @@ function MiniappContent() {
                   disabled={isPasting}
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isPasting ? "Curating..." : "Curate"}
+                  {isPasting ? "Curating..." : "Curate to your feed"}
                 </button>
               </div>
               

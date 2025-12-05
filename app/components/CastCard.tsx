@@ -797,6 +797,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
   const [isCurated, setIsCurated] = useState(false);
   const [curators, setCurators] = useState<Array<{ fid: number; username?: string; display_name?: string; pfp_url?: string }>>([]);
   const [showUncurateConfirm, setShowUncurateConfirm] = useState(false);
+  const [showCurateConfirm, setShowCurateConfirm] = useState(false);
   const [topReplies, setTopReplies] = useState<any[]>(cast._topReplies || []);
   const [hasAnyReplies, setHasAnyReplies] = useState<boolean | undefined>(undefined);
   const [repliesLoading, setRepliesLoading] = useState(false);
@@ -1613,7 +1614,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
     }
   };
 
-  const handleCurate = async () => {
+  const handleCurate = () => {
     if (!user?.fid) {
       return;
     }
@@ -1627,9 +1628,19 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
       return;
     }
 
+    // Show confirmation dialog before curating
+    setShowCurateConfirm(true);
+  };
+
+  const handleConfirmCurate = async () => {
+    if (!user?.fid) {
+      return;
+    }
+
     // Curate the cast (either not curated, or curated by others)
     try {
       setIsCurating(true);
+      setShowCurateConfirm(false);
       
       const response = await fetch("/api/curate", {
         method: "POST",
@@ -1679,7 +1690,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
 
       // Show curated toast
       window.dispatchEvent(new CustomEvent("showToast", { 
-        detail: { message: "Curated", type: "success" } 
+        detail: { message: "Curated to your feed", type: "success" } 
       }));
 
       // Scroll to the cast in the feed
@@ -2898,12 +2909,12 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                       isCurated && curators.some(c => c.fid === user.fid)
                         ? "Remove from curated feed"
                         : isCurated
-                        ? "Add your curation"
-                        : "Add to curated feed"
+                        ? "Curate to your feed"
+                        : "Curate to your feed"
                     }
                   >
                     <span className={isCurated && curators.some(c => c.fid === user.fid) ? "text-purple-600 dark:text-purple-400" : "text-gray-400 dark:text-gray-500"}>
-                      {isCurated ? "Curated" : "Curate"}
+                      {isCurated && curators.some(c => c.fid === user.fid) ? "Curated" : "Curate to your feed"}
                     </span>
                     <Star className={`w-4 h-4 sm:w-5 sm:h-5 ${isCurated && curators.some(c => c.fid === user.fid) ? "fill-current" : ""}`} />
                   </button>
@@ -3314,6 +3325,41 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                 className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isCurating ? "Removing..." : "Remove"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Curate Confirmation Modal */}
+      {showCurateConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={() => setShowCurateConfirm(false)}
+        >
+          <div
+            className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-sm w-full p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+              Curate to your feed?
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              This cast will be added to your curated feed.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowCurateConfirm(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmCurate}
+                disabled={isCurating}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isCurating ? "Curating..." : "Curate to your feed"}
               </button>
             </div>
           </div>

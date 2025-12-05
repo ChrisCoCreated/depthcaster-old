@@ -246,7 +246,7 @@ function ShareContent() {
       <div className="max-w-2xl mx-auto px-4 py-8">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-            Curate this cast?
+            Curate to your feed?
           </h1>
         </div>
 
@@ -272,7 +272,7 @@ function ShareContent() {
                   disabled={isPasting || checkingCurationStatus}
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isPasting ? "Curating..." : checkingCurationStatus ? "Checking..." : "Curate"}
+                  {isPasting ? "Curating..." : checkingCurationStatus ? "Checking..." : "Curate to your feed"}
                 </button>
               </div>
             )}

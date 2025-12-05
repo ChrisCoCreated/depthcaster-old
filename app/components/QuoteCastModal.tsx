@@ -239,23 +239,53 @@ export function QuoteCastModal({ cast, isOpen, onClose, onSuccess }: QuoteCastMo
         return;
       }
 
+      // Verbose log the cast data being quoted
+      console.log("[QuoteCastModal] Cast data being quoted:", {
+        hash: cast.hash,
+        hashLength: cast.hash?.length,
+        hashFormat: cast.hash?.startsWith('0x') ? 'with 0x prefix' : 'without 0x prefix',
+        author: {
+          fid: cast.author.fid,
+          username: cast.author.username,
+          displayName: cast.author.display_name,
+        },
+        text: cast.text?.substring(0, 100),
+        textLength: cast.text?.length,
+        timestamp: cast.timestamp,
+        embeds: cast.embeds,
+        parentHash: cast.parent_hash,
+        fullCast: JSON.stringify(cast, null, 2),
+      });
+
+      const requestBody = {
+        signerUuid: user.signer_uuid,
+        text: text.trim(),
+        embeds: [
+          {
+            cast_id: {
+              hash: cast.hash,
+              fid: cast.author.fid,
+            },
+          },
+        ],
+      };
+
+      // Verbose log the request being sent
+      console.log("[QuoteCastModal] Sending quote cast request:", {
+        url: "/api/cast",
+        method: "POST",
+        body: JSON.stringify(requestBody, null, 2),
+        embedHash: cast.hash,
+        embedHashLength: cast.hash?.length,
+        embedFid: cast.author.fid,
+      });
+
       const response = await fetch("/api/cast", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          signerUuid: user.signer_uuid,
-          text: text.trim(),
-          embeds: [
-            {
-              cast_id: {
-                hash: cast.hash,
-                fid: cast.author.fid,
-              },
-            },
-          ],
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {

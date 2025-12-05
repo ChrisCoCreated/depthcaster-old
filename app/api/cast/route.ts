@@ -21,43 +21,67 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     let { signerUuid, text, parent, embeds, channelId, parentAuthorFid } = body;
 
+    // Verbose log the incoming request
+    console.log("[Cast API] Incoming request:", {
+      hasSignerUuid: !!signerUuid,
+      textLength: text?.length,
+      hasParent: !!parent,
+      hasEmbeds: !!embeds,
+      embedsCount: embeds?.length,
+      embeds: embeds ? JSON.stringify(embeds, null, 2) : null,
+      channelId,
+      parentAuthorFid,
+      fullBody: JSON.stringify(body, null, 2),
+    });
+
     // Normalize embeds format - Neynar SDK accepts both cast_id (snake_case) and castId (camelCase)
-    // Convert cast_id to castId for consistency, but pass hash as-is (it's already correct from Neynar SDK)
+    // Convert cast_id to castId and ensure hash has 0x prefix (Neynar API requires 0x prefix for 20-byte hashes)
     if (embeds && Array.isArray(embeds)) {
-      embeds = embeds.map((embed: any) => {
-        if (embed.cast_id && !embed.castId) {
+      embeds = embeds.map((embed: any, index: number) => {
+        console.log(`[Cast API] Processing embed ${index}:`, JSON.stringify(embed, null, 2));
+        
+        const castId = embed.castId || embed.cast_id;
+        if (castId) {
+          let hash = castId.hash || castId;
+          const fid = castId.fid || embed.cast_id?.fid;
+          
+          // Log original hash details
+          const originalHash = hash;
+          const has0xPrefix = hash.startsWith('0x') || hash.startsWith('0X');
+          const hexLength = has0xPrefix ? hash.length - 2 : hash.length;
+          
+          console.log(`[Cast API] Embed ${index} hash details (before normalization):`, {
+            original: originalHash,
+            length: originalHash.length,
+            hexLength: hexLength,
+            has0xPrefix: has0xPrefix,
+            fid: fid,
+            castIdObject: JSON.stringify(castId, null, 2),
+            embedObject: JSON.stringify(embed, null, 2),
+          });
+          
+          // Ensure hash has 0x prefix - Neynar API requires this for proper byte parsing
+          if (typeof hash === 'string' && !has0xPrefix) {
+            hash = '0x' + hash;
+            console.log(`[Cast API] Added 0x prefix to hash: "${originalHash}" -> "${hash}"`);
+          }
+          
           const normalizedEmbed = {
-            castId: embed.cast_id,
+            castId: {
+              hash,
+              fid,
+            },
             ...(embed.url ? { url: embed.url } : {}),
           };
-          // Log hash details for debugging
-          if (embed.cast_id?.hash) {
-            const hash = embed.cast_id.hash;
-            const hexLength = hash.startsWith('0x') || hash.startsWith('0X') ? hash.length - 2 : hash.length;
-            console.log(`[Cast API] Embed hash details:`, {
-              original: hash,
-              length: hash.length,
-              hexLength: hexLength,
-              has0xPrefix: hash.startsWith('0x') || hash.startsWith('0X'),
-              fid: embed.cast_id.fid,
-            });
-          }
+          
+          console.log(`[Cast API] Embed ${index} normalized:`, JSON.stringify(normalizedEmbed, null, 2));
+          
           return normalizedEmbed;
-        }
-        // Log if castId already exists
-        if (embed.castId?.hash) {
-          const hash = embed.castId.hash;
-          const hexLength = hash.startsWith('0x') || hash.startsWith('0X') ? hash.length - 2 : hash.length;
-          console.log(`[Cast API] Embed hash details (castId):`, {
-            original: hash,
-            length: hash.length,
-            hexLength: hexLength,
-            has0xPrefix: hash.startsWith('0x') || hash.startsWith('0X'),
-            fid: embed.castId.fid,
-          });
         }
         return embed;
       });
+      
+      console.log("[Cast API] All embeds after normalization:", JSON.stringify(embeds, null, 2));
     }
 
     if (!signerUuid) {
@@ -122,16 +146,32 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Verbose log the exact call to Neynar publishCast
+    const publishCastParams = {
+      signerUuid,
+      text: trimmedText,
+      parent,
+      embeds,
+      channelId,
+      parentAuthorFid,
+    };
+    
+    console.log("[Cast API] Calling neynarClient.publishCast with params:", {
+      signerUuid,
+      textLength: trimmedText.length,
+      textPreview: trimmedText.substring(0, 100),
+      hasParent: !!parent,
+      parent,
+      embeds: embeds ? JSON.stringify(embeds, null, 2) : null,
+      embedsCount: embeds?.length,
+      channelId,
+      parentAuthorFid,
+      fullParams: JSON.stringify(publishCastParams, null, 2),
+    });
+
     let castResponse;
     try {
-      castResponse = await neynarClient.publishCast({
-        signerUuid,
-        text: trimmedText,
-        parent,
-        embeds,
-        channelId,
-        parentAuthorFid,
-      });
+      castResponse = await neynarClient.publishCast(publishCastParams);
     } catch (error: any) {
       // Log detailed error information for debugging
       console.error("[Cast API] Neynar publishCast error:", {
