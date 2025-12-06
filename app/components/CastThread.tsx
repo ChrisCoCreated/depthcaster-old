@@ -112,6 +112,30 @@ export function CastThread({ castHash, viewerFid }: CastThreadProps) {
 
       const response = await fetch(`/api/conversation?${params}`);
       if (!response.ok) {
+        // For 404s, the cast might not exist or isn't available via Neynar
+        // This is expected for some casts, so handle gracefully
+        if (response.status === 404) {
+          // Try to get error message from response
+          try {
+            const errorData = await response.json();
+            // If it's a "Cast not found in Neynar API" error, the cast might still exist
+            // but just not be available through the conversation endpoint
+            if (errorData.error?.includes("not found in Neynar")) {
+              setConversation(null);
+              setLoading(false);
+              setLoadingBelowFold(false);
+              setError(null);
+              return;
+            }
+          } catch {
+            // If we can't parse the error, just continue with null conversation
+          }
+          setConversation(null);
+          setLoading(false);
+          setLoadingBelowFold(false);
+          setError(null);
+          return;
+        }
         throw new Error("Failed to fetch conversation");
       }
 
@@ -171,11 +195,13 @@ export function CastThread({ castHash, viewerFid }: CastThreadProps) {
         if (response.ok) {
           setHasConversation(true);
         } else if (response.status === 404) {
+          // 404 is expected for non-curated casts - not an error
           setHasConversation(false);
         } else {
           setHasConversation(false);
         }
-      } catch {
+      } catch (err) {
+        // Silently handle errors - 404s are expected for non-curated casts
         if (!cancelled) {
           setHasConversation(false);
         }
@@ -206,9 +232,12 @@ export function CastThread({ castHash, viewerFid }: CastThreadProps) {
   }
 
   if (!conversation?.conversation) {
+    // If we don't have conversation data, the cast might not be available
+    // This can happen if the cast doesn't exist or isn't accessible via Neynar
     return (
       <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-        Conversation not found
+        <p className="text-lg mb-2">Cast not found</p>
+        <p className="text-sm">This cast may not be available or accessible at this time.</p>
       </div>
     );
   }
