@@ -339,19 +339,19 @@ export default function AdminRolesPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
           User Roles Management
         </h1>
-        <p className="text-gray-600 dark:text-gray-400">
+        <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
           Manage user roles: curator, admin, superadmin, tester, and plus
         </p>
       </div>
 
         {message && (
           <div
-            className={`mb-6 p-4 rounded-lg border ${
+            className={`mb-6 p-3 sm:p-4 rounded-lg border text-sm sm:text-base ${
               message.type === "success"
                 ? "bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700"
                 : "bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-200 border-red-300 dark:border-red-700"
@@ -361,28 +361,28 @@ export default function AdminRolesPage() {
           </div>
         )}
 
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 mb-6">
-          <div className="flex gap-4 items-center mb-4">
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-4 sm:p-6 mb-6">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center">
             <input
               type="text"
               placeholder="Search users by username..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-4 py-2.5 sm:py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
             />
             <button
               onClick={loadUsers}
               disabled={isLoadingUsers}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="px-4 py-2.5 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm sm:text-base whitespace-nowrap"
             >
               {isLoadingUsers ? "Loading..." : "Refresh"}
             </button>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-4 sm:p-6 mb-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100">
               Add Farcaster User
             </h2>
             <button
@@ -393,7 +393,7 @@ export default function AdminRolesPage() {
                   setSearchResults([]);
                 }
               }}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+              className="w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm sm:text-base"
             >
               {showAddUserSection ? "Cancel" : "+ Add User"}
             </button>
@@ -407,9 +407,9 @@ export default function AdminRolesPage() {
                   placeholder="Search by username or enter FID (e.g., @username or 12345)"
                   value={addUserQuery}
                   onChange={(e) => setAddUserQuery(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="w-full px-4 py-2.5 sm:py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm sm:text-base"
                 />
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-2">
                   Search for any Farcaster user by username or FID. You can add roles to users even if they&apos;re not in the database yet.
                 </p>
               </div>
@@ -428,10 +428,10 @@ export default function AdminRolesPage() {
                     return (
                       <div
                         key={result.fid}
-                        className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                        className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 sm:p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
                       >
-                        <div className="flex items-center justify-between gap-4">
-                          <div className="flex items-center gap-3 flex-1">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+                          <div className="flex items-center gap-3 flex-1 w-full sm:w-auto">
                             <Link href={`/profile/${result.fid}`} className="flex-shrink-0">
                               <AvatarImage
                                 src={result.pfp_url}
@@ -478,7 +478,7 @@ export default function AdminRolesPage() {
                             </div>
                           </div>
 
-                          <div className="flex gap-2 flex-wrap">
+                          <div className="flex gap-2 flex-wrap w-full sm:w-auto">
                             {VALID_ROLES.filter(
                               (role) => !existingRoles.includes(role)
                             ).map((role) => (
@@ -489,7 +489,7 @@ export default function AdminRolesPage() {
                                   addingRole?.userFid === result.fid &&
                                   addingRole?.role === role
                                 }
-                                className="px-3 py-1 text-xs bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200 rounded-lg hover:bg-green-200 dark:hover:bg-green-900/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-green-300 dark:border-green-700"
+                                className="px-3 py-1.5 sm:py-1 text-xs sm:text-xs bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200 rounded-lg hover:bg-green-200 dark:hover:bg-green-900/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-green-300 dark:border-green-700 min-h-[32px] touch-manipulation"
                               >
                                 {addingRole?.userFid === result.fid &&
                                 addingRole?.role === role
@@ -519,8 +519,8 @@ export default function AdminRolesPage() {
           )}
         </div>
 
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-4 sm:p-6">
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
             Users ({users.length})
           </h2>
 
@@ -535,10 +535,10 @@ export default function AdminRolesPage() {
               {users.map((userWithRoles) => (
                 <div
                   key={userWithRoles.fid}
-                  className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                  className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 sm:p-5 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
                 >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-3 flex-1">
+                  <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
+                    <div className="flex items-start gap-3 flex-1 w-full sm:w-auto">
                       <Link href={`/profile/${userWithRoles.fid}`} className="flex-shrink-0">
                         <AvatarImage
                           src={userWithRoles.pfpUrl}
@@ -573,13 +573,13 @@ export default function AdminRolesPage() {
                       </div>
                     </div>
 
-                    <div className="flex flex-col gap-3 items-end">
-                      <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-col gap-3 items-start sm:items-end w-full sm:w-auto">
+                      <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                         {userWithRoles.roles.length > 0 ? (
                           userWithRoles.roles.map((role) => (
                             <div
                               key={role}
-                              className={`px-3 py-1 rounded-full text-xs font-medium border ${getRoleColor(role)} flex items-center gap-2`}
+                              className={`px-3 py-1.5 sm:py-1 rounded-full text-xs font-medium border ${getRoleColor(role)} flex items-center gap-2 min-h-[32px]`}
                             >
                               <span>{role}</span>
                               <button
@@ -588,7 +588,7 @@ export default function AdminRolesPage() {
                                   removingRole?.userFid === userWithRoles.fid &&
                                   removingRole?.role === role
                                 }
-                                className="hover:opacity-70 disabled:opacity-50"
+                                className="hover:opacity-70 disabled:opacity-50 text-base leading-none touch-manipulation"
                                 title={`Remove ${role} role`}
                               >
                                 ×
@@ -600,7 +600,7 @@ export default function AdminRolesPage() {
                         )}
                       </div>
 
-                      <div className="flex gap-2 flex-wrap">
+                      <div className="flex gap-2 flex-wrap w-full sm:w-auto">
                         {VALID_ROLES.filter(
                           (role) => !userWithRoles.roles.includes(role)
                         ).map((role) => (
@@ -611,7 +611,7 @@ export default function AdminRolesPage() {
                               addingRole?.userFid === userWithRoles.fid &&
                               addingRole?.role === role
                             }
-                            className="px-3 py-1 text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            className="px-3 py-1.5 sm:py-1 text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-h-[32px] touch-manipulation"
                           >
                             {addingRole?.userFid === userWithRoles.fid &&
                             addingRole?.role === role

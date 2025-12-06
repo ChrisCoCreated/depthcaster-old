@@ -10,7 +10,7 @@ import { usePathname } from "next/navigation";
 import { createPortal } from "react-dom";
 import { AvatarImage } from "./AvatarImage";
 import { analytics } from "@/lib/analytics";
-import { HelpCircle, User, Settings, Shield } from "lucide-react";
+import { HelpCircle, User, Settings, Shield, Users } from "lucide-react";
 
 export function Header() {
   const { user } = useNeynarContext();
@@ -24,6 +24,7 @@ export function Header() {
   const [environment, setEnvironment] = useState<"local" | "preview" | null>(null);
   const [hasPreviewAccess, setHasPreviewAccess] = useState(false);
   const [isAdminUser, setIsAdminUser] = useState(false);
+  const [isSuperAdminUser, setIsSuperAdminUser] = useState(false);
   const [isPfpDropdownOpen, setIsPfpDropdownOpen] = useState(false);
   const [isHelpDropdownOpen, setIsHelpDropdownOpen] = useState(false);
   const [pfpDropdownPosition, setPfpDropdownPosition] = useState({ top: 0, right: 0 });
@@ -61,12 +62,15 @@ export function Header() {
       if (response.ok) {
         const data = await response.json();
         setIsAdminUser(data.isAdmin || data.isSuperAdmin);
+        setIsSuperAdminUser(data.isSuperAdmin || false);
       } else {
         setIsAdminUser(false);
+        setIsSuperAdminUser(false);
       }
     } catch (error) {
       console.error("Failed to check admin status:", error);
       setIsAdminUser(false);
+      setIsSuperAdminUser(false);
     }
   }, []);
 
@@ -83,6 +87,7 @@ export function Header() {
         } else {
           setHasPreviewAccess(false);
           setIsAdminUser(false);
+          setIsSuperAdminUser(false);
         }
       } else {
         setEnvironment(null);
@@ -96,6 +101,7 @@ export function Header() {
       checkAdminStatus(user.fid);
     } else {
       setIsAdminUser(false);
+      setIsSuperAdminUser(false);
     }
   }, [user, checkAdminStatus]);
 
@@ -790,6 +796,18 @@ export function Header() {
                         >
                           <Shield className="w-4 h-4" />
                           Admin Panel
+                        </Link>
+                      )}
+                      {isSuperAdminUser && (
+                        <Link
+                          href="/admin/roles"
+                          onClick={() => {
+                            setIsPfpDropdownOpen(false);
+                          }}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        >
+                          <Users className="w-4 h-4" />
+                          User Roles
                         </Link>
                       )}
                     </div>,
