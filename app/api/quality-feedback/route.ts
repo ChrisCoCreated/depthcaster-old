@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { curatedCasts, curatorCastCurations, qualityFeedback } from "@/lib/schema";
+import { curatedCasts, curatorCastCurations, qualityFeedback, users } from "@/lib/schema";
 import { eq, and } from "drizzle-orm";
 import { extractEmbeddedCastTexts, extractLinkUrls } from "@/lib/conversation";
 import { neynarClient } from "@/lib/neynar";
@@ -10,7 +10,7 @@ import { isAdmin, getUserRoles } from "@/lib/roles";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { castHash, curatorFid, feedback, rootCastHash } = body;
+    const { castHash, curatorFid, feedback, rootCastHash, feedbackUserId } = body;
 
     if (!castHash) {
       return NextResponse.json(
@@ -37,14 +37,37 @@ export async function POST(request: NextRequest) {
     const roles = await getUserRoles(curatorFid);
     const userIsAdmin = isAdmin(roles);
 
-    // Verify that the user has curated this cast OR the root cast OR is admin
+    // If feedbackUserId is provided, validate that the requester is an admin
+    if (feedbackUserId && !userIsAdmin) {
+      return NextResponse.json(
+        { error: "Only admins can attribute feedback to other users" },
+        { status: 403 }
+      );
+    }
+
+    // If feedbackUserId is provided, validate that the user exists
+    if (feedbackUserId) {
+      const feedbackUser = await db.select().from(users).where(eq(users.fid, feedbackUserId)).limit(1);
+      if (feedbackUser.length === 0) {
+        return NextResponse.json(
+          { error: "Selected user not found" },
+          { status: 404 }
+        );
+      }
+    }
+
+    // Use feedbackUserId if provided (for admins), otherwise use curatorFid
+    const finalCuratorFid = feedbackUserId || curatorFid;
+
+    // Verify that the final curator (feedbackUserId if provided, otherwise curatorFid) has curated this cast OR the root cast OR is admin
+    // Note: If feedbackUserId is provided, we check permissions for that user, but the admin (curatorFid) must have admin role
     const curation = await db
       .select()
       .from(curatorCastCurations)
       .where(
         and(
           eq(curatorCastCurations.castHash, castHash),
-          eq(curatorCastCurations.curatorFid, curatorFid)
+          eq(curatorCastCurations.curatorFid, finalCuratorFid)
         )
       )
       .limit(1);
@@ -59,7 +82,7 @@ export async function POST(request: NextRequest) {
         .where(
           and(
             eq(curatorCastCurations.castHash, rootCastHash),
-            eq(curatorCastCurations.curatorFid, curatorFid)
+            eq(curatorCastCurations.curatorFid, finalCuratorFid)
           )
         )
         .limit(1);
@@ -67,7 +90,8 @@ export async function POST(request: NextRequest) {
       hasCuration = rootCuration.length > 0;
     }
 
-    // Allow if user has curated (current or root cast) OR is admin
+    // Allow if final curator has curated (current or root cast) OR requester is admin
+    // If feedbackUserId is provided, the admin is submitting on behalf of another user
     if (!hasCuration && !userIsAdmin) {
       return NextResponse.json(
         { error: "You must curate this cast or the root cast before providing quality feedback, or be an admin" },
@@ -134,9 +158,10 @@ export async function POST(request: NextRequest) {
       .where(eq(curatedCasts.castHash, castHash));
 
     // Record the quality feedback submission
+    // Use finalCuratorFid (which is feedbackUserId if provided, otherwise curatorFid)
     await db.insert(qualityFeedback).values({
       castHash,
-      curatorFid,
+      curatorFid: finalCuratorFid,
       rootCastHash: rootCastHash || null,
       feedback: feedback.trim(),
       previousQualityScore: currentQualityScore,
