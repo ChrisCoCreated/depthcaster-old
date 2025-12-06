@@ -100,8 +100,6 @@ export function CastThread({ castHash, viewerFid }: CastThreadProps) {
       const scrollY = isRefresh && !fold ? window.scrollY : 0;
 
       const params = new URLSearchParams({
-        identifier: castHash,
-        type: "hash",
         replyDepth: "5",
         fold: fold || "above",
       });
@@ -110,33 +108,10 @@ export function CastThread({ castHash, viewerFid }: CastThreadProps) {
         params.append("viewerFid", (viewerFid || user?.fid)!.toString());
       }
 
-      const response = await fetch(`/api/conversation?${params}`);
+      const response = await fetch(`/api/cast/${castHash}?${params}`);
       if (!response.ok) {
-        // For 404s, the cast might not exist or isn't available via Neynar
-        // This is expected for some casts, so handle gracefully
-        if (response.status === 404) {
-          // Try to get error message from response
-          try {
-            const errorData = await response.json();
-            // If it's a "Cast not found in Neynar API" error, the cast might still exist
-            // but just not be available through the conversation endpoint
-            if (errorData.error?.includes("not found in Neynar")) {
-              setConversation(null);
-              setLoading(false);
-              setLoadingBelowFold(false);
-              setError(null);
-              return;
-            }
-          } catch {
-            // If we can't parse the error, just continue with null conversation
-          }
-          setConversation(null);
-          setLoading(false);
-          setLoadingBelowFold(false);
-          setError(null);
-          return;
-        }
-        throw new Error("Failed to fetch conversation");
+        // If the endpoint returns an error, it means Neynar failed
+        throw new Error("Failed to fetch cast");
       }
 
       const data = await response.json();

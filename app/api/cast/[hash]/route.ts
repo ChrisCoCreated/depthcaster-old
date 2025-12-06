@@ -4,6 +4,55 @@ import { curatedCasts, castReplies, curatorCastCurations, curatedCastInteraction
 import { eq } from "drizzle-orm";
 import { isAdmin, getUserRoles } from "@/lib/roles";
 import { refreshUnifiedCuratedWebhooks } from "@/lib/webhooks-unified";
+import { neynarClient } from "@/lib/neynar";
+import { LookupCastConversationTypeEnum, LookupCastConversationSortTypeEnum, LookupCastConversationFoldEnum } from "@neynar/nodejs-sdk/build/api";
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ hash: string }> }
+) {
+  let hash: string | undefined;
+  try {
+    const resolvedParams = await params;
+    hash = resolvedParams.hash;
+    const searchParams = request.nextUrl.searchParams;
+    const replyDepth = parseInt(searchParams.get("replyDepth") || "5");
+    const foldParam = searchParams.get("fold") || "above";
+    const viewerFid = searchParams.get("viewerFid")
+      ? parseInt(searchParams.get("viewerFid")!)
+      : undefined;
+
+    if (!hash) {
+      return NextResponse.json(
+        { error: "Cast hash is required" },
+        { status: 400 }
+      );
+    }
+
+    const foldEnum = foldParam === "below" 
+      ? LookupCastConversationFoldEnum.Below 
+      : LookupCastConversationFoldEnum.Above;
+
+    // Fetch directly from Neynar - no curation logic
+    const conversation = await neynarClient.lookupCastConversation({
+      identifier: hash,
+      type: LookupCastConversationTypeEnum.Hash,
+      replyDepth,
+      viewerFid,
+      sortType: LookupCastConversationSortTypeEnum.Algorithmic,
+      fold: foldEnum,
+      includeChronologicalParentCasts: true,
+    });
+
+    return NextResponse.json(conversation);
+  } catch (error: any) {
+    console.error(`[Cast API] Error fetching cast ${hash || "unknown"}:`, error);
+    return NextResponse.json(
+      { error: error.message || "Failed to fetch cast" },
+      { status: 500 }
+    );
+  }
+}
 
 export async function DELETE(
   request: NextRequest,
