@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { curatedCasts, curatorCastCurations, qualityFeedback, users } from "@/lib/schema";
+import { curatedCasts, curatorCastCurations, qualityFeedback, castReplies } from "@/lib/schema";
 import { eq, and } from "drizzle-orm";
 import { extractEmbeddedCastTexts, extractLinkUrls } from "@/lib/conversation";
 import { neynarClient } from "@/lib/neynar";
@@ -10,7 +10,7 @@ import { isAdmin, getUserRoles } from "@/lib/roles";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { castHash, curatorFid, feedback, rootCastHash, feedbackUserId } = body;
+    const { castHash, curatorFid, feedback, rootCastHash } = body;
 
     if (!castHash) {
       return NextResponse.json(
@@ -37,37 +37,50 @@ export async function POST(request: NextRequest) {
     const roles = await getUserRoles(curatorFid);
     const userIsAdmin = isAdmin(roles);
 
-    // If feedbackUserId is provided, validate that the requester is an admin
-    if (feedbackUserId && !userIsAdmin) {
-      return NextResponse.json(
-        { error: "Only admins can attribute feedback to other users" },
-        { status: 403 }
-      );
-    }
+    // Fetch the cast data from curated_casts table first
+    const castRecord = await db
+      .select()
+      .from(curatedCasts)
+      .where(eq(curatedCasts.castHash, castHash))
+      .limit(1);
 
-    // If feedbackUserId is provided, validate that the user exists
-    if (feedbackUserId) {
-      const feedbackUser = await db.select().from(users).where(eq(users.fid, feedbackUserId)).limit(1);
-      if (feedbackUser.length === 0) {
+    let castData: any;
+    let currentQualityScore: number | null | undefined;
+    let isReply = false;
+    let parentCastHash: string | null = null;
+
+    // If not found in curatedCasts, check castReplies table
+    if (castRecord.length === 0) {
+      const replyRecord = await db
+        .select()
+        .from(castReplies)
+        .where(eq(castReplies.replyCastHash, castHash))
+        .limit(1);
+
+      if (replyRecord.length === 0) {
         return NextResponse.json(
-          { error: "Selected user not found" },
+          { error: "Cast not found in curated casts or replies" },
           { status: 404 }
         );
       }
+
+      isReply = true;
+      castData = replyRecord[0].castData as any;
+      currentQualityScore = replyRecord[0].qualityScore;
+      parentCastHash = replyRecord[0].parentCastHash || null;
+    } else {
+      castData = castRecord[0].castData as any;
+      currentQualityScore = castRecord[0].qualityScore;
     }
 
-    // Use feedbackUserId if provided (for admins), otherwise use curatorFid
-    const finalCuratorFid = feedbackUserId || curatorFid;
-
-    // Verify that the final curator (feedbackUserId if provided, otherwise curatorFid) has curated this cast OR the root cast OR is admin
-    // Note: If feedbackUserId is provided, we check permissions for that user, but the admin (curatorFid) must have admin role
+    // Verify that the user has curated this cast OR the root cast OR parent cast (for replies) OR is admin
     const curation = await db
       .select()
       .from(curatorCastCurations)
       .where(
         and(
           eq(curatorCastCurations.castHash, castHash),
-          eq(curatorCastCurations.curatorFid, finalCuratorFid)
+          eq(curatorCastCurations.curatorFid, curatorFid)
         )
       )
       .limit(1);
@@ -82,7 +95,7 @@ export async function POST(request: NextRequest) {
         .where(
           and(
             eq(curatorCastCurations.castHash, rootCastHash),
-            eq(curatorCastCurations.curatorFid, finalCuratorFid)
+            eq(curatorCastCurations.curatorFid, curatorFid)
           )
         )
         .limit(1);
@@ -90,31 +103,29 @@ export async function POST(request: NextRequest) {
       hasCuration = rootCuration.length > 0;
     }
 
-    // Allow if final curator has curated (current or root cast) OR requester is admin
-    // If feedbackUserId is provided, the admin is submitting on behalf of another user
+    // If it's a reply and user hasn't curated yet, check parent cast curation
+    if (!hasCuration && isReply && parentCastHash) {
+      const parentCuration = await db
+        .select()
+        .from(curatorCastCurations)
+        .where(
+          and(
+            eq(curatorCastCurations.castHash, parentCastHash),
+            eq(curatorCastCurations.curatorFid, curatorFid)
+          )
+        )
+        .limit(1);
+      
+      hasCuration = parentCuration.length > 0;
+    }
+
+    // Allow if user has curated (current, root, or parent cast) OR is admin
     if (!hasCuration && !userIsAdmin) {
       return NextResponse.json(
-        { error: "You must curate this cast or the root cast before providing quality feedback, or be an admin" },
+        { error: "You must curate this cast, the root cast, or the parent cast (for replies) before providing quality feedback, or be an admin" },
         { status: 403 }
       );
     }
-
-    // Fetch the cast data from curated_casts table
-    const castRecord = await db
-      .select()
-      .from(curatedCasts)
-      .where(eq(curatedCasts.castHash, castHash))
-      .limit(1);
-
-    if (castRecord.length === 0) {
-      return NextResponse.json(
-        { error: "Cast not found in curated casts" },
-        { status: 404 }
-      );
-    }
-
-    const castData = castRecord[0].castData as any;
-    const currentQualityScore = castRecord[0].qualityScore;
 
     if (currentQualityScore === null || currentQualityScore === undefined) {
       return NextResponse.json(
@@ -148,20 +159,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Update the quality score in the database
-    await db
-      .update(curatedCasts)
-      .set({
-        qualityScore: result.qualityScore,
-        qualityAnalyzedAt: new Date(),
-      })
-      .where(eq(curatedCasts.castHash, castHash));
+    // Update the quality score in the database (in the correct table)
+    if (isReply) {
+      await db
+        .update(castReplies)
+        .set({
+          qualityScore: result.qualityScore,
+          qualityAnalyzedAt: new Date(),
+        })
+        .where(eq(castReplies.replyCastHash, castHash));
+    } else {
+      await db
+        .update(curatedCasts)
+        .set({
+          qualityScore: result.qualityScore,
+          qualityAnalyzedAt: new Date(),
+        })
+        .where(eq(curatedCasts.castHash, castHash));
+    }
 
     // Record the quality feedback submission
-    // Use finalCuratorFid (which is feedbackUserId if provided, otherwise curatorFid)
     await db.insert(qualityFeedback).values({
       castHash,
-      curatorFid: finalCuratorFid,
+      curatorFid,
       rootCastHash: rootCastHash || null,
       feedback: feedback.trim(),
       previousQualityScore: currentQualityScore,

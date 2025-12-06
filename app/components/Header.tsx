@@ -821,7 +821,7 @@ export function Header() {
           </div>
         </div>
       </header>
-      <FeedbackModal isOpen={isFeedbackModalOpen} onClose={() => setIsFeedbackModalOpen(false)} />
+      <FeedbackModal isOpen={isFeedbackModalOpen} onClose={() => setIsFeedbackModalOpen(false)} isAdmin={isAdminUser} />
       
       {/* Curate Confirmation Modal */}
       {showCurateConfirm && pendingCastData && (
