@@ -3,6 +3,7 @@
 CREATE TABLE IF NOT EXISTS "quality_feedback" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
   "cast_hash" text NOT NULL REFERENCES "curated_casts"("cast_hash") ON DELETE CASCADE,
+  "target_cast_hash" text NOT NULL,
   "curator_fid" bigint NOT NULL REFERENCES "users"("fid"),
   "root_cast_hash" text,
   "feedback" text NOT NULL,
@@ -14,6 +15,8 @@ CREATE TABLE IF NOT EXISTS "quality_feedback" (
 );
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "quality_feedback_cast_hash_idx" ON "quality_feedback" USING btree ("cast_hash");
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "quality_feedback_target_cast_hash_idx" ON "quality_feedback" USING btree ("target_cast_hash");
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "quality_feedback_curator_fid_idx" ON "quality_feedback" USING btree ("curator_fid");
 --> statement-breakpoint

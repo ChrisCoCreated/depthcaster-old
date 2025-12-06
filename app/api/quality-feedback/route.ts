@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
     let currentQualityScore: number | null | undefined;
     let isReply = false;
     let parentCastHash: string | null = null;
+    let curatedCastHashForFeedback: string = castHash; // For foreign key reference
 
     // If not found in curatedCasts, check castReplies table
     if (castRecord.length === 0) {
@@ -68,6 +69,8 @@ export async function POST(request: NextRequest) {
       castData = replyRecord[0].castData as any;
       currentQualityScore = replyRecord[0].qualityScore;
       parentCastHash = replyRecord[0].parentCastHash || null;
+      // Use curatedCastHash for foreign key reference (must exist in curated_casts table)
+      curatedCastHashForFeedback = replyRecord[0].curatedCastHash;
     } else {
       castData = castRecord[0].castData as any;
       currentQualityScore = castRecord[0].qualityScore;
@@ -179,8 +182,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Record the quality feedback submission
+    // castHash: foreign key to curated_casts (must exist in that table)
+    // targetCastHash: the actual cast being reviewed (may be a reply)
     await db.insert(qualityFeedback).values({
-      castHash,
+      castHash: curatedCastHashForFeedback, // Use curated cast hash for foreign key reference
+      targetCastHash: castHash, // The actual cast being reviewed
       curatorFid,
       rootCastHash: rootCastHash || null,
       feedback: feedback.trim(),

@@ -391,7 +391,8 @@ export const curatorRecommendations = pgTable("curator_recommendations", {
 
 export const qualityFeedback = pgTable("quality_feedback", {
   id: uuid("id").defaultRandom().primaryKey(),
-  castHash: text("cast_hash").notNull().references(() => curatedCasts.castHash, { onDelete: "cascade" }),
+  castHash: text("cast_hash").notNull().references(() => curatedCasts.castHash, { onDelete: "cascade" }), // Foreign key to curated_casts (curated cast hash)
+  targetCastHash: text("target_cast_hash").notNull(), // The actual cast being reviewed (may be a reply)
   curatorFid: bigint("curator_fid", { mode: "number" }).notNull().references(() => users.fid),
   rootCastHash: text("root_cast_hash"), // Optional - for replies, the root cast hash
   feedback: text("feedback").notNull(), // The curator's feedback text
@@ -402,6 +403,7 @@ export const qualityFeedback = pgTable("quality_feedback", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   castHashIdx: index("quality_feedback_cast_hash_idx").on(table.castHash),
+  targetCastHashIdx: index("quality_feedback_target_cast_hash_idx").on(table.targetCastHash),
   curatorFidIdx: index("quality_feedback_curator_fid_idx").on(table.curatorFid),
   rootCastHashIdx: index("quality_feedback_root_cast_hash_idx").on(table.rootCastHash),
   createdAtIdx: index("quality_feedback_created_at_idx").on(table.createdAt),
