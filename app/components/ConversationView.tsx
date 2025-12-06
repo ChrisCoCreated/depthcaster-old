@@ -168,7 +168,11 @@ export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusR
       const response = await fetch(`/api/conversation/database?${params}`);
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to fetch conversation");
+        const errorMessage = errorData.error || "Failed to fetch conversation";
+        // Store status code in error for fallback detection
+        const error = new Error(errorMessage);
+        (error as any).status = response.status;
+        throw error;
       }
 
       const data = await response.json();
@@ -184,7 +188,12 @@ export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusR
         });
       }
     } catch (err: any) {
-      setError(err.message || "Failed to load conversation");
+      const errorMessage = err.message || "Failed to load conversation";
+      setError(errorMessage);
+      // Store status code if available for fallback detection
+      if (err.status) {
+        (err as any).status = err.status;
+      }
       setLoading(false);
     }
   }, [castHash, sortBy]);
@@ -192,6 +201,26 @@ export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusR
   useEffect(() => {
     fetchConversation();
   }, [fetchConversation]);
+
+  // Fallback to /cast view if conversation fails (cast not curated)
+  useEffect(() => {
+    if (error && !loading) {
+      // Check if error is due to cast not being curated
+      const errorLower = error.toLowerCase();
+      const isNotCurated = errorLower.includes("not curated") || 
+                          errorLower.includes("conversation not found");
+      if (isNotCurated) {
+        router.replace(`/cast/${castHash}`);
+      }
+    }
+  }, [error, loading, castHash, router]);
+
+  useEffect(() => {
+    if (!loading && !error && !rootCast) {
+      // No root cast found, redirect to cast view
+      router.replace(`/cast/${castHash}`);
+    }
+  }, [loading, error, rootCast, castHash, router]);
 
   useEffect(() => {
     if (!normalizedFocusHash || replies.length === 0) return;
