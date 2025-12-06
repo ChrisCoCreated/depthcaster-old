@@ -389,6 +389,25 @@ export const curatorRecommendations = pgTable("curator_recommendations", {
   createdAtIdx: index("curator_recommendations_created_at_idx").on(table.createdAt),
 }));
 
+export const qualityFeedback = pgTable("quality_feedback", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  castHash: text("cast_hash").notNull().references(() => curatedCasts.castHash, { onDelete: "cascade" }),
+  curatorFid: bigint("curator_fid", { mode: "number" }).notNull().references(() => users.fid),
+  rootCastHash: text("root_cast_hash"), // Optional - for replies, the root cast hash
+  feedback: text("feedback").notNull(), // The curator's feedback text
+  previousQualityScore: integer("previous_quality_score").notNull(),
+  newQualityScore: integer("new_quality_score").notNull(),
+  deepseekReasoning: text("deepseek_reasoning"), // DeepSeek's reasoning for the new score
+  isAdmin: boolean("is_admin").default(false).notNull(), // Whether user was admin when submitting
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  castHashIdx: index("quality_feedback_cast_hash_idx").on(table.castHash),
+  curatorFidIdx: index("quality_feedback_curator_fid_idx").on(table.curatorFid),
+  rootCastHashIdx: index("quality_feedback_root_cast_hash_idx").on(table.rootCastHash),
+  createdAtIdx: index("quality_feedback_created_at_idx").on(table.createdAt),
+  castHashCreatedAtIdx: index("quality_feedback_cast_hash_created_at_idx").on(table.castHash, table.createdAt),
+}));
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type CuratorPack = typeof curatorPacks.$inferSelect;
@@ -439,4 +458,6 @@ export type ApiCallStat = typeof apiCallStats.$inferSelect;
 export type NewApiCallStat = typeof apiCallStats.$inferInsert;
 export type MiniappInstallation = typeof miniappInstallations.$inferSelect;
 export type NewMiniappInstallation = typeof miniappInstallations.$inferInsert;
+export type QualityFeedback = typeof qualityFeedback.$inferSelect;
+export type NewQualityFeedback = typeof qualityFeedback.$inferInsert;
 

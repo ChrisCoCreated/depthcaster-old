@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { curatedCasts, curatorCastCurations } from "@/lib/schema";
+import { curatedCasts, curatorCastCurations, qualityFeedback } from "@/lib/schema";
 import { eq, and } from "drizzle-orm";
 import { extractEmbeddedCastTexts, extractLinkUrls } from "@/lib/conversation";
 import { neynarClient } from "@/lib/neynar";
@@ -132,6 +132,18 @@ export async function POST(request: NextRequest) {
         qualityAnalyzedAt: new Date(),
       })
       .where(eq(curatedCasts.castHash, castHash));
+
+    // Record the quality feedback submission
+    await db.insert(qualityFeedback).values({
+      castHash,
+      curatorFid,
+      rootCastHash: rootCastHash || null,
+      feedback: feedback.trim(),
+      previousQualityScore: currentQualityScore,
+      newQualityScore: result.qualityScore,
+      deepseekReasoning: result.reasoning || null,
+      isAdmin: userIsAdmin,
+    });
 
     return NextResponse.json({
       success: true,
