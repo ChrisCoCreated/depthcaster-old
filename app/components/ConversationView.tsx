@@ -202,26 +202,6 @@ export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusR
     fetchConversation();
   }, [fetchConversation]);
 
-  // Fallback to /cast view if conversation fails (cast not curated)
-  useEffect(() => {
-    if (error && !loading) {
-      // Check if error is due to cast not being curated
-      const errorLower = error.toLowerCase();
-      const isNotCurated = errorLower.includes("not curated") || 
-                          errorLower.includes("conversation not found");
-      if (isNotCurated) {
-        router.replace(`/cast/${castHash}`);
-      }
-    }
-  }, [error, loading, castHash, router]);
-
-  useEffect(() => {
-    if (!loading && !error && !rootCast) {
-      // No root cast found, redirect to cast view
-      router.replace(`/cast/${castHash}`);
-    }
-  }, [loading, error, rootCast, castHash, router]);
-
   useEffect(() => {
     if (!normalizedFocusHash || replies.length === 0) return;
     const element = document.getElementById(`reply-${normalizedFocusHash}`);

@@ -566,19 +566,18 @@ export async function POST(request: NextRequest) {
 
     // Insert into curator_cast_curations (link curator to cast)
     try {
-      // Check if there are any existing curators for this cast (before inserting)
-      const existingCurators = await db
-        .select()
-        .from(curatorCastCurations)
-        .where(eq(curatorCastCurations.castHash, castHash))
-        .limit(1);
-      
-      const isNewCuration = existingCurators.length === 0;
-
       const curationResult = await db.insert(curatorCastCurations).values({
         castHash,
         curatorFid,
       }).returning();
+
+      // Check AFTER insert to avoid race conditions - if only 1 curator exists, this is the first curation
+      const allCurators = await db
+        .select()
+        .from(curatorCastCurations)
+        .where(eq(curatorCastCurations.castHash, castHash));
+      
+      const isNewCuration = allCurators.length === 1; // Only the one we just inserted
 
       // Send miniapp notification to all users when a cast is first curated
       if (isNewCuration) {
