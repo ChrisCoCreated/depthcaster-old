@@ -2806,10 +2806,10 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      // Trigger the edit button click if user has curated current cast or root cast
+                      // Trigger the edit button click if user has curated current cast or root cast, or is admin
                       if (user) {
                         const isCuratedByCurrentUser = curators.some(c => c.fid === user.fid);
-                        const canProvideFeedback = isCuratedByCurrentUser || hasCuratedRootCast;
+                        const canProvideFeedback = isCuratedByCurrentUser || hasCuratedRootCast || isAdmin;
                         if (canProvideFeedback) {
                           setShowQualityFeedbackModal(true);
                         } else {
@@ -2828,9 +2828,9 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        // Check if user has curated this cast or the root cast
+                        // Check if user has curated this cast or the root cast, or is admin
                         const isCuratedByCurrentUser = curators.some(c => c.fid === user.fid);
-                        const canProvideFeedback = isCuratedByCurrentUser || hasCuratedRootCast;
+                        const canProvideFeedback = isCuratedByCurrentUser || hasCuratedRootCast || isAdmin;
                         if (!canProvideFeedback) {
                           setShowCurateFirstMessage(true);
                           setTimeout(() => setShowCurateFirstMessage(false), 3000);
@@ -2862,7 +2862,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                       </svg>
                     </button>
                   )}
-                  {showCurateFirstMessage && (
+                  {showCurateFirstMessage && !isAdmin && (
                     <div className="absolute z-50 top-full left-0 mt-2 px-3 py-2 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg whitespace-nowrap">
                       {rootCastHash && rootCastHash !== cast.hash
                         ? "Please curate this cast or the root cast first to provide quality feedback"

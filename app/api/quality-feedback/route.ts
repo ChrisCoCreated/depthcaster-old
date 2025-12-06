@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import { extractEmbeddedCastTexts, extractLinkUrls } from "@/lib/conversation";
 import { neynarClient } from "@/lib/neynar";
 import { analyzeCastQualityWithFeedback } from "@/lib/deepseek-quality";
+import { isAdmin, getUserRoles } from "@/lib/roles";
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,7 +33,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify that the user has curated this cast OR the root cast
+    // Check if user is admin
+    const roles = await getUserRoles(curatorFid);
+    const userIsAdmin = isAdmin(roles);
+
+    // Verify that the user has curated this cast OR the root cast OR is admin
     const curation = await db
       .select()
       .from(curatorCastCurations)
@@ -62,9 +67,10 @@ export async function POST(request: NextRequest) {
       hasCuration = rootCuration.length > 0;
     }
 
-    if (!hasCuration) {
+    // Allow if user has curated (current or root cast) OR is admin
+    if (!hasCuration && !userIsAdmin) {
       return NextResponse.json(
-        { error: "You must curate this cast or the root cast before providing quality feedback" },
+        { error: "You must curate this cast or the root cast before providing quality feedback, or be an admin" },
         { status: 403 }
       );
     }
