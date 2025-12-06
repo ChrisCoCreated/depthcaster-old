@@ -128,6 +128,14 @@ export function QualityFeedbackModal({
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Command+Return (Mac) or Ctrl+Return (Windows/Linux) to submit
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      handleSubmit();
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -300,14 +308,15 @@ export function QualityFeedbackModal({
                 >
                   Why should the quality score change?
                 </label>
-                <textarea
-                  id="feedback"
-                  value={feedback}
-                  onChange={(e) => handleFeedbackChange(e.target.value)}
-                  placeholder="Explain why you think the quality score should be adjusted. Your feedback will be sent to DeepSeek along with the cast text, embedded casts, and links for re-analysis."
-                  className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-black text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 resize-none"
-                  rows={6}
-                />
+              <textarea
+                id="feedback"
+                value={feedback}
+                onChange={(e) => handleFeedbackChange(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Explain why you think the quality score should be adjusted. Your feedback will be sent to DeepSeek along with the cast text, embedded casts, and links for re-analysis."
+                className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-black text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 resize-none"
+                rows={6}
+              />
               </div>
 
               {error && (
