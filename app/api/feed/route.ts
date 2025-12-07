@@ -905,9 +905,15 @@ export async function GET(request: NextRequest) {
         const minimalCasts = rowsToFetch.map((row: any) => {
           const timestamp = row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString();
           
+          // Normalize hash to include 0x prefix if missing (Neynar API expects 0x prefix)
+          let normalizedHash = row.hash;
+          if (normalizedHash && !normalizedHash.startsWith('0x') && !normalizedHash.startsWith('0X')) {
+            normalizedHash = '0x' + normalizedHash;
+          }
+          
           // Construct cast object directly from query data
           return {
-            hash: row.hash, // Use actual hash from query
+            hash: normalizedHash,
             text: row.text || "",
             timestamp,
             author: {
@@ -938,11 +944,20 @@ export async function GET(request: NextRequest) {
             );
           
           if (viewerCurations.length > 0) {
-            const curatedCastHashes = new Set(viewerCurations.map(c => c.castHash));
+            // Normalize database hashes for comparison (ensure 0x prefix)
+            const curatedCastHashes = new Set(
+              viewerCurations.map(c => {
+                const hash = c.castHash;
+                return hash && !hash.startsWith('0x') && !hash.startsWith('0X') ? '0x' + hash : hash;
+              })
+            );
             
-            // Find which query result hashes are curated by the viewer (direct hash comparison)
+            // Find which query result hashes are curated by the viewer (normalize both sides for comparison)
             const castHashesToFetch = rowsToFetch
-              .map((row: any) => row.hash)
+              .map((row: any) => {
+                const hash = row.hash;
+                return hash && !hash.startsWith('0x') && !hash.startsWith('0X') ? '0x' + hash : hash;
+              })
               .filter((hash: string) => hash && curatedCastHashes.has(hash));
             
             // Only fetch full cast data from Neynar for casts curated by the viewer
