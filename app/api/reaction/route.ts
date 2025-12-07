@@ -12,7 +12,31 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { signerUuid, reactionType, target, targetAuthorFid } = body;
 
+    // Verbose logging - log all received data
+    console.log("[Reaction API] POST - Backend received request:", {
+      timestamp: new Date().toISOString(),
+      method: "POST",
+      endpoint: "/api/reaction",
+      rawBody: body,
+      parsedFields: {
+        signerUuid: signerUuid,
+        reactionType: reactionType,
+        target: target,
+        targetAuthorFid: targetAuthorFid,
+      },
+      requestHeaders: {
+        contentType: request.headers.get("content-type"),
+        referer: request.headers.get("referer"),
+        userAgent: request.headers.get("user-agent"),
+      },
+    });
+
     if (!signerUuid || !reactionType || !target) {
+      console.log("[Reaction API] POST - Missing required fields:", {
+        hasSignerUuid: !!signerUuid,
+        hasReactionType: !!reactionType,
+        hasTarget: !!target,
+      });
       return NextResponse.json(
         { error: "signerUuid, reactionType, and target are required" },
         { status: 400 }
@@ -24,15 +48,67 @@ export async function POST(request: NextRequest) {
     try {
       const signer = await neynarClient.lookupSigner({ signerUuid });
       userFid = signer.fid;
+      console.log("[Reaction API] POST - Signer lookup successful:", {
+        signerUuid: signerUuid,
+        userFid: userFid,
+        signerDetails: {
+          fid: signer.fid,
+          status: signer.status,
+        },
+      });
     } catch (error) {
-      console.error("Error fetching signer:", error);
+      console.error("[Reaction API] POST - Error fetching signer:", {
+        signerUuid: signerUuid,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
+
+    // Check if cast is from 1500+ feed (not in curated casts table)
+    let isFrom1500Feed = false;
+    try {
+      const curatedCastCheck = await db
+        .select({ castHash: curatedCasts.castHash })
+        .from(curatedCasts)
+        .where(eq(curatedCasts.castHash, target))
+        .limit(1);
+      
+      isFrom1500Feed = curatedCastCheck.length === 0;
+      
+      console.log("[Reaction API] POST - Cast source check:", {
+        target: target,
+        isCurated: curatedCastCheck.length > 0,
+        isFrom1500Feed: isFrom1500Feed,
+      });
+    } catch (error) {
+      console.error("[Reaction API] POST - Error checking cast source:", error);
+    }
+
+    console.log("[Reaction API] POST - Publishing reaction to Neynar:", {
+      signerUuid: signerUuid,
+      reactionType: reactionType,
+      target: target,
+      targetAuthorFid: targetAuthorFid,
+      userFid: userFid,
+      isFrom1500Feed: isFrom1500Feed,
+    });
 
     const reaction = await neynarClient.publishReaction({
       signerUuid,
       reactionType: reactionType as ReactionType,
       target,
       targetAuthorFid,
+    });
+
+    console.log("[Reaction API] POST - Reaction published successfully:", {
+      target: target,
+      reactionType: reactionType,
+      userFid: userFid,
+      reactionResult: {
+        hash: reaction.hash,
+        reactionType: reaction.reaction_type,
+        target: reaction.target,
+      },
+      isFrom1500Feed: isFrom1500Feed,
     });
 
     // Track interaction if this is a reaction to a curated cast thread
@@ -147,7 +223,31 @@ export async function DELETE(request: NextRequest) {
     const body = await request.json();
     const { signerUuid, reactionType, target, targetAuthorFid } = body;
 
+    // Verbose logging - log all received data
+    console.log("[Reaction API] DELETE - Backend received request:", {
+      timestamp: new Date().toISOString(),
+      method: "DELETE",
+      endpoint: "/api/reaction",
+      rawBody: body,
+      parsedFields: {
+        signerUuid: signerUuid,
+        reactionType: reactionType,
+        target: target,
+        targetAuthorFid: targetAuthorFid,
+      },
+      requestHeaders: {
+        contentType: request.headers.get("content-type"),
+        referer: request.headers.get("referer"),
+        userAgent: request.headers.get("user-agent"),
+      },
+    });
+
     if (!signerUuid || !reactionType || !target) {
+      console.log("[Reaction API] DELETE - Missing required fields:", {
+        hasSignerUuid: !!signerUuid,
+        hasReactionType: !!reactionType,
+        hasTarget: !!target,
+      });
       return NextResponse.json(
         { error: "signerUuid, reactionType, and target are required" },
         { status: 400 }
@@ -159,15 +259,63 @@ export async function DELETE(request: NextRequest) {
     try {
       const signer = await neynarClient.lookupSigner({ signerUuid });
       userFid = signer.fid;
+      console.log("[Reaction API] DELETE - Signer lookup successful:", {
+        signerUuid: signerUuid,
+        userFid: userFid,
+        signerDetails: {
+          fid: signer.fid,
+          status: signer.status,
+        },
+      });
     } catch (error) {
-      console.error("Error fetching signer:", error);
+      console.error("[Reaction API] DELETE - Error fetching signer:", {
+        signerUuid: signerUuid,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
+
+    // Check if cast is from 1500+ feed (not in curated casts table)
+    let isFrom1500Feed = false;
+    try {
+      const curatedCastCheck = await db
+        .select({ castHash: curatedCasts.castHash })
+        .from(curatedCasts)
+        .where(eq(curatedCasts.castHash, target))
+        .limit(1);
+      
+      isFrom1500Feed = curatedCastCheck.length === 0;
+      
+      console.log("[Reaction API] DELETE - Cast source check:", {
+        target: target,
+        isCurated: curatedCastCheck.length > 0,
+        isFrom1500Feed: isFrom1500Feed,
+      });
+    } catch (error) {
+      console.error("[Reaction API] DELETE - Error checking cast source:", error);
+    }
+
+    console.log("[Reaction API] DELETE - Deleting reaction from Neynar:", {
+      signerUuid: signerUuid,
+      reactionType: reactionType,
+      target: target,
+      targetAuthorFid: targetAuthorFid,
+      userFid: userFid,
+      isFrom1500Feed: isFrom1500Feed,
+    });
 
     const reaction = await neynarClient.deleteReaction({
       signerUuid,
       reactionType: reactionType as ReactionType,
       target,
       targetAuthorFid,
+    });
+
+    console.log("[Reaction API] DELETE - Reaction deleted successfully:", {
+      target: target,
+      reactionType: reactionType,
+      userFid: userFid,
+      reactionResult: reaction,
+      isFrom1500Feed: isFrom1500Feed,
     });
 
     // Remove interaction from database if this is a reaction to a curated cast thread

@@ -1552,6 +1552,15 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
           </div>
         </div>
         
+        {/* 1500+ Feed Description */}
+        {feedType === "1500+" && (
+          <div className="px-2 sm:px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Long-form casts over 1,500 characters from the past week
+            </p>
+          </div>
+        )}
+        
         {/* Filter settings - shown for all feeds except curated */}
         {feedType !== "curated" && <FeedSettingsInline feedType={feedType} />}
         
@@ -1784,15 +1793,6 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
           <My37Manager 
             onPackReady={handlePackReady}
           />
-        </div>
-      )}
-
-      {/* 1500+ Feed Description */}
-      {feedType === "1500+" && (
-        <div className="px-2 sm:px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Long-form casts over 1,500 characters from the past week
-          </p>
         </div>
       )}
 

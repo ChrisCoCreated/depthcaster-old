@@ -1353,17 +1353,53 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
       setIsLiked(!wasLiked);
       setLikesCount(newLikesCount);
 
+      const requestBody = {
+        signerUuid: user.signer_uuid,
+        reactionType: "like",
+        target: cast.hash,
+        targetAuthorFid: cast.author.fid,
+      };
+
+      // Verbose logging for 1500+ feed
+      if (feedType === "1500+") {
+        console.log("[1500+ Feed] Frontend - Like request details:", {
+          feedType: "1500+",
+          method: wasLiked ? "DELETE" : "POST",
+          endpoint: "/api/reaction",
+          requestBody: {
+            signerUuid: requestBody.signerUuid,
+            reactionType: requestBody.reactionType,
+            target: requestBody.target,
+            targetAuthorFid: requestBody.targetAuthorFid,
+          },
+          castDetails: {
+            hash: cast.hash,
+            author: {
+              fid: cast.author?.fid,
+              username: cast.author?.username,
+              display_name: cast.author?.display_name,
+            },
+            text: cast.text?.substring(0, 100) + "...",
+            timestamp: cast.timestamp,
+          },
+          currentState: {
+            wasLiked,
+            previousLikesCount: likesCount,
+            newLikesCount,
+          },
+          user: {
+            fid: user.fid,
+            signer_uuid: user.signer_uuid,
+          },
+        });
+      }
+
       const response = await fetch("/api/reaction", {
         method: wasLiked ? "DELETE" : "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          signerUuid: user.signer_uuid,
-          reactionType: "like",
-          target: cast.hash,
-          targetAuthorFid: cast.author.fid,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
