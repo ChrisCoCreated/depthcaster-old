@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useNeynarContext } from "@neynar/react";
 import { useRouter } from "next/navigation";
 import { AvatarImage } from "./AvatarImage";
@@ -26,14 +27,64 @@ export function HeaderUserSearch() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
+  const [mounted, setMounted] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const canRenderPortalsRef = useRef(false);
+
+  useEffect(() => {
+    setMounted(true);
+    canRenderPortalsRef.current = true;
+  }, []);
+
+  // Update dropdown position when it opens
+  useEffect(() => {
+    if (isExpanded && showDropdown && searchResults.length > 0 && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.bottom + 8,
+        left: rect.left,
+        width: rect.width,
+      });
+    }
+  }, [isExpanded, showDropdown, searchResults.length]);
+
+  // Also update position on window resize and scroll
+  useEffect(() => {
+    if (!isExpanded || !showDropdown || searchResults.length === 0) return;
+
+    const updatePosition = () => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setDropdownPosition({
+          top: rect.bottom + 8,
+          left: rect.left,
+          width: rect.width,
+        });
+      }
+    };
+
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [isExpanded, showDropdown, searchResults.length]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        containerRef.current && 
+        !containerRef.current.contains(target) &&
+        dropdownRef.current &&
+        !dropdownRef.current.contains(target)
+      ) {
         setShowDropdown(false);
         if (!searchTerm) {
           setIsExpanded(false);
@@ -175,7 +226,7 @@ export function HeaderUserSearch() {
   };
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative" ref={containerRef}>
       {/* Container with smooth width transition */}
       <div className={`relative overflow-hidden transition-all duration-300 ease-out ${
         isExpanded ? 'w-48 sm:w-64' : 'w-10 sm:w-10'
@@ -248,8 +299,15 @@ export function HeaderUserSearch() {
       </div>
 
       {/* Dropdown Results */}
-      {isExpanded && showDropdown && searchResults.length > 0 && (
-        <div className="absolute z-[9998] w-48 sm:w-64 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl max-h-80 overflow-y-auto transition-all duration-200 ease-out opacity-100 translate-y-0">
+      {isExpanded && showDropdown && searchResults.length > 0 && mounted && canRenderPortalsRef.current && typeof document !== "undefined" && document.body && createPortal(
+        <div
+          ref={dropdownRef}
+          className="fixed w-48 sm:w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl max-h-80 overflow-y-auto z-[9998]"
+          style={{
+            top: `${dropdownPosition.top}px`,
+            left: `${dropdownPosition.left}px`,
+          }}
+        >
           {searchResults.map((resultUser, index) => (
             <button
               key={resultUser.fid}
@@ -290,7 +348,8 @@ export function HeaderUserSearch() {
               </div>
             </button>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
