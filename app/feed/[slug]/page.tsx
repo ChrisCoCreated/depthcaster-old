@@ -24,6 +24,8 @@ export default function CustomFeedPage({
   const [channelName, setChannelName] = useState<string | null>(null);
   const [displayMode, setDisplayMode] = useState<DisplayMode | null>(null);
   const [showChannelHeader, setShowChannelHeader] = useState(false);
+  const [headerImage, setHeaderImage] = useState<string | null>(null);
+  const [customTitle, setCustomTitle] = useState<string | null>(null);
   
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const lastFetchTimeRef = useRef<number>(0);
@@ -82,7 +84,16 @@ export default function CustomFeedPage({
           setDisplayMode(data.feed.displayMode || null);
           if (data.feed.headerConfig) {
             setShowChannelHeader(data.feed.headerConfig.showChannelHeader || false);
+            setCustomTitle(data.feed.headerConfig.customTitle || null);
+            // Extract header image from headerConfig
+            if (data.feed.headerConfig.headerImage) {
+              setHeaderImage(data.feed.headerConfig.headerImage);
+            }
           }
+        }
+        // Extract header image (can come directly from response, prioritize direct response)
+        if (data.headerImage) {
+          setHeaderImage(data.headerImage);
         }
         // Extract channel name from first cast if available
         if (data.channel) {
@@ -170,19 +181,18 @@ export default function CustomFeedPage({
       <main className="max-w-7xl mx-auto px-4 py-8">
         {/* Feed Header */}
         <div className="mb-6">
-          {showChannelHeader && channelName ? (
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              /{channelName}
-            </h1>
-          ) : feedName ? (
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              {feedName}
-            </h1>
-          ) : (
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              Custom Feed
-            </h1>
+          {headerImage && (
+            <div className="mb-4">
+              <img 
+                src={headerImage} 
+                alt={customTitle || feedName || "Custom Feed"} 
+                className="w-full max-w-4xl rounded-lg"
+              />
+            </div>
           )}
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+            {customTitle || (showChannelHeader && channelName ? `/${channelName}` : feedName || "Custom Feed")}
+          </h1>
           {feedDescription && (
             <p className="text-gray-600 dark:text-gray-400 mt-2">
               {feedDescription}

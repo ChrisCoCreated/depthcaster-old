@@ -48,10 +48,13 @@ export default function ReframePage() {
       const response = await fetch(`/api/feed/custom/reframe?${params}`);
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[Reframe] API Error:', response.status, errorText);
         throw new Error("Failed to fetch feed");
       }
 
       const data = await response.json();
+      console.log('[Reframe] Full API Response:', JSON.stringify(data, null, 2));
 
       if (newCursor) {
         setCasts((prev) => [...prev, ...data.casts]);
@@ -81,6 +84,21 @@ export default function ReframePage() {
         } else if (data.casts && data.casts.length > 0 && data.casts[0].channel) {
           setChannelName(data.casts[0].channel.name);
         }
+        
+        // Debug: log the data to see what we're getting
+        console.log('[Reframe] API Response:', {
+          hasFeed: !!data.feed,
+          hasHeaderConfig: !!data.feed?.headerConfig,
+          customTitle: data.feed?.headerConfig?.customTitle,
+          headerImage: data.headerImage || data.feed?.headerConfig?.headerImage,
+          channelName: data.channel?.name,
+        });
+        console.log('[Reframe] State after update:', {
+          customTitle,
+          headerImage,
+          showChannelHeader,
+          channelName,
+        });
       }
 
       setCursor(data.next?.cursor || null);
@@ -97,6 +115,7 @@ export default function ReframePage() {
 
   // Initial load
   useEffect(() => {
+    console.log('[Reframe] Component mounted, fetching feed...');
     fetchFeed();
   }, [fetchFeed]);
 
@@ -146,6 +165,16 @@ export default function ReframePage() {
     };
   }, [hasMore, loading, loadMore]);
 
+  console.log('[Reframe] Render - State:', { 
+    headerImage, 
+    customTitle, 
+    channelName, 
+    feedName, 
+    loading, 
+    error,
+    hasCasts: casts.length > 0 
+  });
+
   if (error) {
     return (
       <div className="min-h-screen">
@@ -161,18 +190,32 @@ export default function ReframePage() {
       <main className="max-w-7xl mx-auto px-4 py-8">
         {/* Feed Header */}
         <div className="mb-6">
-          {headerImage && (
+          {headerImage ? (
             <div className="mb-4">
               <img 
                 src={headerImage} 
-                alt="Reframe Daily Feed" 
+                alt="Reframe Daily" 
                 className="w-full max-w-4xl rounded-lg"
+                onError={(e) => {
+                  console.error('[Reframe] Image failed to load:', headerImage);
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+                onLoad={() => {
+                  console.log('[Reframe] Image loaded successfully');
+                }}
               />
+            </div>
+          ) : (
+            <div className="mb-4 text-xs text-gray-400">
+              Debug: headerImage is {headerImage ? 'set' : 'null'}
             </div>
           )}
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-            {customTitle ? customTitle : (showChannelHeader && channelName ? `/${channelName}` : feedName || "Reframe")}
+            {customTitle || (showChannelHeader && channelName ? `/${channelName}` : feedName || "Reframe")}
           </h1>
+          <div className="text-xs text-gray-400 mt-1">
+            Debug: customTitle={customTitle || 'null'}, channelName={channelName || 'null'}, feedName={feedName || 'null'}
+          </div>
           {feedDescription && (
             <p className="text-gray-600 dark:text-gray-400 mt-2">
               {feedDescription}

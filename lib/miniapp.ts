@@ -177,8 +177,8 @@ export async function notifyAllMiniappUsersAboutNewCuratedCast(
   castData: any
 ): Promise<{ sent: number; errors: number }> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://depthcaster.vercel.app";
-  // Use miniapp URL to direct users to the feed
-  const targetUrl = `${appUrl}/miniapp`;
+  // Use miniapp URL with castHash query parameter to auto-open the cast
+  const targetUrl = `${appUrl}/miniapp?castHash=${castHash}`;
 
   // Extract cast text (truncation will be handled by buildMiniappNotificationPayload)
   const castText = (castData?.text || "").trim();

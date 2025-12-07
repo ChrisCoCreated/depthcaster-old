@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { MiniAppProvider, useMiniApp } from "@neynar/react";
 import { formatDistanceToNow } from "date-fns";
 import { AvatarImage } from "@/app/components/AvatarImage";
@@ -24,6 +24,7 @@ const ADMIN_FID = 5701;
 
 function MiniappContent() {
   const { isSDKLoaded, context, actions, added, notificationDetails } = useMiniApp();
+  const hasAutoOpenedRef = useRef(false);
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -98,6 +99,37 @@ function MiniappContent() {
       });
     }
   }, [isSDKLoaded, actions]);
+
+  // Auto-open cast from notification
+  useEffect(() => {
+    // Only auto-open once and only if SDK is loaded with actions available
+    if (hasAutoOpenedRef.current || !isSDKLoaded || !actions?.openUrl) {
+      return;
+    }
+
+    // Check for castHash in URL query parameters
+    let castHash: string | null = null;
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      castHash = urlParams.get("castHash");
+    }
+    
+    // Also check notificationDetails from SDK if available
+    const notificationCastHash = (notificationDetails as any)?.castHash;
+
+    const hashToOpen = castHash || notificationCastHash;
+
+    if (hashToOpen) {
+      hasAutoOpenedRef.current = true;
+      // Open the cast in conversation view
+      const url = `${appUrl}/conversation/${hashToOpen}`;
+      actions.openUrl(url).catch((err) => {
+        console.error("Error opening cast from notification:", err);
+        // Fallback to window.open if SDK method fails
+        window.open(url, "_blank", "noopener,noreferrer");
+      });
+    }
+  }, [isSDKLoaded, actions, notificationDetails, appUrl]);
 
   const fetchFeed = useCallback(async (limit: number = 3) => {
     try {
@@ -563,7 +595,7 @@ function MiniappContent() {
             </span>
             <button
               onClick={() => setShowQualityFilters(!showQualityFilters)}
-              className="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+              className="text-xs px-1.5 py-0.5 rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:border-gray-400 dark:hover:border-gray-500 transition-colors"
             >
               Q: {minQualityScore}+
             </button>
