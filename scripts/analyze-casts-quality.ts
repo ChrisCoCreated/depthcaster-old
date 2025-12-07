@@ -16,7 +16,7 @@ config({ path: resolve(process.cwd(), ".env") });
 
 import { db } from "../lib/db";
 import { curatedCasts, castReplies } from "../lib/schema";
-import { isNull, eq } from "drizzle-orm";
+import { isNull, eq, and } from "drizzle-orm";
 import { analyzeBatch } from "../lib/deepseek-quality";
 import { sendPushNotificationToUser } from "../lib/pushNotifications";
 
@@ -57,7 +57,12 @@ async function analyzeCuratedCasts() {
             category: analysisResult.category,
             qualityAnalyzedAt: new Date(),
           })
-          .where(eq(curatedCasts.castHash, castHash));
+          .where(
+            and(
+              eq(curatedCasts.castHash, castHash),
+              isNull(curatedCasts.qualityScore) // Only update if qualityScore is still null
+            )
+          );
         
         // Notify cast author about quality score
         const castRecord = await db
@@ -141,7 +146,12 @@ async function analyzeCastReplies() {
             category: analysisResult.category,
             qualityAnalyzedAt: new Date(),
           })
-          .where(eq(castReplies.replyCastHash, replyCastHash));
+          .where(
+            and(
+              eq(castReplies.replyCastHash, replyCastHash),
+              isNull(castReplies.qualityScore) // Only update if qualityScore is still null
+            )
+          );
       },
       {
         batchSize: 5,

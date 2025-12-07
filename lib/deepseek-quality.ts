@@ -45,6 +45,45 @@ function extractCastText(castData: any): string {
 }
 
 /**
+ * Extract content from embeds (quoted casts, links, images)
+ */
+function extractEmbedContent(castData: any): {
+  quotedCastTexts: string[];
+  linkMetadata: Array<{ title?: string; description?: string; url: string }>;
+  imageAlts: string[];
+} {
+  const quotedCastTexts: string[] = [];
+  const linkMetadata: Array<{ title?: string; description?: string; url: string }> = [];
+  const imageAlts: string[] = [];
+  
+  if (castData.embeds && Array.isArray(castData.embeds)) {
+    for (const embed of castData.embeds) {
+      // Quoted cast - extract text if available (synchronous, no API call)
+      if (embed.cast?.text) {
+        quotedCastTexts.push(embed.cast.text);
+      }
+      
+      // Link embed metadata (synchronous, no API call)
+      if (embed.url && !embed.cast && !embed.cast_id) {
+        const meta = embed.metadata || {};
+        linkMetadata.push({
+          url: embed.url,
+          title: meta.title || meta.html?.ogTitle,
+          description: meta.description || meta.html?.ogDescription,
+        });
+      }
+      
+      // Image alt text
+      if (embed.metadata?.alt) {
+        imageAlts.push(embed.metadata.alt);
+      }
+    }
+  }
+  
+  return { quotedCastTexts, linkMetadata, imageAlts };
+}
+
+/**
  * Check if cast is a quote cast (has embeds with cast)
  */
 function isQuoteCast(castData: any): boolean {
@@ -530,9 +569,60 @@ export async function analyzeCastQuality(
     }
   }
   
-  if (!castText || castText.trim().length === 0) {
-    console.warn("[DeepSeek] Cast has no text, skipping analysis");
-    return null;
+  // Extract embed content
+  const embedContent = extractEmbedContent(castData);
+  
+  // Log embed information for debugging
+  const hasText = castText && castText.trim().length > 0;
+  const hasEmbeds = embedContent.quotedCastTexts.length > 0 || 
+                    embedContent.linkMetadata.length > 0 || 
+                    embedContent.imageAlts.length > 0;
+  
+  if (hasEmbeds) {
+    console.log(`[DeepSeek] Extracted embed content for analysis:`, {
+      hasText,
+      quotedCasts: embedContent.quotedCastTexts.length,
+      links: embedContent.linkMetadata.length,
+      images: embedContent.imageAlts.length,
+      linkUrls: embedContent.linkMetadata.map(l => l.url),
+      imageAlts: embedContent.imageAlts,
+    });
+  }
+  
+  // Build content string with text and embeds
+  const contentParts: string[] = [];
+  
+  if (castText && castText.trim().length > 0) {
+    contentParts.push(`Cast text:\n${castText.substring(0, 2000)}${castText.length > 2000 ? "..." : ""}`);
+  }
+  
+  if (embedContent.quotedCastTexts.length > 0) {
+    contentParts.push(`\nQuoted casts:\n${embedContent.quotedCastTexts.map((text, i) => `[Quoted cast ${i + 1}]: ${text.substring(0, 500)}${text.length > 500 ? "..." : ""}`).join('\n')}`);
+  }
+  
+  if (embedContent.linkMetadata.length > 0) {
+    const linkInfo = embedContent.linkMetadata.map((link, i) => {
+      let info = `[Link ${i + 1}]: ${link.url}`;
+      if (link.title) info += `\n  Title: ${link.title}`;
+      if (link.description) info += `\n  Description: ${link.description}`;
+      return info;
+    }).join('\n');
+    contentParts.push(`\nLinks:\n${linkInfo}`);
+  }
+  
+  if (embedContent.imageAlts.length > 0) {
+    contentParts.push(`\nImages:\n${embedContent.imageAlts.map((alt, i) => `[Image ${i + 1}]: ${alt}`).join('\n')}`);
+  }
+  
+  const fullContent = contentParts.join('\n\n');
+  
+  // If no content at all, assign defaults
+  if (!fullContent || fullContent.trim().length < 10) {
+    return {
+      qualityScore: 50, // Default middle score
+      category: "other",
+      reasoning: "No analyzable text or embed content"
+    };
   }
 
   const prompt = `Analyze this Farcaster cast and provide:
@@ -554,8 +644,7 @@ Category descriptions:
 - playful: Humour, meme-y content, lists, quips, light takes
 - other: Anything that doesn't fit the above categories
 
-Cast text:
-${castText.substring(0, 2000)}${castText.length > 2000 ? "..." : ""}
+${fullContent}
 
 Respond in JSON format:
 {
@@ -628,18 +717,21 @@ Respond in JSON format:
     if (qualityScore > 100) qualityScore = 100;
 
     // Apply simple heuristic adjustments for ultra-short / emoji-only content
-    const normalizedText = castText.trim();
-    const textLength = normalizedText.length;
-    const wordCount = normalizedText === "" ? 0 : normalizedText.split(/\s+/).length;
-    const hasLettersOrDigits = /[A-Za-z0-9]/.test(normalizedText);
+    // Only apply these heuristics if there's actual text (not just embeds)
+    if (castText && castText.trim().length > 0) {
+      const normalizedText = castText.trim();
+      const textLength = normalizedText.length;
+      const wordCount = normalizedText === "" ? 0 : normalizedText.split(/\s+/).length;
+      const hasLettersOrDigits = /[A-Za-z0-9]/.test(normalizedText);
 
-    // Emoji-only or essentially content-free messages should always be very low quality
-    if (!hasLettersOrDigits && textLength > 0) {
-      qualityScore = Math.min(qualityScore, 5);
-    }
-    // Very short acknowledgements should be capped to keep separation from high-effort posts
-    else if (wordCount > 0 && wordCount <= 3 && textLength <= 30) {
-      qualityScore = Math.min(qualityScore, 20);
+      // Emoji-only or essentially content-free messages should always be very low quality
+      if (!hasLettersOrDigits && textLength > 0) {
+        qualityScore = Math.min(qualityScore, 5);
+      }
+      // Very short acknowledgements should be capped to keep separation from high-effort posts
+      else if (wordCount > 0 && wordCount <= 3 && textLength <= 30) {
+        qualityScore = Math.min(qualityScore, 20);
+      }
     }
 
     // Validate and normalize category
