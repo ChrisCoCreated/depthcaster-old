@@ -1349,21 +1349,43 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
       const wasLiked = isLiked;
       const newLikesCount = wasLiked ? likesCount - 1 : likesCount + 1;
       
+      // Enhanced logging for debugging
+      console.log("[CastCard] handleLike called:", {
+        castHash: cast.hash,
+        castHashType: typeof cast.hash,
+        castHashLength: cast.hash?.length,
+        authorFid: cast.author?.fid,
+        authorFidType: typeof cast.author?.fid,
+        authorFidIsNumber: typeof cast.author?.fid === 'number',
+        hasAuthor: !!cast.author,
+        feedType,
+        wasLiked,
+      });
+      
       // Optimistic update
       setIsLiked(!wasLiked);
       setLikesCount(newLikesCount);
+
+      const requestBody = {
+        signerUuid: user.signer_uuid,
+        reactionType: "like",
+        target: cast.hash,
+        targetAuthorFid: cast.author.fid,
+      };
+      
+      console.log("[CastCard] Sending reaction request:", {
+        ...requestBody,
+        target: cast.hash ? `${cast.hash.substring(0, 20)}...` : null,
+        targetAuthorFid: cast.author?.fid,
+        targetAuthorFidType: typeof cast.author?.fid,
+      });
 
       const response = await fetch("/api/reaction", {
         method: wasLiked ? "DELETE" : "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          signerUuid: user.signer_uuid,
-          reactionType: "like",
-          target: cast.hash,
-          targetAuthorFid: cast.author.fid,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {

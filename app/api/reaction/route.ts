@@ -12,7 +12,25 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { signerUuid, reactionType, target, targetAuthorFid } = body;
 
+    // Enhanced logging for debugging
+    console.log("[Reaction API] POST request received:", {
+      hasSignerUuid: !!signerUuid,
+      reactionType,
+      target: target ? `${target.substring(0, 20)}...` : null,
+      targetType: typeof target,
+      targetLength: target?.length,
+      targetAuthorFid,
+      targetAuthorFidType: typeof targetAuthorFid,
+      targetAuthorFidIsNumber: typeof targetAuthorFid === 'number',
+      targetAuthorFidIsNaN: typeof targetAuthorFid === 'number' ? isNaN(targetAuthorFid) : 'N/A',
+    });
+
     if (!signerUuid || !reactionType || !target) {
+      console.error("[Reaction API] Missing required fields:", {
+        hasSignerUuid: !!signerUuid,
+        hasReactionType: !!reactionType,
+        hasTarget: !!target,
+      });
       return NextResponse.json(
         { error: "signerUuid, reactionType, and target are required" },
         { status: 400 }
@@ -28,12 +46,21 @@ export async function POST(request: NextRequest) {
       console.error("Error fetching signer:", error);
     }
 
-    const reaction = await neynarClient.publishReaction({
+    // Log the exact parameters being sent to Neynar
+    const neynarParams = {
       signerUuid,
       reactionType: reactionType as ReactionType,
       target,
       targetAuthorFid,
+    };
+    console.log("[Reaction API] Calling neynarClient.publishReaction with:", {
+      ...neynarParams,
+      target: target ? `${target.substring(0, 20)}...` : null,
+      targetAuthorFid,
+      targetAuthorFidType: typeof targetAuthorFid,
     });
+
+    const reaction = await neynarClient.publishReaction(neynarParams);
 
     // Track interaction if this is a reaction to a curated cast thread
     if (target && userFid) {
@@ -132,9 +159,21 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    console.log("[Reaction API] Successfully published reaction");
     return NextResponse.json({ success: true, reaction });
   } catch (error: any) {
-    console.error("Reaction API error:", error);
+    console.error("[Reaction API] Error details:", {
+      message: error.message,
+      status: error.status,
+      code: error.code,
+      response: error.response?.data ? JSON.stringify(error.response.data).substring(0, 500) : null,
+      config: error.config ? {
+        url: error.config.url,
+        method: error.config.method,
+        data: error.config.data ? JSON.stringify(error.config.data).substring(0, 500) : null,
+      } : null,
+    });
+    console.error("[Reaction API] Full error:", error);
     return NextResponse.json(
       { error: error.message || "Failed to publish reaction" },
       { status: 500 }
