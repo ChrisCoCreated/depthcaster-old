@@ -1484,14 +1484,14 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       <div className="sticky top-0 bg-white dark:bg-black border-b border-gray-200 dark:border-gray-800 z-40">
         <div className="flex items-center justify-between px-2 sm:px-4 py-2 border-b border-gray-200 dark:border-gray-800">
           <div className="flex gap-1 overflow-x-auto scrollbar-hide overscroll-x-contain flex-1">
-            {[
-              { id: "curated", label: "Curated", requiresAuth: false },
+          {[
+            { id: "curated", label: "Curated", requiresAuth: false },
               { id: "my-37", label: myFeedLabel, requiresAuth: true },
               { id: "1500+", label: "1500+", requiresAuth: false },
-              { id: "trending", label: "Trending", requiresAuth: true },
-              { id: "for-you", label: "For You", requiresAuth: true },
-              { id: "following", label: "Following", requiresAuth: true },
-            ].map((tab) => {
+            { id: "trending", label: "Trending", requiresAuth: true },
+            { id: "for-you", label: "For You", requiresAuth: true },
+            { id: "following", label: "Following", requiresAuth: true },
+          ].map((tab) => {
             const isDisabled = tab.requiresAuth && !viewerFid;
             const isActive = feedType === tab.id;
             
@@ -1524,7 +1524,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
               </button>
             );
           })}
-          </div>
+        </div>
           
           {/* Compact view toggle - shown for all feeds */}
           <div className="flex items-center gap-2 px-2 sm:px-3 flex-shrink-0">
