@@ -5,6 +5,9 @@
  *   - Analyze all: npx tsx scripts/analyze-casts-quality.ts
  *   - Analyze only curated casts: npx tsx scripts/analyze-casts-quality.ts casts
  *   - Analyze only replies: npx tsx scripts/analyze-casts-quality.ts replies
+ *   - Reanalyze low quality (< 50): npx tsx scripts/analyze-casts-quality.ts reanalyze-low
+ *   - Reanalyze low quality casts only: npx tsx scripts/analyze-casts-quality.ts reanalyze-low-casts
+ *   - Reanalyze low quality replies only: npx tsx scripts/analyze-casts-quality.ts reanalyze-low-replies
  */
 
 import { config } from "dotenv";
@@ -16,7 +19,7 @@ config({ path: resolve(process.cwd(), ".env") });
 
 import { db } from "../lib/db";
 import { curatedCasts, castReplies } from "../lib/schema";
-import { isNull, eq, and } from "drizzle-orm";
+import { isNull, eq, and, lt } from "drizzle-orm";
 import { analyzeBatch } from "../lib/deepseek-quality";
 import { sendPushNotificationToUser } from "../lib/pushNotifications";
 
@@ -175,6 +178,162 @@ async function analyzeCastReplies() {
 }
 
 /**
+ * Reanalyze curated casts with quality score < 50
+ */
+async function reanalyzeLowQualityCasts() {
+  console.log("Starting reanalysis for curated casts with quality score < 50...\n");
+
+  try {
+    // Get all curated casts with quality score < 50
+    const castsToReanalyze = await db
+      .select({
+        castHash: curatedCasts.castHash,
+        castData: curatedCasts.castData,
+        currentScore: curatedCasts.qualityScore,
+      })
+      .from(curatedCasts)
+      .where(lt(curatedCasts.qualityScore, 50));
+
+    console.log(`Found ${castsToReanalyze.length} curated cast(s) with quality score < 50\n`);
+
+    if (castsToReanalyze.length === 0) {
+      console.log("No casts to reanalyze. Exiting.");
+      return { processed: 0, failed: 0 };
+    }
+
+    // Process in batches
+    const result = await analyzeBatch(
+      castsToReanalyze.map((cast) => ({
+        castHash: cast.castHash,
+        castData: cast.castData,
+      })),
+      async (castHash, analysisResult) => {
+        // Only update if qualityScore is still < 50 (safety check)
+        await db
+          .update(curatedCasts)
+          .set({
+            qualityScore: analysisResult.qualityScore,
+            category: analysisResult.category,
+            qualityAnalyzedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(curatedCasts.castHash, castHash),
+              lt(curatedCasts.qualityScore, 50) // Only update if still < 50
+            )
+          );
+      },
+      {
+        batchSize: 5,
+        delayBetweenBatches: 1000,
+      }
+    );
+
+    console.log("\n" + "=".repeat(60));
+    console.log("LOW QUALITY CASTS REANALYSIS SUMMARY");
+    console.log("=".repeat(60));
+    console.log(`Total casts to reanalyze: ${castsToReanalyze.length}`);
+    console.log(`Successfully processed: ${result.processed}`);
+    console.log(`Failed: ${result.failed}`);
+    console.log("\nReanalysis complete!");
+
+    return result;
+  } catch (error: any) {
+    console.error("Fatal error reanalyzing low quality casts:", error);
+    throw error;
+  }
+}
+
+/**
+ * Reanalyze replies with quality score < 50
+ */
+async function reanalyzeLowQualityReplies() {
+  console.log("Starting reanalysis for replies with quality score < 50...\n");
+
+  try {
+    // Get all replies with quality score < 50
+    const repliesToReanalyze = await db
+      .select({
+        replyCastHash: castReplies.replyCastHash,
+        castData: castReplies.castData,
+        currentScore: castReplies.qualityScore,
+      })
+      .from(castReplies)
+      .where(lt(castReplies.qualityScore, 50));
+
+    console.log(`Found ${repliesToReanalyze.length} reply/reply(ies) with quality score < 50\n`);
+
+    if (repliesToReanalyze.length === 0) {
+      console.log("No replies to reanalyze. Exiting.");
+      return { processed: 0, failed: 0 };
+    }
+
+    // Process in batches
+    const result = await analyzeBatch(
+      repliesToReanalyze.map((reply) => ({
+        castHash: reply.replyCastHash,
+        castData: reply.castData,
+      })),
+      async (replyCastHash, analysisResult) => {
+        // Only update if qualityScore is still < 50 (safety check)
+        await db
+          .update(castReplies)
+          .set({
+            qualityScore: analysisResult.qualityScore,
+            category: analysisResult.category,
+            qualityAnalyzedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(castReplies.replyCastHash, replyCastHash),
+              lt(castReplies.qualityScore, 50) // Only update if still < 50
+            )
+          );
+      },
+      {
+        batchSize: 5,
+        delayBetweenBatches: 1000,
+      }
+    );
+
+    console.log("\n" + "=".repeat(60));
+    console.log("LOW QUALITY REPLIES REANALYSIS SUMMARY");
+    console.log("=".repeat(60));
+    console.log(`Total replies to reanalyze: ${repliesToReanalyze.length}`);
+    console.log(`Successfully processed: ${result.processed}`);
+    console.log(`Failed: ${result.failed}`);
+    console.log("\nReanalysis complete!");
+
+    return result;
+  } catch (error: any) {
+    console.error("Fatal error reanalyzing low quality replies:", error);
+    throw error;
+  }
+}
+
+/**
+ * Reanalyze both casts and replies with quality score < 50
+ */
+async function reanalyzeLowQualityAll() {
+  console.log("Starting reanalysis for all casts and replies with quality score < 50...\n");
+
+  const castsResult = await reanalyzeLowQualityCasts();
+  console.log("\n");
+  const repliesResult = await reanalyzeLowQualityReplies();
+
+  console.log("\n" + "=".repeat(60));
+  console.log("OVERALL LOW QUALITY REANALYSIS SUMMARY");
+  console.log("=".repeat(60));
+  console.log(`Curated casts processed: ${castsResult.processed}`);
+  console.log(`Curated casts failed: ${castsResult.failed}`);
+  console.log(`Replies processed: ${repliesResult.processed}`);
+  console.log(`Replies failed: ${repliesResult.failed}`);
+  console.log(`Total processed: ${castsResult.processed + repliesResult.processed}`);
+  console.log(`Total failed: ${castsResult.failed + repliesResult.failed}`);
+  console.log("\nAll reanalysis complete!");
+}
+
+/**
  * Main function to analyze both casts and replies
  */
 async function analyzeAll() {
@@ -214,6 +373,39 @@ if (command === "casts" || command === "curated") {
 } else if (command === "replies") {
   // Analyze only replies
   analyzeCastReplies()
+    .then(() => {
+      console.log("\nScript finished successfully");
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error("\nScript failed:", error);
+      process.exit(1);
+    });
+} else if (command === "reanalyze-low") {
+  // Reanalyze both casts and replies with quality score < 50
+  reanalyzeLowQualityAll()
+    .then(() => {
+      console.log("\nScript finished successfully");
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error("\nScript failed:", error);
+      process.exit(1);
+    });
+} else if (command === "reanalyze-low-casts") {
+  // Reanalyze only curated casts with quality score < 50
+  reanalyzeLowQualityCasts()
+    .then(() => {
+      console.log("\nScript finished successfully");
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error("\nScript failed:", error);
+      process.exit(1);
+    });
+} else if (command === "reanalyze-low-replies") {
+  // Reanalyze only replies with quality score < 50
+  reanalyzeLowQualityReplies()
     .then(() => {
       console.log("\nScript finished successfully");
       process.exit(0);
