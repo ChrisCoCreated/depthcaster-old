@@ -82,7 +82,7 @@ export const customFeeds: CustomFeed[] = [
     },
     headerConfig: {
       showChannelHeader: true,
-      customTitle: "Reframe Daily Feed",
+      customTitle: "Reframe Daily",
       headerImage: "https://wrpcd.net/cdn-cgi/imagedelivery/BXluQx4ige9GuW0Ia56BHw/c5ae3a36-c183-427a-d75b-d956d304c700/anim=false,f=auto,w=1800",
     },
   },

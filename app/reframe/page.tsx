@@ -65,13 +65,15 @@ export default function ReframePage() {
           if (data.feed.headerConfig) {
             setShowChannelHeader(data.feed.headerConfig.showChannelHeader || false);
             setCustomTitle(data.feed.headerConfig.customTitle || null);
+            // Extract header image from headerConfig
+            if (data.feed.headerConfig.headerImage) {
+              setHeaderImage(data.feed.headerConfig.headerImage);
+            }
           }
         }
-        // Extract header image (can come from headerConfig or directly)
+        // Extract header image (can come directly from response, prioritize direct response)
         if (data.headerImage) {
           setHeaderImage(data.headerImage);
-        } else if (data.feed?.headerConfig?.headerImage) {
-          setHeaderImage(data.feed.headerConfig.headerImage);
         }
         // Extract channel name from first cast if available
         if (data.channel) {

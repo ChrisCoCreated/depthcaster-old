@@ -2126,7 +2126,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                   const firstNewlineIndex = processedText.indexOf('\n');
                   if (firstNewlineIndex !== -1) {
                     firstLine = processedText.substring(0, firstNewlineIndex);
-                    restOfText = processedText.substring(firstNewlineIndex + 1);
+                    restOfText = '\n' + processedText.substring(firstNewlineIndex + 1);
                   } else {
                     // If no newline, find first sentence or first ~100 chars
                     const firstPeriod = processedText.indexOf('. ');
@@ -2179,12 +2179,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                     {shouldBoldFirstLine && firstLine ? (
                       <>
                         <span className="font-bold">{renderProcessedText(firstLine)}</span>
-                        {restOfText && (
-                          <>
-                            {restOfText.startsWith(' ') ? ' ' : ''}
-                            {renderProcessedText(restOfText.trimStart())}
-                          </>
-                        )}
+                        {restOfText && renderProcessedText(restOfText)}
                       </>
                     ) : (
                       renderProcessedText(processedText)
