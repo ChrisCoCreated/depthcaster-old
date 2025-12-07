@@ -2099,6 +2099,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                 </span>
               )}
             </div>
+            )}
 
             {/* Cast text */}
             <div className="text-gray-900 dark:text-gray-100 mb-2 sm:mb-3 text-sm sm:text-base leading-6 sm:leading-7">
