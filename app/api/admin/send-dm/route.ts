@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { users, userRoles } from "@/lib/schema";
 import { eq, asc } from "drizzle-orm";
-import { isAdmin, getUserRoles } from "@/lib/roles";
+import { isSuperAdmin, getUserRoles } from "@/lib/roles";
 import { randomUUID } from "crypto";
 
 export async function POST(request: NextRequest) {
@@ -27,18 +27,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if admin has admin/superadmin role
+    // Check if user has superadmin role
     const adminUser = await db.select().from(users).where(eq(users.fid, adminFidNum)).limit(1);
     if (adminUser.length === 0) {
       return NextResponse.json(
-        { error: "Admin user not found" },
+        { error: "User not found" },
         { status: 404 }
       );
     }
     const adminRoles = await getUserRoles(adminFidNum);
-    if (!isAdmin(adminRoles)) {
+    if (!isSuperAdmin(adminRoles)) {
       return NextResponse.json(
-        { error: "User does not have admin or superadmin role" },
+        { error: "User does not have superadmin role" },
         { status: 403 }
       );
     }

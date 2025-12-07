@@ -35,6 +35,10 @@ export default function AdminRolesPage() {
   const [showAddUserSection, setShowAddUserSection] = useState(false);
   const [lastCuratorAssigned, setLastCuratorAssigned] = useState<number | null>(null);
   const [sendingDm, setSendingDm] = useState<number | null>(null);
+  const [isSuperAdmin, setIsSuperAdmin] = useState<boolean>(false);
+  const [dmModalOpen, setDmModalOpen] = useState<boolean>(false);
+  const [dmRecipientFid, setDmRecipientFid] = useState<number | null>(null);
+  const [dmMessage, setDmMessage] = useState<string>("");
 
   useEffect(() => {
     const checkAdminAccess = async () => {
@@ -49,9 +53,11 @@ export default function AdminRolesPage() {
         
         if (data.isAdmin) {
           setIsAdmin(true);
+          setIsSuperAdmin(data.isSuperAdmin || false);
           loadUsers();
         } else {
           setIsAdmin(false);
+          setIsSuperAdmin(false);
           router.push("/");
         }
       } catch (error) {
@@ -312,10 +318,36 @@ export default function AdminRolesPage() {
     }
   };
 
-  const handleSendDm = async (recipientFid: number) => {
-    if (!user?.fid) return;
+  const handleOpenDmModal = (recipientFid: number) => {
+    const defaultMessage = `Great that you're up for it! Here's the app, currently in private beta.
+
+www.depthcaster.com
+
+I've given you Curator role - guide here: www.depthcaster.com/curators
+
+I'd love any feedback, here, GC or by clicking the ? icon in the app header.
+
+And here is the group chat
+
+https://farcaster.xyz/~/group/GpluEgXNiXtpW1XAO8ct5A
+
+thanks and looking forward to what you curate!`;
     
-    setSendingDm(recipientFid);
+    setDmRecipientFid(recipientFid);
+    setDmMessage(defaultMessage);
+    setDmModalOpen(true);
+  };
+
+  const handleCloseDmModal = () => {
+    setDmModalOpen(false);
+    setDmRecipientFid(null);
+    setDmMessage("");
+  };
+
+  const handleSendDm = async () => {
+    if (!user?.fid || !dmRecipientFid) return;
+    
+    setSendingDm(dmRecipientFid);
     setMessage(null);
     
     try {
@@ -326,7 +358,8 @@ export default function AdminRolesPage() {
         },
         body: JSON.stringify({
           adminFid: user.fid,
-          recipientFid,
+          recipientFid: dmRecipientFid,
+          message: dmMessage,
         }),
       });
 
@@ -334,6 +367,7 @@ export default function AdminRolesPage() {
       
       if (response.ok) {
         setMessage({ type: "success", text: "DM sent successfully!" });
+        handleCloseDmModal();
       } else {
         setMessage({ type: "error", text: data.error || "Failed to send DM" });
       }
@@ -680,9 +714,9 @@ export default function AdminRolesPage() {
                               : `+ ${role}`}
                           </button>
                         ))}
-                        {userWithRoles.roles.includes("curator") && (
+                        {userWithRoles.roles.includes("curator") && isSuperAdmin && (
                           <button
-                            onClick={() => handleSendDm(userWithRoles.fid)}
+                            onClick={() => handleOpenDmModal(userWithRoles.fid)}
                             disabled={sendingDm === userWithRoles.fid}
                             className={`px-3 py-1.5 sm:py-1 text-xs rounded-lg transition-colors min-h-[32px] touch-manipulation ${
                               lastCuratorAssigned === userWithRoles.fid
@@ -691,7 +725,7 @@ export default function AdminRolesPage() {
                             } disabled:opacity-50 disabled:cursor-not-allowed`}
                             title="Send welcome DM"
                           >
-                            {sendingDm === userWithRoles.fid ? "Sending..." : "Share DM"}
+                            Share DM
                           </button>
                         )}
                       </div>
@@ -702,6 +736,63 @@ export default function AdminRolesPage() {
             </div>
           )}
         </div>
+
+        {/* DM Edit Modal */}
+        {dmModalOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-lg max-w-2xl w-full max-h-[90vh] flex flex-col">
+              <div className="p-4 sm:p-6 border-b border-gray-200 dark:border-gray-800">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    Edit DM Message
+                  </h3>
+                  <button
+                    onClick={handleCloseDmModal}
+                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                    disabled={sendingDm !== null}
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              
+              <div className="p-4 sm:p-6 flex-1 overflow-y-auto">
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Message
+                  </label>
+                  <textarea
+                    value={dmMessage}
+                    onChange={(e) => setDmMessage(e.target.value)}
+                    className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    rows={12}
+                    disabled={sendingDm !== null}
+                    placeholder="Enter your message..."
+                  />
+                </div>
+              </div>
+
+              <div className="p-4 sm:p-6 border-t border-gray-200 dark:border-gray-800 flex gap-3 justify-end">
+                <button
+                  onClick={handleCloseDmModal}
+                  disabled={sendingDm !== null}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSendDm}
+                  disabled={sendingDm !== null || !dmMessage.trim()}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {sendingDm !== null ? "Sending..." : "Send DM"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   );
 }
