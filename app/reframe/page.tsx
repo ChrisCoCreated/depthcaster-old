@@ -67,9 +67,11 @@ export default function ReframePage() {
             setCustomTitle(data.feed.headerConfig.customTitle || null);
           }
         }
-        // Extract header image
+        // Extract header image (can come from headerConfig or directly)
         if (data.headerImage) {
           setHeaderImage(data.headerImage);
+        } else if (data.feed?.headerConfig?.headerImage) {
+          setHeaderImage(data.feed.headerConfig.headerImage);
         }
         // Extract channel name from first cast if available
         if (data.channel) {
@@ -167,7 +169,7 @@ export default function ReframePage() {
             </div>
           )}
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-            {customTitle || (showChannelHeader && channelName ? `/${channelName}` : feedName || "Reframe")}
+            {customTitle ? customTitle : (showChannelHeader && channelName ? `/${channelName}` : feedName || "Reframe")}
           </h1>
           {feedDescription && (
             <p className="text-gray-600 dark:text-gray-400 mt-2">

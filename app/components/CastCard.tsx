@@ -805,6 +805,11 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
   const [isRecasted, setIsRecasted] = useState(cast.viewer_context?.recasted || false);
   const [likesCount, setLikesCount] = useState(cast.reactions?.likes_count || 0);
   const [recastsCount, setRecastsCount] = useState(cast.reactions?.recasts_count || 0);
+  
+  // Extract link URL for display mode button
+  const displayModeLinkUrl = displayMode?.replaceEmbeds && cast.embeds && cast.embeds.length > 0
+    ? ((cast.embeds[0] as any)?.url || cast.parent_url)
+    : null;
   const [isReacting, setIsReacting] = useState(false);
   const [isCurating, setIsCurating] = useState(false);
   const [isCurated, setIsCurated] = useState(false);
@@ -2144,30 +2149,8 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
             {/* Embeds */}
             {cast.embeds && cast.embeds.length > 0 && (() => {
               // Check if we should replace embeds with a custom button
+              // If so, skip rendering embeds (button will be shown in action buttons row)
               if (displayMode?.replaceEmbeds) {
-                // Extract the first URL from embeds or parent_url
-                const firstEmbed = cast.embeds[0];
-                // Check if embed has url property (not all embed types have it)
-                const embedUrl = (firstEmbed as any)?.url;
-                const linkUrl = embedUrl || cast.parent_url;
-                
-                if (linkUrl) {
-                  return (
-                    <div className="mb-3 flex justify-end">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (displayMode.embedButtonAction === "open-link") {
-                            window.open(linkUrl, '_blank', 'noopener,noreferrer');
-                          }
-                        }}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
-                      >
-                        {displayMode.embedButtonText || "Open Link"}
-                      </button>
-                    </div>
-                  );
-                }
                 return null;
               }
               
@@ -2932,6 +2915,20 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
 
               {/* Curate and Tag buttons - positioned on the right */}
               <div className="flex items-center gap-2 ml-auto">
+                {/* Display mode button (e.g., "Open Reframe") - positioned on the right */}
+                {displayMode?.replaceEmbeds && displayModeLinkUrl && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (displayMode.embedButtonAction === "open-link") {
+                        window.open(displayModeLinkUrl, '_blank', 'noopener,noreferrer');
+                      }
+                    }}
+                    className="px-2.5 py-1.5 text-xs sm:text-sm bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors"
+                  >
+                    {displayMode.embedButtonText || "Open Link"}
+                  </button>
+                )}
                 {user && (
                   <button
                     onClick={(e) => {
