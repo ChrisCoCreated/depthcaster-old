@@ -20,6 +20,7 @@ import { analytics } from "@/lib/analytics";
 import { hasActiveProSubscription } from "@/lib/castLimits";
 import { VideoPlayer } from "./VideoPlayer";
 import { CuratorBadge } from "./CuratorBadge";
+import { DisplayMode } from "@/lib/customFeeds";
 
 const CURATED_FEED_COLLAPSE_LINE_LIMIT = 8;
 
@@ -780,9 +781,10 @@ interface CastCardProps {
   disableClick?: boolean; // Disable click navigation (e.g., when in conversation view)
   rootCastHash?: string; // Root cast hash for the current page/view
   compressedView?: boolean; // Whether to show compressed view (collapsed text)
+  displayMode?: DisplayMode; // Custom display mode for embeds/links
 }
 
-export function CastCard({ cast, showThread = false, showTopReplies = true, onUpdate, feedType, curatorInfo, sortBy, isReply = false, disableClick = false, rootCastHash, compressedView = false }: CastCardProps) {
+export function CastCard({ cast, showThread = false, showTopReplies = true, onUpdate, feedType, curatorInfo, sortBy, isReply = false, disableClick = false, rootCastHash, compressedView = false, displayMode }: CastCardProps) {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showRecastMenu, setShowRecastMenu] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
@@ -2128,6 +2130,32 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
 
             {/* Embeds */}
             {cast.embeds && cast.embeds.length > 0 && (() => {
+              // Check if we should replace embeds with a custom button
+              if (displayMode?.replaceEmbeds) {
+                // Extract the first URL from embeds or parent_url
+                const firstEmbed = cast.embeds[0];
+                const linkUrl = firstEmbed?.url || cast.parent_url;
+                
+                if (linkUrl) {
+                  return (
+                    <div className="mb-3">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (displayMode.embedButtonAction === "open-link") {
+                            window.open(linkUrl, '_blank', 'noopener,noreferrer');
+                          }
+                        }}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+                      >
+                        {displayMode.embedButtonText || "Open Link"}
+                      </button>
+                    </div>
+                  );
+                }
+                return null;
+              }
+              
               const hideImages = shouldHideImages();
               
               // First pass: group embeds by type
