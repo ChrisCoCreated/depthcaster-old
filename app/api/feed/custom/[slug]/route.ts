@@ -3,7 +3,8 @@ import { neynarClient } from "@/lib/neynar";
 import { FetchFeedFeedTypeEnum, FetchFeedFilterTypeEnum } from "@neynar/nodejs-sdk/build/api";
 import { deduplicateRequest } from "@/lib/neynar-batch";
 import { enrichCastsWithViewerContext } from "@/lib/interactions";
-import { getFeedBySlug, resolveFeedFilters, type CustomFeed } from "@/lib/customFeeds";
+import { getFeedBySlug, type CustomFeed } from "@/lib/customFeeds";
+import { resolveFeedFilters } from "@/lib/customFeeds.server";
 
 export async function GET(
   request: NextRequest,

@@ -1,5 +1,3 @@
-import { neynarClient } from "./neynar";
-
 export type FeedType = "channel" | "user" | "fids" | "custom";
 
 export type FilterType = "authorFid" | "excludeRecasts" | "minLength" | "custom";
@@ -50,65 +48,7 @@ export interface CustomFeed {
   headerConfig?: HeaderConfig;
 }
 
-// Cache for resolved FIDs from usernames
-const usernameToFidCache = new Map<string, number>();
-
-async function resolveUsernameToFid(username: string): Promise<number | null> {
-  // Remove @ if present
-  const cleanUsername = username.replace(/^@/, "");
-  
-  // Check cache first
-  if (usernameToFidCache.has(cleanUsername)) {
-    return usernameToFidCache.get(cleanUsername)!;
-  }
-
-  try {
-    const searchResult = await neynarClient.searchUser({
-      q: cleanUsername,
-      limit: 1,
-    });
-    const foundUser = searchResult.result?.users?.[0];
-    if (foundUser) {
-      usernameToFidCache.set(cleanUsername, foundUser.fid);
-      return foundUser.fid;
-    }
-  } catch (error) {
-    console.error(`Failed to resolve username ${username} to FID:`, error);
-  }
-  
-  return null;
-}
-
-// Resolve any username-based filters to FIDs
-export async function resolveFeedFilters(feed: CustomFeed): Promise<CustomFeed> {
-  const resolvedFeed = { ...feed };
-  
-  if (resolvedFeed.filters) {
-    for (const filter of resolvedFeed.filters) {
-      if (filter.type === "authorFid" && typeof filter.value === "string" && filter.value.startsWith("@")) {
-        const fid = await resolveUsernameToFid(filter.value);
-        if (fid) {
-          filter.value = fid;
-        }
-      }
-    }
-  }
-  
-  // Also resolve username in UserFeedConfig
-  if (resolvedFeed.feedType === "user") {
-    const userConfig = resolvedFeed.feedConfig as UserFeedConfig;
-    const fid = await resolveUsernameToFid(userConfig.username);
-    if (fid) {
-      // Convert to fids feed type for easier handling
-      resolvedFeed.feedType = "fids";
-      resolvedFeed.feedConfig = { fids: [fid] } as FidsFeedConfig;
-    }
-  }
-  
-  return resolvedFeed;
-}
-
-// Custom feed configurations
+// Custom feed configurations (client-safe, no server-side code)
 export const customFeeds: CustomFeed[] = [
   {
     slug: "reframe",
@@ -121,7 +61,7 @@ export const customFeeds: CustomFeed[] = [
     filters: [
       {
         type: "authorFid",
-        value: "@christin", // Will be resolved to FID at runtime
+        value: "@christin", // Will be resolved to FID at runtime on server
       },
     ],
     displayMode: {
@@ -135,8 +75,7 @@ export const customFeeds: CustomFeed[] = [
   },
 ];
 
-// Get feed by slug
+// Get feed by slug (client-safe, just reads from array)
 export function getFeedBySlug(slug: string): CustomFeed | undefined {
   return customFeeds.find((feed) => feed.slug === slug);
 }
-
