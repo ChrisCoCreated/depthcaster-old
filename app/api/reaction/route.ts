@@ -103,11 +103,7 @@ export async function POST(request: NextRequest) {
       target: target,
       reactionType: reactionType,
       userFid: userFid,
-      reactionResult: {
-        hash: reaction.hash,
-        reactionType: reaction.reaction_type,
-        target: reaction.target,
-      },
+      reactionResult: reaction ? JSON.parse(JSON.stringify(reaction)) : null,
       isFrom1500Feed: isFrom1500Feed,
     });
 
@@ -314,7 +310,7 @@ export async function DELETE(request: NextRequest) {
       target: target,
       reactionType: reactionType,
       userFid: userFid,
-      reactionResult: reaction,
+      reactionResult: reaction ? JSON.parse(JSON.stringify(reaction)) : null,
       isFrom1500Feed: isFrom1500Feed,
     });
 
