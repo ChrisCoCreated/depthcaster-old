@@ -12,7 +12,8 @@
     "migrate-0008": "tsx scripts/run-migration-0008.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "test:signin-log": "tsx scripts/test-signin-log.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",

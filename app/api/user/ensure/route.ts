@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { upsertUser, getUser } from "@/lib/users";
 import { syncUserReactions } from "@/lib/reactions";
 import { neynarClient } from "@/lib/neynar";
+import { logSignIn } from "@/lib/signInLogs";
 
 export async function POST(request: NextRequest) {
+  let body: any = {};
   try {
-    const body = await request.json();
+    body = await request.json();
     const { fid, signer_uuid } = body;
 
     if (!fid || typeof fid !== "number") {
@@ -57,13 +59,39 @@ export async function POST(request: NextRequest) {
     const storedSignerInDb = finalUser?.signerUuid;
     const signersMatch = storedSignerInDb === signer_uuid;
 
-    return NextResponse.json({ 
+    const responseData = {
       success: true,
-      signer_uuid: effectiveSignerUuid, // Return the effective signer UUID the app should use
-      signers_match: signersMatch, // Indicate if stored signer matches the one from login
+      signer_uuid: effectiveSignerUuid,
+      signers_match: signersMatch,
+    };
+
+    // Log the sign-in event with request and response data
+    logSignIn({
+      userFid: fid,
+      requestData: { fid, signer_uuid },
+      responseData,
+      signerUuid: effectiveSignerUuid || undefined,
+      success: true,
+    }).catch((error) => {
+      console.error(`[User Ensure] Error logging sign-in event for user ${fid}:`, error);
     });
+
+    return NextResponse.json(responseData);
   } catch (error: any) {
     console.error("Error ensuring user exists:", error);
+    
+    // Log the failed sign-in attempt
+    logSignIn({
+      userFid: body.fid,
+      requestData: body,
+      responseData: null,
+      signerUuid: body.signer_uuid,
+      success: false,
+      error: error.message || "Failed to ensure user exists",
+    }).catch((logError) => {
+      console.error("Error logging failed sign-in event:", logError);
+    });
+
     return NextResponse.json(
       { error: error.message || "Failed to ensure user exists" },
       { status: 500 }

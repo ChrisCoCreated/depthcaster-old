@@ -111,10 +111,12 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch Neynar notifications only if:
+    // 0. ENABLE_NEYNAR_NOTIFICATIONS environment variable is set (defaults to disabled)
     // 1. User has plus role
     // 2. User has selected Neynar notification types
     // 3. We haven't reached the max of 100 Neynar notifications
-    const shouldFetchNeynar = hasPlus && hasNeynarTypesSelected && neynarCountLoaded < MAX_NEYNAR_NOTIFICATIONS;
+    const neynarNotificationsEnabled = process.env.ENABLE_NEYNAR_NOTIFICATIONS === "true" || process.env.ENABLE_NEYNAR_NOTIFICATIONS === "1";
+    const shouldFetchNeynar = neynarNotificationsEnabled && hasPlus && hasNeynarTypesSelected && neynarCountLoaded < MAX_NEYNAR_NOTIFICATIONS;
     const neynarNotifications = shouldFetchNeynar
       ? await deduplicateRequest(cacheKey, async () => {
           // Calculate how many more we can fetch (don't exceed 100 total)

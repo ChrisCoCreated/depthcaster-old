@@ -19,6 +19,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           onAuthSuccess: async (data) => {
             // This callback is triggered when user successfully authenticates
             // The UserInitializer component will handle the signer reconciliation flow
+            
+            // Log the sign-in event
+            try {
+              await fetch("/api/auth/log-signin", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  userFid: data.fid,
+                  requestData: null, // Request data is handled by Neynar SDK
+                  responseData: data,
+                  signerUuid: data.signer_uuid,
+                  success: true,
+                }),
+              });
+            } catch (error) {
+              console.error("Failed to log sign-in event:", error);
+            }
           },
           onSignout: () => {
             // Handle signout if needed

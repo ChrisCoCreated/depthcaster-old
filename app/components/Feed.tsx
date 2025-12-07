@@ -1912,7 +1912,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
               Please sign in to access this feed.
             </p>
             <div className="flex justify-center [&_button]:cursor-pointer">
-              <NeynarAuthButton />
+              <NeynarAuthButton label="Sign in" icon={null} />
             </div>
           </div>
         </div>

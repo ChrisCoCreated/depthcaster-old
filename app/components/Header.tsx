@@ -816,7 +816,7 @@ export function Header() {
                 </div>
               </>
             ) : (
-              !isMiniapp && <NeynarAuthButton />
+              !isMiniapp && <NeynarAuthButton label="Sign in" icon={null} />
             )}
           </div>
         </div>

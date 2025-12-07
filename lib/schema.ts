@@ -410,6 +410,21 @@ export const qualityFeedback = pgTable("quality_feedback", {
   castHashCreatedAtIdx: index("quality_feedback_cast_hash_created_at_idx").on(table.castHash, table.createdAt),
 }));
 
+export const signInLogs = pgTable("sign_in_logs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userFid: bigint("user_fid", { mode: "number" }).references(() => users.fid),
+  requestData: jsonb("request_data"), // Data sent during sign-in
+  responseData: jsonb("response_data"), // Data received from Neynar
+  signerUuid: text("signer_uuid"), // The signer UUID from the response
+  success: boolean("success").notNull(), // Whether sign-in was successful
+  error: text("error"), // Error message if failed
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  userFidIdx: index("sign_in_logs_user_fid_idx").on(table.userFid),
+  createdAtIdx: index("sign_in_logs_created_at_idx").on(table.createdAt),
+  userFidCreatedAtIdx: index("sign_in_logs_user_fid_created_at_idx").on(table.userFid, table.createdAt),
+}));
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type CuratorPack = typeof curatorPacks.$inferSelect;
@@ -462,4 +477,6 @@ export type MiniappInstallation = typeof miniappInstallations.$inferSelect;
 export type NewMiniappInstallation = typeof miniappInstallations.$inferInsert;
 export type QualityFeedback = typeof qualityFeedback.$inferSelect;
 export type NewQualityFeedback = typeof qualityFeedback.$inferInsert;
+export type SignInLog = typeof signInLogs.$inferSelect;
+export type NewSignInLog = typeof signInLogs.$inferInsert;
 

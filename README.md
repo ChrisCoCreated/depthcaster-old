@@ -33,6 +33,7 @@ A Long from farcaster client focused on deep thoughts, philosophy, art, and mean
    NEXT_PUBLIC_APP_URL=http://localhost:3000
    POSTGRES_URL=your_postgres_url_here
    DEEPSEEK_API_KEY=your_deepseek_api_key_here
+   ENABLE_NEYNAR_NOTIFICATIONS=true
    ```
 
    Get your API keys from:
@@ -42,6 +43,8 @@ A Long from farcaster client focused on deep thoughts, philosophy, art, and mean
    For local development, you can use a local PostgreSQL database or a service like [Neon](https://neon.tech) or [Supabase](https://supabase.com)
    
    **Note:** The `DEEPSEEK_API_KEY` is optional. If not provided, quality analysis will be skipped. Quality analysis provides AI-powered quality scores (0-100) and topic categorization for casts and replies.
+   
+   **Note:** `ENABLE_NEYNAR_NOTIFICATIONS` is optional and defaults to disabled. Set to `"true"` or `"1"` to enable fetching Neynar notifications (follows, likes, recasts, mentions, replies, quotes). When disabled, only database-stored notifications (curated casts, app updates) will be shown.
 
 3. **Set up the database**:
    ```bash
@@ -151,6 +154,7 @@ The app uses Neynar's notification API efficiently with on-demand fetching:
    - `NEXT_PUBLIC_APP_URL` - Your Vercel deployment URL (e.g., `https://depthcaster.vercel.app`)
    - `POSTGRES_URL` - Automatically set by Vercel Postgres
    - `DEEPSEEK_API_KEY` - Your DeepSeek API key (optional, for quality analysis)
+   - `ENABLE_NEYNAR_NOTIFICATIONS` - Set to `"true"` or `"1"` to enable Neynar notifications (optional, defaults to disabled)
 
 5. **Initialize the Database**:
    After deployment, run the database setup:

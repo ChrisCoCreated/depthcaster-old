@@ -59,10 +59,14 @@ export function buildMiniappNotificationPayload(
   }
   
   // Truncate title to 32 characters (Neynar limit)
-  const truncatedTitle = title.trim().length > 32 ? title.trim().substring(0, 32) + "..." : title.trim();
+  // Truncate to 29 chars before adding "..." to ensure total is exactly 32
+  const trimmedTitle = title.trim();
+  const truncatedTitle = trimmedTitle.length > 32 ? trimmedTitle.substring(0, 29) + "..." : trimmedTitle;
   
   // Truncate body to 128 characters (Neynar limit)
-  const truncatedBody = body.trim().length > 128 ? body.trim().substring(0, 128) + "..." : body.trim();
+  // Truncate to 125 chars before adding "..." to ensure total is exactly 128
+  const trimmedBody = body.trim();
+  const truncatedBody = trimmedBody.length > 128 ? trimmedBody.substring(0, 125) + "..." : trimmedBody;
   
   return {
     target_fids: targetFidsArray,
@@ -176,16 +180,16 @@ export async function notifyAllMiniappUsersAboutNewCuratedCast(
   // Use miniapp URL to direct users to the feed
   const targetUrl = `${appUrl}/miniapp`;
 
-  // Extract cast preview text (truncate to 128 chars to match notification body limit)
+  // Extract cast text (truncation will be handled by buildMiniappNotificationPayload)
   const castText = (castData?.text || "").trim();
-  const previewText = castText.length > 128 ? castText.substring(0, 128) + "..." : castText;
   
   // Extract author name
   const authorName = castData?.author?.display_name || castData?.author?.username || "Someone";
 
   const title = "New curated cast";
-  // Ensure body always has content - use preview text if available, otherwise fallback
-  const body = previewText || `${authorName} curated a cast`;
+  // Ensure body always has content - use cast text if available, otherwise fallback
+  // buildMiniappNotificationPayload will handle truncation to 128 chars
+  const body = castText || `${authorName} curated a cast`;
 
   // Pass empty array to send to all users with notifications enabled for the app
   // Neynar will automatically filter to only users who have the miniapp installed
