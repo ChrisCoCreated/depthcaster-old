@@ -902,22 +902,26 @@ export async function GET(request: NextRequest) {
         const hasMoreResults = paginatedRows.length > limit;
         
         // Build cast objects directly from query data (no additional API calls needed)
-        const minimalCasts = rowsToFetch.map((row: any) => {
-          const timestamp = row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString();
-          
-          // Construct cast object directly from query data
-          return {
-            hash: row.hash, // Use actual hash from query
-            text: row.text || "",
-            timestamp,
-            author: {
-              fid: row.fid,
-              username: row.fname || `user${row.fid}`,
-              display_name: row.display_name || null,
-              pfp_url: row.pfp || null,
-            },
-          };
-        });
+        // Filter out invalid rows and ensure FID is a number
+        const minimalCasts = rowsToFetch
+          .filter((row: any) => row.hash && row.fid) // Filter invalid rows
+          .map((row: any) => {
+            const timestamp = row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString();
+            const fid = Number(row.fid); // Ensure FID is a number
+            
+            // Construct cast object directly from query data
+            return {
+              hash: row.hash, // Use actual hash from query
+              text: row.text || "",
+              timestamp,
+              author: {
+                fid: fid, // Ensure it's a number, not a string
+                username: row.fname || `user${fid}`,
+                display_name: row.display_name || null,
+                pfp_url: row.pfp || null,
+              },
+            };
+          });
         
         // If viewer is logged in, check which casts they curated and fetch full data for those only
         if (viewerFid) {
