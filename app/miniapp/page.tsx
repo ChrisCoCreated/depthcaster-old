@@ -121,6 +121,22 @@ function MiniappContent() {
 
     if (hashToOpen) {
       hasAutoOpenedRef.current = true;
+      
+      // Log notification click to backend
+      if (context?.user?.fid) {
+        fetch("/api/miniapp/notification-click", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            castHash: hashToOpen,
+            userFid: context.user.fid,
+          }),
+        }).catch((err) => {
+          console.error("Error logging notification click:", err);
+          // Don't block opening the cast if logging fails
+        });
+      }
+      
       // Open the cast in conversation view
       const url = `${appUrl}/conversation/${hashToOpen}`;
       actions.openUrl(url).catch((err) => {
