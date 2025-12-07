@@ -127,6 +127,38 @@ export function FeedbackModal({ isOpen, onClose, isAdmin = false }: FeedbackModa
     }
   }, [showUserDropdown]);
 
+  // Manage the "Feedback recorded by" note prefix when user selection changes
+  useEffect(() => {
+    if (!isAdmin || !user) return;
+
+    const adminName = user.display_name || user.username || `FID ${user.fid}`;
+    const recordedByNote = `Feedback recorded by ${adminName}\n\n`;
+
+    if (selectedUser) {
+      // Add note if user is selected and note is not already present
+      setFormData(prev => {
+        if (prev.description.startsWith(recordedByNote)) {
+          return prev; // Already has the note
+        }
+        return {
+          ...prev,
+          description: recordedByNote + prev.description
+        };
+      });
+    } else {
+      // Remove note when user selection is cleared
+      setFormData(prev => {
+        if (prev.description.startsWith(recordedByNote)) {
+          return {
+            ...prev,
+            description: prev.description.substring(recordedByNote.length)
+          };
+        }
+        return prev;
+      });
+    }
+  }, [selectedUser?.fid, isAdmin, user?.fid, user?.display_name, user?.username]);
+
   if (!isOpen) return null;
 
   const handleSelectUser = (selected: UserSuggestion) => {
@@ -161,6 +193,14 @@ export function FeedbackModal({ isOpen, onClose, isAdmin = false }: FeedbackModa
     // For admins, use selected user's FID if provided, otherwise use current user's FID
     const userFidToUse = isAdmin && selectedUser ? selectedUser.fid : user.fid;
 
+    // If admin is submitting on behalf of another user, prepend note to description
+    let descriptionToSubmit = formData.description || "";
+    if (isAdmin && selectedUser && user) {
+      const adminName = user.display_name || user.username || `FID ${user.fid}`;
+      const recordedByNote = `Feedback recorded by ${adminName}\n\n`;
+      descriptionToSubmit = recordedByNote + descriptionToSubmit;
+    }
+
     try {
       setIsSubmitting(true);
       setError(null);
@@ -170,7 +210,7 @@ export function FeedbackModal({ isOpen, onClose, isAdmin = false }: FeedbackModa
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: formData.title,
-          description: formData.description || null,
+          description: descriptionToSubmit || null,
           castHash: formData.castHash.trim() || null,
           type: "feedback",
           feedbackType: formData.feedbackType,
