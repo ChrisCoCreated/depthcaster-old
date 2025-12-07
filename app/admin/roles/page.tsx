@@ -582,7 +582,18 @@ export default function AdminRolesPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              {users.map((userWithRoles) => (
+              {(() => {
+                // Sort users so lastCuratorAssigned appears first
+                const sortedUsers = [...users];
+                if (lastCuratorAssigned) {
+                  const curatorIndex = sortedUsers.findIndex(u => u.fid === lastCuratorAssigned);
+                  if (curatorIndex > 0) {
+                    const [curatorUser] = sortedUsers.splice(curatorIndex, 1);
+                    sortedUsers.unshift(curatorUser);
+                  }
+                }
+                return sortedUsers;
+              })().map((userWithRoles) => (
                 <div
                   key={userWithRoles.fid}
                   className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 sm:p-5 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
@@ -669,6 +680,20 @@ export default function AdminRolesPage() {
                               : `+ ${role}`}
                           </button>
                         ))}
+                        {userWithRoles.roles.includes("curator") && (
+                          <button
+                            onClick={() => handleSendDm(userWithRoles.fid)}
+                            disabled={sendingDm === userWithRoles.fid}
+                            className={`px-3 py-1.5 sm:py-1 text-xs rounded-lg transition-colors min-h-[32px] touch-manipulation ${
+                              lastCuratorAssigned === userWithRoles.fid
+                                ? "bg-blue-600 text-white hover:bg-blue-700 font-medium"
+                                : "bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200 border border-blue-300 dark:border-blue-700 hover:bg-blue-200 dark:hover:bg-blue-900/30"
+                            } disabled:opacity-50 disabled:cursor-not-allowed`}
+                            title="Send welcome DM"
+                          >
+                            {sendingDm === userWithRoles.fid ? "Sending..." : "Share DM"}
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>

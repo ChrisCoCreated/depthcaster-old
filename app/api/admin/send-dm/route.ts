@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { users, userRoles } from "@/lib/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, asc } from "drizzle-orm";
 import { isAdmin, getUserRoles } from "@/lib/roles";
 import { randomUUID } from "crypto";
 
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
       })
       .from(userRoles)
       .where(eq(userRoles.role, "superadmin"))
-      .orderBy(userRoles.createdAt, userRoles.userFid);
+      .orderBy(asc(userRoles.createdAt), asc(userRoles.userFid));
 
     if (superadminRoles.length === 0) {
       return NextResponse.json(
