@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Default message if not provided
-    const defaultMessage = `Great that you're up for it! Here's the app, currently in private beta.
+    const defaultMessage = `Here's the app, currently in private beta.
 
 www.depthcaster.com
 
@@ -80,9 +80,9 @@ I've given you Curator role - guide here: www.depthcaster.com/curators
 
 I'd love any feedback, here, GC or by clicking the ? icon in the app header.
 
-And here is the group chat
+here is the group chat: https://farcaster.xyz/~/group/GpluEgXNiXtpW1XAO8ct5A
 
-https://farcaster.xyz/~/group/GpluEgXNiXtpW1XAO8ct5A
+and lastly I recommend adding the mini-app so you get notifications over in Farcaster: https://farcaster.xyz/miniapps/HtUwgAw4iQ2x/depthcaster
 
 thanks and looking forward to what you curate!`;
 
