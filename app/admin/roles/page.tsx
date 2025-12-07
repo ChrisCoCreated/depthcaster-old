@@ -33,6 +33,8 @@ export default function AdminRolesPage() {
   const [searchResults, setSearchResults] = useState<Array<{ fid: number; username: string; display_name: string; pfp_url?: string }>>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showAddUserSection, setShowAddUserSection] = useState(false);
+  const [lastCuratorAssigned, setLastCuratorAssigned] = useState<number | null>(null);
+  const [sendingDm, setSendingDm] = useState<number | null>(null);
 
   useEffect(() => {
     const checkAdminAccess = async () => {
@@ -98,6 +100,13 @@ export default function AdminRolesPage() {
     }
   }, [searchQuery, isAdmin, user?.fid]);
 
+  // Clear lastCuratorAssigned when search query changes
+  useEffect(() => {
+    if (searchQuery) {
+      setLastCuratorAssigned(null);
+    }
+  }, [searchQuery]);
+
   const handleAddRole = async (userFid: number, role: ValidRole) => {
     if (!user?.fid) return;
     
@@ -121,6 +130,10 @@ export default function AdminRolesPage() {
       
       if (response.ok) {
         setMessage({ type: "success", text: data.message || `Role "${role}" added successfully` });
+        // Track when curator role is assigned
+        if (role === "curator") {
+          setLastCuratorAssigned(userFid);
+        }
         loadUsers();
       } else {
         setMessage({ type: "error", text: data.error || "Failed to add role" });
@@ -264,6 +277,10 @@ export default function AdminRolesPage() {
       
       if (response.ok) {
         setMessage({ type: "success", text: data.message || `Role "${role}" added successfully` });
+        // Track when curator role is assigned
+        if (role === "curator") {
+          setLastCuratorAssigned(userFid);
+        }
         setAddUserQuery("");
         setSearchResults([]);
         loadUsers();
@@ -292,6 +309,39 @@ export default function AdminRolesPage() {
         return "bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700";
       default:
         return "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-700";
+    }
+  };
+
+  const handleSendDm = async (recipientFid: number) => {
+    if (!user?.fid) return;
+    
+    setSendingDm(recipientFid);
+    setMessage(null);
+    
+    try {
+      const response = await fetch("/api/admin/send-dm", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          adminFid: user.fid,
+          recipientFid,
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        setMessage({ type: "success", text: "DM sent successfully!" });
+      } else {
+        setMessage({ type: "error", text: data.error || "Failed to send DM" });
+      }
+    } catch (error: any) {
+      console.error("Failed to send DM:", error);
+      setMessage({ type: "error", text: error.message || "Failed to send DM" });
+    } finally {
+      setSendingDm(null);
     }
   };
 
