@@ -12,25 +12,32 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { signerUuid, reactionType, target, targetAuthorFid } = body;
 
-    // Enhanced logging for debugging
+    // Log incoming request
     console.log("[Reaction API] POST request received:", {
-      hasSignerUuid: !!signerUuid,
+      signerUuid: signerUuid ? `${signerUuid.substring(0, 8)}...` : null,
       reactionType,
-      target: target ? `${target.substring(0, 20)}...` : null,
+      target,
+      targetAuthorFid,
+      hasSignerUuid: !!signerUuid,
+      hasReactionType: !!reactionType,
+      hasTarget: !!target,
+      hasTargetAuthorFid: !!targetAuthorFid,
       targetType: typeof target,
       targetLength: target?.length,
-      targetAuthorFid,
-      targetAuthorFidType: typeof targetAuthorFid,
-      targetAuthorFidIsNumber: typeof targetAuthorFid === 'number',
-      targetAuthorFidIsNaN: typeof targetAuthorFid === 'number' ? isNaN(targetAuthorFid) : 'N/A',
+      targetStartsWithQuery: target?.startsWith?.("query-"),
     });
 
     if (!signerUuid || !reactionType || !target) {
+      const missingFields = [];
+      if (!signerUuid) missingFields.push("signerUuid");
+      if (!reactionType) missingFields.push("reactionType");
+      if (!target) missingFields.push("target");
+      
       console.error("[Reaction API] Missing required fields:", {
-        hasSignerUuid: !!signerUuid,
-        hasReactionType: !!reactionType,
-        hasTarget: !!target,
+        missingFields,
+        receivedBody: body,
       });
+      
       return NextResponse.json(
         { error: "signerUuid, reactionType, and target are required" },
         { status: 400 }
@@ -40,27 +47,41 @@ export async function POST(request: NextRequest) {
     // Get user FID from signer
     let userFid: number | undefined;
     try {
+      console.log("[Reaction API] Looking up signer:", { signerUuid: `${signerUuid.substring(0, 8)}...` });
       const signer = await neynarClient.lookupSigner({ signerUuid });
       userFid = signer.fid;
-    } catch (error) {
-      console.error("Error fetching signer:", error);
+      console.log("[Reaction API] Signer lookup successful:", { userFid, signerFid: signer.fid });
+    } catch (error: any) {
+      console.error("[Reaction API] Error fetching signer:", {
+        error: error.message,
+        signerUuid: `${signerUuid.substring(0, 8)}...`,
+        errorDetails: error.response?.data || error.response || error,
+      });
     }
 
-    // Log the exact parameters being sent to Neynar
-    const neynarParams = {
-      signerUuid,
+    // Log parameters being sent to Neynar
+    const publishParams = {
+      signerUuid: `${signerUuid.substring(0, 8)}...`,
       reactionType: reactionType as ReactionType,
       target,
       targetAuthorFid,
     };
-    console.log("[Reaction API] Calling neynarClient.publishReaction with:", {
-      ...neynarParams,
-      target: target ? `${target.substring(0, 20)}...` : null,
-      targetAuthorFid,
+    console.log("[Reaction API] Calling publishReaction with params:", {
+      ...publishParams,
+      targetLength: target?.length,
+      targetIsValidHash: target?.match?.(/^0x[a-fA-F0-9]{64}$/) ? true : false,
       targetAuthorFidType: typeof targetAuthorFid,
+      targetAuthorFidValue: targetAuthorFid,
     });
 
-    const reaction = await neynarClient.publishReaction(neynarParams);
+    const reaction = await neynarClient.publishReaction({
+      signerUuid,
+      reactionType: reactionType as ReactionType,
+      target,
+      targetAuthorFid,
+    });
+    
+    console.log("[Reaction API] publishReaction successful:", { reaction: reaction?.hash || "no hash" });
 
     // Track interaction if this is a reaction to a curated cast thread
     if (target && userFid) {
@@ -159,24 +180,32 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log("[Reaction API] Successfully published reaction");
     return NextResponse.json({ success: true, reaction });
   } catch (error: any) {
-    console.error("[Reaction API] Error details:", {
+    console.error("[Reaction API] POST error:", {
       message: error.message,
-      status: error.status,
       code: error.code,
-      response: error.response?.data ? JSON.stringify(error.response.data).substring(0, 500) : null,
+      status: error.status,
+      response: error.response?.data || error.response || null,
+      responseStatus: error.response?.status,
+      responseHeaders: error.response?.headers,
       config: error.config ? {
-        url: error.config.url,
         method: error.config.method,
-        data: error.config.data ? JSON.stringify(error.config.data).substring(0, 500) : null,
+        url: error.config.url,
+        data: error.config.data,
       } : null,
+      stack: error.stack,
     });
-    console.error("[Reaction API] Full error:", error);
+    
+    // If it's a 400 error, return 400 status
+    const statusCode = error.status === 400 || error.response?.status === 400 ? 400 : 500;
+    
     return NextResponse.json(
-      { error: error.message || "Failed to publish reaction" },
-      { status: 500 }
+      { 
+        error: error.message || "Failed to publish reaction",
+        details: error.response?.data || null,
+      },
+      { status: statusCode }
     );
   }
 }
@@ -186,7 +215,32 @@ export async function DELETE(request: NextRequest) {
     const body = await request.json();
     const { signerUuid, reactionType, target, targetAuthorFid } = body;
 
+    // Log incoming request
+    console.log("[Reaction API] DELETE request received:", {
+      signerUuid: signerUuid ? `${signerUuid.substring(0, 8)}...` : null,
+      reactionType,
+      target,
+      targetAuthorFid,
+      hasSignerUuid: !!signerUuid,
+      hasReactionType: !!reactionType,
+      hasTarget: !!target,
+      hasTargetAuthorFid: !!targetAuthorFid,
+      targetType: typeof target,
+      targetLength: target?.length,
+      targetStartsWithQuery: target?.startsWith?.("query-"),
+    });
+
     if (!signerUuid || !reactionType || !target) {
+      const missingFields = [];
+      if (!signerUuid) missingFields.push("signerUuid");
+      if (!reactionType) missingFields.push("reactionType");
+      if (!target) missingFields.push("target");
+      
+      console.error("[Reaction API] Missing required fields:", {
+        missingFields,
+        receivedBody: body,
+      });
+      
       return NextResponse.json(
         { error: "signerUuid, reactionType, and target are required" },
         { status: 400 }
@@ -196,11 +250,32 @@ export async function DELETE(request: NextRequest) {
     // Get user FID from signer
     let userFid: number | undefined;
     try {
+      console.log("[Reaction API] Looking up signer:", { signerUuid: `${signerUuid.substring(0, 8)}...` });
       const signer = await neynarClient.lookupSigner({ signerUuid });
       userFid = signer.fid;
-    } catch (error) {
-      console.error("Error fetching signer:", error);
+      console.log("[Reaction API] Signer lookup successful:", { userFid, signerFid: signer.fid });
+    } catch (error: any) {
+      console.error("[Reaction API] Error fetching signer:", {
+        error: error.message,
+        signerUuid: `${signerUuid.substring(0, 8)}...`,
+        errorDetails: error.response?.data || error.response || error,
+      });
     }
+
+    // Log parameters being sent to Neynar
+    const deleteParams = {
+      signerUuid: `${signerUuid.substring(0, 8)}...`,
+      reactionType: reactionType as ReactionType,
+      target,
+      targetAuthorFid,
+    };
+    console.log("[Reaction API] Calling deleteReaction with params:", {
+      ...deleteParams,
+      targetLength: target?.length,
+      targetIsValidHash: target?.match?.(/^0x[a-fA-F0-9]{64}$/) ? true : false,
+      targetAuthorFidType: typeof targetAuthorFid,
+      targetAuthorFidValue: targetAuthorFid,
+    });
 
     const reaction = await neynarClient.deleteReaction({
       signerUuid,
@@ -208,6 +283,8 @@ export async function DELETE(request: NextRequest) {
       target,
       targetAuthorFid,
     });
+    
+    console.log("[Reaction API] deleteReaction successful:", { reaction: reaction?.hash || "no hash" });
 
     // Remove interaction from database if this is a reaction to a curated cast thread
     if (target && userFid) {
@@ -288,10 +365,30 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true, reaction });
   } catch (error: any) {
-    console.error("Delete reaction API error:", error);
+    console.error("[Reaction API] DELETE error:", {
+      message: error.message,
+      code: error.code,
+      status: error.status,
+      response: error.response?.data || error.response || null,
+      responseStatus: error.response?.status,
+      responseHeaders: error.response?.headers,
+      config: error.config ? {
+        method: error.config.method,
+        url: error.config.url,
+        data: error.config.data,
+      } : null,
+      stack: error.stack,
+    });
+    
+    // If it's a 400 error, return 400 status
+    const statusCode = error.status === 400 || error.response?.status === 400 ? 400 : 500;
+    
     return NextResponse.json(
-      { error: error.message || "Failed to delete reaction" },
-      { status: 500 }
+      { 
+        error: error.message || "Failed to delete reaction",
+        details: error.response?.data || null,
+      },
+      { status: statusCode }
     );
   }
 }

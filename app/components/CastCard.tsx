@@ -1344,29 +1344,34 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
       return;
     }
 
+    // Log cast data before making request
+    console.log("[CastCard] handleLike called:", {
+      castHash: cast.hash,
+      castHashType: typeof cast.hash,
+      castHashLength: cast.hash?.length,
+      castHashStartsWithQuery: cast.hash?.startsWith?.("query-"),
+      castHashIsValid: cast.hash?.match?.(/^0x[a-fA-F0-9]{64}$/) ? true : false,
+      authorFid: cast.author?.fid,
+      authorFidType: typeof cast.author?.fid,
+      hasAuthor: !!cast.author,
+      hasAuthorFid: !!cast.author?.fid,
+      feedType,
+      isLiked,
+      likesCount,
+      userSignerUuid: user.signer_uuid ? `${user.signer_uuid.substring(0, 8)}...` : null,
+      hasSignerUuid: !!user.signer_uuid,
+    });
+
     try {
       setIsReacting(true);
       const wasLiked = isLiked;
       const newLikesCount = wasLiked ? likesCount - 1 : likesCount + 1;
       
-      // Enhanced logging for debugging
-      console.log("[CastCard] handleLike called:", {
-        castHash: cast.hash,
-        castHashType: typeof cast.hash,
-        castHashLength: cast.hash?.length,
-        authorFid: cast.author?.fid,
-        authorFidType: typeof cast.author?.fid,
-        authorFidIsNumber: typeof cast.author?.fid === 'number',
-        hasAuthor: !!cast.author,
-        feedType,
-        wasLiked,
-      });
-      
       // Optimistic update
       setIsLiked(!wasLiked);
       setLikesCount(newLikesCount);
 
-      const requestBody = {
+      const requestPayload = {
         signerUuid: user.signer_uuid,
         reactionType: "like",
         target: cast.hash,
@@ -1374,10 +1379,13 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
       };
       
       console.log("[CastCard] Sending reaction request:", {
-        ...requestBody,
-        target: cast.hash ? `${cast.hash.substring(0, 20)}...` : null,
-        targetAuthorFid: cast.author?.fid,
-        targetAuthorFidType: typeof cast.author?.fid,
+        method: wasLiked ? "DELETE" : "POST",
+        payload: {
+          ...requestPayload,
+          signerUuid: requestPayload.signerUuid ? `${requestPayload.signerUuid.substring(0, 8)}...` : null,
+        },
+        targetHash: cast.hash,
+        targetAuthorFid: cast.author.fid,
       });
 
       const response = await fetch("/api/reaction", {
@@ -1385,14 +1393,38 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify(requestPayload),
+      });
+
+      console.log("[CastCard] Reaction response received:", {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText,
       });
 
       if (!response.ok) {
         // Revert optimistic update on error
         setIsLiked(wasLiked);
         setLikesCount(likesCount);
-        const errorData = await response.json();
+        
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (e) {
+          const text = await response.text();
+          errorData = { error: text || `HTTP ${response.status}` };
+        }
+        
+        console.error("[CastCard] Reaction request failed:", {
+          status: response.status,
+          statusText: response.statusText,
+          errorData,
+          requestPayload: {
+            ...requestPayload,
+            signerUuid: requestPayload.signerUuid ? `${requestPayload.signerUuid.substring(0, 8)}...` : null,
+          },
+        });
+        
         throw new Error(errorData.error || "Failed to toggle like");
       }
 
@@ -1402,8 +1434,21 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
       } else {
         analytics.trackCastLike(cast.hash, cast.author.fid, feedType);
       }
+      
+      console.log("[CastCard] Like successful:", {
+        castHash: cast.hash,
+        wasLiked,
+        newState: !wasLiked,
+      });
     } catch (error: any) {
-      console.error("Like error:", error);
+      console.error("[CastCard] Like error:", {
+        message: error.message,
+        error: error,
+        castHash: cast.hash,
+        authorFid: cast.author?.fid,
+        feedType,
+        stack: error.stack,
+      });
       alert(error.message || "Failed to toggle like");
     } finally {
       setIsReacting(false);

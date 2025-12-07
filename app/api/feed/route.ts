@@ -902,53 +902,22 @@ export async function GET(request: NextRequest) {
         const hasMoreResults = paginatedRows.length > limit;
         
         // Build cast objects directly from query data (no additional API calls needed)
-        // Filter out invalid rows and ensure FID is a number
-        const minimalCasts = rowsToFetch
-          .filter((row: any) => {
-            const isValid = row.hash && row.fid;
-            if (!isValid) {
-              console.log("[1500+ Feed] Filtering out invalid row:", {
-                hasHash: !!row.hash,
-                hash: row.hash ? `${row.hash.substring(0, 20)}...` : null,
-                hasFid: !!row.fid,
-                fid: row.fid,
-                fidType: typeof row.fid,
-              });
-            }
-            return isValid;
-          })
-          .map((row: any) => {
-            const timestamp = row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString();
-            const fid = Number(row.fid); // Ensure FID is a number
-            
-            // Log first few casts for debugging
-            if (minimalCasts.length < 3) {
-              console.log("[1500+ Feed] Constructing cast object:", {
-                hash: row.hash ? `${row.hash.substring(0, 20)}...` : null,
-                hashType: typeof row.hash,
-                hashLength: row.hash?.length,
-                originalFid: row.fid,
-                originalFidType: typeof row.fid,
-                convertedFid: fid,
-                convertedFidType: typeof fid,
-                convertedFidIsNumber: typeof fid === 'number',
-                convertedFidIsNaN: isNaN(fid),
-              });
-            }
-            
-            // Construct cast object directly from query data
-            return {
-              hash: row.hash, // Use actual hash from query
-              text: row.text || "",
-              timestamp,
-              author: {
-                fid: fid, // Ensure it's a number, not a string
-                username: row.fname || `user${fid}`,
-                display_name: row.display_name || null,
-                pfp_url: row.pfp || null,
-              },
-            };
-          });
+        const minimalCasts = rowsToFetch.map((row: any) => {
+          const timestamp = row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString();
+          
+          // Construct cast object directly from query data
+          return {
+            hash: row.hash, // Use actual hash from query
+            text: row.text || "",
+            timestamp,
+            author: {
+              fid: row.fid,
+              username: row.fname || `user${row.fid}`,
+              display_name: row.display_name || null,
+              pfp_url: row.pfp || null,
+            },
+          };
+        });
         
         // If viewer is logged in, check which casts they curated and fetch full data for those only
         if (viewerFid) {

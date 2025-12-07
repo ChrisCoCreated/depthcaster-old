@@ -1911,8 +1911,8 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
             <p className="text-gray-600 dark:text-gray-400 mb-6">
               Please sign in to access this feed.
             </p>
-            <div className="flex justify-center [&_button]:cursor-pointer [&_button_img]:hidden [&_button_svg]:hidden">
-              <NeynarAuthButton label="Sign in" />
+            <div className="flex justify-center [&_button]:cursor-pointer">
+              <NeynarAuthButton label="Sign in" icon={null} />
             </div>
           </div>
         </div>
