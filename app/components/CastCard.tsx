@@ -2134,7 +2134,9 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
               if (displayMode?.replaceEmbeds) {
                 // Extract the first URL from embeds or parent_url
                 const firstEmbed = cast.embeds[0];
-                const linkUrl = firstEmbed?.url || cast.parent_url;
+                // Check if embed has url property (not all embed types have it)
+                const embedUrl = (firstEmbed as any)?.url;
+                const linkUrl = embedUrl || cast.parent_url;
                 
                 if (linkUrl) {
                   return (
