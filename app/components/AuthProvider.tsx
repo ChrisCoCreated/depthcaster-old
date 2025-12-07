@@ -26,10 +26,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                  userFid: data.fid,
+                  userFid: data.user?.fid,
                   requestData: null, // Request data is handled by Neynar SDK
                   responseData: data,
-                  signerUuid: data.signer_uuid,
+                  signerUuid: data.user?.signer_uuid,
                   success: true,
                 }),
               });
