@@ -2108,30 +2108,90 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
 
             {/* Cast text */}
             <div className="text-gray-900 dark:text-gray-100 mb-2 sm:mb-3 text-sm sm:text-base leading-6 sm:leading-7">
-              {shouldCollapseCuratedCastText && !isCuratedCastExpanded && collapsedCuratedCastSegments ? (
-                <div className="space-y-1 whitespace-pre-wrap break-words">
-                  {collapsedCuratedCastSegments.topText && (
-                    <div>{renderTextWithLinks(collapsedCuratedCastSegments.topText, router, false, displayMode?.hideUrlLinks)}</div>
-                  )}
-                  <button
-                    type="button"
-                    className="w-full text-left text-blue-600 dark:text-blue-400 hover:underline focus:outline-none"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsCuratedCastExpanded(true);
-                    }}
-                  >
-                    {`… ${collapsedCuratedCastSegments.hiddenCount} line${
-                      collapsedCuratedCastSegments.hiddenCount === 1 ? "" : "s"
-                    } hidden …`}
-                  </button>
-                  {collapsedCuratedCastSegments.bottomText && (
-                    <div>{renderTextWithLinks(collapsedCuratedCastSegments.bottomText, router, false, displayMode?.hideUrlLinks)}</div>
-                  )}
-                </div>
-              ) : (
-                <div className="whitespace-pre-wrap break-words">{renderTextWithLinks(cast.text || "", router, false, displayMode?.hideUrlLinks)}</div>
-              )}
+              {(() => {
+                // Process text: strip prefix and prepare for first line bold
+                let processedText = cast.text || "";
+                
+                // Strip prefix if specified
+                if (displayMode?.stripTextPrefix && processedText.startsWith(displayMode.stripTextPrefix)) {
+                  processedText = processedText.substring(displayMode.stripTextPrefix.length);
+                }
+                
+                // Split into first line and rest if boldFirstLine is enabled
+                const shouldBoldFirstLine = displayMode?.boldFirstLine;
+                let firstLine = "";
+                let restOfText = "";
+                
+                if (shouldBoldFirstLine) {
+                  const firstNewlineIndex = processedText.indexOf('\n');
+                  if (firstNewlineIndex !== -1) {
+                    firstLine = processedText.substring(0, firstNewlineIndex);
+                    restOfText = processedText.substring(firstNewlineIndex + 1);
+                  } else {
+                    // If no newline, find first sentence or first ~100 chars
+                    const firstPeriod = processedText.indexOf('. ');
+                    const firstExclamation = processedText.indexOf('! ');
+                    const firstQuestion = processedText.indexOf('? ');
+                    const firstBreak = Math.min(
+                      firstPeriod !== -1 ? firstPeriod + 1 : Infinity,
+                      firstExclamation !== -1 ? firstExclamation + 1 : Infinity,
+                      firstQuestion !== -1 ? firstQuestion + 1 : Infinity,
+                      processedText.length > 100 ? 100 : processedText.length
+                    );
+                    if (firstBreak < processedText.length) {
+                      firstLine = processedText.substring(0, firstBreak);
+                      restOfText = processedText.substring(firstBreak);
+                    } else {
+                      firstLine = processedText;
+                    }
+                  }
+                } else {
+                  restOfText = processedText;
+                }
+                
+                const renderProcessedText = (text: string) => {
+                  return renderTextWithLinks(text, router, false, displayMode?.hideUrlLinks);
+                };
+                
+                return shouldCollapseCuratedCastText && !isCuratedCastExpanded && collapsedCuratedCastSegments ? (
+                  <div className="space-y-1 whitespace-pre-wrap break-words">
+                    {collapsedCuratedCastSegments.topText && (
+                      <div>{renderTextWithLinks(collapsedCuratedCastSegments.topText, router, false, displayMode?.hideUrlLinks)}</div>
+                    )}
+                    <button
+                      type="button"
+                      className="w-full text-left text-blue-600 dark:text-blue-400 hover:underline focus:outline-none"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsCuratedCastExpanded(true);
+                      }}
+                    >
+                      {`… ${collapsedCuratedCastSegments.hiddenCount} line${
+                        collapsedCuratedCastSegments.hiddenCount === 1 ? "" : "s"
+                      } hidden …`}
+                    </button>
+                    {collapsedCuratedCastSegments.bottomText && (
+                      <div>{renderTextWithLinks(collapsedCuratedCastSegments.bottomText, router, false, displayMode?.hideUrlLinks)}</div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="whitespace-pre-wrap break-words">
+                    {shouldBoldFirstLine && firstLine ? (
+                      <>
+                        <span className="font-bold">{renderProcessedText(firstLine)}</span>
+                        {restOfText && (
+                          <>
+                            {restOfText.startsWith(' ') ? ' ' : ''}
+                            {renderProcessedText(restOfText.trimStart())}
+                          </>
+                        )}
+                      </>
+                    ) : (
+                      renderProcessedText(processedText)
+                    )}
+                  </div>
+                );
+              })()}
             </div>
             {shouldCollapseCuratedCastText && isCuratedCastExpanded && (
               <button

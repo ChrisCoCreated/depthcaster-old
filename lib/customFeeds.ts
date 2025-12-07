@@ -32,6 +32,8 @@ export interface DisplayMode {
   hideChannelLink?: boolean;
   hideUrlLinks?: boolean;
   hideAuthorInfo?: boolean;
+  stripTextPrefix?: string;
+  boldFirstLine?: boolean;
 }
 
 export interface HeaderConfig {
@@ -75,6 +77,8 @@ export const customFeeds: CustomFeed[] = [
       hideChannelLink: true,
       hideUrlLinks: true,
       hideAuthorInfo: true,
+      stripTextPrefix: "Reframe Daily: ",
+      boldFirstLine: true,
     },
     headerConfig: {
       showChannelHeader: true,
