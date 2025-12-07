@@ -126,6 +126,7 @@ export async function GET(
         headerConfig: resolvedFeed.headerConfig,
       },
       channel: channelInfo,
+      headerImage: resolvedFeed.headerConfig?.headerImage || null,
     };
 
     return NextResponse.json(response);

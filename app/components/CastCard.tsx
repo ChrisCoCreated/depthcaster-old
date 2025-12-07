@@ -25,7 +25,7 @@ import { DisplayMode } from "@/lib/customFeeds";
 const CURATED_FEED_COLLAPSE_LINE_LIMIT = 8;
 
 // Helper function to convert URLs in text to clickable links
-function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>, insideLink: boolean = false) {
+function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>, insideLink: boolean = false, hideUrls: boolean = false) {
   // First, convert base.app links inline
   const textWithConvertedBaseLinks = convertBaseAppLinksInline(text);
   
@@ -40,6 +40,17 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>,
     // Skip if it looks like an email address (has @ before it)
     const beforeMatch = textWithConvertedBaseLinks.substring(Math.max(0, match.index - 50), match.index);
     if (beforeMatch.includes('@') && !beforeMatch.match(/@[\s\n]/)) {
+      continue;
+    }
+    
+    // If hideUrls is true, skip URL rendering and just add the text
+    if (hideUrls) {
+      // Add text before the URL
+      if (match.index > lastIndex) {
+        parts.push(textWithConvertedBaseLinks.substring(lastIndex, match.index));
+      }
+      // Skip the URL itself, just update lastIndex
+      lastIndex = match.index + match[0].length;
       continue;
     }
     
@@ -2048,7 +2059,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                         </span>
                       </div>
                       <div className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
-                        {renderTextWithLinks(parentCast.text || "", router, true)}
+                        {renderTextWithLinks(parentCast.text || "", router, true, displayMode?.hideUrlLinks)}
                       </div>
                     </div>
                   </Link>
@@ -2057,6 +2068,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
             })()}
             
             {/* Author info */}
+            {!displayMode?.hideAuthorInfo && (
             <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 flex-wrap">
               <Link href={`/profile/${author.fid}`} onClick={(e) => e.stopPropagation()}>
                 <span className="font-semibold text-sm sm:text-base text-gray-900 dark:text-gray-100 hover:underline cursor-pointer">
@@ -2093,7 +2105,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
               {shouldCollapseCuratedCastText && !isCuratedCastExpanded && collapsedCuratedCastSegments ? (
                 <div className="space-y-1 whitespace-pre-wrap break-words">
                   {collapsedCuratedCastSegments.topText && (
-                    <div>{renderTextWithLinks(collapsedCuratedCastSegments.topText, router)}</div>
+                    <div>{renderTextWithLinks(collapsedCuratedCastSegments.topText, router, false, displayMode?.hideUrlLinks)}</div>
                   )}
                   <button
                     type="button"
@@ -2108,11 +2120,11 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                     } hidden …`}
                   </button>
                   {collapsedCuratedCastSegments.bottomText && (
-                    <div>{renderTextWithLinks(collapsedCuratedCastSegments.bottomText, router)}</div>
+                    <div>{renderTextWithLinks(collapsedCuratedCastSegments.bottomText, router, false, displayMode?.hideUrlLinks)}</div>
                   )}
                 </div>
               ) : (
-                <div className="whitespace-pre-wrap break-words">{renderTextWithLinks(cast.text || "", router)}</div>
+                <div className="whitespace-pre-wrap break-words">{renderTextWithLinks(cast.text || "", router, false, displayMode?.hideUrlLinks)}</div>
               )}
             </div>
             {shouldCollapseCuratedCastText && isCuratedCastExpanded && (
@@ -2140,7 +2152,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                 
                 if (linkUrl) {
                   return (
-                    <div className="mb-3">
+                    <div className="mb-3 flex justify-end">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -2616,7 +2628,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                               @{embed.cast.author?.username || "unknown"}
                             </div>
                             <div className={`text-sm text-gray-900 dark:text-gray-100 mb-2 ${isQuotingRoot ? 'line-clamp-1' : ''}`}>
-                              {renderTextWithLinks(displayQuotedText, router, true)}
+                              {renderTextWithLinks(displayQuotedText, router, true, displayMode?.hideUrlLinks)}
                             </div>
                             
                             {/* Show embeds from quoted cast in smaller format */}
@@ -2721,7 +2733,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
             })()}
 
             {/* Channel and Category */}
-            {(cast.channel || (category && !isReply)) && (
+            {(cast.channel || (category && !isReply)) && !displayMode?.hideChannelLink && (
               <div className="mb-3 flex items-center gap-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
                 {cast.channel && (
                   <Link

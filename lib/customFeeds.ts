@@ -29,12 +29,16 @@ export interface DisplayMode {
   replaceEmbeds: boolean;
   embedButtonText: string;
   embedButtonAction: "open-link" | "custom";
+  hideChannelLink?: boolean;
+  hideUrlLinks?: boolean;
+  hideAuthorInfo?: boolean;
 }
 
 export interface HeaderConfig {
   showChannelHeader?: boolean;
   customTitle?: string;
   customDescription?: string;
+  headerImage?: string;
 }
 
 export interface CustomFeed {
@@ -68,9 +72,14 @@ export const customFeeds: CustomFeed[] = [
       replaceEmbeds: true,
       embedButtonText: "Open Reframe",
       embedButtonAction: "open-link",
+      hideChannelLink: true,
+      hideUrlLinks: true,
+      hideAuthorInfo: true,
     },
     headerConfig: {
       showChannelHeader: true,
+      customTitle: "Reframe Daily Feed",
+      headerImage: "https://wrpcd.net/cdn-cgi/imagedelivery/BXluQx4ige9GuW0Ia56BHw/c5ae3a36-c183-427a-d75b-d956d304c700/anim=false,f=auto,w=1800",
     },
   },
 ];
