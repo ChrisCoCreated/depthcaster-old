@@ -772,15 +772,21 @@ function ManageCastsModal({
 
   const handleAddCast = async () => {
     if (!castHash.trim()) {
-      onError("Please enter a cast hash");
+      onError("Please enter a cast URL or hash");
       return;
     }
 
     setAdding(true);
     try {
+      const input = castHash.trim();
+      
+      // Detect if input is a URL or hash
+      const isUrl = input.startsWith("http://") || input.startsWith("https://") || input.includes("/");
+      const type = isUrl ? "url" : "hash";
+      
       // Fetch cast data from Neynar
       const conversationResponse = await fetch(
-        `/api/conversation?identifier=${encodeURIComponent(castHash.trim())}&type=hash&replyDepth=0`
+        `/api/conversation?identifier=${encodeURIComponent(input)}&type=${type}&replyDepth=0`
       );
 
       if (!conversationResponse.ok) {
@@ -931,7 +937,7 @@ function ManageCastsModal({
               type="text"
               value={castHash}
               onChange={(e) => setCastHash(e.target.value)}
-              placeholder="Enter cast hash (0x...)"
+              placeholder="Enter cast URL or hash (0x...)"
               className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
               onKeyPress={(e) => {
                 if (e.key === "Enter") {
