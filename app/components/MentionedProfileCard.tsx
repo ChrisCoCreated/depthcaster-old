@@ -42,7 +42,7 @@ export function MentionedProfileCard({ profile }: MentionedProfileCardProps) {
     >
       {/* Banner */}
       {bannerUrl && (
-        <div className="w-full h-32 bg-gray-200 dark:bg-gray-700 relative">
+        <div className="w-full bg-gray-200 dark:bg-gray-700 relative" style={{ aspectRatio: '2.1 / 1' }}>
           <img
             src={bannerUrl}
             alt={`${displayName} banner`}

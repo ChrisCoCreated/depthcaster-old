@@ -2416,13 +2416,26 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
             )}
 
             {/* Expanded Mentioned Profiles */}
-            {displayMode?.expandMentionedProfiles && cast.mentioned_profiles && cast.mentioned_profiles.length > 0 && (
-              <div className="my-3 space-y-3">
-                {cast.mentioned_profiles.map((profile: any, index: number) => (
-                  <MentionedProfileCard key={profile.fid || index} profile={profile} />
-                ))}
-              </div>
-            )}
+            {displayMode?.expandMentionedProfiles && cast.mentioned_profiles && cast.mentioned_profiles.length > 0 && (() => {
+              // Deduplicate profiles by FID - only show one card per unique profile
+              const seenFids = new Set<number>();
+              const uniqueProfiles = cast.mentioned_profiles.filter((profile: any) => {
+                if (!profile.fid) return false;
+                if (seenFids.has(profile.fid)) {
+                  return false;
+                }
+                seenFids.add(profile.fid);
+                return true;
+              });
+              
+              return uniqueProfiles.length > 0 ? (
+                <div className="my-3 space-y-3">
+                  {uniqueProfiles.map((profile: any) => (
+                    <MentionedProfileCard key={profile.fid} profile={profile} />
+                  ))}
+                </div>
+              ) : null;
+            })()}
 
             {/* Embeds */}
             {cast.embeds && cast.embeds.length > 0 && (() => {
