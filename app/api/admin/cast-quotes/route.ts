@@ -81,6 +81,8 @@ export async function GET(request: NextRequest) {
     }
 
     const url = `https://api.neynar.com/v2/farcaster/cast/quotes/?limit=${limit}&identifier=${normalizedHash}&type=hash`;
+    console.log("[Cast Quotes API] Fetching from Neynar:", { url, normalizedHash, limit });
+    
     const response = await fetch(url, {
       method: "GET",
       headers: {
@@ -88,13 +90,17 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    console.log("[Cast Quotes API] Neynar response status:", response.status, response.statusText);
+
     if (!response.ok) {
       let errorMessage = "Failed to fetch cast quotes";
       try {
         const errorData = await response.json();
+        console.error("[Cast Quotes API] Neynar error response:", errorData);
         errorMessage = errorData.message || errorData.error || `Neynar API error: ${response.status} ${response.statusText}`;
       } catch (e) {
         const errorText = await response.text().catch(() => "");
+        console.error("[Cast Quotes API] Neynar error text:", errorText);
         errorMessage = `Neynar API error: ${response.status} ${response.statusText}${errorText ? ` - ${errorText}` : ""}`;
       }
       return NextResponse.json(
@@ -104,9 +110,40 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await response.json();
+    console.log("[Cast Quotes API] Neynar response data structure:", {
+      hasResult: !!data.result,
+      hasQuotes: !!data.quotes,
+      resultType: typeof data.result,
+      resultIsArray: Array.isArray(data.result),
+      resultKeys: data.result && typeof data.result === 'object' ? Object.keys(data.result) : [],
+      dataKeys: Object.keys(data),
+      fullData: JSON.stringify(data).substring(0, 1000),
+    });
     
-    // Return quotes array (Neynar API returns { result: { quotes: [...] } } or similar structure)
-    const quotes = data.result?.quotes || data.quotes || data.result || [];
+    // Handle different possible response structures from Neynar API
+    let quotes: any[] = [];
+    
+    if (Array.isArray(data)) {
+      // Response is directly an array
+      quotes = data;
+    } else if (data.result) {
+      if (Array.isArray(data.result)) {
+        // result is an array
+        quotes = data.result;
+      } else if (data.result.quotes && Array.isArray(data.result.quotes)) {
+        // result.quotes is an array
+        quotes = data.result.quotes;
+      } else if (data.result.casts && Array.isArray(data.result.casts)) {
+        // result.casts is an array
+        quotes = data.result.casts;
+      }
+    } else if (data.quotes && Array.isArray(data.quotes)) {
+      quotes = data.quotes;
+    } else if (data.casts && Array.isArray(data.casts)) {
+      quotes = data.casts;
+    }
+    
+    console.log("[Cast Quotes API] Extracted quotes count:", quotes.length);
 
     return NextResponse.json({
       quotes,

@@ -365,9 +365,9 @@ function CollectionModal({
         }
         gatingRule = {
           type: gatingRuleType as GatingRule["type"],
-          ...(gatingRuleType === "display_name_contains_emoji" && { emoji: gatingRuleEmoji }),
-          ...(gatingRuleType === "has_role" && { role: gatingRuleRole }),
-          ...(gatingRuleType === "user_fid" && { fid: parseInt(gatingRuleFid) }),
+          ...(gatingRuleType === "display_name_contains_emoji" ? { emoji: gatingRuleEmoji } : {}),
+          ...(gatingRuleType === "has_role" ? { role: gatingRuleRole } : {}),
+          ...(gatingRuleType === "user_fid" ? { fid: parseInt(gatingRuleFid) } : {}),
         };
       }
 

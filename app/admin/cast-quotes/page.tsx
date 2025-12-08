@@ -70,23 +70,37 @@ export default function CastQuotesPage() {
     setQuotes([]);
 
     try {
-      const response = await fetch(
-        `/api/admin/cast-quotes?adminFid=${user.fid}&castHash=${encodeURIComponent(castHash.trim())}&limit=100`
-      );
+      const url = `/api/admin/cast-quotes?adminFid=${user.fid}&castHash=${encodeURIComponent(castHash.trim())}&limit=100`;
+      console.log("[Cast Quotes Page] Fetching quotes from:", url);
+      
+      const response = await fetch(url);
+      console.log("[Cast Quotes Page] Response status:", response.status, response.statusText);
 
       if (!response.ok) {
         const data = await response.json();
+        console.error("[Cast Quotes Page] Error response:", data);
         throw new Error(data.error || "Failed to fetch quotes");
       }
 
       const data = await response.json();
+      console.log("[Cast Quotes Page] Response data:", {
+        hasQuotes: !!data.quotes,
+        quotesLength: data.quotes?.length,
+        count: data.count,
+        dataKeys: Object.keys(data),
+      });
+      
       setQuotes(data.quotes || []);
       
       if (data.quotes && data.quotes.length === 0) {
+        console.log("[Cast Quotes Page] No quotes found - setting error message");
         setError("No quotes found for this cast");
+      } else if (!data.quotes) {
+        console.warn("[Cast Quotes Page] No quotes property in response:", data);
+        setError("Unexpected response format from server");
       }
     } catch (error: any) {
-      console.error("Failed to fetch quotes:", error);
+      console.error("[Cast Quotes Page] Failed to fetch quotes:", error);
       setError(error.message || "Failed to fetch quotes");
       setQuotes([]);
     } finally {
