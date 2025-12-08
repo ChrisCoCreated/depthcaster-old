@@ -21,6 +21,7 @@ import {
   FileText,
   UserPlus,
   UserX,
+  MessageCircle,
 } from "lucide-react";
 import { AvatarImage } from "@/app/components/AvatarImage";
 
@@ -38,6 +39,7 @@ const navItems: NavItem[] = [
   { href: "/admin/users-without-roles", label: "Users Without Roles", icon: UserX, section: "users" },
   { href: "/admin/curator-recommendations", label: "Curator Recommendations", icon: UserPlus, section: "users" },
   { href: "/admin/tags", label: "Cast Tags", icon: TagIcon, section: "content" },
+  { href: "/admin/cast-quotes", label: "Cast Quotes", icon: MessageCircle, section: "content" },
   { href: "/admin/curators-leaderboard", label: "Curators Leaderboard", icon: Award, section: "content" },
   { href: "/admin/quality", label: "Quality Filter", icon: Filter, section: "content" },
   { href: "/admin/build-ideas", label: "Build Ideas", icon: Lightbulb, section: "system" },
