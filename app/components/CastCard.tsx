@@ -55,8 +55,11 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>,
   const urlMatches: Array<{ index: number; length: number; url: string; displayText: string }> = [];
   let urlMatch: RegExpExecArray | null;
   while ((urlMatch = urlRegex.exec(textWithConvertedBaseLinks)) !== null) {
+    // TypeScript doesn't narrow the type in while conditions, so we assert non-null here
+    const match = urlMatch;
+    
     // Skip if it looks like an email address (has @ before it) or if it overlaps with a mention
-    const beforeMatch = textWithConvertedBaseLinks.substring(Math.max(0, urlMatch.index - 50), urlMatch.index);
+    const beforeMatch = textWithConvertedBaseLinks.substring(Math.max(0, match.index - 50), match.index);
     if (beforeMatch.includes('@') && !beforeMatch.match(/@[\s\n]/)) {
       continue;
     }
@@ -64,21 +67,21 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>,
     // Check if this URL overlaps with any mention
     const overlapsMention = mentionMatches.some(m => {
       const mentionEnd = m.index + m.length;
-      const urlEnd = urlMatch.index + urlMatch[0].length;
-      return (urlMatch.index >= m.index && urlMatch.index < mentionEnd) ||
-             (m.index >= urlMatch.index && m.index < urlEnd);
+      const urlEnd = match.index + match[0].length;
+      return (match.index >= m.index && match.index < mentionEnd) ||
+             (m.index >= match.index && m.index < urlEnd);
     });
     
     if (overlapsMention) {
       continue;
     }
     
-    let url = urlMatch[1] || urlMatch[2] || urlMatch[3] || urlMatch[4];
+    let url = match[1] || match[2] || match[3] || match[4];
     urlMatches.push({
-      index: urlMatch.index,
-      length: urlMatch[0].length,
+      index: match.index,
+      length: match[0].length,
       url: url,
-      displayText: urlMatch[0],
+      displayText: match[0],
     });
   }
   
