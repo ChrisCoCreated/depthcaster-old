@@ -20,6 +20,7 @@ interface Collection {
   autoCurationRules: any;
   displayMode: any;
   headerConfig: any;
+  hiddenEmbedUrls: string[] | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -343,7 +344,11 @@ function CollectionModal({
     autoCurationRules: collection?.autoCurationRules || null,
     displayMode: collection?.displayMode || null,
     headerConfig: collection?.headerConfig || null,
+    hiddenEmbedUrls: (collection?.hiddenEmbedUrls as string[] | null) || [],
   });
+  const [hiddenEmbedUrlsText, setHiddenEmbedUrlsText] = useState(
+    collection?.hiddenEmbedUrls ? (collection.hiddenEmbedUrls as string[]).join('\n') : ""
+  );
 
   const [gatingRuleType, setGatingRuleType] = useState<GatingRule["type"] | "">(
     collection?.gatingRule?.type || ""
@@ -371,6 +376,12 @@ function CollectionModal({
         };
       }
 
+      // Convert hiddenEmbedUrls text (newline-separated) to array
+      const hiddenEmbedUrlsArray = hiddenEmbedUrlsText
+        .split('\n')
+        .map(url => url.trim())
+        .filter(url => url.length > 0);
+
       const payload = {
         adminFid: userFid,
         name: formData.name,
@@ -384,6 +395,7 @@ function CollectionModal({
         autoCurationRules: formData.autoCurationRules,
         displayMode: formData.displayMode,
         headerConfig: formData.headerConfig,
+        hiddenEmbedUrls: hiddenEmbedUrlsArray.length > 0 ? hiddenEmbedUrlsArray : null,
       };
 
       const url = collection
@@ -584,6 +596,22 @@ function CollectionModal({
                 <option value="image">Image (gallery only)</option>
                 <option value="image-text">Image & Text (image prominent)</option>
               </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Hidden Embed URLs
+              </label>
+              <textarea
+                value={hiddenEmbedUrlsText}
+                onChange={(e) => setHiddenEmbedUrlsText(e.target.value)}
+                rows={4}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-mono text-sm"
+                placeholder="youtube.com&#10;twitter.com&#10;https://example.com/video"
+              />
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Enter URLs or domains to hide embeds from. One per line. Supports domains (e.g., 'youtube.com') or full URLs. Casts will still be displayed, but matching embeds will be hidden.
+              </p>
             </div>
 
             <div className="flex items-center">

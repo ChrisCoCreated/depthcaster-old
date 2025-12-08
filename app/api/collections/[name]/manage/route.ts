@@ -14,7 +14,7 @@ export async function PUT(
   try {
     const { name } = await params;
     const body = await request.json();
-    const { adminFid, displayName, description, accessType, gatedUserId, gatingRule, displayType, autoCurationEnabled, autoCurationRules, displayMode, headerConfig } = body;
+    const { adminFid, displayName, description, accessType, gatedUserId, gatingRule, displayType, autoCurationEnabled, autoCurationRules, displayMode, headerConfig, hiddenEmbedUrls } = body;
 
     if (!adminFid) {
       return NextResponse.json({ error: "adminFid is required" }, { status: 400 });
@@ -47,6 +47,16 @@ export async function PUT(
       return NextResponse.json({ error: "Invalid displayType" }, { status: 400 });
     }
 
+    // Validate hiddenEmbedUrls if provided
+    if (hiddenEmbedUrls !== undefined && hiddenEmbedUrls !== null) {
+      if (!Array.isArray(hiddenEmbedUrls)) {
+        return NextResponse.json({ error: "hiddenEmbedUrls must be an array" }, { status: 400 });
+      }
+      if (!hiddenEmbedUrls.every(url => typeof url === 'string')) {
+        return NextResponse.json({ error: "All items in hiddenEmbedUrls must be strings" }, { status: 400 });
+      }
+    }
+
     const updateData: any = { updatedAt: new Date() };
     if (displayName !== undefined) updateData.displayName = displayName;
     if (description !== undefined) updateData.description = description;
@@ -58,6 +68,7 @@ export async function PUT(
     if (autoCurationRules !== undefined) updateData.autoCurationRules = autoCurationRules;
     if (displayMode !== undefined) updateData.displayMode = displayMode;
     if (headerConfig !== undefined) updateData.headerConfig = headerConfig;
+    if (hiddenEmbedUrls !== undefined) updateData.hiddenEmbedUrls = hiddenEmbedUrls;
 
     const updated = await db.update(collections).set(updateData).where(eq(collections.name, name)).returning();
     return NextResponse.json({ collection: updated[0] });

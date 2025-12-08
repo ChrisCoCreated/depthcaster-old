@@ -439,6 +439,7 @@ export const collections = pgTable("collections", {
   autoCurationRules: jsonb("auto_curation_rules"), // CustomFeed structure for auto-curation
   displayMode: jsonb("display_mode"), // DisplayMode from customFeeds
   headerConfig: jsonb("header_config"), // HeaderConfig from customFeeds
+  hiddenEmbedUrls: jsonb("hidden_embed_urls"), // Array of URLs/domains to hide embeds from
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
