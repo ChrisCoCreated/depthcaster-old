@@ -17,17 +17,14 @@ export const dynamic = "force-dynamic";
 function verifyCronRequest(request: NextRequest): boolean {
   const authHeader = request.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
-
   if (authHeader && cronSecret) {
     const token = authHeader.replace("Bearer ", "");
     return token === cronSecret;
   }
-
   if (!cronSecret) {
     console.warn("[Auto-Curate Collections Cron] CRON_SECRET not set - allowing request (development mode)");
     return true;
   }
-
   return false;
 }
 
@@ -35,7 +32,6 @@ function applyFilters(casts: any[], filters: any[]): any[] {
   if (!filters || filters.length === 0) {
     return casts;
   }
-
   return casts.filter((cast) => {
     for (const filter of filters) {
       if (filter.type === "authorFid" && typeof filter.value === "number") {
@@ -60,19 +56,15 @@ async function processCollection(collection: any): Promise<{ added: number; erro
   const collectionId = collection.id;
   const collectionName = collection.name;
   const autoCurationRules = collection.autoCurationRules as CustomFeed | null;
-
   if (!autoCurationRules) {
     console.log(`[Auto-Curate] Collection ${collectionName} has no autoCurationRules, skipping`);
     return { added: 0, errors: 0 };
   }
-
   console.log(`[Auto-Curate] Processing collection: ${collectionName}`);
-
   try {
     const resolvedFeed = await resolveFeedFilters(autoCurationRules as CustomFeed);
     let casts: any[] = [];
     const limit = 50;
-
     if (resolvedFeed.feedType === "channel") {
       const channelConfig = resolvedFeed.feedConfig as { channelId: string };
       const feed = await deduplicateRequest(
@@ -107,44 +99,34 @@ async function processCollection(collection: any): Promise<{ added: number; erro
       console.log(`[Auto-Curate] Unsupported feed type: ${resolvedFeed.feedType} for collection ${collectionName}`);
       return { added: 0, errors: 0 };
     }
-
-    casts = applyFilters(casts, resolvedFeed.filters);
-
+    casts = applyFilters(casts, resolvedFeed.filters || []);
     if (casts.length === 0) {
       console.log(`[Auto-Curate] No casts found matching rules for collection ${collectionName}`);
       return { added: 0, errors: 0 };
     }
-
     const castHashes = casts.map((cast) => cast.hash).filter(Boolean);
     const existingCollectionCasts = await db
       .select({ castHash: collectionCasts.castHash })
       .from(collectionCasts)
       .where(and(eq(collectionCasts.collectionId, collectionId), inArray(collectionCasts.castHash, castHashes)));
-
     const existingHashes = new Set(existingCollectionCasts.map((cc) => cc.castHash));
     const newCasts = casts.filter((cast) => !existingHashes.has(cast.hash));
-
     if (newCasts.length === 0) {
       console.log(`[Auto-Curate] All matching casts already in collection ${collectionName}`);
       return { added: 0, errors: 0 };
     }
-
     console.log(`[Auto-Curate] Found ${newCasts.length} new casts to add to collection ${collectionName}`);
-
     let added = 0;
     let errors = 0;
-
     for (const cast of newCasts) {
       try {
         const castHash = cast.hash;
         if (!castHash) continue;
-
         const existingCast = await db
           .select()
           .from(curatedCasts)
           .where(eq(curatedCasts.castHash, castHash))
           .limit(1);
-
         if (existingCast.length === 0) {
           const metadata = extractCastMetadata(cast);
           if (metadata.authorFid) {
@@ -157,7 +139,6 @@ async function processCollection(collection: any): Promise<{ added: number; erro
               console.error(`[Auto-Curate] Failed to upsert author ${metadata.authorFid}:`, error);
             });
           }
-
           try {
             await db.insert(curatedCasts).values({
               castHash,
@@ -184,7 +165,6 @@ async function processCollection(collection: any): Promise<{ added: number; erro
             }
           }
         }
-
         try {
           await db.insert(collectionCasts).values({
             collectionId,
@@ -203,7 +183,6 @@ async function processCollection(collection: any): Promise<{ added: number; erro
         errors++;
       }
     }
-
     console.log(`[Auto-Curate] Collection ${collectionName}: Added ${added} casts, ${errors} errors`);
     return { added, errors };
   } catch (error: any) {
@@ -217,16 +196,12 @@ export async function GET(request: NextRequest) {
     if (!verifyCronRequest(request)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
     console.log("[Auto-Curate Collections Cron] Starting auto-curation job");
-
     const autoCurateCollections = await db
       .select()
       .from(collections)
       .where(eq(collections.autoCurationEnabled, true));
-
     console.log(`[Auto-Curate Collections Cron] Found ${autoCurateCollections.length} collections with auto-curation enabled`);
-
     if (autoCurateCollections.length === 0) {
       return NextResponse.json({
         success: true,
@@ -236,11 +211,9 @@ export async function GET(request: NextRequest) {
         totalErrors: 0,
       });
     }
-
     let totalAdded = 0;
     let totalErrors = 0;
     const results: Array<{ collectionName: string; added: number; errors: number }> = [];
-
     for (const collection of autoCurateCollections) {
       const result = await processCollection(collection);
       totalAdded += result.added;
@@ -251,9 +224,7 @@ export async function GET(request: NextRequest) {
         errors: result.errors,
       });
     }
-
     console.log(`[Auto-Curate Collections Cron] Completed: ${totalAdded} casts added across ${autoCurateCollections.length} collections`);
-
     return NextResponse.json({
       success: true,
       collectionsProcessed: autoCurateCollections.length,
