@@ -200,7 +200,7 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>)
       }
     }
     
-    lastIndex = match.index + match[0].length;
+    lastIndex = match.index + match.length;
   }
   
   // Add remaining text
