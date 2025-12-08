@@ -380,6 +380,10 @@ function CollectionModal({
     headerConfig: collection?.headerConfig || null,
     hiddenEmbedUrls: (collection?.hiddenEmbedUrls as string[] | null) || [],
   });
+  
+  const [expandMentionedProfiles, setExpandMentionedProfiles] = useState(
+    (collection?.displayMode as any)?.expandMentionedProfiles || false
+  );
   const [hiddenEmbedUrlsText, setHiddenEmbedUrlsText] = useState(
     collection?.hiddenEmbedUrls ? (collection.hiddenEmbedUrls as string[]).join('\n') : ""
   );
@@ -416,6 +420,12 @@ function CollectionModal({
         .map(url => url.trim())
         .filter(url => url.length > 0);
 
+      // Update displayMode with expandMentionedProfiles
+      const updatedDisplayMode = {
+        ...formData.displayMode,
+        expandMentionedProfiles: expandMentionedProfiles,
+      };
+
       const payload = {
         adminFid: userFid,
         name: formData.name,
@@ -427,7 +437,7 @@ function CollectionModal({
         displayType: formData.displayType,
         autoCurationEnabled: formData.autoCurationEnabled,
         autoCurationRules: formData.autoCurationRules,
-        displayMode: formData.displayMode,
+        displayMode: updatedDisplayMode,
         headerConfig: formData.headerConfig,
         hiddenEmbedUrls: hiddenEmbedUrlsArray.length > 0 ? hiddenEmbedUrlsArray : null,
       };
@@ -659,6 +669,22 @@ function CollectionModal({
               <label htmlFor="autoCurationEnabled" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Enable Auto-Curation
               </label>
+            </div>
+
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="expandMentionedProfiles"
+                checked={expandMentionedProfiles}
+                onChange={(e) => setExpandMentionedProfiles(e.target.checked)}
+                className="mr-2"
+              />
+              <label htmlFor="expandMentionedProfiles" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Expand Mentioned Profiles
+              </label>
+              <p className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                Show full profile cards (pfp, banner, bio, stats, URL) for mentioned profiles in casts
+              </p>
             </div>
 
             {formData.autoCurationEnabled && (

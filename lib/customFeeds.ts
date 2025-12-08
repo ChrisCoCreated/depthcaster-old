@@ -36,6 +36,7 @@ export interface DisplayMode {
   boldFirstLine?: boolean;
   buttonBackgroundColor?: string;
   buttonTextColor?: string;
+  expandMentionedProfiles?: boolean;
 }
 
 export interface HeaderConfig {

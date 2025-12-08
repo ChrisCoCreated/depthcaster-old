@@ -23,6 +23,7 @@ import { CuratorBadge } from "./CuratorBadge";
 import { DisplayMode } from "@/lib/customFeeds";
 import { CollectionSelectModal } from "./CollectionSelectModal";
 import { isFeatureEnabledClient, FEATURE_FLAGS } from "@/lib/feature-flags";
+import { MentionedProfileCard } from "./MentionedProfileCard";
 
 const CURATED_FEED_COLLAPSE_LINE_LIMIT = 8;
 
@@ -2412,6 +2413,15 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
               >
                 Collapse
               </button>
+            )}
+
+            {/* Expanded Mentioned Profiles */}
+            {displayMode?.expandMentionedProfiles && cast.mentioned_profiles && cast.mentioned_profiles.length > 0 && (
+              <div className="my-3 space-y-3">
+                {cast.mentioned_profiles.map((profile: any, index: number) => (
+                  <MentionedProfileCard key={profile.fid || index} profile={profile} />
+                ))}
+              </div>
             )}
 
             {/* Embeds */}
