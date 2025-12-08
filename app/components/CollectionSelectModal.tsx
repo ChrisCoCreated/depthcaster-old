@@ -33,13 +33,47 @@ export function CollectionSelectModal({
   const [loading, setLoading] = useState(false);
   const [selectedCollection, setSelectedCollection] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [checkingSuperAdmin, setCheckingSuperAdmin] = useState(true);
 
-  // Check if feature is enabled
-  const isFeatureEnabled = isFeatureEnabledClient(FEATURE_FLAGS.COLLECTIONS_ENABLED);
+  // Check if feature is enabled for everyone
+  const isCollectionsEnabled = isFeatureEnabledClient(FEATURE_FLAGS.COLLECTIONS_ENABLED);
+  // Check if feature is enabled for superadmins
+  const isCollectionsEnabledForSuperadmins = isFeatureEnabledClient(FEATURE_FLAGS.COLLECTIONS_ENABLED_FOR_SUPERADMINS);
+
+  // Check if user is superadmin
+  useEffect(() => {
+    if (!isOpen || !user?.fid) {
+      setIsSuperAdmin(false);
+      setCheckingSuperAdmin(false);
+      return;
+    }
+
+    const checkSuperAdmin = async () => {
+      try {
+        setCheckingSuperAdmin(true);
+        const response = await fetch(`/api/admin/check?fid=${user.fid}`);
+        if (response.ok) {
+          const data = await response.json();
+          setIsSuperAdmin(data.isSuperAdmin || false);
+        }
+      } catch (error) {
+        console.error("Failed to check superadmin status:", error);
+        setIsSuperAdmin(false);
+      } finally {
+        setCheckingSuperAdmin(false);
+      }
+    };
+
+    checkSuperAdmin();
+  }, [isOpen, user?.fid]);
+
+  // Determine if feature should be enabled (for everyone OR for superadmins)
+  const isFeatureEnabled = isCollectionsEnabled || (isCollectionsEnabledForSuperadmins && isSuperAdmin);
 
   // Fetch accessible collections
   useEffect(() => {
-    if (!isOpen || !isFeatureEnabled || !user?.fid) {
+    if (!isOpen || !isFeatureEnabled || !user?.fid || checkingSuperAdmin) {
       setCollections([]);
       return;
     }
@@ -60,7 +94,7 @@ export function CollectionSelectModal({
     };
 
     fetchCollections();
-  }, [isOpen, isFeatureEnabled, user?.fid]);
+  }, [isOpen, isFeatureEnabled, user?.fid, checkingSuperAdmin]);
 
   // Handle selection
   const handleSubmit = async (e: React.FormEvent) => {
