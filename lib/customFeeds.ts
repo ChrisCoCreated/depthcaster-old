@@ -61,7 +61,7 @@ export const customFeeds: CustomFeed[] = [
   {
     slug: "reframe",
     name: "Reframe",
-    description: "Daily optomistic science news from the reframe channel by @christin",
+    description: "Daily optimistic science news from the reframe channel by @christin",
     feedType: "channel",
     feedConfig: {
       channelId: "reframe",

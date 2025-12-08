@@ -105,6 +105,13 @@ export async function syncUserReactions(fid: number): Promise<{
     errors: 0,
   };
 
+  // Check if Neynar notifications are enabled
+  const neynarNotificationsEnabled = process.env.ENABLE_NEYNAR_NOTIFICATIONS === "true" || process.env.ENABLE_NEYNAR_NOTIFICATIONS === "1";
+  if (!neynarNotificationsEnabled) {
+    console.log(`[Reaction Sync] ENABLE_NEYNAR_NOTIFICATIONS is disabled, skipping reaction sync for user ${fid}`);
+    return stats;
+  }
+
   // Check if user has any role
   const userRoles = await getUserRoles(fid);
   if (userRoles.length === 0) {
@@ -362,6 +369,13 @@ export async function syncUserReactionsIncremental(fid: number): Promise<{
     reactionsSynced: 0,
     errors: 0,
   };
+
+  // Check if Neynar notifications are enabled
+  const neynarNotificationsEnabled = process.env.ENABLE_NEYNAR_NOTIFICATIONS === "true" || process.env.ENABLE_NEYNAR_NOTIFICATIONS === "1";
+  if (!neynarNotificationsEnabled) {
+    console.log(`[Incremental Reaction Sync] ENABLE_NEYNAR_NOTIFICATIONS is disabled, skipping reaction sync for user ${fid}`);
+    return stats;
+  }
 
   // Check if user has any role
   const userRoles = await getUserRoles(fid);
