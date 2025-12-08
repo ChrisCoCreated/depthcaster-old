@@ -97,8 +97,12 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>)
         <Link
           key={match.index}
           href={`/profile/${encodeURIComponent(username)}`}
-          className="text-blue-600 dark:text-blue-400 hover:underline"
-          onClick={(e) => e.stopPropagation()}
+          className="text-blue-600 dark:text-blue-400 underline"
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            router.push(`/profile/${encodeURIComponent(username)}`);
+          }}
         >
           {displayText}
         </Link>
