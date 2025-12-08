@@ -64,6 +64,13 @@
       "when": 1765093875884,
       "tag": "0008_lean_mysterio",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1765220529794,
+      "tag": "0009_add_hidden_embed_urls_to_collections",
+      "breakpoints": true
     }
   ]
 }
