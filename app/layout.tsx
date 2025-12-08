@@ -91,8 +91,8 @@ export const metadata: Metadata = {
       { url: "/icon-512x512.webp", sizes: "512x512", type: "image/webp" },
     ],
     apple: [
-      { url: "/icon-152x152.webp", sizes: "152x152", type: "image/webp" },
       { url: "/icon-192x192.webp", sizes: "192x192", type: "image/webp" },
+      { url: "/icon-152x152.webp", sizes: "152x152", type: "image/webp" },
     ],
   },
   appleWebApp: {

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useNotificationPermission } from "@/lib/hooks/useNotificationPermission";
+import { initializePWATracking, markPWAInstalled } from "@/lib/pwa-detection";
 
 export function ServiceWorkerRegistration() {
   const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null);
@@ -19,6 +20,19 @@ export function ServiceWorkerRegistration() {
         });
 
         setRegistration(registration);
+
+        // Initialize PWA tracking when service worker is registered
+        initializePWATracking();
+
+        // Listen for messages from service worker
+        navigator.serviceWorker.addEventListener("message", (event) => {
+          if (event.data && event.data.type === "INITIALIZE_PWA_TRACKING") {
+            initializePWATracking();
+          }
+          if (event.data && event.data.type === "MARK_PWA_INSTALLED") {
+            markPWAInstalled();
+          }
+        });
 
         // Handle service worker updates
         registration.addEventListener("updatefound", () => {

@@ -61,7 +61,7 @@ export const customFeeds: CustomFeed[] = [
   {
     slug: "reframe",
     name: "Reframe",
-    description: "Casts from the reframe channel by @christin",
+    description: "Daily optomistic science news from the reframe channel by @christin",
     feedType: "channel",
     feedConfig: {
       channelId: "reframe",
@@ -74,7 +74,7 @@ export const customFeeds: CustomFeed[] = [
     ],
     displayMode: {
       replaceEmbeds: true,
-      embedButtonText: "Open This Reframe",
+      embedButtonText: "Open this Reframe",
       embedButtonAction: "open-link",
       hideChannelLink: true,
       hideUrlLinks: true,

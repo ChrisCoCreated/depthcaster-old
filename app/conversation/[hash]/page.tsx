@@ -2,6 +2,7 @@
 
 import { ConversationView } from "../../components/ConversationView";
 import { CastComposer } from "../../components/CastComposer";
+import { OpenInAppBanner } from "../../components/OpenInAppBanner";
 import { useNeynarContext } from "@neynar/react";
 import { use, useEffect, useRef, useCallback, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -122,6 +123,7 @@ export default function ConversationPage({
   if (conversationExists) {
     return (
       <div className="min-h-screen">
+        <OpenInAppBanner />
         <main className="max-w-7xl mx-auto px-4 py-8">
           <ConversationView castHash={actualCastHash} viewerFid={user?.fid} focusReplyHash={focusReplyHash} onFocusReply={focusReplyBox} />
           

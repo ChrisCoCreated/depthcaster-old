@@ -16,6 +16,16 @@ self.addEventListener('activate', (event) => {
           .filter((name) => name !== CACHE_NAME)
           .map((name) => caches.delete(name))
       );
+    }).then(() => {
+      // Notify all clients to initialize PWA tracking
+      // This helps detect if PWA is installed
+      return self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+        return Promise.all(
+          clientList.map((client) => {
+            return client.postMessage({ type: 'INITIALIZE_PWA_TRACKING' });
+          })
+        );
+      });
     })
   );
   return self.clients.claim();
@@ -31,6 +41,16 @@ self.addEventListener('message', (event) => {
   // Handle skip waiting request (when user clicks refresh)
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
+  }
+  
+  // Handle PWA tracking request from client
+  if (event.data && event.data.type === 'TRACK_PWA_INSTALLED') {
+    // Notify all clients to mark PWA as installed
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      clientList.forEach((client) => {
+        client.postMessage({ type: 'MARK_PWA_INSTALLED' });
+      });
+    });
   }
 });
 
