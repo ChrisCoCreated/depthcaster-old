@@ -60,9 +60,12 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>,
   
   // Then process mentions without braces
   while ((mentionMatch = mentionRegexWithoutBraces.exec(textWithConvertedBaseLinks)) !== null) {
+    // TypeScript doesn't narrow the type in while conditions, so we assert non-null here
+    const match = mentionMatch;
+    
     // Check if it's part of an email address (has alphanumeric before @)
-    const beforeChar = mentionMatch.index > 0 
-      ? textWithConvertedBaseLinks[mentionMatch.index - 1] 
+    const beforeChar = match.index > 0 
+      ? textWithConvertedBaseLinks[match.index - 1] 
       : '';
     // Skip if it looks like an email (has alphanumeric before @)
     if (/[a-zA-Z0-9]/.test(beforeChar)) {
@@ -72,21 +75,21 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>,
     // Check if this mention overlaps with a brace mention
     const overlapsBraceMention = mentionMatches.some(m => {
       const mentionEnd = m.index + m.length;
-      const matchEnd = mentionMatch.index + mentionMatch[0].length;
-      return (mentionMatch.index >= m.index && mentionMatch.index < mentionEnd) ||
-             (m.index >= mentionMatch.index && m.index < matchEnd);
+      const matchEnd = match.index + match[0].length;
+      return (match.index >= m.index && match.index < mentionEnd) ||
+             (m.index >= match.index && m.index < matchEnd);
     });
     
     if (overlapsBraceMention) {
       continue;
     }
     
-    const username = mentionMatch[1];
+    const username = match[1];
     if (!username) continue;
     
     mentionMatches.push({
-      index: mentionMatch.index,
-      length: mentionMatch[0].length,
+      index: match.index,
+      length: match[0].length,
       username: username,
     });
   }
