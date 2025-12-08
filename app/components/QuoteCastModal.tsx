@@ -36,7 +36,7 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>)
   
   // First, process mentions with braces
   const mentionMatches: Array<{ index: number; length: number; username: string }> = [];
-  let mentionMatch;
+  let mentionMatch: RegExpExecArray | null;
   while ((mentionMatch = mentionRegexWithBraces.exec(textWithConvertedBaseLinks)) !== null) {
     const username = mentionMatch[1];
     if (!username) continue;
