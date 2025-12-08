@@ -3,6 +3,7 @@
   "short_name": "Depthcaster",
   "description": "A Long from farcaster client focused on philosophy, art, and meaningful conversations",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#000000",

@@ -34,6 +34,8 @@ export interface DisplayMode {
   hideAuthorInfo?: boolean;
   stripTextPrefix?: string;
   boldFirstLine?: boolean;
+  buttonBackgroundColor?: string;
+  buttonTextColor?: string;
 }
 
 export interface HeaderConfig {
@@ -72,13 +74,15 @@ export const customFeeds: CustomFeed[] = [
     ],
     displayMode: {
       replaceEmbeds: true,
-      embedButtonText: "Open Reframe",
+      embedButtonText: "Open This Reframe",
       embedButtonAction: "open-link",
       hideChannelLink: true,
       hideUrlLinks: true,
       hideAuthorInfo: true,
       stripTextPrefix: "Reframe Daily: ",
       boldFirstLine: true,
+      buttonBackgroundColor: "#ffd268",
+      buttonTextColor: "#000000",
     },
     headerConfig: {
       showChannelHeader: true,

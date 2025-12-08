@@ -2979,7 +2979,11 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                         window.open(displayModeLinkUrl, '_blank', 'noopener,noreferrer');
                       }
                     }}
-                    className="px-2.5 py-1.5 text-xs sm:text-sm bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors"
+                    style={{
+                      backgroundColor: displayMode.buttonBackgroundColor || '#000000',
+                      color: displayMode.buttonTextColor || '#ffffff',
+                    }}
+                    className="px-2.5 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors hover:opacity-90"
                   >
                     {displayMode.embedButtonText || "Open Link"}
                   </button>
