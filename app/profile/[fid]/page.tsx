@@ -30,23 +30,19 @@ export default function ProfilePage({
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ActivityType>("curated-casts");
   const fid = parseInt(fidParam);
+  const isFid = !isNaN(fid);
 
   useEffect(() => {
     fetchProfile();
-  }, [fid]);
+  }, [fidParam]);
 
   const fetchProfile = async () => {
-    if (isNaN(fid)) {
-      setError("Invalid FID");
-      setLoading(false);
-      return;
-    }
-
     try {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`/api/user/${fid}`);
+      // Pass the parameter as-is (can be FID or username)
+      const response = await fetch(`/api/user/${encodeURIComponent(fidParam)}`);
       if (!response.ok) {
         if (response.status === 404) {
           setError("User not found");
@@ -142,9 +138,9 @@ export default function ProfilePage({
 
           {/* Activity content */}
           <div className="mt-4">
-            {activeTab === "curated-casts" && (
+            {activeTab === "curated-casts" && profile && (
               <UserActivitySection
-                fid={fid}
+                fid={profile.fid}
                 viewerFid={viewerFid}
                 type="curated-casts"
                 title="Curated Casts"
@@ -152,9 +148,9 @@ export default function ProfilePage({
                 autoExpand={true}
               />
             )}
-            {activeTab === "popular-casts" && (
+            {activeTab === "popular-casts" && profile && (
               <UserActivitySection
-                fid={fid}
+                fid={profile.fid}
                 viewerFid={viewerFid}
                 type="popular-casts"
                 title="Popular Casts"
@@ -162,9 +158,9 @@ export default function ProfilePage({
                 autoExpand={true}
               />
             )}
-            {activeTab === "casts" && (
+            {activeTab === "casts" && profile && (
               <UserActivitySection
-                fid={fid}
+                fid={profile.fid}
                 viewerFid={viewerFid}
                 type="casts"
                 title="Casts"
@@ -172,9 +168,9 @@ export default function ProfilePage({
                 autoExpand={true}
               />
             )}
-            {activeTab === "replies-recasts" && (
+            {activeTab === "replies-recasts" && profile && (
               <UserActivitySection
-                fid={fid}
+                fid={profile.fid}
                 viewerFid={viewerFid}
                 type="replies-recasts"
                 title="Replies & Recasts"
@@ -182,9 +178,9 @@ export default function ProfilePage({
                 autoExpand={true}
               />
             )}
-            {activeTab === "interactions" && (
+            {activeTab === "interactions" && profile && (
               <UserActivitySection
-                fid={fid}
+                fid={profile.fid}
                 viewerFid={viewerFid}
                 type="interactions"
                 title="Interactions"

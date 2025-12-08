@@ -11,14 +11,41 @@ export async function GET(
   try {
     const { fid: fidParam } = await params;
     const fid = parseInt(fidParam);
+    const isFid = !isNaN(fid);
 
-    if (isNaN(fid)) {
-      return NextResponse.json(
-        { error: "Invalid FID" },
-        { status: 400 }
-      );
+    // Check if it's a username (not a valid FID)
+    if (!isFid) {
+      // Treat as username
+      const username = fidParam;
+
+      // Fetch from Neynar using fnames
+      const response = await neynarClient.fetchBulkUsers({ fnames: [username] });
+
+      const user = response.users?.[0];
+      if (!user) {
+        return NextResponse.json(
+          { error: "User not found" },
+          { status: 404 }
+        );
+      }
+
+      // Cache the response using FID
+      const cacheKey = cacheUser.generateKey([user.fid]);
+      cacheUser.set(cacheKey, response);
+
+      return NextResponse.json({
+        fid: user.fid,
+        username: user.username,
+        display_name: user.display_name,
+        pfp_url: user.pfp_url,
+        bio: user.profile?.bio?.text,
+        follower_count: user.follower_count,
+        following_count: user.following_count,
+        verified: user.verified_addresses?.eth_addresses?.length > 0 || user.verified_addresses?.sol_addresses?.length > 0,
+      });
     }
 
+    // Original FID-based logic
     // Check cache first
     const cacheKey = cacheUser.generateKey([fid]);
     const cached = cacheUser.get(cacheKey);
