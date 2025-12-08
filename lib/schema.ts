@@ -455,12 +455,14 @@ export const collectionCasts = pgTable("collection_casts", {
   castHash: text("cast_hash").notNull().references(() => curatedCasts.castHash, { onDelete: "cascade" }),
   curatorFid: bigint("curator_fid", { mode: "number" }).notNull().references(() => users.fid),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  order: integer("order"),
 }, (table) => ({
   collectionIdCastHashUnique: uniqueIndex("collection_casts_collection_id_cast_hash_key").on(table.collectionId, table.castHash),
   collectionIdIdx: index("collection_casts_collection_id_idx").on(table.collectionId),
   castHashIdx: index("collection_casts_cast_hash_idx").on(table.castHash),
   curatorFidIdx: index("collection_casts_curator_fid_idx").on(table.curatorFid),
   createdAtIdx: index("collection_casts_created_at_idx").on(table.createdAt),
+  orderIdx: index("collection_casts_order_idx").on(table.order),
 }));
 
 export type User = typeof users.$inferSelect;

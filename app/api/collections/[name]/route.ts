@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { collections, collectionCasts, curatedCasts, users } from "@/lib/schema";
-import { eq, and, desc, lt, inArray } from "drizzle-orm";
+import { collections, collectionCasts, curatedCasts } from "@/lib/schema";
+import { eq, and, desc, asc, lt, inArray, sql } from "drizzle-orm";
 import { enrichCastsWithViewerContext } from "@/lib/interactions";
 import { Cast } from "@neynar/nodejs-sdk/build/api";
 
@@ -164,10 +164,15 @@ export async function GET(
         castHash: collectionCasts.castHash,
         curatorFid: collectionCasts.curatorFid,
         createdAt: collectionCasts.createdAt,
+        order: collectionCasts.order,
       })
       .from(collectionCasts)
       .where(and(eq(collectionCasts.collectionId, collectionData.id), cursorCondition))
-      .orderBy(desc(collectionCasts.createdAt))
+      .orderBy(
+        sql`CASE WHEN ${collectionCasts.order} IS NULL THEN 1 ELSE 0 END`,
+        asc(collectionCasts.order),
+        desc(collectionCasts.createdAt)
+      )
       .limit(Math.min(limit, 100));
 
     if (collectionCastsList.length === 0) {

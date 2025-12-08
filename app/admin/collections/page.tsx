@@ -737,6 +737,9 @@ function ManageCastsModal({
   const [castHash, setCastHash] = useState("");
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [reordering, setReordering] = useState(false);
 
   useEffect(() => {
     loadCasts();
@@ -841,6 +844,65 @@ function ManageCastsModal({
     }
   };
 
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex !== null && draggedIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragOverIndex(null);
+  };
+
+  const handleDrop = async (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === dropIndex) {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+
+    const newCasts = [...casts];
+    const draggedCast = newCasts[draggedIndex];
+    newCasts.splice(draggedIndex, 1);
+    newCasts.splice(dropIndex, 0, draggedCast);
+    setCasts(newCasts);
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+
+    // Save new order to API
+    setReordering(true);
+    try {
+      const castHashes = newCasts.map((cast) => cast.hash);
+      const response = await fetch(`/api/collections/${encodeURIComponent(collection.name)}/reorder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          adminFid: userFid,
+          castHashes: castHashes,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to reorder casts");
+      }
+
+      onSuccess("Casts reordered successfully");
+    } catch (error: any) {
+      onError(error.message || "Failed to reorder casts");
+      // Revert on error
+      loadCasts();
+    } finally {
+      setReordering(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white dark:bg-gray-900 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
@@ -851,7 +913,7 @@ function ManageCastsModal({
                 Manage Casts: {collection.displayName || collection.name}
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Add or remove casts from this collection
+                Add, remove, or reorder casts by dragging
               </p>
             </div>
             <button
@@ -895,32 +957,62 @@ function ManageCastsModal({
               No casts in this collection yet. Add one above to get started.
             </div>
           ) : (
-            <div className="space-y-4">
-              {casts.map((cast) => (
+            <div className="space-y-2">
+              {reordering && (
+                <div className="text-center text-sm text-gray-500 dark:text-gray-400 py-2">
+                  Saving new order...
+                </div>
+              )}
+              {casts.map((cast, index) => (
                 <div
                   key={cast.hash}
-                  className="flex items-start justify-between p-4 border border-gray-200 dark:border-gray-800 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
+                  draggable
+                  onDragStart={() => handleDragStart(index)}
+                  onDragOver={(e) => handleDragOver(e, index)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, index)}
+                  className={`flex items-start justify-between p-4 border rounded-lg transition-colors ${
+                    draggedIndex === index
+                      ? "opacity-50 border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20"
+                      : dragOverIndex === index
+                      ? "border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20"
+                      : "border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800"
+                  } ${draggedIndex !== null ? "cursor-move" : ""}`}
                 >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Link
-                        href={`/cast/${cast.hash}`}
-                        target="_blank"
-                        className="text-blue-600 dark:text-blue-400 hover:underline font-mono text-sm"
+                  <div className="flex items-start gap-3 flex-1">
+                    <div className="flex-shrink-0 mt-1 text-gray-400 dark:text-gray-500 cursor-move">
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                        className="opacity-50"
                       >
-                        {cast.hash.substring(0, 16)}...
-                      </Link>
+                        <path d="M7 2a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM7 8a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM7 14a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM13 2a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM13 8a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM13 14a2 2 0 1 1 0 4 2 2 0 0 1 0-4z" />
+                      </svg>
                     </div>
-                    {cast.text && (
-                      <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2">
-                        {cast.text}
-                      </p>
-                    )}
-                    {cast.author && (
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        by @{cast.author.username || cast.author.fid}
-                      </p>
-                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Link
+                          href={`/cast/${cast.hash}`}
+                          target="_blank"
+                          className="text-blue-600 dark:text-blue-400 hover:underline font-mono text-sm"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {cast.hash.substring(0, 16)}...
+                        </Link>
+                      </div>
+                      {cast.text && (
+                        <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2">
+                          {cast.text}
+                        </p>
+                      )}
+                      {cast.author && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          by @{cast.author.username || cast.author.fid}
+                        </p>
+                      )}
+                    </div>
                   </div>
                   <button
                     onClick={() => handleRemoveCast(cast.hash)}
