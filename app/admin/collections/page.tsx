@@ -33,6 +33,7 @@ export default function AdminCollectionsPage() {
   const [loading, setLoading] = useState(false);
   const [editingCollection, setEditingCollection] = useState<Collection | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [managingCollection, setManagingCollection] = useState<Collection | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -160,11 +161,9 @@ export default function AdminCollectionsPage() {
           userFid={user.fid}
           onClose={() => {
             setShowCreateModal(false);
-            setEditingCollection(null);
           }}
           onSuccess={() => {
             setShowCreateModal(false);
-            setEditingCollection(null);
             setSuccess("Collection created successfully");
             setTimeout(() => setSuccess(null), 3000);
             loadCollections();
@@ -192,6 +191,24 @@ export default function AdminCollectionsPage() {
           onError={(err) => {
             setError(err);
             setTimeout(() => setError(null), 5000);
+          }}
+        />
+      )}
+
+      {managingCollection && (
+        <ManageCastsModal
+          userFid={user.fid}
+          collection={managingCollection}
+          onClose={() => {
+            setManagingCollection(null);
+          }}
+          onError={(err) => {
+            setError(err);
+            setTimeout(() => setError(null), 5000);
+          }}
+          onSuccess={(msg) => {
+            setSuccess(msg);
+            setTimeout(() => setSuccess(null), 3000);
           }}
         />
       )}
@@ -270,6 +287,12 @@ export default function AdminCollectionsPage() {
                         >
                           View
                         </Link>
+                        <button
+                          onClick={() => setManagingCollection(collection)}
+                          className="text-green-600 dark:text-green-400 hover:text-green-900 dark:hover:text-green-300"
+                        >
+                          Manage Casts
+                        </button>
                         <button
                           onClick={() => setEditingCollection(collection)}
                           className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300"
@@ -601,6 +624,234 @@ function CollectionModal({
               </button>
             </div>
           </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ManageCastsModal({
+  userFid,
+  collection,
+  onClose,
+  onError,
+  onSuccess,
+}: {
+  userFid: number;
+  collection: Collection;
+  onClose: () => void;
+  onError: (error: string) => void;
+  onSuccess: (message: string) => void;
+}) {
+  const [casts, setCasts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
+  const [castHash, setCastHash] = useState("");
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+
+  useEffect(() => {
+    loadCasts();
+  }, [collection.name]);
+
+  const loadCasts = async (loadMore = false) => {
+    try {
+      const url = `/api/collections/${encodeURIComponent(collection.name)}?limit=25${loadMore && cursor ? `&cursor=${cursor}` : ""}`;
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to load casts");
+      }
+
+      if (loadMore) {
+        setCasts([...casts, ...data.casts]);
+      } else {
+        setCasts(data.casts);
+      }
+
+      setCursor(data.next?.cursor || null);
+      setHasMore(!!data.next?.cursor);
+    } catch (error: any) {
+      onError(error.message || "Failed to load casts");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddCast = async () => {
+    if (!castHash.trim()) {
+      onError("Please enter a cast hash");
+      return;
+    }
+
+    setAdding(true);
+    try {
+      // Fetch cast data from Neynar
+      const conversationResponse = await fetch(
+        `/api/conversation?identifier=${encodeURIComponent(castHash.trim())}&type=hash&replyDepth=0`
+      );
+
+      if (!conversationResponse.ok) {
+        const errorData = await conversationResponse.json();
+        throw new Error(errorData.error || "Failed to fetch cast from Neynar");
+      }
+
+      const conversationData = await conversationResponse.json();
+      const castData = conversationData?.conversation?.cast;
+
+      if (!castData) {
+        throw new Error("Cast not found");
+      }
+
+      // Add to collection
+      const addResponse = await fetch(`/api/collections/${encodeURIComponent(collection.name)}/curate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          castHash: castData.hash,
+          curatorFid: userFid,
+          castData: castData,
+        }),
+      });
+
+      if (!addResponse.ok) {
+        const errorData = await addResponse.json();
+        throw new Error(errorData.error || "Failed to add cast to collection");
+      }
+
+      setCastHash("");
+      onSuccess("Cast added successfully");
+      loadCasts();
+    } catch (error: any) {
+      onError(error.message || "Failed to add cast");
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const handleRemoveCast = async (castHashToRemove: string) => {
+    if (!confirm("Are you sure you want to remove this cast from the collection?")) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `/api/collections/${encodeURIComponent(collection.name)}/curate?castHash=${encodeURIComponent(castHashToRemove)}&curatorFid=${userFid}`,
+        { method: "DELETE" }
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to remove cast");
+      }
+
+      onSuccess("Cast removed successfully");
+      loadCasts();
+    } catch (error: any) {
+      onError(error.message || "Failed to remove cast");
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-gray-900 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                Manage Casts: {collection.displayName || collection.name}
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Add or remove casts from this collection
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={castHash}
+              onChange={(e) => setCastHash(e.target.value)}
+              placeholder="Enter cast hash (0x...)"
+              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+              onKeyPress={(e) => {
+                if (e.key === "Enter") {
+                  handleAddCast();
+                }
+              }}
+            />
+            <button
+              onClick={handleAddCast}
+              disabled={adding || !castHash.trim()}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {adding ? "Adding..." : "Add Cast"}
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6">
+          {loading ? (
+            <div className="text-center text-gray-500 py-8">Loading casts...</div>
+          ) : casts.length === 0 ? (
+            <div className="text-center text-gray-500 py-8">
+              No casts in this collection yet. Add one above to get started.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {casts.map((cast) => (
+                <div
+                  key={cast.hash}
+                  className="flex items-start justify-between p-4 border border-gray-200 dark:border-gray-800 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Link
+                        href={`/cast/${cast.hash}`}
+                        target="_blank"
+                        className="text-blue-600 dark:text-blue-400 hover:underline font-mono text-sm"
+                      >
+                        {cast.hash.substring(0, 16)}...
+                      </Link>
+                    </div>
+                    {cast.text && (
+                      <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2">
+                        {cast.text}
+                      </p>
+                    )}
+                    {cast.author && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        by @{cast.author.username || cast.author.fid}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => handleRemoveCast(cast.hash)}
+                    className="ml-4 px-3 py-1 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              {hasMore && (
+                <button
+                  onClick={() => loadCasts(true)}
+                  className="w-full py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg"
+                >
+                  Load More
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
