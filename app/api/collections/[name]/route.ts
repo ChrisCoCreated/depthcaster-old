@@ -35,27 +35,79 @@ function hasImageEmbeds(castData: any): boolean {
   return false;
 }
 
-function shouldHideEmbed(embedUrl: string, hiddenUrls: string[]): boolean {
-  if (!embedUrl || !hiddenUrls || hiddenUrls.length === 0) {
+/**
+ * Normalize a cast hash for comparison (handle 0x prefix, case-insensitive)
+ */
+function normalizeCastHash(hash: string): string {
+  if (!hash) return '';
+  const trimmed = hash.trim();
+  // Remove 0x prefix if present, then add it back for consistent comparison
+  const withoutPrefix = trimmed.startsWith('0x') || trimmed.startsWith('0X') 
+    ? trimmed.slice(2) 
+    : trimmed;
+  return '0x' + withoutPrefix.toLowerCase();
+}
+
+/**
+ * Check if a string is a cast hash (hex string, optionally with 0x prefix)
+ */
+function isCastHash(str: string): boolean {
+  if (!str || typeof str !== 'string') return false;
+  const trimmed = str.trim();
+  const withoutPrefix = trimmed.startsWith('0x') || trimmed.startsWith('0X') 
+    ? trimmed.slice(2) 
+    : trimmed;
+  // Check if it's a valid hex string (at least 1 character, only hex digits)
+  return /^[a-fA-F0-9]+$/.test(withoutPrefix) && withoutPrefix.length > 0;
+}
+
+/**
+ * Check if an embed should be hidden based on hidden URLs or cast hashes
+ */
+function shouldHideEmbed(embed: any, hiddenItems: string[]): boolean {
+  if (!embed || !hiddenItems || hiddenItems.length === 0) {
     return false;
   }
   
-  const normalizedEmbedUrl = embedUrl.toLowerCase().trim();
+  // Check if this is a cast embed
+  const castHash = embed.cast_id?.hash || embed.cast?.hash;
   
-  for (const hiddenUrl of hiddenUrls) {
-    if (typeof hiddenUrl !== 'string') continue;
+  // Check if this is a URL embed
+  const embedUrl = embed.url;
+  
+  for (const hiddenItem of hiddenItems) {
+    if (typeof hiddenItem !== 'string') continue;
     
-    const normalizedHidden = hiddenUrl.toLowerCase().trim();
+    const trimmed = hiddenItem.trim();
+    if (!trimmed) continue;
     
-    const cleanEmbed = normalizedEmbedUrl.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
-    const cleanHidden = normalizedHidden.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
-    
-    if (cleanEmbed === cleanHidden) {
-      return true;
+    // Check if hidden item is a cast hash
+    if (isCastHash(trimmed)) {
+      if (castHash) {
+        const normalizedEmbedHash = normalizeCastHash(castHash);
+        const normalizedHiddenHash = normalizeCastHash(trimmed);
+        if (normalizedEmbedHash === normalizedHiddenHash) {
+          return true;
+        }
+      }
+      continue; // Skip URL matching for cast hashes
     }
     
-    if (normalizedEmbedUrl.includes(cleanHidden)) {
-      return true;
+    // Otherwise, treat as URL and check URL matching
+    if (embedUrl) {
+      const normalizedEmbedUrl = embedUrl.toLowerCase().trim();
+      const normalizedHidden = trimmed.toLowerCase().trim();
+      
+      const cleanEmbed = normalizedEmbedUrl.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+      const cleanHidden = normalizedHidden.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+      
+      if (cleanEmbed === cleanHidden) {
+        return true;
+      }
+      
+      if (normalizedEmbedUrl.includes(cleanHidden)) {
+        return true;
+      }
     }
   }
   
@@ -69,8 +121,8 @@ function filterHiddenEmbeds(cast: Cast, hiddenEmbedUrls: string[] | null): Cast 
   
   const filteredEmbeds = cast.embeds.filter(embed => {
     const embedAny = embed as any;
-    if (!embedAny.url) return true;
-    return !shouldHideEmbed(embedAny.url, hiddenEmbedUrls);
+    // Check both URL embeds and cast embeds
+    return !shouldHideEmbed(embedAny, hiddenEmbedUrls);
   });
   
   return {
