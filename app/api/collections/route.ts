@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { collections, users } from "@/lib/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { isAdmin, getUserRoles } from "@/lib/roles";
 import { canUserAddToCollection } from "@/lib/collection-gating";
 
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const userFid = searchParams.get("userFid") ? parseInt(searchParams.get("userFid")!) : undefined;
 
-    const allCollections = await db.select().from(collections).orderBy(collections.createdAt);
+    const allCollections = await db.select().from(collections).orderBy(desc(collections.createdAt));
 
     if (!userFid) {
       const openCollections = allCollections.filter((c) => c.accessType === "open");
