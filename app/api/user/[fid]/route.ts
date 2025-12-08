@@ -12,6 +12,9 @@ export async function GET(
     const { fid: fidParam } = await params;
     const fid = parseInt(fidParam);
     const isFid = !isNaN(fid);
+    const searchParams = request.nextUrl.searchParams;
+    const viewerFidParam = searchParams.get("viewerFid");
+    const viewerFid = viewerFidParam ? parseInt(viewerFidParam) : undefined;
 
     // Check if it's a username (not a valid FID)
     if (!isFid) {
@@ -37,7 +40,7 @@ export async function GET(
       const cacheKey = cacheUser.generateKey([userFid]);
       const cached = cacheUser.get(cacheKey);
       
-      if (cached?.users?.[0]) {
+      if (cached?.users?.[0] && !viewerFid) {
         const user = cached.users[0];
         return NextResponse.json({
           fid: user.fid,
@@ -48,12 +51,16 @@ export async function GET(
           follower_count: user.follower_count,
           following_count: user.following_count,
           verified: user.verified_addresses?.eth_addresses?.length > 0 || user.verified_addresses?.sol_addresses?.length > 0,
+          isFollowing: false,
         });
       }
 
       // Fetch from Neynar using FID
       const response = await deduplicateRequest(cacheKey, async () => {
-        return await neynarClient.fetchBulkUsers({ fids: [userFid] });
+        return await neynarClient.fetchBulkUsers({ 
+          fids: [userFid],
+          viewerFid,
+        });
       });
 
       const user = response.users?.[0];
@@ -64,8 +71,10 @@ export async function GET(
         );
       }
 
-      // Cache the response
-      cacheUser.set(cacheKey, response);
+      // Cache the response (only if no viewerFid to avoid caching viewer-specific data)
+      if (!viewerFid) {
+        cacheUser.set(cacheKey, response);
+      }
 
       return NextResponse.json({
         fid: user.fid,
@@ -76,14 +85,15 @@ export async function GET(
         follower_count: user.follower_count,
         following_count: user.following_count,
         verified: user.verified_addresses?.eth_addresses?.length > 0 || user.verified_addresses?.sol_addresses?.length > 0,
+        isFollowing: user.viewer_context?.following || false,
       });
     }
 
     // Original FID-based logic
-    // Check cache first
+    // Check cache first (only if no viewerFid)
     const cacheKey = cacheUser.generateKey([fid]);
     const cached = cacheUser.get(cacheKey);
-    if (cached?.users?.[0]) {
+    if (cached?.users?.[0] && !viewerFid) {
       const user = cached.users[0];
       return NextResponse.json({
         fid: user.fid,
@@ -94,12 +104,16 @@ export async function GET(
         follower_count: user.follower_count,
         following_count: user.following_count,
         verified: user.verified_addresses?.eth_addresses?.length > 0 || user.verified_addresses?.sol_addresses?.length > 0,
+        isFollowing: false,
       });
     }
 
     // Fetch from Neynar
     const response = await deduplicateRequest(cacheKey, async () => {
-      return await neynarClient.fetchBulkUsers({ fids: [fid] });
+      return await neynarClient.fetchBulkUsers({ 
+        fids: [fid],
+        viewerFid,
+      });
     });
 
     const user = response.users?.[0];
@@ -110,8 +124,10 @@ export async function GET(
       );
     }
 
-    // Cache the response
-    cacheUser.set(cacheKey, response);
+    // Cache the response (only if no viewerFid to avoid caching viewer-specific data)
+    if (!viewerFid) {
+      cacheUser.set(cacheKey, response);
+    }
 
     return NextResponse.json({
       fid: user.fid,
@@ -122,6 +138,7 @@ export async function GET(
       follower_count: user.follower_count,
       following_count: user.following_count,
       verified: user.verified_addresses?.eth_addresses?.length > 0 || user.verified_addresses?.sol_addresses?.length > 0,
+      isFollowing: user.viewer_context?.following || false,
     });
   } catch (error: any) {
     console.error("Error fetching user profile:", error);

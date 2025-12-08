@@ -2431,7 +2431,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
               return uniqueProfiles.length > 0 ? (
                 <div className="my-3 space-y-3">
                   {uniqueProfiles.map((profile: any) => (
-                    <MentionedProfileCard key={profile.fid} profile={profile} />
+                    <MentionedProfileCard key={profile.fid} profile={profile} viewerFid={user?.fid} />
                   ))}
                 </div>
               ) : null;

@@ -16,6 +16,7 @@ interface UserProfile {
   follower_count?: number;
   following_count?: number;
   verified?: boolean;
+  isFollowing?: boolean;
 }
 
 export default function ProfilePage({
@@ -34,15 +35,20 @@ export default function ProfilePage({
 
   useEffect(() => {
     fetchProfile();
-  }, [fidParam]);
+  }, [fidParam, user?.fid]);
 
   const fetchProfile = async () => {
     try {
       setLoading(true);
       setError(null);
 
+      const viewerFid = user?.fid;
+      const url = viewerFid
+        ? `/api/user/${encodeURIComponent(fidParam)}?viewerFid=${viewerFid}`
+        : `/api/user/${encodeURIComponent(fidParam)}`;
+
       // Pass the parameter as-is (can be FID or username)
-      const response = await fetch(`/api/user/${encodeURIComponent(fidParam)}`);
+      const response = await fetch(url);
       if (!response.ok) {
         if (response.status === 404) {
           setError("User not found");
@@ -106,6 +112,7 @@ export default function ProfilePage({
           followingCount={profile.following_count}
           verified={profile.verified}
           viewerFid={viewerFid}
+          isFollowing={profile.isFollowing}
           onProfileUpdate={handleProfileUpdate}
         />
 

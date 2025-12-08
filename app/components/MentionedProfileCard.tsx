@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
+import { useNeynarContext } from "@neynar/react";
 import { AvatarImage } from "./AvatarImage";
 
 interface MentionedProfileCardProps {
@@ -22,9 +24,13 @@ interface MentionedProfileCardProps {
     following_count?: number;
     url?: string;
   };
+  viewerFid?: number;
 }
 
-export function MentionedProfileCard({ profile }: MentionedProfileCardProps) {
+export function MentionedProfileCard({ profile, viewerFid }: MentionedProfileCardProps) {
+  const { user } = useNeynarContext();
+  const [followLoading, setFollowLoading] = useState(false);
+  const [followSuccess, setFollowSuccess] = useState(false);
   const bannerUrl = profile.profile?.banner?.url;
   const bio = profile.profile?.bio?.text;
   const displayName = profile.display_name || profile.username || `User ${profile.fid}`;
@@ -33,6 +39,33 @@ export function MentionedProfileCard({ profile }: MentionedProfileCardProps) {
   const followerCount = profile.follower_count ?? 0;
   const followingCount = profile.following_count ?? 0;
   const url = profile.url;
+
+  const handleFollow = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user?.signer_uuid || !viewerFid) return;
+    setFollowLoading(true);
+    try {
+      const response = await fetch(`/api/user/${profile.fid}/follow`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          signerUuid: user.signer_uuid,
+        }),
+      });
+
+      if (response.ok) {
+        setFollowSuccess(true);
+        setTimeout(() => setFollowSuccess(false), 2000);
+      } else {
+        const data = await response.json();
+        console.error("Failed to follow user:", data.error);
+      }
+    } catch (error) {
+      console.error("Failed to follow user:", error);
+    } finally {
+      setFollowLoading(false);
+    }
+  };
 
   return (
     <Link
@@ -121,6 +154,21 @@ export function MentionedProfileCard({ profile }: MentionedProfileCardProps) {
                 >
                   {url}
                 </a>
+              )}
+
+              {/* Follow Button */}
+              {viewerFid && viewerFid !== profile.fid && (
+                <button
+                  onClick={handleFollow}
+                  disabled={followLoading || followSuccess}
+                  className={`px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium ${
+                    followSuccess
+                      ? "bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400"
+                      : "bg-blue-600 text-white hover:bg-blue-700"
+                  }`}
+                >
+                  {followLoading ? "..." : followSuccess ? "Followed!" : "Follow"}
+                </button>
               )}
             </div>
           </div>

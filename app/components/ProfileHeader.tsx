@@ -15,6 +15,7 @@ interface ProfileHeaderProps {
   followingCount?: number;
   verified?: boolean;
   viewerFid?: number;
+  isFollowing?: boolean;
   onProfileUpdate?: () => void;
 }
 
@@ -28,11 +29,14 @@ export function ProfileHeader({
   followingCount,
   verified,
   viewerFid,
+  isFollowing: initialIsFollowing = false,
   onProfileUpdate,
 }: ProfileHeaderProps) {
   const { user } = useNeynarContext();
   const [isWatching, setIsWatching] = useState(false);
   const [watchLoading, setWatchLoading] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(initialIsFollowing);
+  const [followLoading, setFollowLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editDisplayName, setEditDisplayName] = useState(displayName || "");
   const [editBio, setEditBio] = useState(bio || "");
@@ -42,6 +46,11 @@ export function ProfileHeader({
   const [isCurator, setIsCurator] = useState(false);
 
   const isOwnProfile = user?.fid === fid;
+
+  // Update isFollowing when prop changes
+  useEffect(() => {
+    setIsFollowing(initialIsFollowing);
+  }, [initialIsFollowing]);
 
   // Check watch status on mount
   useEffect(() => {
@@ -185,6 +194,61 @@ export function ProfileHeader({
     setUpdateSuccess(false);
   };
 
+  const handleFollow = async () => {
+    if (!user?.signer_uuid || !viewerFid) return;
+    setFollowLoading(true);
+    try {
+      const response = await fetch(`/api/user/${fid}/follow`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          signerUuid: user.signer_uuid,
+        }),
+      });
+
+      if (response.ok) {
+        setIsFollowing(true);
+        if (onProfileUpdate) {
+          onProfileUpdate();
+        }
+      } else {
+        const data = await response.json();
+        console.error("Failed to follow user:", data.error);
+      }
+    } catch (error) {
+      console.error("Failed to follow user:", error);
+    } finally {
+      setFollowLoading(false);
+    }
+  };
+
+  const handleUnfollow = async () => {
+    if (!user?.signer_uuid || !viewerFid) return;
+    setFollowLoading(true);
+    try {
+      const response = await fetch(
+        `/api/user/${fid}/follow?signerUuid=${user.signer_uuid}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (response.ok) {
+        setIsFollowing(false);
+        if (onProfileUpdate) {
+          onProfileUpdate();
+        }
+      } else {
+        const data = await response.json();
+        console.error("Failed to unfollow user:", data.error);
+      }
+    } catch (error) {
+      console.error("Failed to unfollow user:", error);
+    } finally {
+      setFollowLoading(false);
+    }
+  };
+
   return (
     <div className="border-b border-gray-200 dark:border-gray-800 pb-6 mb-6">
       <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
@@ -273,17 +337,30 @@ export function ProfileHeader({
                 </div>
               ) : (
                 viewerFid && (
-                  <button
-                    onClick={isWatching ? handleUnwatch : handleWatch}
-                    disabled={watchLoading}
-                    className={`px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium ${
-                      isWatching
-                        ? "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-                        : "bg-blue-600 text-white hover:bg-blue-700"
-                    }`}
-                  >
-                    {watchLoading ? "..." : isWatching ? "Unwatch" : "Watch"}
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={isFollowing ? handleUnfollow : handleFollow}
+                      disabled={followLoading}
+                      className={`px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium ${
+                        isFollowing
+                          ? "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                          : "bg-blue-600 text-white hover:bg-blue-700"
+                      }`}
+                    >
+                      {followLoading ? "..." : isFollowing ? "Following" : "Follow"}
+                    </button>
+                    <button
+                      onClick={isWatching ? handleUnwatch : handleWatch}
+                      disabled={watchLoading}
+                      className={`px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium ${
+                        isWatching
+                          ? "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                          : "bg-blue-600 text-white hover:bg-blue-700"
+                      }`}
+                    >
+                      {watchLoading ? "..." : isWatching ? "Unwatch" : "Watch"}
+                    </button>
+                  </div>
                 )
               )}
             </div>
