@@ -9,10 +9,10 @@ export const dynamic = "force-dynamic";
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ name: string }> }
 ) {
   try {
-    const { id } = await params;
+    const { name } = await params;
     const body = await request.json();
     const { adminFid, displayName, description, accessType, gatedUserId, gatingRule, displayType, autoCurationEnabled, autoCurationRules, displayMode, headerConfig } = body;
 
@@ -34,7 +34,7 @@ export async function PUT(
       return NextResponse.json({ error: "User does not have admin or superadmin role" }, { status: 403 });
     }
 
-    const existing = await db.select().from(collections).where(eq(collections.id, id)).limit(1);
+    const existing = await db.select().from(collections).where(eq(collections.name, name)).limit(1);
     if (existing.length === 0) {
       return NextResponse.json({ error: "Collection not found" }, { status: 404 });
     }
@@ -59,7 +59,7 @@ export async function PUT(
     if (displayMode !== undefined) updateData.displayMode = displayMode;
     if (headerConfig !== undefined) updateData.headerConfig = headerConfig;
 
-    const updated = await db.update(collections).set(updateData).where(eq(collections.id, id)).returning();
+    const updated = await db.update(collections).set(updateData).where(eq(collections.name, name)).returning();
     return NextResponse.json({ collection: updated[0] });
   } catch (error: unknown) {
     const err = error as { message?: string };
@@ -70,10 +70,10 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ name: string }> }
 ) {
   try {
-    const { id } = await params;
+    const { name } = await params;
     const searchParams = request.nextUrl.searchParams;
     const adminFid = searchParams.get("adminFid");
 
@@ -95,12 +95,12 @@ export async function DELETE(
       return NextResponse.json({ error: "User does not have admin or superadmin role" }, { status: 403 });
     }
 
-    const existing = await db.select().from(collections).where(eq(collections.id, id)).limit(1);
+    const existing = await db.select().from(collections).where(eq(collections.name, name)).limit(1);
     if (existing.length === 0) {
       return NextResponse.json({ error: "Collection not found" }, { status: 404 });
     }
 
-    await db.delete(collections).where(eq(collections.id, id));
+    await db.delete(collections).where(eq(collections.name, name));
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
     const err = error as { message?: string };
