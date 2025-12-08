@@ -18,8 +18,43 @@ export async function GET(
       // Treat as username
       const username = fidParam;
 
-      // Fetch from Neynar using fnames
-      const response = await neynarClient.fetchBulkUsers({ fnames: [username] });
+      // Search for user by username
+      const searchResult = await neynarClient.searchUser({
+        q: username,
+        limit: 1,
+      });
+      
+      const foundUser = searchResult.result?.users?.[0];
+      if (!foundUser) {
+        return NextResponse.json(
+          { error: "User not found" },
+          { status: 404 }
+        );
+      }
+
+      // Fetch full user data using FID (to use caching)
+      const userFid = foundUser.fid;
+      const cacheKey = cacheUser.generateKey([userFid]);
+      const cached = cacheUser.get(cacheKey);
+      
+      if (cached?.users?.[0]) {
+        const user = cached.users[0];
+        return NextResponse.json({
+          fid: user.fid,
+          username: user.username,
+          display_name: user.display_name,
+          pfp_url: user.pfp_url,
+          bio: user.profile?.bio?.text,
+          follower_count: user.follower_count,
+          following_count: user.following_count,
+          verified: user.verified_addresses?.eth_addresses?.length > 0 || user.verified_addresses?.sol_addresses?.length > 0,
+        });
+      }
+
+      // Fetch from Neynar using FID
+      const response = await deduplicateRequest(cacheKey, async () => {
+        return await neynarClient.fetchBulkUsers({ fids: [userFid] });
+      });
 
       const user = response.users?.[0];
       if (!user) {
@@ -29,8 +64,7 @@ export async function GET(
         );
       }
 
-      // Cache the response using FID
-      const cacheKey = cacheUser.generateKey([user.fid]);
+      // Cache the response
       cacheUser.set(cacheKey, response);
 
       return NextResponse.json({
