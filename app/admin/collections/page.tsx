@@ -71,13 +71,47 @@ export default function AdminCollectionsPage() {
   const loadCollections = async () => {
     if (!user?.fid) return;
     setLoading(true);
+    setError(null);
     try {
       const response = await fetch(`/api/collections?userFid=${user.fid}`);
+      
+      // Log response details
+      console.log("[Frontend] Collections API response:", {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        url: response.url
+      });
+      
       const data = await response.json();
+      
+      // Log response data
+      console.log("[Frontend] Collections API data:", data);
+      
+      if (!response.ok) {
+        // Log error response details
+        console.error("[Frontend] Collections API error response:", {
+          status: response.status,
+          statusText: response.statusText,
+          error: data.error,
+          code: data.code,
+          hint: data.hint,
+          fullData: data
+        });
+        setError(data.error || `Failed to load collections (${response.status})`);
+        return;
+      }
+      
       setCollections(data.collections || []);
     } catch (error) {
-      console.error("Failed to load collections:", error);
-      setError("Failed to load collections");
+      // Log full error details
+      console.error("[Frontend] Failed to load collections - exception:", {
+        error,
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        name: error instanceof Error ? error.name : undefined
+      });
+      setError(error instanceof Error ? error.message : "Failed to load collections");
     } finally {
       setLoading(false);
     }

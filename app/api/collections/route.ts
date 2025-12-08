@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { collections, users } from "@/lib/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { isAdmin, getUserRoles } from "@/lib/roles";
 import { canUserAddToCollection } from "@/lib/collection-gating";
 
@@ -49,9 +49,33 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ collections: accessibleCollections });
   } catch (error: unknown) {
-    const err = error as { message?: string };
-    console.error("Collections GET API error:", err.message || err);
-    return NextResponse.json({ error: err.message || "Failed to fetch collections" }, { status: 500 });
+    const err = error as { 
+      message?: string; 
+      code?: string; 
+      detail?: string; 
+      hint?: string; 
+      cause?: any;
+      stack?: string;
+    };
+    
+    // Log comprehensive error details
+    console.error("Collections GET API error:", {
+      message: err.message,
+      code: err.code,
+      detail: err.detail,
+      hint: err.hint,
+      cause: err.cause,
+      stack: err.stack,
+      fullError: error
+    });
+    
+    // Return detailed error message
+    const errorMessage = err.detail || err.message || "Failed to fetch collections";
+    return NextResponse.json({ 
+      error: errorMessage,
+      code: err.code,
+      hint: err.hint 
+    }, { status: 500 });
   }
 }
 
@@ -123,11 +147,35 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ collection: newCollection[0] });
   } catch (error: unknown) {
-    const err = error as { code?: string; message?: string };
-    console.error("Collections POST API error:", err.message || err);
+    const err = error as { 
+      code?: string; 
+      message?: string;
+      detail?: string;
+      hint?: string;
+      cause?: any;
+      stack?: string;
+    };
+    
+    // Log comprehensive error details
+    console.error("Collections POST API error:", {
+      message: err.message,
+      code: err.code,
+      detail: err.detail,
+      hint: err.hint,
+      cause: err.cause,
+      stack: err.stack,
+      fullError: error
+    });
+    
     if (err.code === "23505" || err.message?.includes("unique")) {
       return NextResponse.json({ error: "Collection with this name already exists" }, { status: 409 });
     }
-    return NextResponse.json({ error: err.message || "Failed to create collection" }, { status: 500 });
+    
+    const errorMessage = err.detail || err.message || "Failed to create collection";
+    return NextResponse.json({ 
+      error: errorMessage,
+      code: err.code,
+      hint: err.hint 
+    }, { status: 500 });
   }
 }
