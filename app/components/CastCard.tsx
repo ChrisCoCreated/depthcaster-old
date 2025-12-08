@@ -21,6 +21,8 @@ import { hasActiveProSubscription } from "@/lib/castLimits";
 import { VideoPlayer } from "./VideoPlayer";
 import { CuratorBadge } from "./CuratorBadge";
 import { DisplayMode } from "@/lib/customFeeds";
+import { CollectionSelectModal } from "./CollectionSelectModal";
+import { isFeatureEnabledClient, FEATURE_FLAGS } from "@/lib/feature-flags";
 
 const CURATED_FEED_COLLAPSE_LINE_LIMIT = 8;
 
@@ -816,6 +818,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
   const [curators, setCurators] = useState<Array<{ fid: number; username?: string; display_name?: string; pfp_url?: string }>>([]);
   const [showUncurateConfirm, setShowUncurateConfirm] = useState(false);
   const [showCurateConfirm, setShowCurateConfirm] = useState(false);
+  const [showCollectionSelectModal, setShowCollectionSelectModal] = useState(false);
   const [topReplies, setTopReplies] = useState<any[]>(cast._topReplies || []);
   const [hasAnyReplies, setHasAnyReplies] = useState<boolean | undefined>(undefined);
   const [repliesLoading, setRepliesLoading] = useState(false);
@@ -1648,11 +1651,19 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
       return;
     }
 
-    // Show confirmation dialog before curating
-    setShowCurateConfirm(true);
+    // Check if collections feature is enabled
+    const isCollectionsEnabled = isFeatureEnabledClient(FEATURE_FLAGS.COLLECTIONS_ENABLED);
+    
+    if (isCollectionsEnabled) {
+      // Show collection selection modal
+      setShowCollectionSelectModal(true);
+    } else {
+      // Show simple confirmation dialog (existing behavior)
+      setShowCurateConfirm(true);
+    }
   };
 
-  const handleConfirmCurate = async () => {
+  const handleConfirmCurate = async (collectionName: string | null = null) => {
     if (!user?.fid) {
       return;
     }
@@ -1661,8 +1672,14 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
     try {
       setIsCurating(true);
       setShowCurateConfirm(false);
+      setShowCollectionSelectModal(false);
       
-      const response = await fetch("/api/curate", {
+      // If collectionName is provided, add to collection instead of main feed
+      const apiEndpoint = collectionName 
+        ? `/api/collections/${collectionName}/curate`
+        : "/api/curate";
+      
+      const response = await fetch(apiEndpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1694,23 +1711,28 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
         return;
       }
 
-      // Success - refresh curation status
-      const checkResponse = await fetch(`/api/curate?castHash=${cast.hash}`);
-      let updatedCurators: Array<{ fid: number; username?: string; display_name?: string; pfp_url?: string }> = [];
-      if (checkResponse.ok) {
-        const data = await checkResponse.json();
-        setIsCurated(data.isCurated);
-        // Use curators in chronological order (oldest first) from API
-        updatedCurators = data.curatorInfo || [];
-        setCurators(updatedCurators);
+      // Success - refresh curation status (only for main feed)
+      if (!collectionName) {
+        const checkResponse = await fetch(`/api/curate?castHash=${cast.hash}`);
+        let updatedCurators: Array<{ fid: number; username?: string; display_name?: string; pfp_url?: string }> = [];
+        if (checkResponse.ok) {
+          const data = await checkResponse.json();
+          setIsCurated(data.isCurated);
+          // Use curators in chronological order (oldest first) from API
+          updatedCurators = data.curatorInfo || [];
+          setCurators(updatedCurators);
+        }
       }
 
       // Track analytics
       analytics.trackCurateCast(cast.hash, user.fid);
 
       // Show curated toast
+      const successMessage = collectionName 
+        ? `Added to collection: ${collectionName}`
+        : "Curated to your feed";
       window.dispatchEvent(new CustomEvent("showToast", { 
-        detail: { message: "Curated to your feed", type: "success" } 
+        detail: { message: successMessage, type: "success" } 
       }));
 
       // Scroll to the cast in the feed
@@ -3433,7 +3455,19 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
       )}
 
       {/* Curate Confirmation Modal */}
-      {showCurateConfirm && (
+      {/* Collection Select Modal (when feature enabled) */}
+      {showCollectionSelectModal && (
+        <CollectionSelectModal
+          isOpen={showCollectionSelectModal}
+          onClose={() => setShowCollectionSelectModal(false)}
+          onSelect={handleConfirmCurate}
+          castHash={cast.hash}
+          castData={cast}
+        />
+      )}
+
+      {/* Simple Curate Confirm Modal (when feature disabled) */}
+      {showCurateConfirm && !isFeatureEnabledClient(FEATURE_FLAGS.COLLECTIONS_ENABLED) && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
           onClick={() => setShowCurateConfirm(false)}
@@ -3456,7 +3490,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                 Cancel
               </button>
               <button
-                onClick={handleConfirmCurate}
+                onClick={() => handleConfirmCurate(null)}
                 disabled={isCurating}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
