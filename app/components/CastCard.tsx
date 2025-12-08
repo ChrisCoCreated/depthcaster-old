@@ -857,6 +857,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
   const [isAuthorCurator, setIsAuthorCurator] = useState(false);
   const [tags, setTags] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [showTagMenu, setShowTagMenu] = useState(false);
   const [isTagging, setIsTagging] = useState(false);
   const [showAutoLikeNotification, setShowAutoLikeNotification] = useState(false);
@@ -1261,6 +1262,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
         if (adminResponse.ok) {
           const adminData = await adminResponse.json();
           setIsAdmin(adminData.isAdmin || false);
+          setIsSuperAdmin(adminData.isSuperAdmin || false);
         }
 
         // Fetch tags
@@ -1653,8 +1655,12 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
 
     // Check if collections feature is enabled
     const isCollectionsEnabled = isFeatureEnabledClient(FEATURE_FLAGS.COLLECTIONS_ENABLED);
+    const isCollectionsEnabledForSuperadmins = isFeatureEnabledClient(FEATURE_FLAGS.COLLECTIONS_ENABLED_FOR_SUPERADMINS);
     
-    if (isCollectionsEnabled) {
+    // Show collection modal if:
+    // 1. Feature flag is enabled for everyone, OR
+    // 2. Superadmin feature flag is enabled AND user is a superadmin
+    if (isCollectionsEnabled || (isCollectionsEnabledForSuperadmins && isSuperAdmin)) {
       // Show collection selection modal
       setShowCollectionSelectModal(true);
     } else {
