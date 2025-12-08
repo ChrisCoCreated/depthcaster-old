@@ -41,6 +41,7 @@ export function MentionedProfileCard({ profile, viewerFid }: MentionedProfileCar
   const url = profile.url;
 
   const handleFollow = async (e: React.MouseEvent) => {
+    e.preventDefault();
     e.stopPropagation();
     if (!user?.signer_uuid || !viewerFid) return;
     setFollowLoading(true);
@@ -161,10 +162,10 @@ export function MentionedProfileCard({ profile, viewerFid }: MentionedProfileCar
                 <button
                   onClick={handleFollow}
                   disabled={followLoading || followSuccess}
-                  className={`px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium ${
+                  className={`px-4 py-1.5 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium ${
                     followSuccess
                       ? "bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400"
-                      : "bg-blue-600 text-white hover:bg-blue-700"
+                      : "bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
                   }`}
                 >
                   {followLoading ? "..." : followSuccess ? "Followed!" : "Follow"}
