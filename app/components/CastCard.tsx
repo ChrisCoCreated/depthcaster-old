@@ -1712,9 +1712,9 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
       }
 
       // Success - refresh curation status (only for main feed)
+      let updatedCurators: Array<{ fid: number; username?: string; display_name?: string; pfp_url?: string }> = [];
       if (!collectionName) {
         const checkResponse = await fetch(`/api/curate?castHash=${cast.hash}`);
-        let updatedCurators: Array<{ fid: number; username?: string; display_name?: string; pfp_url?: string }> = [];
         if (checkResponse.ok) {
           const data = await checkResponse.json();
           setIsCurated(data.isCurated);
@@ -1722,6 +1722,9 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
           updatedCurators = data.curatorInfo || [];
           setCurators(updatedCurators);
         }
+      } else {
+        // For collections, use current curators list
+        updatedCurators = curators;
       }
 
       // Track analytics
