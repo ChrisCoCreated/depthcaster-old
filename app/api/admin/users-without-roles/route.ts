@@ -60,7 +60,16 @@ export async function GET(request: NextRequest) {
     }
 
     // Get users with their roles
-    let query = db
+    // Build where condition based on search query
+    const whereConditions = [inArray(users.fid, loggedInFids)];
+    if (searchQuery && searchQuery.length >= 2) {
+      whereConditions.push(
+        isNotNull(users.username),
+        ilike(users.username, `%${searchQuery}%`)
+      );
+    }
+
+    const query = db
       .select({
         fid: users.fid,
         username: users.username,
@@ -70,18 +79,7 @@ export async function GET(request: NextRequest) {
       })
       .from(users)
       .leftJoin(userRoles, eq(users.fid, userRoles.userFid))
-      .where(inArray(users.fid, loggedInFids));
-
-    // If search query provided, filter by username
-    if (searchQuery && searchQuery.length >= 2) {
-      query = query.where(
-        and(
-          inArray(users.fid, loggedInFids),
-          isNotNull(users.username),
-          ilike(users.username, `%${searchQuery}%`)
-        )
-      ) as any;
-    }
+      .where(and(...whereConditions));
 
     const results = await query;
 
