@@ -17,7 +17,7 @@ export async function POST(
   try {
     const { name } = await params;
     const body = await request.json();
-    const { castHash, curatorFid, castData } = body;
+    const { castHash, curatorFid, castData, translatedText } = body;
 
     if (!castHash) {
       return NextResponse.json({ error: "castHash is required" }, { status: 400 });
@@ -66,6 +66,11 @@ export async function POST(
 
     if (existingCast.length === 0) {
       const metadata = extractCastMetadata(castData);
+      
+      // Use translated text if provided, otherwise use extracted text
+      const castText = translatedText || metadata.castText;
+      const castTextLength = castText ? castText.length : 0;
+      
       if (metadata.authorFid) {
         const authorData = (castData as any)?.author;
         await upsertUser(metadata.authorFid, {
@@ -86,8 +91,8 @@ export async function POST(
           topReplies: null,
           repliesUpdatedAt: null,
           conversationFetchedAt: null,
-          castText: metadata.castText,
-          castTextLength: metadata.castTextLength,
+          castText: castText,
+          castTextLength: castTextLength,
           authorFid: metadata.authorFid,
           likesCount: metadata.likesCount,
           recastsCount: metadata.recastsCount,
@@ -107,6 +112,10 @@ export async function POST(
                 displayName: authorData?.display_name,
                 pfpUrl: authorData?.pfp_url,
               });
+              // Use translated text if provided, otherwise use extracted text
+              const castText = translatedText || metadata.castText;
+              const castTextLength = castText ? castText.length : 0;
+              
               await db.insert(curatedCasts).values({
                 castHash,
                 castData,
@@ -115,8 +124,8 @@ export async function POST(
                 topReplies: null,
                 repliesUpdatedAt: null,
                 conversationFetchedAt: null,
-                castText: metadata.castText,
-                castTextLength: metadata.castTextLength,
+                castText: castText,
+                castTextLength: castTextLength,
                 authorFid: metadata.authorFid,
                 likesCount: metadata.likesCount,
                 recastsCount: metadata.recastsCount,

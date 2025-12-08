@@ -31,8 +31,12 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>,
   // First, convert base.app links inline
   const textWithConvertedBaseLinks = convertBaseAppLinksInline(text);
   
-  // Mention regex pattern - matches @{username} format
-  const mentionRegex = /@\{([a-zA-Z0-9_-]+)\}/g;
+  // Mention regex pattern - matches @username or @{username} format
+  // Matches @{username} or @username (username can contain dots like base.base.eth)
+  // For @username format, matches until whitespace, punctuation, or end of string
+  // For @{username} format, matches the content inside braces
+  const mentionRegexWithBraces = /@\{([a-zA-Z0-9_.-]+)\}/g;
+  const mentionRegexWithoutBraces = /@([a-zA-Z0-9](?:[a-zA-Z0-9_.-]*[a-zA-Z0-9])?)(?=\s|$|[.,;:!?)\]])/g;
   
   // URL regex pattern - matches http(s):// URLs, www. URLs, domain-like patterns, and /cast/ paths
   const urlRegex = /(https?:\/\/[^\s<>"']+)|(www\.[^\s<>"']+)|(\/cast\/0x[a-fA-F0-9]{8,})|([a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.(?:[a-zA-Z]{2,})(?:\/[^\s<>"']*)?)/g;
@@ -40,14 +44,50 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>,
   const parts: (string | ReactElement)[] = [];
   let lastIndex = 0;
   
-  // First, process mentions
+  // First, process mentions with braces
   const mentionMatches: Array<{ index: number; length: number; username: string }> = [];
   let mentionMatch;
-  while ((mentionMatch = mentionRegex.exec(textWithConvertedBaseLinks)) !== null) {
+  while ((mentionMatch = mentionRegexWithBraces.exec(textWithConvertedBaseLinks)) !== null) {
+    const username = mentionMatch[1];
+    if (!username) continue;
+    
     mentionMatches.push({
       index: mentionMatch.index,
       length: mentionMatch[0].length,
-      username: mentionMatch[1],
+      username: username,
+    });
+  }
+  
+  // Then process mentions without braces
+  while ((mentionMatch = mentionRegexWithoutBraces.exec(textWithConvertedBaseLinks)) !== null) {
+    // Check if it's part of an email address (has alphanumeric before @)
+    const beforeChar = mentionMatch.index > 0 
+      ? textWithConvertedBaseLinks[mentionMatch.index - 1] 
+      : '';
+    // Skip if it looks like an email (has alphanumeric before @)
+    if (/[a-zA-Z0-9]/.test(beforeChar)) {
+      continue;
+    }
+    
+    // Check if this mention overlaps with a brace mention
+    const overlapsBraceMention = mentionMatches.some(m => {
+      const mentionEnd = m.index + m.length;
+      const matchEnd = mentionMatch.index + mentionMatch[0].length;
+      return (mentionMatch.index >= m.index && mentionMatch.index < mentionEnd) ||
+             (m.index >= mentionMatch.index && m.index < matchEnd);
+    });
+    
+    if (overlapsBraceMention) {
+      continue;
+    }
+    
+    const username = mentionMatch[1];
+    if (!username) continue;
+    
+    mentionMatches.push({
+      index: mentionMatch.index,
+      length: mentionMatch[0].length,
+      username: username,
     });
   }
   
@@ -101,7 +141,9 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>,
     if (match.type === 'mention') {
       const mentionMatch = match as typeof match & { username: string };
       const username = mentionMatch.username;
-      const displayText = `@{${username}}`;
+      // Get the original text to preserve format (@username or @{username})
+      const originalText = textWithConvertedBaseLinks.substring(match.index, match.index + match.length);
+      const displayText = originalText;
       
       if (insideLink) {
         parts.push(
@@ -1811,6 +1853,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
           castHash: cast.hash,
           curatorFid: user.fid,
           castData: cast,
+          translatedText: translatedText || undefined,
         }),
       });
 

@@ -308,6 +308,11 @@ export async function POST(request: NextRequest) {
       const { extractCastMetadata } = await import("@/lib/cast-metadata");
       const metadata = extractCastMetadata(finalCastData);
       
+      // Use translated text if provided, otherwise use extracted text
+      const translatedText = body.translatedText;
+      const castText = translatedText || metadata.castText;
+      const castTextLength = castText ? castText.length : 0;
+      
       // Ensure the author exists in the users table before inserting the cast
       if (metadata.authorFid) {
         const authorData = (finalCastData as any)?.author;
@@ -330,8 +335,8 @@ export async function POST(request: NextRequest) {
           topReplies: null, // No longer storing replies here - they're in cast_replies
           repliesUpdatedAt: null, // No longer storing replies here - they're in cast_replies
           conversationFetchedAt: null,
-          castText: metadata.castText,
-          castTextLength: metadata.castTextLength,
+          castText: castText,
+          castTextLength: castTextLength,
           authorFid: metadata.authorFid,
           likesCount: metadata.likesCount,
           recastsCount: metadata.recastsCount,
