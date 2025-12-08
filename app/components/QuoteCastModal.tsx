@@ -5,7 +5,7 @@ import { Cast } from "@neynar/nodejs-sdk/build/api";
 import { useNeynarContext } from "@neynar/react";
 import { convertBaseAppLinksInline, isFarcasterLink, extractCastHashFromUrl } from "@/lib/link-converter";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, type AppRouterInstance } from "next/navigation";
 import { AvatarImage } from "./AvatarImage";
 import { analytics } from "@/lib/analytics";
 import {
@@ -17,7 +17,7 @@ import {
 } from "@/lib/castLimits";
 
 // Helper function to convert URLs in text to clickable links
-function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>) {
+function renderTextWithLinks(text: string, router: AppRouterInstance) {
   // First, convert base.app links inline
   const textWithConvertedBaseLinks = convertBaseAppLinksInline(text);
   
@@ -105,98 +105,97 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>)
       let url = urlMatch.url;
       let displayText = urlMatch.displayText;
     
-    // Check if it's a Depthcaster link (already converted base.app link)
-    if (url && url.startsWith('/cast/')) {
-      parts.push(
-        <Link
-          key={match.index}
-          href={url}
-          className="text-blue-600 dark:text-blue-400 hover:underline break-all"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {displayText}
-        </Link>
-      );
-    }
-    // Handle external URLs
-    else {
-      // Ensure URL is absolute for external links
-      if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        url = 'https://' + url;
-      }
-      
-      // Check if it's a Farcaster link (farcaster.xyz, warpcast.com) - convert on click
-      if (isFarcasterLink(url)) {
-        const hash = extractCastHashFromUrl(url);
-        // Full cast hash is 0x + 64 hex chars = 66 chars total
-        if (hash && hash.length === 66) {
-          // Full hash found - convert directly
-          parts.push(
-            <a
-              key={match.index}
-              href={`/cast/${hash}`}
-              className="text-blue-600 dark:text-blue-400 hover:underline break-all"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                router.push(`/cast/${hash}`);
-              }}
-            >
-              {displayText}
-            </a>
-          );
+      // Check if it's a Depthcaster link (already converted base.app link)
+      if (url && url.startsWith('/cast/')) {
+        parts.push(
+          <Link
+            key={match.index}
+            href={url}
+            className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {displayText}
+          </Link>
+        );
+      } else {
+        // Handle external URLs
+        // Ensure URL is absolute for external links
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+          url = 'https://' + url;
+        }
+        
+        // Check if it's a Farcaster link (farcaster.xyz, warpcast.com) - convert on click
+        if (isFarcasterLink(url)) {
+          const hash = extractCastHashFromUrl(url);
+          // Full cast hash is 0x + 64 hex chars = 66 chars total
+          if (hash && hash.length === 66) {
+            // Full hash found - convert directly
+            parts.push(
+              <a
+                key={match.index}
+                href={`/cast/${hash}`}
+                className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  router.push(`/cast/${hash}`);
+                }}
+              >
+                {displayText}
+              </a>
+            );
+          } else {
+            // Hash not found or truncated - resolve via API on click
+            parts.push(
+              <a
+                key={match.index}
+                href={url}
+                className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+                onClick={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  try {
+                    // Resolve the URL to get the cast hash
+                    const response = await fetch(`/api/conversation?identifier=${encodeURIComponent(url)}&type=url&replyDepth=0`);
+                    if (response.ok) {
+                      const data = await response.json();
+                      const castHash = data?.conversation?.cast?.hash;
+                      if (castHash) {
+                        router.push(`/cast/${castHash}`);
+                      } else {
+                        // Fallback to external link
+                        window.open(url, '_blank');
+                      }
+                    } else {
+                      // Fallback to external link on error
+                      window.open(url, '_blank');
+                    }
+                  } catch (error) {
+                    console.error('Failed to resolve Farcaster link:', error);
+                    // Fallback to external link
+                    window.open(url, '_blank');
+                  }
+                }}
+              >
+                {displayText}
+              </a>
+            );
+          }
         } else {
-          // Hash not found or truncated - resolve via API on click
+          // Regular external link
           parts.push(
             <a
               key={match.index}
               href={url}
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-blue-600 dark:text-blue-400 hover:underline break-all"
-              onClick={async (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                try {
-                  // Resolve the URL to get the cast hash
-                  const response = await fetch(`/api/conversation?identifier=${encodeURIComponent(url)}&type=url&replyDepth=0`);
-                  if (response.ok) {
-                    const data = await response.json();
-                    const castHash = data?.conversation?.cast?.hash;
-                    if (castHash) {
-                      router.push(`/cast/${castHash}`);
-                    } else {
-                      // Fallback to external link
-                      window.open(url, '_blank');
-                    }
-                  } else {
-                    // Fallback to external link on error
-                    window.open(url, '_blank');
-                  }
-                } catch (error) {
-                  console.error('Failed to resolve Farcaster link:', error);
-                  // Fallback to external link
-                  window.open(url, '_blank');
-                }
-              }}
+              onClick={(e) => e.stopPropagation()}
             >
               {displayText}
             </a>
           );
         }
-      }
-      // Regular external link
-      else {
-        parts.push(
-          <a
-            key={match.index}
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-600 dark:text-blue-400 hover:underline break-all"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {displayText}
-          </a>
-        );
       }
     }
     
