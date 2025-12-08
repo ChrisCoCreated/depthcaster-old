@@ -183,11 +183,12 @@ export async function POST(request: NextRequest) {
       cacheNotificationCount.invalidateUser(userFid);
     }
 
-    // Only call Neynar API if user has plus role
+    // Only call Neynar API if user has plus role and Neynar notifications are enabled
     // When panel opens (no notificationType), always mark all Neynar notifications as seen
     // When specific notificationType is provided, mark that specific type as seen
     let result = null;
-    if (hasPlus) {
+    const neynarNotificationsEnabled = process.env.ENABLE_NEYNAR_NOTIFICATIONS === "true" || process.env.ENABLE_NEYNAR_NOTIFICATIONS === "1";
+    if (hasPlus && neynarNotificationsEnabled) {
       const shouldCallNeynar = 
         notificationType !== undefined || // Specific notification type requested
         (!notificationType && !castHash); // Panel opened - mark all Neynar notifications as seen
