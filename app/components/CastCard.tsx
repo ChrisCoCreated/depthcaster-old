@@ -53,7 +53,7 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>,
   
   // Then process URLs
   const urlMatches: Array<{ index: number; length: number; url: string; displayText: string }> = [];
-  let urlMatch;
+  let urlMatch: RegExpExecArray | null;
   while ((urlMatch = urlRegex.exec(textWithConvertedBaseLinks)) !== null) {
     // Skip if it looks like an email address (has @ before it) or if it overlaps with a mention
     const beforeMatch = textWithConvertedBaseLinks.substring(Math.max(0, urlMatch.index - 50), urlMatch.index);
@@ -942,6 +942,8 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
   const [showCurateFirstMessage, setShowCurateFirstMessage] = useState(false);
   const [isQualityScoreHovered, setIsQualityScoreHovered] = useState(false);
   const [hasCuratedRootCast, setHasCuratedRootCast] = useState(false);
+  const [translatedText, setTranslatedText] = useState<string | null>(null);
+  const [isTranslating, setIsTranslating] = useState(false);
 
   const [localCompressedView, setLocalCompressedView] = useState(compressedView);
   
@@ -966,7 +968,10 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
     setLocalCompressedView(compressedView);
   }, [compressedView]);
 
-  const castTextLines = useMemo(() => (cast.text ? cast.text.split(/\r?\n/) : []), [cast.text]);
+  const castTextLines = useMemo(() => {
+    const textToUse = translatedText || cast.text || "";
+    return textToUse ? textToUse.split(/\r?\n/) : [];
+  }, [translatedText, cast.text]);
   const shouldCollapseCuratedCastText = useMemo(() => {
     if (!localCompressedView || castTextLines.length <= CURATED_FEED_COLLAPSE_LINE_LIMIT) {
       return false;
@@ -1560,15 +1565,16 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
   };
 
   const handleCopyText = async () => {
+    const textToCopy = translatedText || cast.text || '';
     try {
-      await navigator.clipboard.writeText(cast.text || '');
+      await navigator.clipboard.writeText(textToCopy);
       setShowShareMenu(false);
       // Optionally show a toast notification
     } catch (error) {
       console.error('Failed to copy text:', error);
       // Fallback for older browsers
       const textArea = document.createElement('textarea');
-      textArea.value = cast.text || '';
+      textArea.value = textToCopy;
       document.body.appendChild(textArea);
       textArea.select();
       document.execCommand('copy');
@@ -1620,6 +1626,36 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
         document.body.removeChild(textArea);
       }
       setShowShareMenu(false);
+    }
+  };
+
+  const handleTranslateToEnglish = async () => {
+    if (!cast.text || isTranslating || translatedText) return;
+    
+    setIsTranslating(true);
+    setShowShareMenu(false);
+    
+    try {
+      const response = await fetch('/api/translate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text: cast.text }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Translation failed');
+      }
+
+      const data = await response.json();
+      setTranslatedText(data.translatedText);
+    } catch (error: any) {
+      console.error('Failed to translate:', error);
+      alert(error.message || 'Failed to translate. Please try again.');
+    } finally {
+      setIsTranslating(false);
     }
   };
 
@@ -2051,6 +2087,16 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                 >
                   Copy share link
                 </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleTranslateToEnglish();
+                  }}
+                  disabled={!cast.text || isTranslating || !!translatedText}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border-t border-gray-200 dark:border-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isTranslating ? 'Translating...' : 'Translate to English'}
+                </button>
               </div>
             )}
           </div>
@@ -2215,7 +2261,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
             <div className="text-gray-900 dark:text-gray-100 mb-2 sm:mb-3 text-sm sm:text-base leading-6 sm:leading-7">
               {(() => {
                 // Process text: strip prefix and prepare for first line bold
-                let processedText = cast.text || "";
+                let processedText = translatedText || cast.text || "";
                 
                 // Strip prefix if specified
                 if (displayMode?.stripTextPrefix && processedText.startsWith(displayMode.stripTextPrefix)) {
