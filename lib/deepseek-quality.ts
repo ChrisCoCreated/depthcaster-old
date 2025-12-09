@@ -773,8 +773,13 @@ export async function analyzeCastQualityWithFeedback(params: {
 
   const { castText, embeddedCastTexts, links, curatorFeedback, currentQualityScore } = params;
 
-  if (!castText || castText.trim().length === 0) {
-    console.warn("[DeepSeek] Cast has no text, skipping analysis");
+  const hasText = castText && castText.trim().length > 0;
+  const hasEmbeddedCasts = embeddedCastTexts.length > 0;
+  const hasLinks = links.length > 0;
+
+  // Allow analysis even if there's no text, as long as there's embedded casts, links, or curator feedback
+  if (!hasText && !hasEmbeddedCasts && !hasLinks) {
+    console.warn("[DeepSeek] Cast has no text, embedded casts, or links, skipping analysis");
     return null;
   }
 
@@ -796,6 +801,11 @@ export async function analyzeCastQualityWithFeedback(params: {
     });
   }
 
+  // Build cast text section (handle empty text case)
+  const castTextSection = hasText 
+    ? `Cast Text:\n${castText.substring(0, 2000)}${castText.length > 2000 ? "..." : ""}`
+    : "Cast Text: (No text content - cast may contain only embedded casts or links)";
+
   const prompt = `You are re-evaluating a cast's quality score based on curator feedback.
 
 Current Quality Score: ${currentQualityScore}/100
@@ -803,8 +813,7 @@ Current Quality Score: ${currentQualityScore}/100
 Curator Feedback:
 ${curatorFeedback}
 
-Cast Text:
-${castText.substring(0, 2000)}${castText.length > 2000 ? "..." : ""}${embeddedCastsContext}${linksContext}
+${castTextSection}${embeddedCastsContext}${linksContext}
 
 Please re-analyze the quality considering the curator's feedback. The curator has already curated this cast and is providing specific feedback about why the quality score should change.
 

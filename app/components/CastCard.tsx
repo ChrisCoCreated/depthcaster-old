@@ -2358,6 +2358,8 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                   for (const prefix of prefixes) {
                     if (prefix && processedText.startsWith(prefix)) {
                       processedText = processedText.substring(prefix.length);
+                      // Trim leading whitespace after removing prefix
+                      processedText = processedText.trimStart();
                       break; // Only strip the first matching prefix
                     }
                   }

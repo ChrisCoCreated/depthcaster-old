@@ -5,3 +5,4 @@ ALTER TABLE "collections" ADD COLUMN IF NOT EXISTS "order_mode" text DEFAULT 'ma
 --> statement-breakpoint
 ALTER TABLE "collections" ADD COLUMN IF NOT EXISTS "order_direction" text DEFAULT 'desc' NOT NULL;
 
+
