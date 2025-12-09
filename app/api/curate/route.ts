@@ -358,6 +358,34 @@ export async function POST(request: NextRequest) {
               .where(eq(curatedCasts.castHash, hash));
             console.log(`[Curate] Quality analysis completed for cast ${hash}: score=${result.qualityScore}, category=${result.category}`);
             
+            // Check if this is a new curation (first time curated)
+            const allCurators = await db
+              .select()
+              .from(curatorCastCurations)
+              .where(eq(curatorCastCurations.castHash, hash));
+            const isNewCuration = allCurators.length === 1;
+            
+            // Send miniapp notification only if quality score > 70 and it's a new curation
+            if (isNewCuration && result.qualityScore > 70) {
+              try {
+                const { notifyAllMiniappUsersAboutNewCuratedCast } = await import("@/lib/miniapp");
+                // Fetch the cast data for notification
+                const castRecord = await db
+                  .select({ castData: curatedCasts.castData })
+                  .from(curatedCasts)
+                  .where(eq(curatedCasts.castHash, hash))
+                  .limit(1);
+                
+                if (castRecord[0]?.castData) {
+                  notifyAllMiniappUsersAboutNewCuratedCast(hash, castRecord[0].castData).catch((error) => {
+                    console.error(`[Curate] Error sending miniapp notification for new curated cast ${hash}:`, error);
+                  });
+                }
+              } catch (error) {
+                console.error(`[Curate] Error sending miniapp notification for cast ${hash}:`, error);
+              }
+            }
+            
             // Notify cast author about quality score
             const castRecord = await db
               .select({ authorFid: curatedCasts.authorFid })
@@ -467,6 +495,34 @@ export async function POST(request: NextRequest) {
                     })
                     .where(eq(curatedCasts.castHash, hash));
                   console.log(`[Curate] Quality analysis completed for cast ${hash}: score=${result.qualityScore}, category=${result.category}`);
+                  
+                  // Check if this is a new curation (first time curated)
+                  const allCurators = await db
+                    .select()
+                    .from(curatorCastCurations)
+                    .where(eq(curatorCastCurations.castHash, hash));
+                  const isNewCuration = allCurators.length === 1;
+                  
+                  // Send miniapp notification only if quality score > 70 and it's a new curation
+                  if (isNewCuration && result.qualityScore > 70) {
+                    try {
+                      const { notifyAllMiniappUsersAboutNewCuratedCast } = await import("@/lib/miniapp");
+                      // Fetch the cast data for notification
+                      const castRecord = await db
+                        .select({ castData: curatedCasts.castData })
+                        .from(curatedCasts)
+                        .where(eq(curatedCasts.castHash, hash))
+                        .limit(1);
+                      
+                      if (castRecord[0]?.castData) {
+                        notifyAllMiniappUsersAboutNewCuratedCast(hash, castRecord[0].castData).catch((error) => {
+                          console.error(`[Curate] Error sending miniapp notification for new curated cast ${hash}:`, error);
+                        });
+                      }
+                    } catch (error) {
+                      console.error(`[Curate] Error sending miniapp notification for cast ${hash}:`, error);
+                    }
+                  }
                   
                   // Notify cast author about quality score
                   const castRecord = await db
@@ -584,19 +640,28 @@ export async function POST(request: NextRequest) {
       
       const isNewCuration = allCurators.length === 1; // Only the one we just inserted
 
-      // Send miniapp notification to all users when a cast is first curated
+      // Check if cast already has a quality score > 70 (edge case: score was set before curation)
+      // If so, send notification immediately. Otherwise, notification will be sent after quality analysis completes.
       if (isNewCuration) {
-        try {
-          const { notifyAllMiniappUsersAboutNewCuratedCast } = await import("@/lib/miniapp");
-          notifyAllMiniappUsersAboutNewCuratedCast(castHash, finalCastData).catch((error) => {
-            console.error(`[Curate] Error sending miniapp notification for new curated cast ${castHash}:`, error);
-            // Don't fail curation if notification fails
-          });
-        } catch (error) {
-          console.error(`[Curate] Error importing miniapp notification function:`, error);
-          // Don't fail curation if import fails
+        const existingCast = await db
+          .select({ qualityScore: curatedCasts.qualityScore, castData: curatedCasts.castData })
+          .from(curatedCasts)
+          .where(eq(curatedCasts.castHash, castHash))
+          .limit(1);
+        
+        if (existingCast[0]?.qualityScore && existingCast[0].qualityScore > 70) {
+          try {
+            const { notifyAllMiniappUsersAboutNewCuratedCast } = await import("@/lib/miniapp");
+            notifyAllMiniappUsersAboutNewCuratedCast(castHash, existingCast[0].castData).catch((error) => {
+              console.error(`[Curate] Error sending miniapp notification for new curated cast ${castHash} with existing quality score:`, error);
+            });
+          } catch (error) {
+            console.error(`[Curate] Error sending miniapp notification for cast ${castHash}:`, error);
+          }
         }
       }
+      // Otherwise, miniapp notifications are sent after quality analysis completes (only if score > 70)
+      // See quality analysis callback above
 
       // Send notification to admin user 5701 when a cast is curated for the first time
       const ADMIN_FID = 5701;
