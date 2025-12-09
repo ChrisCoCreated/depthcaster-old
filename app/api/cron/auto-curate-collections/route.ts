@@ -34,16 +34,41 @@ function applyFilters(casts: any[], filters: any[]): any[] {
   }
   return casts.filter((cast) => {
     for (const filter of filters) {
-      if (filter.type === "authorFid" && typeof filter.value === "number") {
-        if (cast.author?.fid !== filter.value) {
+      if (filter.type === "authorFid") {
+        // Handle both number and string (numeric string) FIDs
+        let filterFid: number | null = null;
+        if (typeof filter.value === "number") {
+          filterFid = filter.value;
+        } else if (typeof filter.value === "string") {
+          // Try to parse numeric string
+          const parsed = parseInt(filter.value, 10);
+          if (!isNaN(parsed)) {
+            filterFid = parsed;
+          }
+        }
+        
+        if (filterFid !== null && cast.author?.fid !== filterFid) {
           return false;
+        } else if (filterFid === null) {
+          // If we couldn't parse the FID, skip this filter (shouldn't happen after resolveFeedFilters)
+          console.warn(`[Auto-Curate] Could not parse authorFid filter value: ${filter.value}`);
+          continue;
         }
       } else if (filter.type === "excludeRecasts" && filter.value === true) {
         if (cast.parent_hash) {
           return false;
         }
-      } else if (filter.type === "minLength" && typeof filter.value === "number") {
-        if (!cast.text || cast.text.length < filter.value) {
+      } else if (filter.type === "minLength") {
+        let minLength: number | null = null;
+        if (typeof filter.value === "number") {
+          minLength = filter.value;
+        } else if (typeof filter.value === "string") {
+          const parsed = parseInt(filter.value, 10);
+          if (!isNaN(parsed)) {
+            minLength = parsed;
+          }
+        }
+        if (minLength !== null && (!cast.text || cast.text.length < minLength)) {
           return false;
         }
       }
@@ -60,9 +85,10 @@ async function processCollection(collection: any): Promise<{ added: number; erro
     console.log(`[Auto-Curate] Collection ${collectionName} has no autoCurationRules, skipping`);
     return { added: 0, errors: 0 };
   }
-  console.log(`[Auto-Curate] Processing collection: ${collectionName}`);
+    console.log(`[Auto-Curate] Processing collection: ${collectionName}`);
   try {
     const resolvedFeed = await resolveFeedFilters(autoCurationRules as CustomFeed);
+    console.log(`[Auto-Curate] Resolved feed filters:`, JSON.stringify(resolvedFeed.filters, null, 2));
     let casts: any[] = [];
     const limit = 50;
     if (resolvedFeed.feedType === "channel") {
@@ -99,7 +125,9 @@ async function processCollection(collection: any): Promise<{ added: number; erro
       console.log(`[Auto-Curate] Unsupported feed type: ${resolvedFeed.feedType} for collection ${collectionName}`);
       return { added: 0, errors: 0 };
     }
+    const castsBeforeFilter = casts.length;
     casts = applyFilters(casts, resolvedFeed.filters || []);
+    console.log(`[Auto-Curate] Filtered casts: ${castsBeforeFilter} -> ${casts.length} (filters: ${resolvedFeed.filters?.length || 0})`);
     if (casts.length === 0) {
       console.log(`[Auto-Curate] No casts found matching rules for collection ${collectionName}`);
       return { added: 0, errors: 0 };

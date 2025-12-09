@@ -36,11 +36,28 @@ export async function resolveFeedFilters(feed: CustomFeed): Promise<CustomFeed> 
   
   if (resolvedFeed.filters) {
     for (const filter of resolvedFeed.filters) {
-      if (filter.type === "authorFid" && typeof filter.value === "string" && filter.value.startsWith("@")) {
-        const fid = await resolveUsernameToFid(filter.value);
-        if (fid) {
-          filter.value = fid;
+      if (filter.type === "authorFid") {
+        // Handle username strings (starting with @)
+        if (typeof filter.value === "string" && filter.value.startsWith("@")) {
+          const originalValue = filter.value;
+          const fid = await resolveUsernameToFid(originalValue);
+          if (fid) {
+            filter.value = fid;
+            console.log(`[resolveFeedFilters] Resolved username ${originalValue} to FID ${fid}`);
+          } else {
+            console.warn(`[resolveFeedFilters] Failed to resolve username ${originalValue} to FID`);
+          }
+        } 
+        // Handle numeric strings - convert to number
+        else if (typeof filter.value === "string" && /^\d+$/.test(filter.value)) {
+          const originalValue = filter.value;
+          const fid = parseInt(originalValue, 10);
+          if (!isNaN(fid)) {
+            filter.value = fid;
+            console.log(`[resolveFeedFilters] Converted numeric string ${originalValue} to FID ${fid}`);
+          }
         }
+        // If it's already a number, leave it as is
       }
     }
   }
