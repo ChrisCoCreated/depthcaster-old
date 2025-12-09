@@ -225,34 +225,177 @@ export async function GET(request: NextRequest) {
       .orderBy(sql`count(*) DESC`)
       .limit(20);
 
-    // Feed Analytics
-    const feedViewStats = await db
-      .select({
-        feedType: feedViewSessions.feedType,
-        totalSessions: sql<number>`count(*)::int`,
-        totalDuration: sql<number>`COALESCE(sum(duration_seconds), 0)::bigint`,
-        avgDuration: sql<number | null>`ROUND(COALESCE(avg(duration_seconds), 0))::bigint`,
-        uniqueUsers: sql<number>`count(distinct user_fid)::int`,
-      })
-      .from(feedViewSessions)
-      .where(timeFilter ? sql`created_at >= ${timeFilter.toISOString()}` : sql`1=1`)
-      .groupBy(feedViewSessions.feedType)
-      .then((results) => results.map((r) => ({
-        ...r,
+    // Feed Analytics - UNION data from both main table and daily aggregates
+    // For unique users, we need to get distinct users from main table and max from daily (since daily stores aggregated unique_users)
+    const feedViewStatsRecent = timeFilter
+      ? await db
+          .select({
+            feedType: feedViewSessions.feedType,
+            totalSessions: sql<number>`count(*)::int`,
+            totalDuration: sql<number>`COALESCE(sum(duration_seconds), 0)::bigint`,
+            avgDuration: sql<number | null>`ROUND(COALESCE(avg(duration_seconds), 0))::bigint`,
+            uniqueUsers: sql<number>`count(distinct user_fid)::int`,
+          })
+          .from(feedViewSessions)
+          .where(sql`created_at >= ${timeFilter.toISOString()}`)
+          .groupBy(feedViewSessions.feedType)
+      : await db
+          .select({
+            feedType: feedViewSessions.feedType,
+            totalSessions: sql<number>`count(*)::int`,
+            totalDuration: sql<number>`COALESCE(sum(duration_seconds), 0)::bigint`,
+            avgDuration: sql<number | null>`ROUND(COALESCE(avg(duration_seconds), 0))::bigint`,
+            uniqueUsers: sql<number>`count(distinct user_fid)::int`,
+          })
+          .from(feedViewSessions)
+          .groupBy(feedViewSessions.feedType);
+
+    const feedViewStatsDaily = timeFilter
+      ? await db
+          .select({
+            feedType: feedViewSessionsDaily.feedType,
+            totalSessions: sql<number>`COALESCE(sum(total_sessions), 0)::int`,
+            totalDuration: sql<number>`COALESCE(sum(total_duration_seconds), 0)::bigint`,
+            avgDuration: sql<number | null>`ROUND(COALESCE(avg(avg_duration), 0))::bigint`,
+            uniqueUsers: sql<number>`COALESCE(max(unique_users), 0)::int`,
+          })
+          .from(feedViewSessionsDaily)
+          .where(sql`date >= ${timeFilter.toISOString()}`)
+          .groupBy(feedViewSessionsDaily.feedType)
+      : await db
+          .select({
+            feedType: feedViewSessionsDaily.feedType,
+            totalSessions: sql<number>`COALESCE(sum(total_sessions), 0)::int`,
+            totalDuration: sql<number>`COALESCE(sum(total_duration_seconds), 0)::bigint`,
+            avgDuration: sql<number | null>`ROUND(COALESCE(avg(avg_duration), 0))::bigint`,
+            uniqueUsers: sql<number>`COALESCE(max(unique_users), 0)::int`,
+          })
+          .from(feedViewSessionsDaily)
+          .groupBy(feedViewSessionsDaily.feedType);
+
+    // Merge results by feed type
+    const feedViewStatsMap = new Map<string, {
+      feedType: string;
+      totalSessions: number;
+      totalDuration: number;
+      avgDuration: number;
+      uniqueUsers: number;
+    }>();
+
+    // Add recent data
+    feedViewStatsRecent.forEach((r) => {
+      feedViewStatsMap.set(r.feedType, {
+        feedType: r.feedType,
+        totalSessions: r.totalSessions,
         totalDuration: typeof r.totalDuration === 'string' ? parseInt(r.totalDuration) : r.totalDuration,
         avgDuration: r.avgDuration ? (typeof r.avgDuration === 'string' ? parseInt(r.avgDuration) : r.avgDuration) : 0,
-      })));
+        uniqueUsers: r.uniqueUsers,
+      });
+    });
 
-    const castViewStats = await db
-      .select({
-        feedType: castViews.feedType,
-        totalViews: sql<number>`count(*)::int`,
-        uniqueCasts: sql<number>`count(distinct cast_hash)::int`,
-        uniqueUsers: sql<number>`count(distinct user_fid)::int`,
-      })
-      .from(castViews)
-      .where(timeFilter ? sql`created_at >= ${timeFilter.toISOString()}` : sql`1=1`)
-      .groupBy(castViews.feedType);
+    // Add/merge daily data
+    feedViewStatsDaily.forEach((d) => {
+      const existing = feedViewStatsMap.get(d.feedType);
+      if (existing) {
+        existing.totalSessions += d.totalSessions;
+        existing.totalDuration += typeof d.totalDuration === 'string' ? parseInt(d.totalDuration) : d.totalDuration;
+        existing.uniqueUsers = Math.max(existing.uniqueUsers, d.uniqueUsers); // Use max since daily is aggregated
+        // Recalculate average
+        existing.avgDuration = existing.totalSessions > 0 
+          ? Math.round(existing.totalDuration / existing.totalSessions)
+          : 0;
+      } else {
+        feedViewStatsMap.set(d.feedType, {
+          feedType: d.feedType,
+          totalSessions: d.totalSessions,
+          totalDuration: typeof d.totalDuration === 'string' ? parseInt(d.totalDuration) : d.totalDuration,
+          avgDuration: d.avgDuration ? (typeof d.avgDuration === 'string' ? parseInt(d.avgDuration) : d.avgDuration) : 0,
+          uniqueUsers: d.uniqueUsers,
+        });
+      }
+    });
+
+    const feedViewStats = Array.from(feedViewStatsMap.values());
+
+    // Cast Views - UNION data from both main table and daily aggregates
+    const castViewStatsRecent = timeFilter
+      ? await db
+          .select({
+            feedType: sql<string>`COALESCE(${castViews.feedType}, 'unknown')`,
+            totalViews: sql<number>`count(*)::int`,
+            uniqueCasts: sql<number>`count(distinct cast_hash)::int`,
+            uniqueUsers: sql<number>`count(distinct user_fid)::int`,
+          })
+          .from(castViews)
+          .where(sql`created_at >= ${timeFilter.toISOString()}`)
+          .groupBy(sql`COALESCE(${castViews.feedType}, 'unknown')`)
+      : await db
+          .select({
+            feedType: sql<string>`COALESCE(${castViews.feedType}, 'unknown')`,
+            totalViews: sql<number>`count(*)::int`,
+            uniqueCasts: sql<number>`count(distinct cast_hash)::int`,
+            uniqueUsers: sql<number>`count(distinct user_fid)::int`,
+          })
+          .from(castViews)
+          .groupBy(sql`COALESCE(${castViews.feedType}, 'unknown')`);
+
+    const castViewStatsDaily = timeFilter
+      ? await db
+          .select({
+            feedType: castViewsDaily.feedType,
+            totalViews: sql<number>`COALESCE(sum(view_count), 0)::int`,
+            uniqueCasts: sql<number>`count(distinct cast_hash)::int`,
+            uniqueUsers: sql<number>`COALESCE(max(unique_users), 0)::int`,
+          })
+          .from(castViewsDaily)
+          .where(sql`date >= ${timeFilter.toISOString()}`)
+          .groupBy(castViewsDaily.feedType)
+      : await db
+          .select({
+            feedType: castViewsDaily.feedType,
+            totalViews: sql<number>`COALESCE(sum(view_count), 0)::int`,
+            uniqueCasts: sql<number>`count(distinct cast_hash)::int`,
+            uniqueUsers: sql<number>`COALESCE(max(unique_users), 0)::int`,
+          })
+          .from(castViewsDaily)
+          .groupBy(castViewsDaily.feedType);
+
+    // Merge results by feed type
+    const castViewStatsMap = new Map<string, {
+      feedType: string;
+      totalViews: number;
+      uniqueCasts: number;
+      uniqueUsers: number;
+    }>();
+
+    // Add recent data
+    castViewStatsRecent.forEach((r) => {
+      castViewStatsMap.set(r.feedType, {
+        feedType: r.feedType,
+        totalViews: r.totalViews,
+        uniqueCasts: r.uniqueCasts,
+        uniqueUsers: r.uniqueUsers,
+      });
+    });
+
+    // Add/merge daily data - for unique casts, we use the sum since daily table has distinct cast_hash per row
+    castViewStatsDaily.forEach((d) => {
+      const existing = castViewStatsMap.get(d.feedType);
+      if (existing) {
+        existing.totalViews += d.totalViews;
+        existing.uniqueCasts += d.uniqueCasts; // Daily table has one row per cast_hash, so count is accurate
+        existing.uniqueUsers = Math.max(existing.uniqueUsers, d.uniqueUsers);
+      } else {
+        castViewStatsMap.set(d.feedType, {
+          feedType: d.feedType,
+          totalViews: d.totalViews,
+          uniqueCasts: d.uniqueCasts,
+          uniqueUsers: d.uniqueUsers,
+        });
+      }
+    });
+
+    const castViewStats = Array.from(castViewStatsMap.values());
 
     // Top Curators
     const topCurators = await db
@@ -329,6 +472,153 @@ export async function GET(request: NextRequest) {
       UNION ALL
       SELECT 'cast_views', min(created_at) FROM cast_views
     `);
+
+    // Daily Usage Breakdowns
+    const dailyBreakdownQuery = timeFilter
+      ? sql`
+        SELECT 
+          date,
+          feed_type,
+          SUM(total_sessions)::int as total_sessions,
+          SUM(total_duration_seconds)::bigint as total_duration_seconds,
+          CASE 
+            WHEN SUM(total_sessions) > 0 
+            THEN ROUND(SUM(total_duration_seconds)::float / SUM(total_sessions)::float)::bigint
+            ELSE 0::bigint
+          END as avg_duration_seconds,
+          MAX(unique_users)::int as unique_users
+        FROM (
+          SELECT 
+            DATE_TRUNC('day', created_at) as date,
+            feed_type,
+            1 as total_sessions,
+            duration_seconds as total_duration_seconds,
+            user_fid
+          FROM feed_view_sessions
+          WHERE created_at >= ${timeFilter.toISOString()}
+          UNION ALL
+          SELECT 
+            date,
+            feed_type,
+            total_sessions,
+            total_duration_seconds,
+            NULL as user_fid
+          FROM feed_view_sessions_daily
+          WHERE date >= ${timeFilter.toISOString()}
+        ) combined
+        GROUP BY date, feed_type
+        ORDER BY date DESC, feed_type
+      `
+      : sql`
+        SELECT 
+          date,
+          feed_type,
+          SUM(total_sessions)::int as total_sessions,
+          SUM(total_duration_seconds)::bigint as total_duration_seconds,
+          CASE 
+            WHEN SUM(total_sessions) > 0 
+            THEN ROUND(SUM(total_duration_seconds)::float / SUM(total_sessions)::float)::bigint
+            ELSE 0::bigint
+          END as avg_duration_seconds,
+          MAX(unique_users)::int as unique_users
+        FROM (
+          SELECT 
+            DATE_TRUNC('day', created_at) as date,
+            feed_type,
+            1 as total_sessions,
+            duration_seconds as total_duration_seconds,
+            user_fid
+          FROM feed_view_sessions
+          UNION ALL
+          SELECT 
+            date,
+            feed_type,
+            total_sessions,
+            total_duration_seconds,
+            NULL as user_fid
+          FROM feed_view_sessions_daily
+        ) combined
+        GROUP BY date, feed_type
+        ORDER BY date DESC, feed_type
+      `;
+    
+    const dailyBreakdownRaw = await db.execute(dailyBreakdownQuery);
+    const dailyBreakdown = (dailyBreakdownRaw as any).rows?.map((r: any) => ({
+      date: r.date,
+      feedType: r.feed_type,
+      totalSessions: parseInt(r.total_sessions) || 0,
+      totalDurationSeconds: typeof r.total_duration_seconds === 'string' ? parseInt(r.total_duration_seconds) : (r.total_duration_seconds || 0),
+      avgDurationSeconds: typeof r.avg_duration_seconds === 'string' ? parseInt(r.avg_duration_seconds) : (r.avg_duration_seconds || 0),
+      uniqueUsers: parseInt(r.unique_users) || 0,
+    })) || [];
+
+    // Daily Cast Views Breakdown
+    const dailyCastViewsQuery = timeFilter
+      ? sql`
+        SELECT 
+          date,
+          feed_type,
+          SUM(view_count)::int as total_views,
+          COUNT(DISTINCT cast_hash)::int as unique_casts,
+          MAX(unique_users)::int as unique_users
+        FROM (
+          SELECT 
+            DATE_TRUNC('day', created_at) as date,
+            COALESCE(feed_type, 'unknown') as feed_type,
+            1 as view_count,
+            cast_hash,
+            user_fid
+          FROM cast_views
+          WHERE created_at >= ${timeFilter.toISOString()}
+          UNION ALL
+          SELECT 
+            date,
+            feed_type,
+            view_count,
+            cast_hash,
+            NULL as user_fid
+          FROM cast_views_daily
+          WHERE date >= ${timeFilter.toISOString()}
+        ) combined
+        GROUP BY date, feed_type
+        ORDER BY date DESC, feed_type
+      `
+      : sql`
+        SELECT 
+          date,
+          feed_type,
+          SUM(view_count)::int as total_views,
+          COUNT(DISTINCT cast_hash)::int as unique_casts,
+          MAX(unique_users)::int as unique_users
+        FROM (
+          SELECT 
+            DATE_TRUNC('day', created_at) as date,
+            COALESCE(feed_type, 'unknown') as feed_type,
+            1 as view_count,
+            cast_hash,
+            user_fid
+          FROM cast_views
+          UNION ALL
+          SELECT 
+            date,
+            feed_type,
+            view_count,
+            cast_hash,
+            NULL as user_fid
+          FROM cast_views_daily
+        ) combined
+        GROUP BY date, feed_type
+        ORDER BY date DESC, feed_type
+      `;
+    
+    const dailyCastViewsRaw = await db.execute(dailyCastViewsQuery);
+    const dailyCastViews = (dailyCastViewsRaw as any).rows?.map((r: any) => ({
+      date: r.date,
+      feedType: r.feed_type || 'unknown',
+      totalViews: parseInt(r.total_views) || 0,
+      uniqueCasts: parseInt(r.unique_casts) || 0,
+      uniqueUsers: parseInt(r.unique_users) || 0,
+    })) || [];
 
     // API Call Statistics
     let reactionFetchCount = 0;
@@ -425,6 +715,8 @@ export async function GET(request: NextRequest) {
           uniqueCasts: c.uniqueCasts,
           uniqueUsers: c.uniqueUsers,
         })),
+        dailyBreakdown: dailyBreakdown,
+        dailyCastViews: dailyCastViews,
       },
       engagement: {
         avgScore: avgEngagementScore[0]?.avg || 0,

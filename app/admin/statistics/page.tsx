@@ -53,6 +53,21 @@ interface Statistics {
       uniqueCasts: number;
       uniqueUsers: number;
     }>;
+    dailyBreakdown: Array<{
+      date: string;
+      feedType: string;
+      totalSessions: number;
+      totalDurationSeconds: number;
+      avgDurationSeconds: number;
+      uniqueUsers: number;
+    }>;
+    dailyCastViews: Array<{
+      date: string;
+      feedType: string;
+      totalViews: number;
+      uniqueCasts: number;
+      uniqueUsers: number;
+    }>;
   };
   engagement: {
     avgScore: number;
@@ -412,6 +427,116 @@ export default function AdminStatisticsPage() {
                     </table>
                   </div>
                 </div>
+
+                {statistics.feedAnalytics.dailyBreakdown && statistics.feedAnalytics.dailyBreakdown.length > 0 && (
+                  <div className="mt-6">
+                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Daily Usage Breakdown
+                    </h3>
+                    <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0">
+                          <tr>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">
+                              Date
+                            </th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">
+                              Feed Type
+                            </th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">
+                              Sessions
+                            </th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">
+                              Total Time
+                            </th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">
+                              Avg Duration
+                            </th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">
+                              Unique Users
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                          {statistics.feedAnalytics.dailyBreakdown.map((day, idx) => (
+                            <tr key={`${day.date}-${day.feedType}-${idx}`}>
+                              <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">
+                                {new Date(day.date).toLocaleDateString()}
+                              </td>
+                              <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">
+                                {day.feedType}
+                              </td>
+                              <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">
+                                {formatNumber(day.totalSessions)}
+                              </td>
+                              <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">
+                                {formatDuration(day.totalDurationSeconds)}
+                              </td>
+                              <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">
+                                {formatDuration(day.avgDurationSeconds)}
+                              </td>
+                              <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">
+                                {formatNumber(day.uniqueUsers)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {statistics.feedAnalytics.dailyCastViews && statistics.feedAnalytics.dailyCastViews.length > 0 && (
+                  <div className="mt-6">
+                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Daily Cast Views Breakdown
+                    </h3>
+                    <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0">
+                          <tr>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">
+                              Date
+                            </th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">
+                              Feed Type
+                            </th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">
+                              Total Views
+                            </th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">
+                              Unique Casts
+                            </th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">
+                              Unique Users
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                          {statistics.feedAnalytics.dailyCastViews.map((day, idx) => (
+                            <tr key={`${day.date}-${day.feedType}-${idx}`}>
+                              <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">
+                                {new Date(day.date).toLocaleDateString()}
+                              </td>
+                              <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">
+                                {day.feedType}
+                              </td>
+                              <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">
+                                {formatNumber(day.totalViews)}
+                              </td>
+                              <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">
+                                {formatNumber(day.uniqueCasts)}
+                              </td>
+                              <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">
+                                {formatNumber(day.uniqueUsers)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

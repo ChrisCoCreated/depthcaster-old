@@ -170,7 +170,6 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   const castsRestoredRef = useRef<boolean>(false);
   const justSavedOnClickRef = useRef<number>(0); // Timestamp of last click save
   const feedViewStartTimeRef = useRef<number | null>(null);
-  const feedViewIntervalRef = useRef<NodeJS.Timeout | null>(null);
   // Rate limiting: minimum 2 seconds between API calls
   const MIN_FETCH_INTERVAL = 2000;
 
@@ -1015,7 +1014,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
     lastFetchTimeRef.current = 0;
   }, [feedType]);
 
-  // Track feed view time
+  // Track feed view time - only track on feed change and unmount, not periodically
   useEffect(() => {
     // Helper to track feed view to database
     const trackFeedViewToDB = async (feedTypeToTrack: string, duration: number) => {
@@ -1038,66 +1037,40 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       }
     };
 
-    // End previous feed view if exists
-    if (feedViewStartTimeRef.current !== null) {
+    // End previous feed view if feed type changed
+    if (feedViewStartTimeRef.current !== null && prevFeedTypeRef.current && prevFeedTypeRef.current !== feedType) {
       const duration = Math.floor((Date.now() - feedViewStartTimeRef.current) / 1000);
       if (duration > 0) {
-        const prevFeedType = prevFeedTypeRef.current || feedType;
         analytics.trackFeedViewTime(
-          prevFeedType,
+          prevFeedTypeRef.current,
           duration,
           sortBy,
           selectedCuratorFids,
           selectedPackIds
         );
         // Also track to database
-        trackFeedViewToDB(prevFeedType, duration);
+        trackFeedViewToDB(prevFeedTypeRef.current, duration);
       }
-    }
-
-    // Clear previous interval
-    if (feedViewIntervalRef.current) {
-      clearInterval(feedViewIntervalRef.current);
     }
 
     // Start tracking new feed view
     feedViewStartTimeRef.current = Date.now();
 
-    // Send periodic updates every 30 seconds
-    feedViewIntervalRef.current = setInterval(() => {
-      if (feedViewStartTimeRef.current !== null) {
-        const duration = Math.floor((Date.now() - feedViewStartTimeRef.current) / 1000);
-        if (duration > 0) {
-          analytics.trackFeedViewTime(
-            feedType,
-            duration,
-            sortBy,
-            selectedCuratorFids,
-            selectedPackIds
-          );
-          // Also track to database
-          trackFeedViewToDB(feedType, duration);
-        }
-      }
-    }, 30000);
-
-    // Cleanup on unmount or feed change
+    // Cleanup on unmount or feed change - track final session
     return () => {
-      if (feedViewIntervalRef.current) {
-        clearInterval(feedViewIntervalRef.current);
-      }
       if (feedViewStartTimeRef.current !== null) {
         const duration = Math.floor((Date.now() - feedViewStartTimeRef.current) / 1000);
         if (duration > 0) {
+          const feedTypeToTrack = prevFeedTypeRef.current || feedType;
           analytics.trackFeedViewTime(
-            feedType,
+            feedTypeToTrack,
             duration,
             sortBy,
             selectedCuratorFids,
             selectedPackIds
           );
           // Also track to database
-          trackFeedViewToDB(feedType, duration);
+          trackFeedViewToDB(feedTypeToTrack, duration);
         }
         feedViewStartTimeRef.current = null;
       }
