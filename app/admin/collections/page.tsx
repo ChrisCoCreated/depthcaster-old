@@ -403,7 +403,17 @@ function CollectionModal({
   );
   const [hideChannelLink, setHideChannelLink] = useState(existingDisplayMode.hideChannelLink || false);
   const [hideUrlLinks, setHideUrlLinks] = useState(existingDisplayMode.hideUrlLinks || false);
+  // Backward compatibility: if hideAuthorInfo exists but new options don't, initialize from it
   const [hideAuthorInfo, setHideAuthorInfo] = useState(existingDisplayMode.hideAuthorInfo || false);
+  const [hideAuthorDisplayName, setHideAuthorDisplayName] = useState(
+    existingDisplayMode.hideAuthorDisplayName ?? (existingDisplayMode.hideAuthorInfo ? true : false)
+  );
+  const [hideAuthorUsername, setHideAuthorUsername] = useState(
+    existingDisplayMode.hideAuthorUsername ?? (existingDisplayMode.hideAuthorInfo ? true : false)
+  );
+  const [hideAuthorPfp, setHideAuthorPfp] = useState(
+    existingDisplayMode.hideAuthorPfp ?? (existingDisplayMode.hideAuthorInfo ? true : false)
+  );
   // Handle both single string (backward compatible) and array for stripTextPrefix
   const [stripTextPrefixes, setStripTextPrefixes] = useState<string[]>(() => {
     const prefix = existingDisplayMode.stripTextPrefix;
@@ -487,7 +497,16 @@ function CollectionModal({
         embedButtonAction: replaceEmbeds ? embedButtonAction : undefined,
         hideChannelLink,
         hideUrlLinks,
-        hideAuthorInfo,
+        hideAuthorInfo: (() => {
+          // Only set hideAuthorInfo for backward compatibility if all three are set
+          if (hideAuthorDisplayName && hideAuthorUsername && hideAuthorPfp) {
+            return true;
+          }
+          return undefined; // Don't set it if using new granular options
+        })(),
+        hideAuthorDisplayName,
+        hideAuthorUsername,
+        hideAuthorPfp,
         stripTextPrefix: (() => {
           const nonEmptyPrefixes = stripTextPrefixes.filter(p => p.trim().length > 0);
           if (nonEmptyPrefixes.length === 0) return undefined;
@@ -949,20 +968,45 @@ function CollectionModal({
                     </p>
                   </div>
 
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id="hideAuthorInfo"
-                      checked={hideAuthorInfo}
-                      onChange={(e) => setHideAuthorInfo(e.target.checked)}
-                      className="mr-2"
-                    />
-                    <label htmlFor="hideAuthorInfo" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Hide Author Info
-                    </label>
-                    <p className="ml-2 text-xs text-gray-500 dark:text-gray-400">
-                      Hide author name and avatar
-                    </p>
+                  <div className="space-y-2">
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="hideAuthorDisplayName"
+                        checked={hideAuthorDisplayName}
+                        onChange={(e) => setHideAuthorDisplayName(e.target.checked)}
+                        className="mr-2"
+                      />
+                      <label htmlFor="hideAuthorDisplayName" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Hide Author Display Name
+                      </label>
+                    </div>
+
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="hideAuthorUsername"
+                        checked={hideAuthorUsername}
+                        onChange={(e) => setHideAuthorUsername(e.target.checked)}
+                        className="mr-2"
+                      />
+                      <label htmlFor="hideAuthorUsername" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Hide Author Username
+                      </label>
+                    </div>
+
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="hideAuthorPfp"
+                        checked={hideAuthorPfp}
+                        onChange={(e) => setHideAuthorPfp(e.target.checked)}
+                        className="mr-2"
+                      />
+                      <label htmlFor="hideAuthorPfp" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Hide Author Profile Picture
+                      </label>
+                    </div>
                   </div>
 
                   <div>

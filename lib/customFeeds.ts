@@ -31,7 +31,10 @@ export interface DisplayMode {
   embedButtonAction: "open-link" | "custom";
   hideChannelLink?: boolean;
   hideUrlLinks?: boolean;
-  hideAuthorInfo?: boolean;
+  hideAuthorInfo?: boolean; // Deprecated: use hideAuthorDisplayName, hideAuthorUsername, hideAuthorPfp instead
+  hideAuthorDisplayName?: boolean;
+  hideAuthorUsername?: boolean;
+  hideAuthorPfp?: boolean;
   stripTextPrefix?: string | string[]; // Single prefix (backward compatible) or array of prefixes
   replaceCharacters?: Array<{ from: string; to: string }>; // Replace characters (e.g., { from: ";", to: "\n" })
   boldFirstLine?: boolean;

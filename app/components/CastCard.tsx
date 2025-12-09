@@ -2236,14 +2236,20 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
         
         <div className="flex gap-2 sm:gap-3">
           {/* Avatar */}
-          <Link href={`/profile/${author.fid}`} onClick={(e) => e.stopPropagation()}>
-            <AvatarImage
-              src={author.pfp_url}
-              alt={author.username}
-              size={48}
-              className="w-10 h-10 sm:w-12 sm:h-12 rounded-full cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0 object-cover"
-            />
-          </Link>
+          {(() => {
+            // Use new granular option if set, otherwise fall back to hideAuthorInfo for backward compatibility
+            const shouldHidePfp = displayMode?.hideAuthorPfp ?? (displayMode?.hideAuthorInfo && !displayMode?.hideAuthorDisplayName && !displayMode?.hideAuthorUsername && !displayMode?.hideAuthorPfp);
+            return !shouldHidePfp ? (
+              <Link href={`/profile/${author.fid}`} onClick={(e) => e.stopPropagation()}>
+                <AvatarImage
+                  src={author.pfp_url}
+                  alt={author.username}
+                  size={48}
+                  className="w-10 h-10 sm:w-12 sm:h-12 rounded-full cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0 object-cover"
+                />
+              </Link>
+            ) : null;
+          })()}
 
           {/* Content */}
           <div className="flex-1 min-w-0">
@@ -2287,16 +2293,31 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
             })()}
             
             {/* Author info */}
-            {!displayMode?.hideAuthorInfo && (
-            <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 flex-wrap">
-              <Link href={`/profile/${author.fid}`} onClick={(e) => e.stopPropagation()}>
-                <span className="font-semibold text-sm sm:text-base text-gray-900 dark:text-gray-100 hover:underline cursor-pointer">
-                  {author.display_name || author.username}
-                </span>
-              </Link>
-              <span className="text-gray-500 dark:text-gray-400 text-xs sm:text-sm">
-                @{author.username}
-              </span>
+            {(() => {
+              // Use new granular options if set, otherwise fall back to hideAuthorInfo for backward compatibility
+              const hideAll = displayMode?.hideAuthorInfo && !displayMode?.hideAuthorDisplayName && !displayMode?.hideAuthorUsername && !displayMode?.hideAuthorPfp;
+              const hideDisplayName = displayMode?.hideAuthorDisplayName ?? hideAll;
+              const hideUsername = displayMode?.hideAuthorUsername ?? hideAll;
+              
+              // Don't render the container if both are hidden
+              if (hideDisplayName && hideUsername) {
+                return null;
+              }
+              
+              return (
+                <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 flex-wrap">
+                  {!hideDisplayName && (
+                    <Link href={`/profile/${author.fid}`} onClick={(e) => e.stopPropagation()}>
+                      <span className="font-semibold text-sm sm:text-base text-gray-900 dark:text-gray-100 hover:underline cursor-pointer">
+                        {author.display_name || author.username}
+                      </span>
+                    </Link>
+                  )}
+                  {!hideUsername && (
+                    <span className="text-gray-500 dark:text-gray-400 text-xs sm:text-sm">
+                      @{author.username}
+                    </span>
+                  )}
               {hasActiveProSubscription(author as any) && (
                 <span className="text-blue-500 text-sm" title="Pro User">
                   ⚡
@@ -2317,8 +2338,9 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                   </svg>
                 </span>
               )}
-            </div>
-            )}
+                </div>
+              );
+            })()}
 
             {/* Cast text */}
             <div className="text-gray-900 dark:text-gray-100 mb-2 sm:mb-3 text-sm sm:text-base leading-6 sm:leading-7">
