@@ -410,6 +410,9 @@ function CollectionModal({
     if (!prefix) return [];
     return Array.isArray(prefix) ? prefix : [prefix];
   });
+  const [replaceCharacters, setReplaceCharacters] = useState<Array<{ from: string; to: string }>>(
+    existingDisplayMode.replaceCharacters || []
+  );
   const [boldFirstLine, setBoldFirstLine] = useState(existingDisplayMode.boldFirstLine || false);
   const [buttonBackgroundColor, setButtonBackgroundColor] = useState(
     existingDisplayMode.buttonBackgroundColor || "#000000"
@@ -490,6 +493,10 @@ function CollectionModal({
           if (nonEmptyPrefixes.length === 0) return undefined;
           // For backward compatibility, return single string if only one prefix, otherwise return array
           return nonEmptyPrefixes.length === 1 ? nonEmptyPrefixes[0] : nonEmptyPrefixes;
+        })(),
+        replaceCharacters: (() => {
+          const nonEmptyReplacements = replaceCharacters.filter(r => r.from && r.to !== undefined);
+          return nonEmptyReplacements.length > 0 ? nonEmptyReplacements : undefined;
         })(),
         boldFirstLine,
         buttonBackgroundColor: replaceEmbeds ? buttonBackgroundColor : undefined,
@@ -1007,6 +1014,83 @@ function CollectionModal({
                     )}
                     <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                       Remove these prefixes from the beginning of cast text. The first matching prefix will be removed.
+                    </p>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Replace Characters
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReplaceCharacters([...replaceCharacters, { from: "", to: "" }]);
+                        }}
+                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                      >
+                        + Add Replacement
+                      </button>
+                    </div>
+                    {replaceCharacters.length === 0 ? (
+                      <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                        No replacements. Add one to replace characters in cast text (e.g., replace ";" with newline).
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {replaceCharacters.map((replacement, index) => (
+                          <div key={index} className="flex gap-2 items-start p-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded">
+                            <div className="flex-1 grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                                  From
+                                </label>
+                                <input
+                                  type="text"
+                                  value={replacement.from}
+                                  onChange={(e) => {
+                                    const newReplacements = [...replaceCharacters];
+                                    newReplacements[index] = { ...newReplacements[index], from: e.target.value };
+                                    setReplaceCharacters(newReplacements);
+                                  }}
+                                  className="w-full px-2 py-1 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm"
+                                  placeholder="e.g., ;"
+                                  maxLength={10}
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                                  To
+                                </label>
+                                <input
+                                  type="text"
+                                  value={replacement.to}
+                                  onChange={(e) => {
+                                    const newReplacements = [...replaceCharacters];
+                                    newReplacements[index] = { ...newReplacements[index], to: e.target.value };
+                                    setReplaceCharacters(newReplacements);
+                                  }}
+                                  className="w-full px-2 py-1 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm"
+                                  placeholder="\\n for newline"
+                                  maxLength={10}
+                                />
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setReplaceCharacters(replaceCharacters.filter((_, i) => i !== index));
+                              }}
+                              className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm px-2 self-end"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                      Replace characters in cast text. Use "\\n" in the "To" field for newlines. All occurrences will be replaced.
                     </p>
                   </div>
 

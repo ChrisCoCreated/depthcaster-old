@@ -33,6 +33,7 @@ export interface DisplayMode {
   hideUrlLinks?: boolean;
   hideAuthorInfo?: boolean;
   stripTextPrefix?: string | string[]; // Single prefix (backward compatible) or array of prefixes
+  replaceCharacters?: Array<{ from: string; to: string }>; // Replace characters (e.g., { from: ";", to: "\n" })
   boldFirstLine?: boolean;
   buttonBackgroundColor?: string;
   buttonTextColor?: string;

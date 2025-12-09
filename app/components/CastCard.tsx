@@ -2341,6 +2341,21 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                   }
                 }
                 
+                // Replace characters if specified (e.g., replace ";" with newline)
+                if (displayMode?.replaceCharacters && displayMode.replaceCharacters.length > 0) {
+                  for (const replacement of displayMode.replaceCharacters) {
+                    if (replacement.from && replacement.to !== undefined) {
+                      // Handle special escape sequences: "\n" (two characters) -> actual newline
+                      let toValue = replacement.to;
+                      // Convert escape sequences
+                      toValue = toValue.replace(/\\n/g, "\n"); // \n -> newline
+                      toValue = toValue.replace(/\\t/g, "\t"); // \t -> tab
+                      toValue = toValue.replace(/\\r/g, "\r"); // \r -> carriage return
+                      processedText = processedText.replaceAll(replacement.from, toValue);
+                    }
+                  }
+                }
+                
                 // Split into first line and rest if boldFirstLine is enabled
                 const shouldBoldFirstLine = displayMode?.boldFirstLine;
                 let firstLine = "";
