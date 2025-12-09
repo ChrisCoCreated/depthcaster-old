@@ -57,7 +57,7 @@ function MiniappContent() {
         return saved;
       }
     }
-    return "auto"; // Default to auto-open in Depthcaster
+    return "depthcaster"; // Default to Depthcaster
   });
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://depthcaster.vercel.app";
