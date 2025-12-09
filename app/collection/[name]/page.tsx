@@ -51,6 +51,8 @@ export default function CollectionPage({
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const lastFetchTimeRef = useRef<number>(0);
   const MIN_FETCH_INTERVAL = 500;
+  const currentIndexRef = useRef(0);
+  const isNavigatingRef = useRef(false);
 
   // Extract images from casts
   useEffect(() => {
@@ -204,21 +206,79 @@ export default function CollectionPage({
   }, [hasMore, loading, loadMore]);
 
   // Image modal navigation
-  const handlePreviousImage = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex(currentIndex - 1);
-      setModalImageUrl(images[currentIndex - 1].imageUrl);
-      setHasUserClosedModal(false);
+  const handlePreviousImage = useCallback(() => {
+    // Prevent concurrent navigations
+    if (isNavigatingRef.current) {
+      return;
     }
-  };
+    
+    isNavigatingRef.current = true;
+    const currentIdx = currentIndexRef.current;
+    
+    if (currentIdx > 0) {
+      setCurrentIndex((prev) => {
+        const newIndex = Math.max(0, prev - 1);
+        setTimeout(() => {
+          isNavigatingRef.current = false;
+        }, 100);
+        return newIndex;
+      });
+      setHasUserClosedModal(false);
+    } else {
+      isNavigatingRef.current = false;
+    }
+  }, []);
 
-  const handleNextImage = () => {
-    if (currentIndex < images.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-      setModalImageUrl(images[currentIndex + 1].imageUrl);
-      setHasUserClosedModal(false);
+  const handleNextImage = useCallback(() => {
+    // Prevent concurrent navigations
+    if (isNavigatingRef.current) {
+      return;
     }
-  };
+    
+    isNavigatingRef.current = true;
+    const currentIdx = currentIndexRef.current;
+    
+    if (currentIdx < images.length - 1) {
+      setCurrentIndex((prev) => {
+        const newIndex = Math.min(images.length - 1, prev + 1);
+        setTimeout(() => {
+          isNavigatingRef.current = false;
+        }, 100);
+        return newIndex;
+      });
+      setHasUserClosedModal(false);
+    } else {
+      isNavigatingRef.current = false;
+    }
+  }, [images.length]);
+
+  // Sync refs with state
+  useEffect(() => {
+    currentIndexRef.current = currentIndex;
+  }, [currentIndex]);
+
+  // Keep modal image in sync with current index
+  useEffect(() => {
+    if (isModalOpen && images.length > 0 && currentIndex >= 0 && currentIndex < images.length) {
+      setModalImageUrl(images[currentIndex].imageUrl);
+    }
+  }, [currentIndex, images, isModalOpen]);
+
+  // Handle keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isModalOpen) return;
+      
+      if (e.key === "ArrowLeft") {
+        handlePreviousImage();
+      } else if (e.key === "ArrowRight") {
+        handleNextImage();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isModalOpen, handlePreviousImage, handleNextImage]);
 
   if (error) {
     return (
