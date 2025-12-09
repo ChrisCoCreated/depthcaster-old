@@ -241,3 +241,110 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { adminFid, castHash, qualityScore, category, type } = body;
+
+    // Check admin access
+    if (!adminFid) {
+      return NextResponse.json(
+        { error: "adminFid is required" },
+        { status: 400 }
+      );
+    }
+
+    if (!castHash) {
+      return NextResponse.json(
+        { error: "castHash is required" },
+        { status: 400 }
+      );
+    }
+
+    if (qualityScore === undefined || qualityScore === null) {
+      return NextResponse.json(
+        { error: "qualityScore is required" },
+        { status: 400 }
+      );
+    }
+
+    const adminFidNum = parseInt(String(adminFid));
+    if (isNaN(adminFidNum)) {
+      return NextResponse.json(
+        { error: "Invalid adminFid" },
+        { status: 400 }
+      );
+    }
+
+    // Validate quality score
+    const qualityScoreNum = parseInt(String(qualityScore));
+    if (isNaN(qualityScoreNum) || qualityScoreNum < 0 || qualityScoreNum > 100) {
+      return NextResponse.json(
+        { error: "qualityScore must be between 0 and 100" },
+        { status: 400 }
+      );
+    }
+
+    // Verify admin status
+    const adminUser = await db.select().from(users).where(eq(users.fid, adminFidNum)).limit(1);
+    if (adminUser.length === 0) {
+      return NextResponse.json(
+        { error: "Admin user not found" },
+        { status: 404 }
+      );
+    }
+    const roles = await getUserRoles(adminFidNum);
+    if (!isAdmin(roles)) {
+      return NextResponse.json(
+        { error: "User does not have admin or superadmin role" },
+        { status: 403 }
+      );
+    }
+
+    // Determine if it's a cast or reply
+    const isReply = type === "reply";
+
+    // Update quality score in the appropriate table
+    if (isReply) {
+      const updateData: any = {
+        qualityScore: qualityScoreNum,
+        qualityAnalyzedAt: new Date(),
+      };
+      if (category) {
+        updateData.category = category;
+      }
+      
+      await db
+        .update(castReplies)
+        .set(updateData)
+        .where(eq(castReplies.replyCastHash, castHash));
+    } else {
+      const updateData: any = {
+        qualityScore: qualityScoreNum,
+        qualityAnalyzedAt: new Date(),
+      };
+      if (category) {
+        updateData.category = category;
+      }
+      
+      await db
+        .update(curatedCasts)
+        .set(updateData)
+        .where(eq(curatedCasts.castHash, castHash));
+    }
+
+    return NextResponse.json({
+      success: true,
+      qualityScore: qualityScoreNum,
+      category: category || null,
+    });
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    console.error("Admin quality update API error:", err.message || err);
+    return NextResponse.json(
+      { error: err.message || "Failed to update quality score" },
+      { status: 500 }
+    );
+  }
+}

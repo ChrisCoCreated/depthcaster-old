@@ -15,6 +15,19 @@ interface QualityItem {
   type: "cast" | "reply";
 }
 
+const VALID_CATEGORIES = [
+  "crypto-critique",
+  "platform-analysis",
+  "creator-economy",
+  "art-culture",
+  "ai-philosophy",
+  "community-culture",
+  "life-reflection",
+  "market-news",
+  "playful",
+  "other",
+] as const;
+
 export default function QualityPage() {
   const { user } = useNeynarContext();
   const router = useRouter();
@@ -29,6 +42,12 @@ export default function QualityPage() {
   const [includeNull, setIncludeNull] = useState<boolean>(false);
   const [showCasts, setShowCasts] = useState<boolean>(true);
   const [showReplies, setShowReplies] = useState<boolean>(true);
+
+  // Editing state
+  const [editingItem, setEditingItem] = useState<string | null>(null);
+  const [editQualityScore, setEditQualityScore] = useState<string>("");
+  const [editCategory, setEditCategory] = useState<string>("");
+  const [saving, setSaving] = useState<string | null>(null);
 
   useEffect(() => {
     const checkAdminAccess = async () => {
@@ -93,6 +112,72 @@ export default function QualityPage() {
 
   const handleSearch = () => {
     fetchItems();
+  };
+
+  const handleEdit = (item: QualityItem) => {
+    setEditingItem(item.hash);
+    setEditQualityScore(item.qualityScore?.toString() || "");
+    setEditCategory(item.category || "");
+  };
+
+  const handleCancelEdit = () => {
+    setEditingItem(null);
+    setEditQualityScore("");
+    setEditCategory("");
+  };
+
+  const handleSaveEdit = async (item: QualityItem) => {
+    if (!user?.fid) return;
+
+    const qualityScoreNum = parseInt(editQualityScore);
+    if (isNaN(qualityScoreNum) || qualityScoreNum < 0 || qualityScoreNum > 100) {
+      alert("Quality score must be between 0 and 100");
+      return;
+    }
+
+    setSaving(item.hash);
+    try {
+      const response = await fetch("/api/admin/quality", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          adminFid: user.fid,
+          castHash: item.hash,
+          qualityScore: qualityScoreNum,
+          category: editCategory || null,
+          type: item.type,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Update the item in the list
+        setItems((prevItems) =>
+          prevItems.map((i) =>
+            i.hash === item.hash
+              ? {
+                  ...i,
+                  qualityScore: data.qualityScore,
+                  category: data.category,
+                }
+              : i
+          )
+        );
+        setEditingItem(null);
+        setEditQualityScore("");
+        setEditCategory("");
+      } else {
+        const error = await response.json();
+        alert(`Failed to update: ${error.error || "Unknown error"}`);
+      }
+    } catch (error) {
+      console.error("Failed to save edit:", error);
+      alert("Failed to save changes");
+    } finally {
+      setSaving(null);
+    }
   };
 
   if (!user || isLoading) {
@@ -245,9 +330,12 @@ export default function QualityPage() {
                   }
                 }
 
+                const isEditing = editingItem === item.hash;
+                const isSaving = saving === item.hash;
+
                 return (
                   <div key={item.hash} className="border-b border-gray-200 dark:border-gray-800 pb-4 last:border-b-0">
-                    <div className="mb-2 flex items-center gap-2">
+                    <div className="mb-2 flex items-center gap-2 flex-wrap">
                       <span className={`px-2 py-1 text-xs rounded ${
                         item.type === "cast" 
                           ? "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200"
@@ -255,19 +343,75 @@ export default function QualityPage() {
                       }`}>
                         {item.type === "cast" ? "Cast" : "Reply"}
                       </span>
-                      {item.qualityScore !== null ? (
-                        <span className="px-2 py-1 text-xs rounded bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
-                          Quality: {item.qualityScore}
-                        </span>
+                      
+                      {isEditing ? (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <label className="text-xs text-gray-700 dark:text-gray-300">Quality:</label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              value={editQualityScore}
+                              onChange={(e) => setEditQualityScore(e.target.value)}
+                              className="w-20 px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                              disabled={isSaving}
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <label className="text-xs text-gray-700 dark:text-gray-300">Category:</label>
+                            <select
+                              value={editCategory}
+                              onChange={(e) => setEditCategory(e.target.value)}
+                              className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                              disabled={isSaving}
+                            >
+                              <option value="">None</option>
+                              {VALID_CATEGORIES.map((cat) => (
+                                <option key={cat} value={cat}>
+                                  {cat}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <button
+                            onClick={() => handleSaveEdit(item)}
+                            disabled={isSaving}
+                            className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {isSaving ? "Saving..." : "Save"}
+                          </button>
+                          <button
+                            onClick={handleCancelEdit}
+                            disabled={isSaving}
+                            className="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Cancel
+                          </button>
+                        </>
                       ) : (
-                        <span className="px-2 py-1 text-xs rounded bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-500">
-                          Quality: null
-                        </span>
-                      )}
-                      {item.category && (
-                        <span className="px-2 py-1 text-xs rounded bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
-                          {item.category}
-                        </span>
+                        <>
+                          {item.qualityScore !== null ? (
+                            <span className="px-2 py-1 text-xs rounded bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
+                              Quality: {item.qualityScore}
+                            </span>
+                          ) : (
+                            <span className="px-2 py-1 text-xs rounded bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-500">
+                              Quality: null
+                            </span>
+                          )}
+                          {item.category && (
+                            <span className="px-2 py-1 text-xs rounded bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
+                              {item.category}
+                            </span>
+                          )}
+                          <button
+                            onClick={() => handleEdit(item)}
+                            className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                          >
+                            Edit
+                          </button>
+                        </>
                       )}
                     </div>
                     <CastCard
