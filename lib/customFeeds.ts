@@ -32,7 +32,7 @@ export interface DisplayMode {
   hideChannelLink?: boolean;
   hideUrlLinks?: boolean;
   hideAuthorInfo?: boolean;
-  stripTextPrefix?: string;
+  stripTextPrefix?: string | string[]; // Single prefix (backward compatible) or array of prefixes
   boldFirstLine?: boolean;
   buttonBackgroundColor?: string;
   buttonTextColor?: string;

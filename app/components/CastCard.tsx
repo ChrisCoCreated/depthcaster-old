@@ -2326,9 +2326,19 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                 // Process text: strip prefix and prepare for first line bold
                 let processedText = translatedText || cast.text || "";
                 
-                // Strip prefix if specified
-                if (displayMode?.stripTextPrefix && processedText.startsWith(displayMode.stripTextPrefix)) {
-                  processedText = processedText.substring(displayMode.stripTextPrefix.length);
+                // Strip prefix(es) if specified - supports both single string (backward compatible) and array
+                if (displayMode?.stripTextPrefix) {
+                  const prefixes = Array.isArray(displayMode.stripTextPrefix) 
+                    ? displayMode.stripTextPrefix 
+                    : [displayMode.stripTextPrefix];
+                  
+                  // Try each prefix in order, strip the first one that matches
+                  for (const prefix of prefixes) {
+                    if (prefix && processedText.startsWith(prefix)) {
+                      processedText = processedText.substring(prefix.length);
+                      break; // Only strip the first matching prefix
+                    }
+                  }
                 }
                 
                 // Split into first line and rest if boldFirstLine is enabled

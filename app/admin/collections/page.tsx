@@ -404,7 +404,12 @@ function CollectionModal({
   const [hideChannelLink, setHideChannelLink] = useState(existingDisplayMode.hideChannelLink || false);
   const [hideUrlLinks, setHideUrlLinks] = useState(existingDisplayMode.hideUrlLinks || false);
   const [hideAuthorInfo, setHideAuthorInfo] = useState(existingDisplayMode.hideAuthorInfo || false);
-  const [stripTextPrefix, setStripTextPrefix] = useState(existingDisplayMode.stripTextPrefix || "");
+  // Handle both single string (backward compatible) and array for stripTextPrefix
+  const [stripTextPrefixes, setStripTextPrefixes] = useState<string[]>(() => {
+    const prefix = existingDisplayMode.stripTextPrefix;
+    if (!prefix) return [];
+    return Array.isArray(prefix) ? prefix : [prefix];
+  });
   const [boldFirstLine, setBoldFirstLine] = useState(existingDisplayMode.boldFirstLine || false);
   const [buttonBackgroundColor, setButtonBackgroundColor] = useState(
     existingDisplayMode.buttonBackgroundColor || "#000000"
@@ -480,7 +485,12 @@ function CollectionModal({
         hideChannelLink,
         hideUrlLinks,
         hideAuthorInfo,
-        stripTextPrefix: stripTextPrefix || undefined,
+        stripTextPrefix: (() => {
+          const nonEmptyPrefixes = stripTextPrefixes.filter(p => p.trim().length > 0);
+          if (nonEmptyPrefixes.length === 0) return undefined;
+          // For backward compatibility, return single string if only one prefix, otherwise return array
+          return nonEmptyPrefixes.length === 1 ? nonEmptyPrefixes[0] : nonEmptyPrefixes;
+        })(),
         boldFirstLine,
         buttonBackgroundColor: replaceEmbeds ? buttonBackgroundColor : undefined,
         buttonTextColor: replaceEmbeds ? buttonTextColor : undefined,
@@ -949,18 +959,54 @@ function CollectionModal({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Strip Text Prefix
-                    </label>
-                    <input
-                      type="text"
-                      value={stripTextPrefix}
-                      onChange={(e) => setStripTextPrefix(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm"
-                      placeholder="e.g., Reframe Daily: "
-                    />
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      Remove this prefix from the beginning of cast text
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Strip Text Prefixes
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStripTextPrefixes([...stripTextPrefixes, ""]);
+                        }}
+                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                      >
+                        + Add Prefix
+                      </button>
+                    </div>
+                    {stripTextPrefixes.length === 0 ? (
+                      <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                        No prefixes. Add one to remove prefixes from the beginning of cast text.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {stripTextPrefixes.map((prefix, index) => (
+                          <div key={index} className="flex gap-2 items-start">
+                            <input
+                              type="text"
+                              value={prefix}
+                              onChange={(e) => {
+                                const newPrefixes = [...stripTextPrefixes];
+                                newPrefixes[index] = e.target.value;
+                                setStripTextPrefixes(newPrefixes);
+                              }}
+                              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm"
+                              placeholder="e.g., Reframe Daily: "
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setStripTextPrefixes(stripTextPrefixes.filter((_, i) => i !== index));
+                              }}
+                              className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm px-2"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                      Remove these prefixes from the beginning of cast text. The first matching prefix will be removed.
                     </p>
                   </div>
 
