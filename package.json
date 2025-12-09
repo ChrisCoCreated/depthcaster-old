@@ -16,6 +16,7 @@
     "test:signin-log": "tsx scripts/test-signin-log.ts"
   },
   "dependencies": {
+    "@farcaster/miniapp-sdk": "^0.2.1",
     "@neondatabase/serverless": "^1.0.2",
     "@neynar/nodejs-sdk": "^3.85.0",
     "@neynar/react": "^1.2.21",

@@ -6,6 +6,7 @@ import { formatDistanceToNow } from "date-fns";
 import { AvatarImage } from "@/app/components/AvatarImage";
 import Link from "next/link";
 import { analytics } from "@/lib/analytics";
+import { sdk } from "@farcaster/miniapp-sdk";
 
 interface FeedItem {
   castHash: string;
@@ -49,6 +50,13 @@ function MiniappContent() {
     return 70;
   });
   const [showQualityFilters, setShowQualityFilters] = useState(false);
+  const [openInFarcaster, setOpenInFarcaster] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("miniappOpenInFarcaster");
+      return saved === "true";
+    }
+    return false;
+  });
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://depthcaster.vercel.app";
   
@@ -444,14 +452,30 @@ function MiniappContent() {
     }
   };
 
-  const handleCastClick = (castHash: string) => {
-    // Open externally in depthcaster conversation view
-    const url = `${appUrl}/conversation/${castHash}`;
-    if (actions?.openUrl) {
-      actions.openUrl(url);
+  const handleCastClick = async (castHash: string) => {
+    if (openInFarcaster) {
+      // Open in Farcaster using SDK
+      try {
+        await sdk.actions.viewCast({ hash: castHash });
+      } catch (error) {
+        console.error("Error opening cast in Farcaster:", error);
+        // Fallback to Depthcaster on error
+        const url = `${appUrl}/conversation/${castHash}`;
+        if (actions?.openUrl) {
+          actions.openUrl(url);
+        } else {
+          window.open(url, "_blank", "noopener,noreferrer");
+        }
+      }
     } else {
-      // Fallback to window.open if SDK not ready
-      window.open(url, "_blank", "noopener,noreferrer");
+      // Open in Depthcaster conversation view
+      const url = `${appUrl}/conversation/${castHash}`;
+      if (actions?.openUrl) {
+        actions.openUrl(url);
+      } else {
+        // Fallback to window.open if SDK not ready
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
     }
   };
 
@@ -517,6 +541,19 @@ function MiniappContent() {
             </Link>
           {context?.user?.fid && (
             <div className="relative flex items-center gap-1">
+              {/* Toggle for opening links in Farcaster vs Depthcaster */}
+              <button
+                onClick={() => {
+                  const newValue = !openInFarcaster;
+                  setOpenInFarcaster(newValue);
+                  localStorage.setItem("miniappOpenInFarcaster", newValue.toString());
+                }}
+                className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                aria-label={openInFarcaster ? "Open links in Farcaster" : "Open links in Depthcaster"}
+                title={openInFarcaster ? "Open links in Farcaster" : "Open links in Depthcaster"}
+              >
+                {openInFarcaster ? "🔗 Farcaster" : "📱 Depthcaster"}
+              </button>
               <button
                 onClick={handlePasteToCurate}
                 disabled={isPasting}

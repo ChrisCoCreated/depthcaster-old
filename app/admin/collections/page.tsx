@@ -5,6 +5,7 @@ import { useNeynarContext } from "@neynar/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { GatingRule } from "@/lib/collection-gating";
+import { extractCastHashFromUrl } from "@/lib/link-converter";
 
 interface Collection {
   id: string;
@@ -780,13 +781,15 @@ function ManageCastsModal({
     try {
       const input = castHash.trim();
       
-      // Detect if input is a URL or hash
-      const isUrl = input.startsWith("http://") || input.startsWith("https://") || input.includes("/");
-      const type = isUrl ? "url" : "hash";
+      // Try to extract hash from URL if it's a known Farcaster URL format
+      // This is faster than passing the full URL to the API
+      const extractedHash = extractCastHashFromUrl(input);
+      const identifier = extractedHash || input;
+      const type = extractedHash ? "hash" : (input.startsWith("http://") || input.startsWith("https://") ? "url" : "hash");
       
       // Fetch cast data from Neynar
       const conversationResponse = await fetch(
-        `/api/conversation?identifier=${encodeURIComponent(input)}&type=${type}&replyDepth=0`
+        `/api/conversation?identifier=${encodeURIComponent(identifier)}&type=${type}&replyDepth=0`
       );
 
       if (!conversationResponse.ok) {
