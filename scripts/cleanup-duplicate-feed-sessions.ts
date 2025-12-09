@@ -113,14 +113,16 @@ async function cleanupDuplicateFeedSessions() {
     
     if (idsToDelete.length > 0) {
       // Delete in batches to avoid overwhelming the database
-      const batchSize = 1000;
+      const batchSize = 500;
       let deletedCount = 0;
       
       for (let i = 0; i < idsToDelete.length; i += batchSize) {
         const batch = idsToDelete.slice(i, i + batchSize);
+        // Use IN clause with proper UUID casting
+        const placeholders = batch.map((_, idx) => sql`${batch[idx]}::uuid`).join(sql`, `);
         const result = await db.execute(sql`
           DELETE FROM feed_view_sessions
-          WHERE id = ANY(${batch}::uuid[])
+          WHERE id IN (${sql.raw(batch.map(id => `'${id}'::uuid`).join(', '))})
         `);
         deletedCount += batch.length;
         console.log(`  Deleted ${deletedCount} of ${idsToDelete.length} duplicates...`);

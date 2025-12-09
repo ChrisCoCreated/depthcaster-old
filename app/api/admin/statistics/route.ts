@@ -486,7 +486,7 @@ export async function GET(request: NextRequest) {
             THEN ROUND(SUM(total_duration_seconds)::float / SUM(total_sessions)::float)::bigint
             ELSE 0::bigint
           END as avg_duration_seconds,
-          MAX(unique_users)::int as unique_users
+          COUNT(DISTINCT user_fid)::int as unique_users
         FROM (
           SELECT 
             DATE_TRUNC('day', created_at) as date,
@@ -520,7 +520,7 @@ export async function GET(request: NextRequest) {
             THEN ROUND(SUM(total_duration_seconds)::float / SUM(total_sessions)::float)::bigint
             ELSE 0::bigint
           END as avg_duration_seconds,
-          MAX(unique_users)::int as unique_users
+          COUNT(DISTINCT user_fid)::int as unique_users
         FROM (
           SELECT 
             DATE_TRUNC('day', created_at) as date,
@@ -560,7 +560,7 @@ export async function GET(request: NextRequest) {
           feed_type,
           SUM(view_count)::int as total_views,
           COUNT(DISTINCT cast_hash)::int as unique_casts,
-          MAX(unique_users)::int as unique_users
+          COUNT(DISTINCT user_fid)::int as unique_users
         FROM (
           SELECT 
             DATE_TRUNC('day', created_at) as date,
@@ -589,7 +589,7 @@ export async function GET(request: NextRequest) {
           feed_type,
           SUM(view_count)::int as total_views,
           COUNT(DISTINCT cast_hash)::int as unique_casts,
-          MAX(unique_users)::int as unique_users
+          COUNT(DISTINCT user_fid)::int as unique_users
         FROM (
           SELECT 
             DATE_TRUNC('day', created_at) as date,
