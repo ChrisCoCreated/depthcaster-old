@@ -262,6 +262,7 @@ function MiniappContent() {
       return;
     }
 
+
     // Only scroll if we had a notification on mount (not if user just changed preference)
     const hashToScroll = hadNotificationOnMountRef.current;
 
