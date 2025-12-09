@@ -786,8 +786,10 @@ export function Header() {
                         <Settings className="w-4 h-4" />
                         Settings
                       </Link>
-                      <Link
-                        href="/miniapp"
+                      <a
+                        href="https://farcaster.xyz/miniapps/HtUwgAw4iQ2x/depthcaster"
+                        target="_blank"
+                        rel="noopener noreferrer"
                         onClick={() => {
                           setIsPfpDropdownOpen(false);
                         }}
@@ -795,7 +797,7 @@ export function Header() {
                       >
                         <Download className="w-4 h-4" />
                         Install Miniapp
-                      </Link>
+                      </a>
                       {isAdminUser && (
                         <Link
                           href="/admin"
