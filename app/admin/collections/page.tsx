@@ -393,6 +393,34 @@ function CollectionModal({
     collection?.hiddenEmbedUrls ? (collection.hiddenEmbedUrls as string[]).join('\n') : ""
   );
 
+  // Display Mode state
+  const existingDisplayMode = (collection?.displayMode as any) || {};
+  const [displayModeEnabled, setDisplayModeEnabled] = useState(!!collection?.displayMode);
+  const [replaceEmbeds, setReplaceEmbeds] = useState(existingDisplayMode.replaceEmbeds || false);
+  const [embedButtonText, setEmbedButtonText] = useState(existingDisplayMode.embedButtonText || "");
+  const [embedButtonAction, setEmbedButtonAction] = useState<"open-link" | "custom">(
+    existingDisplayMode.embedButtonAction || "open-link"
+  );
+  const [hideChannelLink, setHideChannelLink] = useState(existingDisplayMode.hideChannelLink || false);
+  const [hideUrlLinks, setHideUrlLinks] = useState(existingDisplayMode.hideUrlLinks || false);
+  const [hideAuthorInfo, setHideAuthorInfo] = useState(existingDisplayMode.hideAuthorInfo || false);
+  const [stripTextPrefix, setStripTextPrefix] = useState(existingDisplayMode.stripTextPrefix || "");
+  const [boldFirstLine, setBoldFirstLine] = useState(existingDisplayMode.boldFirstLine || false);
+  const [buttonBackgroundColor, setButtonBackgroundColor] = useState(
+    existingDisplayMode.buttonBackgroundColor || "#000000"
+  );
+  const [buttonTextColor, setButtonTextColor] = useState(
+    existingDisplayMode.buttonTextColor || "#ffffff"
+  );
+
+  // Header Config state
+  const existingHeaderConfig = (collection?.headerConfig as any) || {};
+  const [headerConfigEnabled, setHeaderConfigEnabled] = useState(!!collection?.headerConfig);
+  const [showChannelHeader, setShowChannelHeader] = useState(existingHeaderConfig.showChannelHeader || false);
+  const [customTitle, setCustomTitle] = useState(existingHeaderConfig.customTitle || "");
+  const [customDescription, setCustomDescription] = useState(existingHeaderConfig.customDescription || "");
+  const [headerImage, setHeaderImage] = useState(existingHeaderConfig.headerImage || "");
+
   const [gatingRuleType, setGatingRuleType] = useState<GatingRule["type"] | "">(
     collection?.gatingRule?.type || ""
   );
@@ -444,11 +472,28 @@ function CollectionModal({
         .map(url => url.trim())
         .filter(url => url.length > 0);
 
-      // Update displayMode with expandMentionedProfiles
-      const updatedDisplayMode = {
-        ...formData.displayMode,
-        expandMentionedProfiles: expandMentionedProfiles,
-      };
+      // Build displayMode object
+      const updatedDisplayMode = displayModeEnabled ? {
+        replaceEmbeds,
+        embedButtonText: replaceEmbeds ? embedButtonText : undefined,
+        embedButtonAction: replaceEmbeds ? embedButtonAction : undefined,
+        hideChannelLink,
+        hideUrlLinks,
+        hideAuthorInfo,
+        stripTextPrefix: stripTextPrefix || undefined,
+        boldFirstLine,
+        buttonBackgroundColor: replaceEmbeds ? buttonBackgroundColor : undefined,
+        buttonTextColor: replaceEmbeds ? buttonTextColor : undefined,
+        expandMentionedProfiles,
+      } : null;
+
+      // Build headerConfig object
+      const updatedHeaderConfig = headerConfigEnabled ? {
+        showChannelHeader,
+        customTitle: customTitle || undefined,
+        customDescription: customDescription || undefined,
+        headerImage: headerImage || undefined,
+      } : null;
 
       // Build autoCurationRules if enabled
       let autoCurationRules: any = null;
@@ -497,7 +542,7 @@ function CollectionModal({
         autoCurationEnabled: formData.autoCurationEnabled,
         autoCurationRules: autoCurationRules,
         displayMode: updatedDisplayMode,
-        headerConfig: formData.headerConfig,
+        headerConfig: updatedHeaderConfig,
         hiddenEmbedUrls: hiddenEmbedUrlsArray.length > 0 ? hiddenEmbedUrlsArray : null,
         orderMode: formData.orderMode,
         orderDirection: formData.orderDirection,
@@ -746,6 +791,276 @@ function CollectionModal({
               <p className="ml-2 text-xs text-gray-500 dark:text-gray-400">
                 Show full profile cards (pfp, banner, bio, stats, URL) for mentioned profiles in casts
               </p>
+            </div>
+
+            {/* Display Mode Settings */}
+            <div className="p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg space-y-4">
+              <div className="flex items-center justify-between">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="displayModeEnabled"
+                    checked={displayModeEnabled}
+                    onChange={(e) => setDisplayModeEnabled(e.target.checked)}
+                    className="mr-2"
+                  />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Enable Display Mode
+                  </span>
+                </label>
+              </div>
+
+              {displayModeEnabled && (
+                <div className="space-y-4 pt-2 border-t border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="replaceEmbeds"
+                      checked={replaceEmbeds}
+                      onChange={(e) => setReplaceEmbeds(e.target.checked)}
+                      className="mr-2"
+                    />
+                    <label htmlFor="replaceEmbeds" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Replace Embeds with Button
+                    </label>
+                    <p className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                      Replace embed previews with a custom button
+                    </p>
+                  </div>
+
+                  {replaceEmbeds && (
+                    <div className="space-y-3 pl-6 border-l-2 border-gray-300 dark:border-gray-600">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Button Text
+                        </label>
+                        <input
+                          type="text"
+                          value={embedButtonText}
+                          onChange={(e) => setEmbedButtonText(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm"
+                          placeholder="e.g., Open this Reframe"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Button Action
+                        </label>
+                        <select
+                          value={embedButtonAction}
+                          onChange={(e) => setEmbedButtonAction(e.target.value as "open-link" | "custom")}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm"
+                        >
+                          <option value="open-link">Open Link</option>
+                          <option value="custom">Custom</option>
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Button Background Color
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              type="color"
+                              value={buttonBackgroundColor}
+                              onChange={(e) => setButtonBackgroundColor(e.target.value)}
+                              className="h-10 w-20 border border-gray-300 dark:border-gray-700 rounded cursor-pointer"
+                            />
+                            <input
+                              type="text"
+                              value={buttonBackgroundColor}
+                              onChange={(e) => setButtonBackgroundColor(e.target.value)}
+                              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm font-mono"
+                              placeholder="#000000"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Button Text Color
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              type="color"
+                              value={buttonTextColor}
+                              onChange={(e) => setButtonTextColor(e.target.value)}
+                              className="h-10 w-20 border border-gray-300 dark:border-gray-700 rounded cursor-pointer"
+                            />
+                            <input
+                              type="text"
+                              value={buttonTextColor}
+                              onChange={(e) => setButtonTextColor(e.target.value)}
+                              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm font-mono"
+                              placeholder="#ffffff"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="hideChannelLink"
+                      checked={hideChannelLink}
+                      onChange={(e) => setHideChannelLink(e.target.checked)}
+                      className="mr-2"
+                    />
+                    <label htmlFor="hideChannelLink" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Hide Channel Link
+                    </label>
+                  </div>
+
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="hideUrlLinks"
+                      checked={hideUrlLinks}
+                      onChange={(e) => setHideUrlLinks(e.target.checked)}
+                      className="mr-2"
+                    />
+                    <label htmlFor="hideUrlLinks" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Hide URL Links
+                    </label>
+                    <p className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                      Hide clickable URL links in cast text
+                    </p>
+                  </div>
+
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="hideAuthorInfo"
+                      checked={hideAuthorInfo}
+                      onChange={(e) => setHideAuthorInfo(e.target.checked)}
+                      className="mr-2"
+                    />
+                    <label htmlFor="hideAuthorInfo" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Hide Author Info
+                    </label>
+                    <p className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                      Hide author name and avatar
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Strip Text Prefix
+                    </label>
+                    <input
+                      type="text"
+                      value={stripTextPrefix}
+                      onChange={(e) => setStripTextPrefix(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm"
+                      placeholder="e.g., Reframe Daily: "
+                    />
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      Remove this prefix from the beginning of cast text
+                    </p>
+                  </div>
+
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="boldFirstLine"
+                      checked={boldFirstLine}
+                      onChange={(e) => setBoldFirstLine(e.target.checked)}
+                      className="mr-2"
+                    />
+                    <label htmlFor="boldFirstLine" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Bold First Line
+                    </label>
+                    <p className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                      Make the first line of cast text bold
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Header Configuration */}
+            <div className="p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg space-y-4">
+              <div className="flex items-center justify-between">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="headerConfigEnabled"
+                    checked={headerConfigEnabled}
+                    onChange={(e) => setHeaderConfigEnabled(e.target.checked)}
+                    className="mr-2"
+                  />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Enable Header Configuration
+                  </span>
+                </label>
+              </div>
+
+              {headerConfigEnabled && (
+                <div className="space-y-4 pt-2 border-t border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="showChannelHeader"
+                      checked={showChannelHeader}
+                      onChange={(e) => setShowChannelHeader(e.target.checked)}
+                      className="mr-2"
+                    />
+                    <label htmlFor="showChannelHeader" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Show Channel Header
+                    </label>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Custom Title
+                    </label>
+                    <input
+                      type="text"
+                      value={customTitle}
+                      onChange={(e) => setCustomTitle(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm"
+                      placeholder="e.g., Reframe Daily"
+                    />
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      Custom title to display instead of collection name
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Custom Description
+                    </label>
+                    <textarea
+                      value={customDescription}
+                      onChange={(e) => setCustomDescription(e.target.value)}
+                      rows={2}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm"
+                      placeholder="Optional description text"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Header Image URL
+                    </label>
+                    <input
+                      type="text"
+                      value={headerImage}
+                      onChange={(e) => setHeaderImage(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm"
+                      placeholder="e.g., /images/instructions/reframebanner.jpg"
+                    />
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      URL or path to header image (relative to public folder or absolute URL)
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {formData.autoCurationEnabled && (
