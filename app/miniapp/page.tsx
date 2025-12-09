@@ -26,6 +26,8 @@ const ADMIN_FID = 5701;
 function MiniappContent() {
   const { isSDKLoaded, context, actions, added, notificationDetails } = useMiniApp();
   const hasAutoOpenedRef = useRef(false);
+  const hasScrolledToCastRef = useRef(false);
+  const castElementRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -110,10 +112,9 @@ function MiniappContent() {
     }
   }, [isSDKLoaded, actions]);
 
-  // Auto-open cast from notification
+  // Handle notification click - log data and either auto-open or prepare to scroll
   useEffect(() => {
-    // Only auto-open if preference is "auto" and only once
-    if (openLinkPreference !== "auto" || hasAutoOpenedRef.current || !isSDKLoaded) {
+    if (!isSDKLoaded) {
       return;
     }
 
@@ -130,7 +131,16 @@ function MiniappContent() {
     const hashToOpen = castHash || notificationCastHash;
 
     if (hashToOpen) {
-      hasAutoOpenedRef.current = true;
+      // Log comprehensive notification data
+      console.log("[Miniapp Notification] Notification data received:", {
+        castHash: hashToOpen,
+        urlParams: typeof window !== "undefined" ? Object.fromEntries(new URLSearchParams(window.location.search)) : null,
+        notificationDetails: notificationDetails,
+        fullNotificationDetails: JSON.stringify(notificationDetails, null, 2),
+        userFid: context?.user?.fid,
+        openLinkPreference,
+        timestamp: new Date().toISOString(),
+      });
       
       // Log notification click to backend
       if (context?.user?.fid) {
@@ -140,6 +150,7 @@ function MiniappContent() {
           body: JSON.stringify({
             castHash: hashToOpen,
             userFid: context.user.fid,
+            notificationDetails: notificationDetails,
           }),
         }).catch((err) => {
           console.error("Error logging notification click:", err);
@@ -147,19 +158,26 @@ function MiniappContent() {
         });
       }
       
-      // Auto-open in Depthcaster conversation view
-      const url = `${appUrl}/conversation/${hashToOpen}`;
-      if (actions?.openUrl) {
-        actions.openUrl(url).catch((err) => {
-          console.error("Error opening cast from notification:", err);
-          // Fallback to window.open if SDK method fails
+      // Only auto-open if preference is "auto" and only once
+      if (openLinkPreference === "auto" && !hasAutoOpenedRef.current) {
+        hasAutoOpenedRef.current = true;
+        
+        // Auto-open in Depthcaster conversation view
+        const url = `${appUrl}/conversation/${hashToOpen}`;
+        if (actions?.openUrl) {
+          actions.openUrl(url).catch((err) => {
+            console.error("Error opening cast from notification:", err);
+            // Fallback to window.open if SDK method fails
+            window.open(url, "_blank", "noopener,noreferrer");
+          });
+        } else {
           window.open(url, "_blank", "noopener,noreferrer");
-        });
-      } else {
-        window.open(url, "_blank", "noopener,noreferrer");
+        }
       }
+      // If preference is not "auto", we'll scroll to the cast in the feed instead
+      // (handled in the scroll effect below)
     }
-  }, [isSDKLoaded, actions, notificationDetails, appUrl, openLinkPreference]);
+  }, [isSDKLoaded, actions, notificationDetails, appUrl, openLinkPreference, context?.user?.fid]);
 
   const fetchFeed = useCallback(async (limit: number = 3) => {
     try {
@@ -198,6 +216,29 @@ function MiniappContent() {
     return () => clearTimeout(timer);
   }, [fetchFeed]);
 
+  const loadMoreItems = useCallback(async () => {
+    if (loadingMore || !hasMore || feedItems.length >= 30) return;
+
+    try {
+      setLoadingMore(true);
+      const response = await fetch(`/api/miniapp/feed?limit=30&minQualityScore=${minQualityScore}`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch more items");
+      }
+      const data = await response.json();
+      const newItems = data.items || [];
+      // Only add items we don't already have
+      const existingHashes = new Set(feedItems.map(item => item.castHash));
+      const itemsToAdd = newItems.filter((item: FeedItem) => !existingHashes.has(item.castHash));
+      setFeedItems(prev => [...prev, ...itemsToAdd]);
+      setHasMore(itemsToAdd.length > 0 && feedItems.length + itemsToAdd.length < 30);
+    } catch (err) {
+      console.error("Error loading more items:", err);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, hasMore, feedItems, minQualityScore]);
+
   // Lazy load remaining items after initial render
   useEffect(() => {
     if (!loading && feedItems.length > 0 && hasMore && feedItems.length < 30) {
@@ -207,7 +248,52 @@ function MiniappContent() {
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [loading, feedItems.length, hasMore]);
+  }, [loading, feedItems.length, hasMore, loadMoreItems]);
+
+  // Scroll to cast when opened from notification (if preference is not "auto")
+  useEffect(() => {
+    if (openLinkPreference === "auto" || hasScrolledToCastRef.current || loading || feedItems.length === 0) {
+      return;
+    }
+
+    // Get castHash from URL or notification
+    let castHash: string | null = null;
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      castHash = urlParams.get("castHash");
+    }
+    const notificationCastHash = (notificationDetails as any)?.castHash;
+    const hashToScroll = castHash || notificationCastHash;
+
+    if (!hashToScroll) {
+      return;
+    }
+
+    // Check if cast is in current feed items
+    const castInFeed = feedItems.find(item => item.castHash === hashToScroll);
+    
+    if (castInFeed) {
+      // Cast is in feed, scroll to it
+      hasScrolledToCastRef.current = true;
+      const timer = setTimeout(() => {
+        const element = castElementRefs.current.get(hashToScroll);
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "center" });
+          // Highlight the cast briefly
+          element.style.transition = "background-color 0.3s";
+          element.style.backgroundColor = "rgba(59, 130, 246, 0.1)";
+          setTimeout(() => {
+            element.style.backgroundColor = "";
+          }, 2000);
+        }
+      }, 300); // Small delay to ensure DOM is ready
+      return () => clearTimeout(timer);
+    } else if (hasMore && feedItems.length < 30 && !loadingMore) {
+      // Cast not in feed yet, load more items
+      console.log("[Miniapp Notification] Cast not in current feed, loading more items...");
+      loadMoreItems();
+    }
+  }, [feedItems, loading, hasMore, loadingMore, notificationDetails, openLinkPreference, loadMoreItems]);
 
   useEffect(() => {
     if (toast) {
@@ -398,28 +484,6 @@ function MiniappContent() {
     }
   };
 
-  const loadMoreItems = async () => {
-    if (loadingMore || !hasMore || feedItems.length >= 30) return;
-
-    try {
-      setLoadingMore(true);
-      const response = await fetch(`/api/miniapp/feed?limit=30&minQualityScore=${minQualityScore}`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch more items");
-      }
-      const data = await response.json();
-      const newItems = data.items || [];
-      // Only add items we don't already have
-      const existingHashes = new Set(feedItems.map(item => item.castHash));
-      const itemsToAdd = newItems.filter((item: FeedItem) => !existingHashes.has(item.castHash));
-      setFeedItems(prev => [...prev, ...itemsToAdd]);
-      setHasMore(itemsToAdd.length > 0 && feedItems.length + itemsToAdd.length < 30);
-    } catch (err) {
-      console.error("Error loading more items:", err);
-    } finally {
-      setLoadingMore(false);
-    }
-  };
 
   const handleInstall = async () => {
     if (!isSDKLoaded || !actions) return;
@@ -726,6 +790,13 @@ function MiniappContent() {
             feedItems.map((item) => (
               <div
                 key={item.castHash}
+                ref={(el) => {
+                  if (el) {
+                    castElementRefs.current.set(item.castHash, el);
+                  } else {
+                    castElementRefs.current.delete(item.castHash);
+                  }
+                }}
                 onClick={() => handleCastClick(item.castHash)}
                 className="border border-gray-200 dark:border-gray-800 rounded-lg p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
               >
