@@ -401,6 +401,25 @@ function CollectionModal({
   const [gatingRuleFid, setGatingRuleFid] = useState(collection?.gatingRule?.fid?.toString() || "");
   const [saving, setSaving] = useState(false);
 
+  // Auto-curation state
+  const existingAutoCurationRules = collection?.autoCurationRules as any;
+  const [autoCurationFeedType, setAutoCurationFeedType] = useState<"channel" | "fids" | null>(
+    existingAutoCurationRules?.feedType || null
+  );
+  const [autoCurationChannelId, setAutoCurationChannelId] = useState(
+    existingAutoCurationRules?.feedType === "channel" 
+      ? (existingAutoCurationRules?.feedConfig as any)?.channelId || ""
+      : ""
+  );
+  const [autoCurationFids, setAutoCurationFids] = useState(
+    existingAutoCurationRules?.feedType === "fids"
+      ? (existingAutoCurationRules?.feedConfig as any)?.fids?.join(", ") || ""
+      : ""
+  );
+  const [autoCurationFilters, setAutoCurationFilters] = useState<Array<{ type: string; value: any }>>(
+    existingAutoCurationRules?.filters || []
+  );
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -431,6 +450,41 @@ function CollectionModal({
         expandMentionedProfiles: expandMentionedProfiles,
       };
 
+      // Build autoCurationRules if enabled
+      let autoCurationRules: any = null;
+      if (formData.autoCurationEnabled && autoCurationFeedType) {
+        if (autoCurationFeedType === "channel") {
+          if (!autoCurationChannelId.trim()) {
+            throw new Error("Channel ID is required when auto-curation is enabled");
+          }
+          autoCurationRules = {
+            feedType: "channel",
+            feedConfig: {
+              channelId: autoCurationChannelId.trim(),
+            },
+            filters: autoCurationFilters.length > 0 ? autoCurationFilters : undefined,
+          };
+        } else if (autoCurationFeedType === "fids") {
+          if (!autoCurationFids.trim()) {
+            throw new Error("FIDs are required when auto-curation is enabled");
+          }
+          const fidsArray = autoCurationFids
+            .split(",")
+            .map((f: string) => parseInt(f.trim()))
+            .filter((f: number) => !isNaN(f));
+          if (fidsArray.length === 0) {
+            throw new Error("At least one valid FID is required");
+          }
+          autoCurationRules = {
+            feedType: "fids",
+            feedConfig: {
+              fids: fidsArray,
+            },
+            filters: autoCurationFilters.length > 0 ? autoCurationFilters : undefined,
+          };
+        }
+      }
+
       const payload = {
         adminFid: userFid,
         name: formData.name,
@@ -441,7 +495,7 @@ function CollectionModal({
         gatingRule: gatingRule,
         displayType: formData.displayType,
         autoCurationEnabled: formData.autoCurationEnabled,
-        autoCurationRules: formData.autoCurationRules,
+        autoCurationRules: autoCurationRules,
         displayMode: updatedDisplayMode,
         headerConfig: formData.headerConfig,
         hiddenEmbedUrls: hiddenEmbedUrlsArray.length > 0 ? hiddenEmbedUrlsArray : null,
@@ -695,10 +749,164 @@ function CollectionModal({
             </div>
 
             {formData.autoCurationEnabled && (
-              <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                  Auto-curation rules can be configured via the API. This feature will be enhanced in a future update.
-                </p>
+              <div className="p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Feed Type *
+                  </label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center">
+                      <input
+                        type="radio"
+                        name="autoCurationFeedType"
+                        value="channel"
+                        checked={autoCurationFeedType === "channel"}
+                        onChange={(e) => {
+                          setAutoCurationFeedType("channel");
+                          setAutoCurationFids("");
+                        }}
+                        className="mr-2"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Channel</span>
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="radio"
+                        name="autoCurationFeedType"
+                        value="fids"
+                        checked={autoCurationFeedType === "fids"}
+                        onChange={(e) => {
+                          setAutoCurationFeedType("fids");
+                          setAutoCurationChannelId("");
+                        }}
+                        className="mr-2"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">FIDs</span>
+                    </label>
+                  </div>
+                </div>
+
+                {autoCurationFeedType === "channel" && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Channel ID *
+                    </label>
+                    <input
+                      type="text"
+                      value={autoCurationChannelId}
+                      onChange={(e) => setAutoCurationChannelId(e.target.value)}
+                      required={formData.autoCurationEnabled}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                      placeholder="e.g., cryptosapiens"
+                    />
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      The channel ID to fetch casts from
+                    </p>
+                  </div>
+                )}
+
+                {autoCurationFeedType === "fids" && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      FIDs (comma-separated) *
+                    </label>
+                    <input
+                      type="text"
+                      value={autoCurationFids}
+                      onChange={(e) => setAutoCurationFids(e.target.value)}
+                      required={formData.autoCurationEnabled}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                      placeholder="e.g., 123, 456, 789"
+                    />
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      Comma-separated list of FIDs to fetch casts from
+                    </p>
+                  </div>
+                )}
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Filters (optional)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAutoCurationFilters([...autoCurationFilters, { type: "authorFid", value: "" }]);
+                      }}
+                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      + Add Filter
+                    </button>
+                  </div>
+                  {autoCurationFilters.length === 0 ? (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                      No filters. All casts from the feed will be included.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {autoCurationFilters.map((filter, index) => (
+                        <div key={index} className="flex gap-2 items-start p-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded">
+                          <select
+                            value={filter.type}
+                            onChange={(e) => {
+                              const newFilters = [...autoCurationFilters];
+                              newFilters[index] = {
+                                type: e.target.value,
+                                value: e.target.value === "excludeRecasts" ? true : "",
+                              };
+                              setAutoCurationFilters(newFilters);
+                            }}
+                            className="flex-shrink-0 px-2 py-1 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm"
+                          >
+                            <option value="authorFid">Author FID</option>
+                            <option value="excludeRecasts">Exclude Recasts</option>
+                            <option value="minLength">Min Length</option>
+                          </select>
+                          {filter.type === "excludeRecasts" ? (
+                            <div className="flex-1 flex items-center text-sm text-gray-600 dark:text-gray-400">
+                              Excludes all recasts (casts with parent_hash)
+                            </div>
+                          ) : filter.type === "authorFid" ? (
+                            <input
+                              type="text"
+                              value={filter.value}
+                              onChange={(e) => {
+                                const newFilters = [...autoCurationFilters];
+                                newFilters[index].value = e.target.value;
+                                setAutoCurationFilters(newFilters);
+                              }}
+                              className="flex-1 px-2 py-1 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm"
+                              placeholder="@username or FID number"
+                            />
+                          ) : (
+                            <input
+                              type="number"
+                              value={filter.value}
+                              onChange={(e) => {
+                                const newFilters = [...autoCurationFilters];
+                                newFilters[index].value = parseInt(e.target.value) || 0;
+                                setAutoCurationFilters(newFilters);
+                              }}
+                              className="flex-1 px-2 py-1 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm"
+                              placeholder="Minimum character length"
+                              min="0"
+                            />
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAutoCurationFilters(autoCurationFilters.filter((_, i) => i !== index));
+                            }}
+                            className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
