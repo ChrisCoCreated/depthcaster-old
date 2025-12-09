@@ -28,6 +28,7 @@ function MiniappContent() {
   const hasAutoOpenedRef = useRef(false);
   const hasScrolledToCastRef = useRef(false);
   const castElementRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const hadNotificationOnMountRef = useRef<string | null>(null);
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -112,7 +113,7 @@ function MiniappContent() {
     }
   }, [isSDKLoaded, actions]);
 
-  // Handle notification click - log data and either auto-open or prepare to scroll
+  // Track notification on initial mount
   useEffect(() => {
     if (!isSDKLoaded) {
       return;
@@ -130,54 +131,59 @@ function MiniappContent() {
 
     const hashToOpen = castHash || notificationCastHash;
 
-    if (hashToOpen) {
-      // Log comprehensive notification data
-      console.log("[Miniapp Notification] Notification data received:", {
-        castHash: hashToOpen,
-        urlParams: typeof window !== "undefined" ? Object.fromEntries(new URLSearchParams(window.location.search)) : null,
-        notificationDetails: notificationDetails,
-        fullNotificationDetails: JSON.stringify(notificationDetails, null, 2),
-        userFid: context?.user?.fid,
-        openLinkPreference,
-        timestamp: new Date().toISOString(),
-      });
-      
-      // Log notification click to backend
-      if (context?.user?.fid) {
-        fetch("/api/miniapp/notification-click", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            castHash: hashToOpen,
-            userFid: context.user.fid,
-            notificationDetails: notificationDetails,
-          }),
-        }).catch((err) => {
-          console.error("Error logging notification click:", err);
-          // Don't block opening the cast if logging fails
-        });
-      }
-      
-      // Only auto-open if preference is "auto" and only once
-      if (openLinkPreference === "auto" && !hasAutoOpenedRef.current) {
-        hasAutoOpenedRef.current = true;
-        
-        // Auto-open in Depthcaster conversation view
-        const url = `${appUrl}/conversation/${hashToOpen}`;
-        if (actions?.openUrl) {
-          actions.openUrl(url).catch((err) => {
-            console.error("Error opening cast from notification:", err);
-            // Fallback to window.open if SDK method fails
-            window.open(url, "_blank", "noopener,noreferrer");
-          });
-        } else {
-          window.open(url, "_blank", "noopener,noreferrer");
-        }
-      }
-      // If preference is not "auto", we'll scroll to the cast in the feed instead
-      // (handled in the scroll effect below)
+    // Store the notification hash on initial mount if present
+    if (hashToOpen && !hadNotificationOnMountRef.current) {
+      hadNotificationOnMountRef.current = hashToOpen;
     }
-  }, [isSDKLoaded, actions, notificationDetails, appUrl, openLinkPreference, context?.user?.fid]);
+  }, [isSDKLoaded, notificationDetails]);
+
+  // Handle notification click - log data and either auto-open or prepare to scroll
+  useEffect(() => {
+    if (!isSDKLoaded) {
+      return;
+    }
+
+    // Only proceed if we had a notification on mount (not if user just changed preference)
+    const hashToOpen = hadNotificationOnMountRef.current;
+    if (!hashToOpen) {
+      return;
+    }
+
+    // Log notification click to backend
+    if (context?.user?.fid) {
+      fetch("/api/miniapp/notification-click", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          castHash: hashToOpen,
+          userFid: context.user.fid,
+          notificationDetails: notificationDetails,
+        }),
+      }).catch((err) => {
+        console.error("Error logging notification click:", err);
+        // Don't block opening the cast if logging fails
+      });
+    }
+    
+    // Only auto-open if preference is "auto" and only once, and notification was present on mount
+    if (openLinkPreference === "auto" && !hasAutoOpenedRef.current) {
+      hasAutoOpenedRef.current = true;
+      
+      // Auto-open in Depthcaster conversation view
+      const url = `${appUrl}/conversation/${hashToOpen}`;
+      if (actions?.openUrl) {
+        actions.openUrl(url).catch((err) => {
+          console.error("Error opening cast from notification:", err);
+          // Fallback to window.open if SDK method fails
+          window.open(url, "_blank", "noopener,noreferrer");
+        });
+      } else {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
+    }
+    // If preference is not "auto", we'll scroll to the cast in the feed instead
+    // (handled in the scroll effect below)
+  }, [isSDKLoaded, actions, appUrl, openLinkPreference, context?.user?.fid, notificationDetails]);
 
   const fetchFeed = useCallback(async (limit: number = 3) => {
     try {
@@ -256,14 +262,8 @@ function MiniappContent() {
       return;
     }
 
-    // Get castHash from URL or notification
-    let castHash: string | null = null;
-    if (typeof window !== "undefined") {
-      const urlParams = new URLSearchParams(window.location.search);
-      castHash = urlParams.get("castHash");
-    }
-    const notificationCastHash = (notificationDetails as any)?.castHash;
-    const hashToScroll = castHash || notificationCastHash;
+    // Only scroll if we had a notification on mount (not if user just changed preference)
+    const hashToScroll = hadNotificationOnMountRef.current;
 
     if (!hashToScroll) {
       return;
@@ -290,7 +290,6 @@ function MiniappContent() {
       return () => clearTimeout(timer);
     } else if (hasMore && feedItems.length < 30 && !loadingMore) {
       // Cast not in feed yet, load more items
-      console.log("[Miniapp Notification] Cast not in current feed, loading more items...");
       loadMoreItems();
     }
   }, [feedItems, loading, hasMore, loadingMore, notificationDetails, openLinkPreference, loadMoreItems]);
