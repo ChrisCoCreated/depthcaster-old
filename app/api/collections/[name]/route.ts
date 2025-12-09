@@ -155,25 +155,55 @@ export async function GET(
     }
 
     const collectionData = collection[0];
-    const cursorCondition = cursor
-      ? lt(collectionCasts.createdAt, new Date(cursor))
-      : undefined;
+    const orderMode = (collectionData.orderMode as "manual" | "auto") || "manual";
+    const orderDirection = (collectionData.orderDirection as "asc" | "desc") || "desc";
+    
+    let collectionCastsList;
+    
+    if (orderMode === "auto") {
+      // Auto ordering: order by cast timestamp from curatedCasts
+      const cursorCondition = cursor
+        ? lt(curatedCasts.castCreatedAt, new Date(cursor))
+        : undefined;
 
-    const collectionCastsList = await db
-      .select({
-        castHash: collectionCasts.castHash,
-        curatorFid: collectionCasts.curatorFid,
-        createdAt: collectionCasts.createdAt,
-        order: collectionCasts.order,
-      })
-      .from(collectionCasts)
-      .where(and(eq(collectionCasts.collectionId, collectionData.id), cursorCondition))
-      .orderBy(
-        sql`CASE WHEN ${collectionCasts.order} IS NULL THEN 1 ELSE 0 END`,
-        asc(collectionCasts.order),
-        desc(collectionCasts.createdAt)
-      )
-      .limit(Math.min(limit, 100));
+      collectionCastsList = await db
+        .select({
+          castHash: collectionCasts.castHash,
+          curatorFid: collectionCasts.curatorFid,
+          createdAt: collectionCasts.createdAt,
+          order: collectionCasts.order,
+        })
+        .from(collectionCasts)
+        .innerJoin(curatedCasts, eq(collectionCasts.castHash, curatedCasts.castHash))
+        .where(and(eq(collectionCasts.collectionId, collectionData.id), cursorCondition))
+        .orderBy(
+          orderDirection === "asc" 
+            ? asc(curatedCasts.castCreatedAt)
+            : desc(curatedCasts.castCreatedAt)
+        )
+        .limit(Math.min(limit, 100));
+    } else {
+      // Manual ordering: use order field, fallback to createdAt
+      const cursorCondition = cursor
+        ? lt(collectionCasts.createdAt, new Date(cursor))
+        : undefined;
+
+      collectionCastsList = await db
+        .select({
+          castHash: collectionCasts.castHash,
+          curatorFid: collectionCasts.curatorFid,
+          createdAt: collectionCasts.createdAt,
+          order: collectionCasts.order,
+        })
+        .from(collectionCasts)
+        .where(and(eq(collectionCasts.collectionId, collectionData.id), cursorCondition))
+        .orderBy(
+          sql`CASE WHEN ${collectionCasts.order} IS NULL THEN 1 ELSE 0 END`,
+          asc(collectionCasts.order),
+          desc(collectionCasts.createdAt)
+        )
+        .limit(Math.min(limit, 100));
+    }
 
     if (collectionCastsList.length === 0) {
       return NextResponse.json({
@@ -232,7 +262,16 @@ export async function GET(
     let nextCursor: string | null = null;
     if (filteredCasts.length === limit && filteredCasts.length > 0) {
       const lastItem = filteredCasts[filteredCasts.length - 1];
-      nextCursor = lastItem.createdAt.toISOString();
+      if (orderMode === "auto") {
+        // For auto mode, use cast timestamp from the cast data
+        const lastCastData = castDataMap.get(lastItem.castHash);
+        const castTimestamp = lastCastData?.timestamp 
+          ? new Date(lastCastData.timestamp)
+          : lastItem.createdAt;
+        nextCursor = castTimestamp.toISOString();
+      } else {
+        nextCursor = lastItem.createdAt.toISOString();
+      }
     }
 
     return NextResponse.json({

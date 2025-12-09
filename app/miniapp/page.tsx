@@ -50,12 +50,14 @@ function MiniappContent() {
     return 70;
   });
   const [showQualityFilters, setShowQualityFilters] = useState(false);
-  const [openInFarcaster, setOpenInFarcaster] = useState<boolean>(() => {
+  const [openLinkPreference, setOpenLinkPreference] = useState<"auto" | "farcaster" | "depthcaster">(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("miniappOpenInFarcaster");
-      return saved === "true";
+      const saved = localStorage.getItem("miniappOpenLinkPreference");
+      if (saved === "farcaster" || saved === "depthcaster" || saved === "auto") {
+        return saved;
+      }
     }
-    return false;
+    return "auto"; // Default to auto-open in Depthcaster
   });
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://depthcaster.vercel.app";
@@ -110,8 +112,8 @@ function MiniappContent() {
 
   // Auto-open cast from notification
   useEffect(() => {
-    // Only auto-open once and only if SDK is loaded with actions available
-    if (hasAutoOpenedRef.current || !isSDKLoaded || !actions?.openUrl) {
+    // Only auto-open if preference is "auto" and only once
+    if (openLinkPreference !== "auto" || hasAutoOpenedRef.current || !isSDKLoaded) {
       return;
     }
 
@@ -145,15 +147,19 @@ function MiniappContent() {
         });
       }
       
-      // Open the cast in conversation view
+      // Auto-open in Depthcaster conversation view
       const url = `${appUrl}/conversation/${hashToOpen}`;
-      actions.openUrl(url).catch((err) => {
-        console.error("Error opening cast from notification:", err);
-        // Fallback to window.open if SDK method fails
+      if (actions?.openUrl) {
+        actions.openUrl(url).catch((err) => {
+          console.error("Error opening cast from notification:", err);
+          // Fallback to window.open if SDK method fails
+          window.open(url, "_blank", "noopener,noreferrer");
+        });
+      } else {
         window.open(url, "_blank", "noopener,noreferrer");
-      });
+      }
     }
-  }, [isSDKLoaded, actions, notificationDetails, appUrl]);
+  }, [isSDKLoaded, actions, notificationDetails, appUrl, openLinkPreference]);
 
   const fetchFeed = useCallback(async (limit: number = 3) => {
     try {
@@ -453,7 +459,7 @@ function MiniappContent() {
   };
 
   const handleCastClick = async (castHash: string) => {
-    if (openInFarcaster) {
+    if (openLinkPreference === "farcaster") {
       // Open in Farcaster using SDK
       try {
         await sdk.actions.viewCast({ hash: castHash });
@@ -468,7 +474,7 @@ function MiniappContent() {
         }
       }
     } else {
-      // Open in Depthcaster conversation view
+      // Open in Depthcaster conversation view (for both "depthcaster" and "auto" preferences)
       const url = `${appUrl}/conversation/${castHash}`;
       if (actions?.openUrl) {
         actions.openUrl(url);
@@ -541,18 +547,31 @@ function MiniappContent() {
             </Link>
           {context?.user?.fid && (
             <div className="relative flex items-center gap-1">
-              {/* Toggle for opening links in Farcaster vs Depthcaster */}
+              {/* Toggle for opening links: Auto Open Depthcaster, Farcaster, or Depthcaster */}
               <button
                 onClick={() => {
-                  const newValue = !openInFarcaster;
-                  setOpenInFarcaster(newValue);
-                  localStorage.setItem("miniappOpenInFarcaster", newValue.toString());
+                  // Cycle through: auto -> farcaster -> depthcaster -> auto
+                  const nextPreference = 
+                    openLinkPreference === "auto" ? "farcaster" :
+                    openLinkPreference === "farcaster" ? "depthcaster" : "auto";
+                  setOpenLinkPreference(nextPreference);
+                  localStorage.setItem("miniappOpenLinkPreference", nextPreference);
                 }}
                 className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                aria-label={openInFarcaster ? "Open links in Farcaster" : "Open links in Depthcaster"}
-                title={openInFarcaster ? "Open links in Farcaster" : "Open links in Depthcaster"}
+                aria-label={
+                  openLinkPreference === "auto" ? "Auto Open Depthcaster" :
+                  openLinkPreference === "farcaster" ? "Open links in Farcaster" :
+                  "Open links in Depthcaster"
+                }
+                title={
+                  openLinkPreference === "auto" ? "Auto Open Depthcaster (click to change)" :
+                  openLinkPreference === "farcaster" ? "Open links in Farcaster (click to change)" :
+                  "Open links in Depthcaster (click to change)"
+                }
               >
-                {openInFarcaster ? "🔗 Farcaster" : "📱 Depthcaster"}
+                {openLinkPreference === "auto" ? "⚡ Auto" :
+                 openLinkPreference === "farcaster" ? "🔗 Farcaster" :
+                 "📱 Depthcaster"}
               </button>
               <button
                 onClick={handlePasteToCurate}

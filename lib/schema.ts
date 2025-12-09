@@ -440,6 +440,8 @@ export const collections = pgTable("collections", {
   displayMode: jsonb("display_mode"), // DisplayMode from customFeeds
   headerConfig: jsonb("header_config"), // HeaderConfig from customFeeds
   hiddenEmbedUrls: jsonb("hidden_embed_urls"), // Array of URLs/domains to hide embeds from
+  orderMode: text("order_mode").default("manual").notNull(), // 'manual' or 'auto'
+  orderDirection: text("order_direction").default("desc").notNull(), // 'asc' or 'desc'
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({

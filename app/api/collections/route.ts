@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { adminFid, name, displayName, description, accessType, gatedUserId, gatingRule, displayType, autoCurationEnabled, autoCurationRules, displayMode, headerConfig, hiddenEmbedUrls } = body;
+    const { adminFid, name, displayName, description, accessType, gatedUserId, gatingRule, displayType, autoCurationEnabled, autoCurationRules, displayMode, headerConfig, hiddenEmbedUrls, orderMode, orderDirection } = body;
 
     if (!adminFid) {
       return NextResponse.json({ error: "adminFid is required" }, { status: 400 });
@@ -114,6 +114,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid displayType" }, { status: 400 });
     }
 
+    if (orderMode && !["manual", "auto"].includes(orderMode)) {
+      return NextResponse.json({ error: "Invalid orderMode" }, { status: 400 });
+    }
+
+    if (orderDirection && !["asc", "desc"].includes(orderDirection)) {
+      return NextResponse.json({ error: "Invalid orderDirection" }, { status: 400 });
+    }
+
     // Validate hiddenEmbedUrls if provided
     if (hiddenEmbedUrls !== undefined && hiddenEmbedUrls !== null) {
       if (!Array.isArray(hiddenEmbedUrls)) {
@@ -143,6 +151,8 @@ export async function POST(request: NextRequest) {
       displayMode: displayMode || null,
       headerConfig: headerConfig || null,
       hiddenEmbedUrls: hiddenEmbedUrls || null,
+      orderMode: orderMode || "manual",
+      orderDirection: orderDirection || "desc",
     }).returning();
 
     return NextResponse.json({ collection: newCollection[0] });

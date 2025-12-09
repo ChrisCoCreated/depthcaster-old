@@ -14,7 +14,7 @@ export async function PUT(
   try {
     const { name } = await params;
     const body = await request.json();
-    const { adminFid, displayName, description, accessType, gatedUserId, gatingRule, displayType, autoCurationEnabled, autoCurationRules, displayMode, headerConfig, hiddenEmbedUrls } = body;
+    const { adminFid, displayName, description, accessType, gatedUserId, gatingRule, displayType, autoCurationEnabled, autoCurationRules, displayMode, headerConfig, hiddenEmbedUrls, orderMode, orderDirection } = body;
 
     if (!adminFid) {
       return NextResponse.json({ error: "adminFid is required" }, { status: 400 });
@@ -47,6 +47,14 @@ export async function PUT(
       return NextResponse.json({ error: "Invalid displayType" }, { status: 400 });
     }
 
+    if (orderMode && !["manual", "auto"].includes(orderMode)) {
+      return NextResponse.json({ error: "Invalid orderMode" }, { status: 400 });
+    }
+
+    if (orderDirection && !["asc", "desc"].includes(orderDirection)) {
+      return NextResponse.json({ error: "Invalid orderDirection" }, { status: 400 });
+    }
+
     // Validate hiddenEmbedUrls if provided
     if (hiddenEmbedUrls !== undefined && hiddenEmbedUrls !== null) {
       if (!Array.isArray(hiddenEmbedUrls)) {
@@ -69,6 +77,8 @@ export async function PUT(
     if (displayMode !== undefined) updateData.displayMode = displayMode;
     if (headerConfig !== undefined) updateData.headerConfig = headerConfig;
     if (hiddenEmbedUrls !== undefined) updateData.hiddenEmbedUrls = hiddenEmbedUrls;
+    if (orderMode !== undefined) updateData.orderMode = orderMode;
+    if (orderDirection !== undefined) updateData.orderDirection = orderDirection;
 
     const updated = await db.update(collections).set(updateData).where(eq(collections.name, name)).returning();
     return NextResponse.json({ collection: updated[0] });

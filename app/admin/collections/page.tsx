@@ -22,6 +22,8 @@ interface Collection {
   displayMode: any;
   headerConfig: any;
   hiddenEmbedUrls: string[] | null;
+  orderMode: "manual" | "auto";
+  orderDirection: "asc" | "desc";
   createdAt: string;
   updatedAt: string;
 }
@@ -380,6 +382,8 @@ function CollectionModal({
     displayMode: collection?.displayMode || null,
     headerConfig: collection?.headerConfig || null,
     hiddenEmbedUrls: (collection?.hiddenEmbedUrls as string[] | null) || [],
+    orderMode: (collection?.orderMode || "manual") as "manual" | "auto",
+    orderDirection: (collection?.orderDirection || "desc") as "asc" | "desc",
   });
   
   const [expandMentionedProfiles, setExpandMentionedProfiles] = useState(
@@ -441,6 +445,8 @@ function CollectionModal({
         displayMode: updatedDisplayMode,
         headerConfig: formData.headerConfig,
         hiddenEmbedUrls: hiddenEmbedUrlsArray.length > 0 ? hiddenEmbedUrlsArray : null,
+        orderMode: formData.orderMode,
+        orderDirection: formData.orderDirection,
       };
 
       const url = collection
@@ -696,6 +702,48 @@ function CollectionModal({
               </div>
             )}
 
+            <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Cast Ordering
+                </label>
+                <select
+                  value={formData.orderMode}
+                  onChange={(e) => setFormData({ ...formData, orderMode: e.target.value as "manual" | "auto" })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                >
+                  <option value="manual">Manual (drag to reorder)</option>
+                  <option value="auto">Auto (by cast timestamp)</option>
+                </select>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  {formData.orderMode === "manual"
+                    ? "Casts can be manually reordered by dragging in the Manage Casts modal"
+                    : "Casts are automatically ordered by timestamp. Manual reordering is disabled."}
+                </p>
+              </div>
+
+              {formData.orderMode === "auto" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Order Direction
+                  </label>
+                  <select
+                    value={formData.orderDirection}
+                    onChange={(e) => setFormData({ ...formData, orderDirection: e.target.value as "asc" | "desc" })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  >
+                    <option value="desc">Descending (newest first)</option>
+                    <option value="asc">Ascending (oldest first)</option>
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    {formData.orderDirection === "desc"
+                      ? "Newest casts appear first"
+                      : "Oldest casts appear first"}
+                  </p>
+                </div>
+              )}
+            </div>
+
             <div className="flex items-center justify-end gap-3 pt-4">
               <button
                 type="button"
@@ -741,6 +789,8 @@ function ManageCastsModal({
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [reordering, setReordering] = useState(false);
+  
+  const isAutoOrdering = collection.orderMode === "auto";
 
   useEffect(() => {
     loadCasts();
@@ -854,10 +904,12 @@ function ManageCastsModal({
   };
 
   const handleDragStart = (index: number) => {
+    if (isAutoOrdering) return;
     setDraggedIndex(index);
   };
 
   const handleDragOver = (e: React.DragEvent, index: number) => {
+    if (isAutoOrdering) return;
     e.preventDefault();
     if (draggedIndex !== null && draggedIndex !== index) {
       setDragOverIndex(index);
@@ -869,6 +921,7 @@ function ManageCastsModal({
   };
 
   const handleDrop = async (e: React.DragEvent, dropIndex: number) => {
+    if (isAutoOrdering) return;
     e.preventDefault();
     if (draggedIndex === null || draggedIndex === dropIndex) {
       setDraggedIndex(null);
@@ -922,7 +975,9 @@ function ManageCastsModal({
                 Manage Casts: {collection.displayName || collection.name}
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Add, remove, or reorder casts by dragging
+                {isAutoOrdering
+                  ? `Add or remove casts. Ordering is automatic (${collection.orderDirection === "desc" ? "newest first" : "oldest first"})`
+                  : "Add, remove, or reorder casts by dragging"}
               </p>
             </div>
             <button
@@ -975,7 +1030,7 @@ function ManageCastsModal({
               {casts.map((cast, index) => (
                 <div
                   key={cast.hash}
-                  draggable
+                  draggable={!isAutoOrdering}
                   onDragStart={() => handleDragStart(index)}
                   onDragOver={(e) => handleDragOver(e, index)}
                   onDragLeave={handleDragLeave}
@@ -986,20 +1041,22 @@ function ManageCastsModal({
                       : dragOverIndex === index
                       ? "border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20"
                       : "border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800"
-                  } ${draggedIndex !== null ? "cursor-move" : ""}`}
+                  } ${draggedIndex !== null && !isAutoOrdering ? "cursor-move" : ""}`}
                 >
                   <div className="flex items-start gap-3 flex-1">
-                    <div className="flex-shrink-0 mt-1 text-gray-400 dark:text-gray-500 cursor-move">
-                      <svg
-                        width="20"
-                        height="20"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                        className="opacity-50"
-                      >
-                        <path d="M7 2a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM7 8a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM7 14a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM13 2a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM13 8a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM13 14a2 2 0 1 1 0 4 2 2 0 0 1 0-4z" />
-                      </svg>
-                    </div>
+                    {!isAutoOrdering && (
+                      <div className="flex-shrink-0 mt-1 text-gray-400 dark:text-gray-500 cursor-move">
+                        <svg
+                          width="20"
+                          height="20"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                          className="opacity-50"
+                        >
+                          <path d="M7 2a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM7 8a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM7 14a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM13 2a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM13 8a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM13 14a2 2 0 1 1 0 4 2 2 0 0 1 0-4z" />
+                        </svg>
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-2">
                         <Link
