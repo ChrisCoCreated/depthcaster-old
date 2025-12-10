@@ -27,8 +27,8 @@ export function isSubstackLink(url: string): boolean {
     
     console.log('[Substack] Checking URL:', url, 'normalized:', normalizedUrl, 'hostname:', hostname);
     
-    // Check if hostname ends with .substack.com
-    if (hostname.endsWith('.substack.com')) {
+    // Check if hostname ends with .substack.com (subdomain) or is exactly substack.com (main domain)
+    if (hostname.endsWith('.substack.com') || hostname === 'substack.com' || hostname === 'www.substack.com') {
       console.log('[Substack] ✓ Detected Substack link:', url);
       return true;
     }
@@ -59,14 +59,41 @@ export function parseSubstackUrl(url: string): ParsedSubstackUrl {
     const hostname = urlObj.hostname.toLowerCase();
     const pathname = urlObj.pathname;
 
-    // Check if it's a Substack domain
-    if (hostname.endsWith('.substack.com')) {
+    // Check if it's a Substack domain (subdomain or main domain)
+    if (hostname.endsWith('.substack.com') || hostname === 'substack.com' || hostname === 'www.substack.com') {
       result.hostname = hostname;
       
-      // Parse path: /p/post-slug or /post-slug
-      const pathMatch = pathname.match(/^\/p\/([^/]+)/) || pathname.match(/^\/([^/]+)/);
-      if (pathMatch) {
-        result.postSlug = pathMatch[1];
+      // For main domain (substack.com), check different URL formats
+      if (hostname === 'substack.com' || hostname === 'www.substack.com') {
+        // Check for note URL format: /@username/note/c-xxxxx
+        const noteMatch = pathname.match(/^\/@([^/]+)\/note\/([^/]+)/);
+        if (noteMatch) {
+          // For notes on main domain, we'll use the username as a pseudo-hostname
+          result.hostname = `${noteMatch[1]}.substack.com`;
+          result.postSlug = noteMatch[2];
+        } 
+        // Check for home feed URL format: /home/post/p-xxxxx (not supported)
+        else if (pathname.match(/^\/home\/post\//)) {
+          // Home feed URLs don't have publication info, can't fetch RSS
+          // Leave hostname as substack.com to trigger error handling
+          const postMatch = pathname.match(/\/p-([^/?]+)/);
+          if (postMatch) {
+            result.postSlug = postMatch[1];
+          }
+        }
+        // Regular post on main domain (unlikely but handle it)
+        else {
+          const pathMatch = pathname.match(/^\/p\/([^/]+)/) || pathname.match(/^\/([^/]+)/);
+          if (pathMatch) {
+            result.postSlug = pathMatch[1];
+          }
+        }
+      } else {
+        // Subdomain format: /p/post-slug or /post-slug
+        const pathMatch = pathname.match(/^\/p\/([^/]+)/) || pathname.match(/^\/([^/]+)/);
+        if (pathMatch) {
+          result.postSlug = pathMatch[1];
+        }
       }
     }
   } catch (error) {

@@ -205,6 +205,26 @@ export async function fetchSubstackPost(url: string): Promise<SubstackPost> {
     throw new Error('Invalid Substack URL format');
   }
 
+  // Check if this is a note URL (notes are on substack.com/@username/note/...)
+  const isNote = url.includes('/note/');
+  
+  if (isNote) {
+    // Notes are typically not in RSS feeds
+    throw new Error('Substack notes are not available via RSS feed. Only full posts are supported.');
+  }
+
+  // Check if this is a home feed URL (substack.com/home/post/p-...)
+  // These don't have publication info, so we can't fetch RSS
+  if (parsed.hostname === 'substack.com' || parsed.hostname === 'www.substack.com') {
+    if (url.includes('/home/post/')) {
+      throw new Error('Substack home feed URLs are not supported. Please use the direct publication post URL (e.g., publication.substack.com/p/post-slug).');
+    }
+    // If hostname is still substack.com (not a subdomain), we can't fetch RSS
+    if (!parsed.hostname.endsWith('.substack.com') || parsed.hostname === 'substack.com' || parsed.hostname === 'www.substack.com') {
+      throw new Error('Cannot determine publication from Substack URL. Please use a direct publication post URL (e.g., publication.substack.com/p/post-slug).');
+    }
+  }
+
   const rssUrl = getSubstackRssUrl(parsed.hostname);
   const publicationSlug = parsed.hostname.replace('.substack.com', '');
   

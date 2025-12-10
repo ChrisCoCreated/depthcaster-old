@@ -173,12 +173,35 @@ async function handleParagraphPost(url: string): Promise<NextResponse> {
 async function handleSubstackPost(url: string): Promise<NextResponse> {
   console.log('[Blog API] Fetching Substack post:', url);
   
-  const postData = await fetchSubstackPost(url);
-  
-  console.log('[Blog API] Successfully fetched Substack post:', postData.id);
-  
-  // Return normalized format (same as Paragraph)
-  return NextResponse.json(postData);
+  try {
+    const postData = await fetchSubstackPost(url);
+    
+    console.log('[Blog API] Successfully fetched Substack post:', postData.id);
+    
+    // Return normalized format (same as Paragraph)
+    return NextResponse.json({
+      ...postData,
+      publication: {
+        ...postData.publication,
+        platform: 'substack',
+      },
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    // If it's a note, return a helpful error
+    if (errorMessage.includes('notes are not available')) {
+      return NextResponse.json(
+        { 
+          error: "Substack notes are not supported. Only full posts can be previewed.",
+          note: "Notes are shorter-form content that aren't included in RSS feeds."
+        },
+        { status: 400 }
+      );
+    }
+    
+    throw error;
+  }
 }
 
 
