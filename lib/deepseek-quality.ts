@@ -11,8 +11,7 @@ import { LookupCastConversationTypeEnum } from "@neynar/nodejs-sdk/build/api";
 import { extractCastTimestamp } from "@/lib/cast-timestamp";
 import { extractCastMetadata } from "@/lib/cast-metadata";
 import { upsertBulkUsers } from "@/lib/users";
-import { isParagraphLink, parseParagraphUrl } from "@/lib/paragraph";
-import { ParagraphAPI } from "@paragraph_xyz/sdk";
+import { isBlogLink } from "./blog";
 
 const DEEPSEEK_API_URL = process.env.DEEPSEEK_API_URL || "https://api.deepseek.com";
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
@@ -62,18 +61,18 @@ async function extractEmbedContent(castData: any): Promise<{
   const paragraphArticles: Array<{ url: string; title?: string; content?: string; markdown?: string }> = [];
   const imageAlts: string[] = [];
   let hasImageEmbeds = false;
-  const processedParagraphUrls = new Set<string>();
+  const processedBlogUrls = new Set<string>();
   
-  // First, collect all Paragraph URLs from embeds
+  // First, collect all blog URLs (Paragraph and Substack) from embeds
   if (castData.embeds && Array.isArray(castData.embeds)) {
     for (const embed of castData.embeds) {
-      if (embed.url && isParagraphLink(embed.url)) {
-        processedParagraphUrls.add(embed.url);
+      if (embed.url && isBlogLink(embed.url)) {
+        processedBlogUrls.add(embed.url);
       }
     }
   }
   
-  // Also check cast text for Paragraph links
+  // Also check cast text for blog links
   const castText = extractCastText(castData);
   if (castText) {
     const urlRegex = /(https?:\/\/[^\s<>"']+)|(www\.[^\s<>"']+)/g;
@@ -83,14 +82,14 @@ async function extractEmbedContent(castData: any): Promise<{
       if (url && !url.startsWith('http://') && !url.startsWith('https://')) {
         url = 'https://' + url;
       }
-      if (url && isParagraphLink(url)) {
-        processedParagraphUrls.add(url);
+      if (url && isBlogLink(url)) {
+        processedBlogUrls.add(url);
       }
     }
   }
   
-  // Process embeds and fetch Paragraph articles in parallel
-  const paragraphPromises: Promise<void>[] = [];
+  // Process embeds and fetch blog articles in parallel
+  const blogPromises: Promise<void>[] = [];
   
   if (castData.embeds && Array.isArray(castData.embeds)) {
     for (const embed of castData.embeds) {
@@ -115,9 +114,9 @@ async function extractEmbedContent(castData: any): Promise<{
       
       // Link embed
       if (embed.url && !embed.cast && !embed.cast_id) {
-        // Check if it's a Paragraph link
-        if (isParagraphLink(embed.url)) {
-          // Fetch Paragraph article content (will be handled in the loop below)
+        // Check if it's a blog link (Paragraph or Substack)
+        if (isBlogLink(embed.url)) {
+          // Fetch blog article content (will be handled in the loop below)
           // For now, just skip adding to linkMetadata - we'll fetch it separately
         } else {
           // Regular link - just use metadata
@@ -132,51 +131,40 @@ async function extractEmbedContent(castData: any): Promise<{
     }
   }
   
-  // Fetch all Paragraph articles in parallel
-  for (const paragraphUrl of processedParagraphUrls) {
+  // Fetch all blog articles (Paragraph and Substack) in parallel via unified API
+  for (const blogUrl of processedBlogUrls) {
     const fetchPromise = (async () => {
       try {
-        console.log('[DeepSeek] Fetching Paragraph article for quality assessment:', paragraphUrl);
-        const api = new ParagraphAPI();
-        const parsed = parseParagraphUrl(paragraphUrl);
+        console.log('[DeepSeek] Fetching blog article for quality assessment:', blogUrl);
         
-        if (!parsed.publicationSlug || !parsed.postSlug) {
-          console.warn('[DeepSeek] Invalid Paragraph URL format:', paragraphUrl);
+        // Use the unified blog API endpoint
+        const apiUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/blog?url=${encodeURIComponent(blogUrl)}`;
+        const response = await fetch(apiUrl);
+        
+        if (!response.ok) {
+          console.warn('[DeepSeek] Failed to fetch blog article:', blogUrl, response.status, response.statusText);
           return;
         }
         
-        const cleanPublicationSlug = parsed.publicationSlug.replace(/^@/, "");
+        const postData = await response.json();
         
-        try {
-          const postData = await api.getPost(
-            {
-              publicationSlug: cleanPublicationSlug,
-              postSlug: parsed.postSlug,
-            },
-            { includeContent: true }
-          );
-          
-          paragraphArticles.push({
-            url: paragraphUrl,
-            title: postData.title,
-            content: postData.staticHtml,
-            markdown: postData.markdown,
-          });
-          console.log('[DeepSeek] Successfully fetched Paragraph article:', postData.title);
-        } catch (error) {
-          console.warn('[DeepSeek] Failed to fetch Paragraph article:', paragraphUrl, error);
-          // Don't add to linkMetadata - we'll just skip it if fetch fails
-        }
+        paragraphArticles.push({
+          url: blogUrl,
+          title: postData.title,
+          content: postData.staticHtml,
+          markdown: postData.markdown,
+        });
+        console.log('[DeepSeek] Successfully fetched blog article:', postData.title);
       } catch (error) {
-        console.error('[DeepSeek] Error processing Paragraph link:', paragraphUrl, error);
+        console.error('[DeepSeek] Error processing blog link:', blogUrl, error);
       }
     })();
-    paragraphPromises.push(fetchPromise);
+    blogPromises.push(fetchPromise);
   }
   
-  // Wait for all Paragraph article fetches to complete
-  if (paragraphPromises.length > 0) {
-    await Promise.all(paragraphPromises);
+  // Wait for all blog article fetches to complete
+  if (blogPromises.length > 0) {
+    await Promise.all(blogPromises);
   }
   
   return { quotedCastTexts, linkMetadata, paragraphArticles, imageAlts, hasImageEmbeds };

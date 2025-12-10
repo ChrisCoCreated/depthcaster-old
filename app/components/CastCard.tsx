@@ -24,8 +24,8 @@ import { DisplayMode } from "@/lib/customFeeds";
 import { CollectionSelectModal } from "./CollectionSelectModal";
 import { isFeatureEnabledClient, FEATURE_FLAGS } from "@/lib/feature-flags";
 import { MentionedProfileCard } from "./MentionedProfileCard";
-import { ParagraphPreview } from "./ParagraphPreview";
-import { isParagraphLink } from "@/lib/paragraph";
+import { BlogPreview } from "./BlogPreview";
+import { isBlogLink } from "@/lib/blog";
 
 const CURATED_FEED_COLLAPSE_LINE_LIMIT = 8;
 
@@ -2488,11 +2488,11 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
               ) : null;
             })()}
 
-            {/* Check for Paragraph links in cast text (that might not be embeds yet) */}
+            {/* Check for blog links in cast text (that might not be embeds yet) */}
             {(() => {
-              const paragraphUrlsInText: string[] = [];
+              const blogUrlsInText: string[] = [];
               if (cast.text) {
-                console.log('[CastCard] Checking cast text for Paragraph links:', cast.text);
+                console.log('[CastCard] Checking cast text for blog links:', cast.text);
                 // Extract URLs from text using the same regex pattern
                 const urlRegex = /(https?:\/\/[^\s<>"']+)|(www\.[^\s<>"']+)/g;
                 let match;
@@ -2503,9 +2503,15 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                   if (url && !url.startsWith('http://') && !url.startsWith('https://')) {
                     url = 'https://' + url;
                   }
+                  // Clean up URL - remove trailing punctuation that might have been captured
+                  if (url) {
+                    url = url.trim().replace(/[.,;:!?)\]'"`]+$/, '');
+                  }
                   allUrls.push(url);
                   console.log('[CastCard] Found URL in text:', url);
-                  if (url && isParagraphLink(url)) {
+                  const blogPlatform = url ? isBlogLink(url) : null;
+                  console.log('[CastCard] Blog platform check for', url, ':', blogPlatform);
+                  if (url && blogPlatform) {
                     // Check if this URL is already in embeds (normalize for comparison)
                     const normalizedUrl = url.replace(/\/$/, ''); // Remove trailing slash
                     const isInEmbeds = cast.embeds?.some((embed: any) => {
@@ -2515,24 +2521,24 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                              normalizedEmbedUrl === url || 
                              embed.url === url;
                     });
-                    console.log('[CastCard] Paragraph link in embeds?', isInEmbeds);
+                    console.log('[CastCard] Blog link in embeds?', isInEmbeds);
                     if (!isInEmbeds) {
-                      paragraphUrlsInText.push(url);
-                      console.log('[CastCard] ✓ Adding Paragraph link from text:', url);
+                      blogUrlsInText.push(url);
+                      console.log('[CastCard] ✓ Adding blog link from text:', url);
                     }
                   }
                 }
                 console.log('[CastCard] All URLs found:', allUrls);
-                console.log('[CastCard] Paragraph URLs from text:', paragraphUrlsInText);
+                console.log('[CastCard] Blog URLs from text:', blogUrlsInText);
               }
               
-              if (paragraphUrlsInText.length > 0) {
-                console.log('[CastCard] Rendering', paragraphUrlsInText.length, 'Paragraph preview(s) from text');
+              if (blogUrlsInText.length > 0) {
+                console.log('[CastCard] Rendering', blogUrlsInText.length, 'blog preview(s) from text');
                 return (
                   <div className="mb-3 space-y-2">
-                    {paragraphUrlsInText.map((url, idx) => (
-                      <div key={`paragraph-text-${idx}`} onClick={(e) => e.stopPropagation()}>
-                        <ParagraphPreview url={url} />
+                    {blogUrlsInText.map((url, idx) => (
+                      <div key={`blog-text-${idx}`} onClick={(e) => e.stopPropagation()}>
+                        <BlogPreview url={url} />
                       </div>
                     ))}
                   </div>
@@ -2557,15 +2563,16 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
               
               cast.embeds.forEach((embed: any, index: number) => {
                 console.log('[CastCard] Processing embed', index, ':', embed.url);
-                // Check if this is a Paragraph link first - these should always be in "other" group
-                if (embed.url && isParagraphLink(embed.url)) {
-                  console.log('[CastCard] ✓ Found Paragraph link in embed:', embed.url);
+                // Check if this is a blog link first - these should always be in "other" group
+                const embedBlogPlatform = embed.url ? isBlogLink(embed.url) : null;
+                if (embed.url && embedBlogPlatform) {
+                  console.log('[CastCard] ✓ Found blog link in embed:', embed.url, 'platform:', embedBlogPlatform);
                   // Close current image group if exists
                   if (currentImageGroup) {
                     embedGroups.push({ type: 'images', embeds: currentImageGroup.embeds, indices: currentImageGroup.indices });
                     currentImageGroup = null;
                   }
-                  // Add as other embed (Paragraph links get special treatment)
+                  // Add as other embed (blog links get special treatment)
                   embedGroups.push({ type: 'other', embeds: [embed], indices: [index] });
                   return; // Skip the rest of the processing for this embed
                 }
@@ -2671,12 +2678,13 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                         // URL embed (images, videos, links)
                         if (embed.url) {
                           console.log('[CastCard] Rendering embed URL:', embed.url);
-                          // Check if this is a Paragraph link - render special preview
-                          if (isParagraphLink(embed.url)) {
-                            console.log('[CastCard] ✓ Rendering Paragraph preview for embed:', embed.url);
+                          // Check if this is a blog link - render special preview
+                          const renderBlogPlatform = isBlogLink(embed.url);
+                          if (renderBlogPlatform) {
+                            console.log('[CastCard] ✓ Rendering blog preview for embed:', embed.url, 'platform:', renderBlogPlatform);
                             return (
                               <div key={index} onClick={(e) => e.stopPropagation()}>
-                                <ParagraphPreview url={embed.url} />
+                                <BlogPreview url={embed.url} />
                               </div>
                             );
                           }
