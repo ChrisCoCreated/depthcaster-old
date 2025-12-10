@@ -50,6 +50,14 @@ export async function GET(request: NextRequest) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       const errorStatus = (error as { status?: number })?.status;
       
+      // Check if it's a client error (400) that was already handled
+      if (errorMessage.includes('notes are not supported') || 
+          errorMessage.includes('home feed URLs are not supported') ||
+          errorMessage.includes('Cannot determine publication')) {
+        // Re-throw to let handleSubstackPost handle it
+        throw error;
+      }
+      
       if (errorMessage.includes("not found") || errorStatus === 404 || errorMessage.includes("Post not found")) {
         return NextResponse.json(
           { error: "Post not found" },
@@ -190,11 +198,23 @@ async function handleSubstackPost(url: string): Promise<NextResponse> {
     const errorMessage = error instanceof Error ? error.message : String(error);
     
     // If it's a note, return a helpful error
-    if (errorMessage.includes('notes are not available')) {
+    if (errorMessage.includes('notes are not available') || errorMessage.includes('notes are not supported')) {
       return NextResponse.json(
         { 
           error: "Substack notes are not supported. Only full posts can be previewed.",
           note: "Notes are shorter-form content that aren't included in RSS feeds."
+        },
+        { status: 400 }
+      );
+    }
+    
+    // If it's a home feed URL or unsupported format, return a helpful error
+    if (errorMessage.includes('home feed URLs are not supported') || 
+        errorMessage.includes('Cannot determine publication')) {
+      return NextResponse.json(
+        { 
+          error: errorMessage,
+          suggestion: "Please use the direct publication post URL (e.g., publication.substack.com/p/post-slug)."
         },
         { status: 400 }
       );

@@ -33,6 +33,16 @@ export function isSubstackLink(url: string): boolean {
       return true;
     }
     
+    // Check for custom domain Substack publications
+    // Substack posts have the pattern /p/post-slug
+    const pathname = urlObj.pathname;
+    if (pathname.match(/^\/p\//)) {
+      // This looks like a Substack post URL pattern
+      // We'll verify by trying to fetch the RSS feed when processing
+      console.log('[Substack] ✓ Detected potential Substack link (custom domain with /p/ pattern):', url);
+      return true;
+    }
+    
     console.log('[Substack] ✗ Not a Substack link:', url, '(hostname:', hostname, ')');
     return false;
   } catch (error) {
@@ -94,6 +104,13 @@ export function parseSubstackUrl(url: string): ParsedSubstackUrl {
         if (pathMatch) {
           result.postSlug = pathMatch[1];
         }
+      }
+    } else {
+      // Custom domain - check if it has Substack post pattern /p/post-slug
+      const pathMatch = pathname.match(/^\/p\/([^/]+)/);
+      if (pathMatch) {
+        result.hostname = hostname; // Use the custom domain
+        result.postSlug = pathMatch[1];
       }
     }
   } catch (error) {

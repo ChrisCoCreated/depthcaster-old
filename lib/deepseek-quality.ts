@@ -120,15 +120,15 @@ async function extractEmbedContent(castData: any): Promise<{
           // For now, just skip adding to linkMetadata - we'll fetch it separately
         } else {
           // Regular link - just use metadata
-          const meta = embed.metadata || {};
-          linkMetadata.push({
-            url: embed.url,
-            title: meta.title || meta.html?.ogTitle,
-            description: meta.description || meta.html?.ogDescription,
-          });
-        }
+        const meta = embed.metadata || {};
+        linkMetadata.push({
+          url: embed.url,
+          title: meta.title || meta.html?.ogTitle,
+          description: meta.description || meta.html?.ogDescription,
+        });
       }
     }
+  }
   }
   
   // Fetch all blog articles (Paragraph and Substack) in parallel via unified API

@@ -3,6 +3,7 @@
  */
 
 import Parser from 'rss-parser';
+import TurndownService from 'turndown';
 import { parseSubstackUrl, getSubstackRssUrl } from './substack';
 
 const parser = new Parser({
@@ -108,7 +109,7 @@ export async function parseRssFeed(xml: string): Promise<RssFeed> {
         content: item.content,
         contentSnippet: item.contentSnippet,
         'content:encoded': (item as any)['content:encoded'],
-        author: item.creator || item.author,
+        author: (item as any).creator || (item as any).author,
         guid: item.guid,
       })),
     };
@@ -154,44 +155,81 @@ function extractCoverImage(html: string): string | undefined {
 }
 
 /**
- * Convert HTML to markdown (basic conversion)
- * This is a simple implementation - for production, consider using a library like turndown
+ * Convert HTML to markdown using Turndown
  */
+const turndownService = new TurndownService({
+  headingStyle: 'atx', // Use # for headers
+  codeBlockStyle: 'fenced', // Use ``` for code blocks
+  bulletListMarker: '-', // Use - for lists
+  emDelimiter: '*', // Use * for emphasis
+  strongDelimiter: '**', // Use ** for strong
+});
+
+// Configure Turndown to handle Substack-specific elements
+turndownService.addRule('strikethrough', {
+  filter: (node) => {
+    return node.nodeName === 'S' || 
+           node.nodeName === 'STRIKE' || 
+           node.nodeName === 'DEL' ||
+           (node as HTMLElement).tagName?.toLowerCase() === 's' ||
+           (node as HTMLElement).tagName?.toLowerCase() === 'strike' ||
+           (node as HTMLElement).tagName?.toLowerCase() === 'del';
+  },
+  replacement: (content) => `~~${content}~~`,
+});
+
+// Remove script and style tags before conversion
+turndownService.addRule('removeScripts', {
+  filter: ['script', 'style'],
+  replacement: () => '',
+});
+
 function htmlToMarkdown(html: string): string {
-  // Remove script and style tags
-  let markdown = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
-  markdown = markdown.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-  
-  // Convert headers
-  markdown = markdown.replace(/<h1[^>]*>(.*?)<\/h1>/gi, '# $1\n\n');
-  markdown = markdown.replace(/<h2[^>]*>(.*?)<\/h2>/gi, '## $1\n\n');
-  markdown = markdown.replace(/<h3[^>]*>(.*?)<\/h3>/gi, '### $1\n\n');
-  
-  // Convert paragraphs
-  markdown = markdown.replace(/<p[^>]*>(.*?)<\/p>/gi, '$1\n\n');
-  
-  // Convert links
-  markdown = markdown.replace(/<a[^>]+href=["']([^"']+)["'][^>]*>(.*?)<\/a>/gi, '[$2]($1)');
-  
-  // Convert bold and italic
-  markdown = markdown.replace(/<strong[^>]*>(.*?)<\/strong>/gi, '**$1**');
-  markdown = markdown.replace(/<b[^>]*>(.*?)<\/b>/gi, '**$1**');
-  markdown = markdown.replace(/<em[^>]*>(.*?)<\/em>/gi, '*$1*');
-  markdown = markdown.replace(/<i[^>]*>(.*?)<\/i>/gi, '*$1*');
-  
-  // Convert lists
-  markdown = markdown.replace(/<li[^>]*>(.*?)<\/li>/gi, '- $1\n');
-  markdown = markdown.replace(/<ul[^>]*>|<\/ul>/gi, '\n');
-  markdown = markdown.replace(/<ol[^>]*>|<\/ol>/gi, '\n');
-  
-  // Remove remaining HTML tags
-  markdown = markdown.replace(/<[^>]+>/g, '');
-  
-  // Clean up whitespace
-  markdown = markdown.replace(/\n{3,}/g, '\n\n');
-  markdown = markdown.trim();
-  
-  return markdown;
+  try {
+    // Clean up HTML before conversion - remove images entirely
+    let cleaned = html
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      // Remove image tags completely (they'll be handled separately via coverImage)
+      .replace(/<img[^>]*>/gi, '')
+      .replace(/<figure[^>]*>[\s\S]*?<\/figure>/gi, '')
+      .replace(/<picture[^>]*>[\s\S]*?<\/picture>/gi, '');
+    
+    // Convert to markdown
+    let markdown = turndownService.turndown(cleaned);
+    
+    // Clean up any remaining image markdown syntax
+    markdown = markdown
+      // Remove image markdown ![alt](url) - handle multiline cases
+      .replace(/!\[([^\]]*)\]\([^)]+\)/g, '')
+      // Remove orphaned image link fragments ](url) - handle multiline
+      .replace(/\]\(https?:\/\/[^)]+\)/g, '')
+      // Remove standalone image URLs on their own line
+      .replace(/^https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|svg)(\?[^\s]*)?$/gmi, '')
+      // Remove lines that are just brackets or image fragments
+      .replace(/^\[+\s*$/gm, '')
+      .replace(/^\s*\]+$/gm, '')
+      // Remove orphaned brackets at start/end of lines
+      .replace(/^\[+\s*/gm, '')
+      .replace(/\s*\]+$/gm, '')
+      // Remove empty lines with just brackets
+      .replace(/^\s*\[\s*\]\s*$/gm, '')
+      // Clean up excessive whitespace
+      .replace(/\n{3,}/g, '\n\n')
+      // Remove leading/trailing whitespace and empty lines
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0 || line === '') // Keep single empty lines for paragraph breaks
+      .join('\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+    
+    return markdown;
+  } catch (error) {
+    console.error('[RSS Fetcher] Error converting HTML to markdown:', error);
+    // Fallback: return plain text if conversion fails
+    return html.replace(/<[^>]+>/g, '').trim();
+  }
 }
 
 /**

@@ -91,14 +91,99 @@ export function BlogPreview({ url }: BlogPreviewProps) {
 
   const displayContent = post.markdown || "";
   
-  // Extract the first paragraph (everything up to the first double newline or end of content)
-  const firstParagraphMatch = displayContent.match(/^([^\n]+(?:\n(?!\n)[^\n]+)*)/);
-  const firstParagraph = firstParagraphMatch ? firstParagraphMatch[1].trim() : displayContent.split('\n')[0] || displayContent.substring(0, 500);
+  // Helper to remove images and other markdown syntax from preview
+  const cleanMarkdownForPreview = (md: string): string => {
+    return md
+      // Remove images completely ![alt](url) or ](url) fragments
+      .replace(/!\[([^\]]*)\]\([^)]+\)/g, '')
+      .replace(/\]\([^)]+\)/g, '') // Remove leftover ](url) fragments
+      // Remove standalone image URLs on their own line
+      .replace(/^https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|svg)(\?[^\s]*)?$/gmi, '')
+      // Remove links but keep text [text](url) -> text
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      // Clean up any orphaned brackets
+      .replace(/^\[+\s*/gm, '')
+      .replace(/\s*\]+$/gm, '')
+      // Remove bold/italic markers but keep text
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/\*([^*]+)\*/g, '$1')
+      .replace(/__([^_]+)__/g, '$1')
+      .replace(/_([^_]+)_/g, '$1')
+      // Remove headers
+      .replace(/^#+\s+/gm, '')
+      // Remove list markers
+      .replace(/^[-*+]\s+/gm, '')
+      // Clean up extra whitespace and newlines
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/[ \t]+/g, ' ')
+      .trim();
+  };
+  
+  // Helper to extract text from markdown (remove syntax, keep text)
+  const extractTextFromMarkdown = (md: string): string => {
+    return cleanMarkdownForPreview(md);
+  };
+  
+  const lines = displayContent.split('\n');
+  let firstParagraphRaw = "";
+  
+  // Find the first line with substantial text content (after removing markdown syntax)
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    
+    // Skip lines that are just images or image fragments
+    if (line.match(/^!?\[.*?\]\([^)]+\)$/) || 
+        line.match(/^\]\([^)]+\)$/) ||
+        line.match(/^https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|svg)/i)) {
+      continue;
+    }
+    
+    const textContent = extractTextFromMarkdown(line);
+    // Skip if line is just markdown syntax with no real text
+    if (textContent && textContent.length > 10) {
+      // Found first substantial line, collect until double newline
+      let paragraphLines = [line];
+      
+      for (let j = i + 1; j < lines.length; j++) {
+        const nextLine = lines[j].trim();
+        if (nextLine === "") {
+          // Double newline found, stop
+          break;
+        }
+        // Skip image lines in the paragraph
+        if (!nextLine.match(/^!?\[.*?\]\([^)]+\)$/) && 
+            !nextLine.match(/^\]\([^)]+\)$/) &&
+            !nextLine.match(/^https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|svg)/i)) {
+          paragraphLines.push(nextLine);
+        }
+      }
+      
+      firstParagraphRaw = paragraphLines.join('\n');
+      break;
+    }
+  }
+  
+  // Fallback: if no substantial paragraph found, take first 500 chars and clean it
+  if (!firstParagraphRaw || extractTextFromMarkdown(firstParagraphRaw).length < 10) {
+    firstParagraphRaw = displayContent.substring(0, 500).trim();
+  }
+  
+  // Clean the first paragraph to remove images for preview (but keep markdown structure)
+  // Remove images but keep other markdown formatting
+  const firstParagraph = firstParagraphRaw
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '') // Remove images
+    .replace(/\]\(https?:\/\/[^)]+\)/g, '') // Remove orphaned ](url) fragments
+    .replace(/^\[+\s*/gm, '') // Remove leading brackets
+    .replace(/\s*\]+$/gm, '') // Remove trailing brackets
+    .replace(/\n{3,}/g, '\n\n') // Clean up excessive newlines
+    .trim();
   
   // Check if there's more content after the first paragraph
-  const remainingContent = firstParagraphMatch 
-    ? displayContent.substring(firstParagraphMatch[0].length).trim()
-    : displayContent.substring(firstParagraph.length).trim();
+  const firstParagraphIndex = displayContent.indexOf(firstParagraphRaw);
+  const remainingContent = firstParagraphIndex >= 0 
+    ? displayContent.substring(firstParagraphIndex + firstParagraphRaw.length).trim()
+    : displayContent.substring(firstParagraphRaw.length).trim();
   const hasMoreContent = remainingContent.length > 0;
 
   // Determine platform name for "Read on..." link
@@ -146,7 +231,40 @@ export function BlogPreview({ url }: BlogPreviewProps) {
           {expanded ? (
             <div>
               {post.markdown ? (
-                <MarkdownRenderer content={post.markdown} />
+                <MarkdownRenderer content={(() => {
+                  let cleaned = post.markdown
+                    // Remove image markdown ![alt](url) - handle multiline
+                    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '')
+                    // Remove orphaned image link fragments ](url)
+                    .replace(/\]\(https?:\/\/[^)]+\)/g, '')
+                    // Remove lines that are just brackets
+                    .replace(/^\[+\s*$/gm, '')
+                    .replace(/^\s*\]+$/gm, '')
+                    // Remove orphaned brackets at start/end of lines
+                    .replace(/^\[+\s*/gm, '')
+                    .replace(/\s*\]+$/gm, '')
+                    // Remove empty bracket lines
+                    .replace(/^\s*\[\s*\]\s*$/gm, '')
+                    // Clean up excessive whitespace
+                    .replace(/\n{3,}/g, '\n\n')
+                    .trim();
+                  
+                  // Remove leading empty lines and image artifacts
+                  cleaned = cleaned.split('\n')
+                    .map(line => line.trim())
+                    .filter((line, index, arr) => {
+                      // Remove leading empty lines
+                      if (index === 0 && line === '') return false;
+                      // Remove lines that are just brackets or image fragments
+                      if (line.match(/^\[+\s*$/) || line.match(/^\s*\]+$/)) return false;
+                      return true;
+                    })
+                    .join('\n')
+                    .replace(/\n{3,}/g, '\n\n')
+                    .trim();
+                  
+                  return cleaned;
+                })()} />
               ) : post.staticHtml ? (
                 <div
                   className="prose prose-sm sm:prose-base dark:prose-invert max-w-none"
@@ -159,7 +277,14 @@ export function BlogPreview({ url }: BlogPreviewProps) {
           ) : (
             <div>
               {post.markdown ? (
-                <MarkdownRenderer content={firstParagraph} />
+                // For preview, use cleaned markdown without images
+                firstParagraph ? (
+                  <MarkdownRenderer content={firstParagraph} />
+                ) : (
+                  <p className="mb-4 text-gray-700 dark:text-gray-300 leading-relaxed">
+                    {extractTextFromMarkdown(displayContent.substring(0, 200))}
+                  </p>
+                )
               ) : (
                 <p className="mb-4 text-gray-700 dark:text-gray-300 leading-relaxed">{firstParagraph}</p>
               )}
