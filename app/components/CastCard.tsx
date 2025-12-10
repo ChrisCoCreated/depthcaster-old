@@ -24,6 +24,8 @@ import { DisplayMode } from "@/lib/customFeeds";
 import { CollectionSelectModal } from "./CollectionSelectModal";
 import { isFeatureEnabledClient, FEATURE_FLAGS } from "@/lib/feature-flags";
 import { MentionedProfileCard } from "./MentionedProfileCard";
+import { ParagraphPreview } from "./ParagraphPreview";
+import { isParagraphLink } from "@/lib/paragraph";
 
 const CURATED_FEED_COLLAPSE_LINE_LIMIT = 8;
 
@@ -2601,6 +2603,15 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                         
                         // URL embed (images, videos, links)
                         if (embed.url) {
+                          // Check if this is a Paragraph link - render special preview
+                          if (isParagraphLink(embed.url)) {
+                            return (
+                              <div key={index} onClick={(e) => e.stopPropagation()}>
+                                <ParagraphPreview url={embed.url} />
+                              </div>
+                            );
+                          }
+
                           const metadata = embed.metadata;
                           const urlObj = new URL(embed.url);
                           const isXEmbed = urlObj.hostname === 'x.com' || urlObj.hostname === 'twitter.com';

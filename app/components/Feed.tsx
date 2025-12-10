@@ -170,6 +170,13 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   const castsRestoredRef = useRef<boolean>(false);
   const justSavedOnClickRef = useRef<number>(0); // Timestamp of last click save
   const feedViewStartTimeRef = useRef<number | null>(null);
+  const sessionStartTimeRef = useRef<number | null>(null);
+  const activeSessionIdRef = useRef<string | null>(null);
+  const sessionUpdateIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const tabHiddenTimeRef = useRef<number | null>(null);
+  const MAX_SESSION_DURATION = 4 * 60 * 60 * 1000; // 4 hours in milliseconds
+  const SESSION_UPDATE_INTERVAL = 2 * 60 * 1000; // Update every 2 minutes
+  const TAB_HIDDEN_THRESHOLD = 5 * 60 * 1000; // 5 minutes
   // Rate limiting: minimum 2 seconds between API calls
   const MIN_FETCH_INTERVAL = 2000;
 
@@ -1014,68 +1021,174 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
     lastFetchTimeRef.current = 0;
   }, [feedType]);
 
-  // Track feed view time - only track on feed change and unmount, not periodically
+  // Helper to create or update active session in database
+  const updateActiveSession = async (feedTypeToTrack: string, duration: number, isFinal: boolean = false) => {
+    try {
+      await fetch("/api/analytics/feed-view", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          feedType: feedTypeToTrack,
+          durationSeconds: duration,
+          userFid: viewerFid || null,
+          sortBy: sortBy || null,
+          curatorFids: selectedCuratorFids.length > 0 ? selectedCuratorFids : null,
+          packIds: selectedPackIds.length > 0 ? selectedPackIds : null,
+          sessionStartTime: sessionStartTimeRef.current,
+          isUpdate: !isFinal && activeSessionIdRef.current !== null,
+        }),
+      });
+    } catch (error) {
+      // Silently fail - analytics shouldn't break the app
+      console.error("Failed to track feed view:", error);
+    }
+  };
+
+  // End active session
+  const endActiveSession = (reason: string) => {
+    if (sessionStartTimeRef.current === null) return;
+
+    // Clear update interval
+    if (sessionUpdateIntervalRef.current) {
+      clearInterval(sessionUpdateIntervalRef.current);
+      sessionUpdateIntervalRef.current = null;
+    }
+
+    const duration = Math.floor((Date.now() - sessionStartTimeRef.current) / 1000);
+    if (duration > 0) {
+      const feedTypeToTrack = prevFeedTypeRef.current || feedType;
+      analytics.trackFeedViewTime(
+        feedTypeToTrack,
+        duration,
+        sortBy,
+        selectedCuratorFids,
+        selectedPackIds
+      );
+      // Finalize session in database
+      updateActiveSession(feedTypeToTrack, duration, true);
+    }
+
+    // Reset session tracking
+    sessionStartTimeRef.current = null;
+    activeSessionIdRef.current = null;
+    feedViewStartTimeRef.current = null;
+    tabHiddenTimeRef.current = null;
+  };
+
+  // Track feed view time with active session concept
   useEffect(() => {
-    // Helper to track feed view to database
-    const trackFeedViewToDB = async (feedTypeToTrack: string, duration: number) => {
-      try {
-        await fetch("/api/analytics/feed-view", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+    // End previous session if feed type changed
+    if (sessionStartTimeRef.current !== null && prevFeedTypeRef.current && prevFeedTypeRef.current !== feedType) {
+      endActiveSession("feed_type_changed");
+    }
+
+    // Start new session
+    const sessionStartTime = Date.now();
+    sessionStartTimeRef.current = sessionStartTime;
+    feedViewStartTimeRef.current = sessionStartTime;
+    activeSessionIdRef.current = `${viewerFid || 'anonymous'}_${feedType}_${sessionStartTime}`;
+
+    // Create initial session record
+    updateActiveSession(feedType, 0, false);
+
+    // Set up periodic updates (every 2 minutes)
+    sessionUpdateIntervalRef.current = setInterval(() => {
+      if (sessionStartTimeRef.current !== null) {
+        const duration = Math.floor((Date.now() - sessionStartTimeRef.current) / 1000);
+        if (duration > 0) {
+          // Update active session duration
+          updateActiveSession(feedType, duration, false);
+        }
+      }
+    }, SESSION_UPDATE_INTERVAL);
+
+    // Check for maximum session duration
+    const maxDurationTimeout = setTimeout(() => {
+      if (sessionStartTimeRef.current !== null) {
+        endActiveSession("max_duration_reached");
+      }
+    }, MAX_SESSION_DURATION);
+
+    // Cleanup on unmount or feed change
+    return () => {
+      if (sessionUpdateIntervalRef.current) {
+        clearInterval(sessionUpdateIntervalRef.current);
+        sessionUpdateIntervalRef.current = null;
+      }
+      clearTimeout(maxDurationTimeout);
+      endActiveSession("component_unmount");
+    };
+  }, [feedType, viewerFid]); // Only depend on feedType and viewerFid, not filters
+
+  // Handle tab visibility changes
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Tab hidden - start tracking hidden time
+        tabHiddenTimeRef.current = Date.now();
+      } else {
+        // Tab visible again
+        if (tabHiddenTimeRef.current !== null) {
+          const hiddenDuration = Date.now() - tabHiddenTimeRef.current;
+          if (hiddenDuration >= TAB_HIDDEN_THRESHOLD) {
+            // Tab was hidden for > 5 minutes, end session
+            endActiveSession("tab_hidden_too_long");
+          } else {
+            // Tab was hidden briefly, continue session
+            tabHiddenTimeRef.current = null;
+          }
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
+
+  // Handle user inactivity
+  useEffect(() => {
+    if (!isUserActive && sessionStartTimeRef.current !== null) {
+      // User became inactive - check after threshold
+      const inactivityTimeout = setTimeout(() => {
+        if (!isUserActive && sessionStartTimeRef.current !== null) {
+          endActiveSession("user_inactive");
+        }
+      }, TAB_HIDDEN_THRESHOLD); // Use same 5 minute threshold
+
+      return () => clearTimeout(inactivityTimeout);
+    }
+  }, [isUserActive]);
+
+  // Handle page unload/navigation away
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (sessionStartTimeRef.current !== null) {
+        // Use sendBeacon for reliable tracking on page unload
+        const duration = Math.floor((Date.now() - sessionStartTimeRef.current) / 1000);
+        if (duration > 0) {
+          const feedTypeToTrack = prevFeedTypeRef.current || feedType;
+          const data = JSON.stringify({
             feedType: feedTypeToTrack,
             durationSeconds: duration,
             userFid: viewerFid || null,
             sortBy: sortBy || null,
             curatorFids: selectedCuratorFids.length > 0 ? selectedCuratorFids : null,
             packIds: selectedPackIds.length > 0 ? selectedPackIds : null,
-          }),
-        });
-      } catch (error) {
-        // Silently fail - analytics shouldn't break the app
-        console.error("Failed to track feed view:", error);
-      }
-    };
-
-    // End previous feed view if feed type changed
-    if (feedViewStartTimeRef.current !== null && prevFeedTypeRef.current && prevFeedTypeRef.current !== feedType) {
-      const duration = Math.floor((Date.now() - feedViewStartTimeRef.current) / 1000);
-      if (duration > 0) {
-        analytics.trackFeedViewTime(
-          prevFeedTypeRef.current,
-          duration,
-          sortBy,
-          selectedCuratorFids,
-          selectedPackIds
-        );
-        // Also track to database
-        trackFeedViewToDB(prevFeedTypeRef.current, duration);
-      }
-    }
-
-    // Start tracking new feed view
-    feedViewStartTimeRef.current = Date.now();
-
-    // Cleanup on unmount or feed change - track final session
-    return () => {
-      if (feedViewStartTimeRef.current !== null) {
-        const duration = Math.floor((Date.now() - feedViewStartTimeRef.current) / 1000);
-        if (duration > 0) {
-          const feedTypeToTrack = prevFeedTypeRef.current || feedType;
-          analytics.trackFeedViewTime(
-            feedTypeToTrack,
-            duration,
-            sortBy,
-            selectedCuratorFids,
-            selectedPackIds
-          );
-          // Also track to database
-          trackFeedViewToDB(feedTypeToTrack, duration);
+            sessionStartTime: sessionStartTimeRef.current,
+            isUpdate: false, // Finalize on unload
+          });
+          navigator.sendBeacon("/api/analytics/feed-view", data);
         }
-        feedViewStartTimeRef.current = null;
       }
     };
-  }, [feedType, sortBy, selectedCuratorFids, selectedPackIds, viewerFid]);
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [feedType, viewerFid, sortBy, selectedCuratorFids, selectedPackIds]);
 
   // Close login prompt when user logs in
   useEffect(() => {

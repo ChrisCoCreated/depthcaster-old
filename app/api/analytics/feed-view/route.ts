@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { feedViewSessions } from "@/lib/schema";
+import { eq, and, isNull } from "drizzle-orm";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { feedType, durationSeconds, userFid, sortBy, curatorFids, packIds } = body;
+    const { 
+      feedType, 
+      durationSeconds, 
+      userFid, 
+      sortBy, 
+      curatorFids, 
+      packIds, 
+      sessionStartTime,
+      isUpdate 
+    } = body;
 
     if (!feedType || typeof durationSeconds !== "number") {
       return NextResponse.json(
@@ -14,16 +24,47 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Insert feed view session (non-blocking, don't fail if it errors)
+    // Convert sessionStartTime to Date if provided
+    const sessionStartTimeDate = sessionStartTime 
+      ? new Date(sessionStartTime) 
+      : new Date(); // Use current time if not provided (for new sessions)
+
+    // Insert or update feed view session (non-blocking, don't fail if it errors)
     try {
-      await db.insert(feedViewSessions).values({
-        feedType,
-        durationSeconds,
-        userFid: userFid ? Number(userFid) : null,
-        sortBy: sortBy || null,
-        curatorFids: curatorFids && curatorFids.length > 0 ? curatorFids : null,
-        packIds: packIds && packIds.length > 0 ? packIds : null,
-      } as any);
+      if (isUpdate && sessionStartTime) {
+        // Update existing active session
+        const userFidValue = userFid ? Number(userFid) : null;
+        await db
+          .update(feedViewSessions)
+          .set({
+            durationSeconds,
+            sortBy: sortBy || null,
+            curatorFids: curatorFids && curatorFids.length > 0 ? curatorFids : null,
+            packIds: packIds && packIds.length > 0 ? packIds : null,
+          })
+          .where(
+            and(
+              userFidValue !== null 
+                ? eq(feedViewSessions.userFid, userFidValue)
+                : isNull(feedViewSessions.userFid),
+              eq(feedViewSessions.feedType, feedType),
+              eq(feedViewSessions.sessionStartTime, sessionStartTimeDate)
+            )
+          );
+        // Note: If session doesn't exist, update will silently do nothing
+        // The next periodic update or new session creation will handle it
+      } else {
+        // Create new session
+        await db.insert(feedViewSessions).values({
+          feedType,
+          durationSeconds,
+          userFid: userFid ? Number(userFid) : null,
+          sortBy: sortBy || null,
+          curatorFids: curatorFids && curatorFids.length > 0 ? curatorFids : null,
+          packIds: packIds && packIds.length > 0 ? packIds : null,
+          sessionStartTime: sessionStartTimeDate,
+        } as any);
+      }
     } catch (error) {
       // Log but don't fail - analytics shouldn't break the app
       console.error("Failed to track feed view session:", error);
