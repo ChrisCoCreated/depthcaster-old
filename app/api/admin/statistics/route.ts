@@ -622,6 +622,102 @@ export async function GET(request: NextRequest) {
       uniqueUsers: parseInt(r.unique_users) || 0,
     })) || [];
 
+    // Active Users for Past 7 Days
+    const activeUsersQuery = sql`
+      WITH date_range AS (
+        SELECT generate_series(
+          DATE_TRUNC('day', NOW() - INTERVAL '6 days'),
+          DATE_TRUNC('day', NOW()),
+          '1 day'::interval
+        )::date as date
+      ),
+      daily_active_users AS (
+        SELECT DISTINCT
+          DATE_TRUNC('day', created_at)::date as date,
+          user_fid
+        FROM feed_view_sessions
+        WHERE user_fid IS NOT NULL
+          AND user_fid NOT IN (${sql.join(adminFids.map(fid => sql`${fid}`), sql`, `)})
+          AND created_at >= DATE_TRUNC('day', NOW() - INTERVAL '6 days')
+        UNION
+        SELECT DISTINCT
+          DATE_TRUNC('day', created_at)::date as date,
+          user_fid
+        FROM cast_views
+        WHERE user_fid IS NOT NULL
+          AND user_fid NOT IN (${sql.join(adminFids.map(fid => sql`${fid}`), sql`, `)})
+          AND created_at >= DATE_TRUNC('day', NOW() - INTERVAL '6 days')
+        UNION
+        SELECT DISTINCT
+          DATE_TRUNC('day', created_at)::date as date,
+          user_fid
+        FROM page_views
+        WHERE user_fid IS NOT NULL
+          AND user_fid NOT IN (${sql.join(adminFids.map(fid => sql`${fid}`), sql`, `)})
+          AND created_at >= DATE_TRUNC('day', NOW() - INTERVAL '6 days')
+      ),
+      daily_curators AS (
+        SELECT DISTINCT
+          DATE_TRUNC('day', created_at)::date as date,
+          curator_fid as user_fid
+        FROM curated_casts
+        WHERE curator_fid IS NOT NULL
+          AND curator_fid NOT IN (${sql.join(adminFids.map(fid => sql`${fid}`), sql`, `)})
+          AND created_at >= DATE_TRUNC('day', NOW() - INTERVAL '6 days')
+      ),
+      daily_onchain_actions AS (
+        SELECT DISTINCT
+          DATE_TRUNC('day', created_at)::date as date,
+          user_fid
+        FROM curated_cast_interactions
+        WHERE user_fid NOT IN (${sql.join(adminFids.map(fid => sql`${fid}`), sql`, `)})
+          AND created_at >= DATE_TRUNC('day', NOW() - INTERVAL '6 days')
+        UNION
+        SELECT DISTINCT
+          DATE_TRUNC('day', created_at)::date as date,
+          watcher_fid as user_fid
+        FROM user_watches
+        WHERE watcher_fid NOT IN (${sql.join(adminFids.map(fid => sql`${fid}`), sql`, `)})
+          AND created_at >= DATE_TRUNC('day', NOW() - INTERVAL '6 days')
+      ),
+      daily_users_with_flags AS (
+        SELECT 
+          dau.date,
+          dau.user_fid,
+          CASE WHEN dc.user_fid IS NOT NULL THEN true ELSE false END as curated,
+          CASE WHEN doa.user_fid IS NOT NULL THEN true ELSE false END as onchain
+        FROM daily_active_users dau
+        LEFT JOIN daily_curators dc ON dau.date = dc.date AND dau.user_fid = dc.user_fid
+        LEFT JOIN daily_onchain_actions doa ON dau.date = doa.date AND dau.user_fid = doa.user_fid
+      )
+      SELECT 
+        dr.date,
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'fid', duwf.user_fid,
+              'curated', duwf.curated,
+              'onchain', duwf.onchain
+            ) ORDER BY duwf.user_fid
+          ) FILTER (WHERE duwf.user_fid IS NOT NULL),
+          '[]'::json
+        ) as users
+      FROM date_range dr
+      LEFT JOIN daily_users_with_flags duwf ON dr.date = duwf.date
+      GROUP BY dr.date
+      ORDER BY dr.date DESC
+    `;
+
+    const activeUsersResult = await db.execute(activeUsersQuery);
+    const activeUsersData = (activeUsersResult as any).rows?.map((row: any) => ({
+      date: row.date,
+      users: (row.users || []).map((user: any) => ({
+        fid: parseInt(user.fid),
+        curated: user.curated || false,
+        onchain: user.onchain || false,
+      })),
+    })) || [];
+
     // API Call Statistics
     let reactionFetchCount = 0;
     let reactionFetchCUCost = 0;
@@ -746,6 +842,7 @@ export async function GET(request: NextRequest) {
           cuCostPerCall: 2,
         },
       },
+      activeUsers: activeUsersData,
     });
   } catch (error: unknown) {
     const err = error as { message?: string; cause?: any };

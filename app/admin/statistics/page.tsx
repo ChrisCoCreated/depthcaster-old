@@ -92,6 +92,14 @@ interface Statistics {
       cuCostPerCall: number;
     };
   };
+  activeUsers: Array<{
+    date: string;
+    users: Array<{
+      fid: number;
+      curated: boolean;
+      onchain: boolean;
+    }>;
+  }>;
 }
 
 export default function AdminStatisticsPage() {
@@ -295,6 +303,73 @@ export default function AdminStatisticsPage() {
           </div>
         ) : statistics ? (
           <div className="space-y-6">
+            {/* Active Users View - Past 7 Days */}
+            {statistics.activeUsers && statistics.activeUsers.length > 0 && (
+              <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+                  Active Users (Past 7 Days)
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
+                  {statistics.activeUsers.map((day, idx) => {
+                    const date = new Date(day.date);
+                    const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    const isToday = date.toDateString() === new Date().toDateString();
+                    
+                    return (
+                      <div
+                        key={idx}
+                        className={`border rounded-lg p-3 ${
+                          isToday
+                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                            : 'border-gray-200 dark:border-gray-700'
+                        }`}
+                      >
+                        <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          {dateStr}
+                          {isToday && (
+                            <span className="ml-1 text-xs text-blue-600 dark:text-blue-400">(Today)</span>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                          {day.users.length} active
+                        </div>
+                        <div className="space-y-1 max-h-48 overflow-y-auto">
+                          {day.users.map((user) => (
+                            <div
+                              key={user.fid}
+                              className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400"
+                            >
+                              <span className="font-mono">{user.fid}</span>
+                              {user.curated && (
+                                <span className="text-yellow-500" title="Curated">
+                                  ⭐
+                                </span>
+                              )}
+                              {user.onchain && (
+                                <span className="text-blue-500" title="Onchain action">
+                                  ⛓️
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="mt-4 flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+                  <div className="flex items-center gap-1">
+                    <span>⭐</span>
+                    <span>Curated</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span>⛓️</span>
+                    <span>Onchain action</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Overview Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
