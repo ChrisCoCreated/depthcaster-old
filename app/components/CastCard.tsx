@@ -2488,6 +2488,59 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
               ) : null;
             })()}
 
+            {/* Check for Paragraph links in cast text (that might not be embeds yet) */}
+            {(() => {
+              const paragraphUrlsInText: string[] = [];
+              if (cast.text) {
+                console.log('[CastCard] Checking cast text for Paragraph links:', cast.text);
+                // Extract URLs from text using the same regex pattern
+                const urlRegex = /(https?:\/\/[^\s<>"']+)|(www\.[^\s<>"']+)/g;
+                let match;
+                const text = cast.text;
+                const allUrls: string[] = [];
+                while ((match = urlRegex.exec(text)) !== null) {
+                  let url = match[1] || match[2];
+                  if (url && !url.startsWith('http://') && !url.startsWith('https://')) {
+                    url = 'https://' + url;
+                  }
+                  allUrls.push(url);
+                  console.log('[CastCard] Found URL in text:', url);
+                  if (url && isParagraphLink(url)) {
+                    // Check if this URL is already in embeds (normalize for comparison)
+                    const normalizedUrl = url.replace(/\/$/, ''); // Remove trailing slash
+                    const isInEmbeds = cast.embeds?.some((embed: any) => {
+                      if (!embed.url) return false;
+                      const normalizedEmbedUrl = embed.url.replace(/\/$/, '');
+                      return normalizedEmbedUrl === normalizedUrl || 
+                             normalizedEmbedUrl === url || 
+                             embed.url === url;
+                    });
+                    console.log('[CastCard] Paragraph link in embeds?', isInEmbeds);
+                    if (!isInEmbeds) {
+                      paragraphUrlsInText.push(url);
+                      console.log('[CastCard] ✓ Adding Paragraph link from text:', url);
+                    }
+                  }
+                }
+                console.log('[CastCard] All URLs found:', allUrls);
+                console.log('[CastCard] Paragraph URLs from text:', paragraphUrlsInText);
+              }
+              
+              if (paragraphUrlsInText.length > 0) {
+                console.log('[CastCard] Rendering', paragraphUrlsInText.length, 'Paragraph preview(s) from text');
+                return (
+                  <div className="mb-3 space-y-2">
+                    {paragraphUrlsInText.map((url, idx) => (
+                      <div key={`paragraph-text-${idx}`} onClick={(e) => e.stopPropagation()}>
+                        <ParagraphPreview url={url} />
+                      </div>
+                    ))}
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
             {/* Embeds */}
             {cast.embeds && cast.embeds.length > 0 && (() => {
               // Check if we should replace embeds with a custom button
@@ -2503,6 +2556,20 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
               let currentImageGroup: { embeds: any[], indices: number[] } | null = null;
               
               cast.embeds.forEach((embed: any, index: number) => {
+                console.log('[CastCard] Processing embed', index, ':', embed.url);
+                // Check if this is a Paragraph link first - these should always be in "other" group
+                if (embed.url && isParagraphLink(embed.url)) {
+                  console.log('[CastCard] ✓ Found Paragraph link in embed:', embed.url);
+                  // Close current image group if exists
+                  if (currentImageGroup) {
+                    embedGroups.push({ type: 'images', embeds: currentImageGroup.embeds, indices: currentImageGroup.indices });
+                    currentImageGroup = null;
+                  }
+                  // Add as other embed (Paragraph links get special treatment)
+                  embedGroups.push({ type: 'other', embeds: [embed], indices: [index] });
+                  return; // Skip the rest of the processing for this embed
+                }
+                
                 // Check if this is a direct image embed
                 const isDirectImage = embed.url && (
                   embed.metadata?.image || 
@@ -2603,8 +2670,10 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                         
                         // URL embed (images, videos, links)
                         if (embed.url) {
+                          console.log('[CastCard] Rendering embed URL:', embed.url);
                           // Check if this is a Paragraph link - render special preview
                           if (isParagraphLink(embed.url)) {
+                            console.log('[CastCard] ✓ Rendering Paragraph preview for embed:', embed.url);
                             return (
                               <div key={index} onClick={(e) => e.stopPropagation()}>
                                 <ParagraphPreview url={embed.url} />

@@ -34,11 +34,17 @@ export function ParagraphPreview({ url }: ParagraphPreviewProps) {
   useEffect(() => {
     const fetchPost = async () => {
       try {
+        console.log('[ParagraphPreview] Fetching post for URL:', url);
         setLoading(true);
         setError(null);
-        const response = await fetch(`/api/paragraph?url=${encodeURIComponent(url)}`);
+        const apiUrl = `/api/paragraph?url=${encodeURIComponent(url)}`;
+        console.log('[ParagraphPreview] API URL:', apiUrl);
+        const response = await fetch(apiUrl);
         
+        console.log('[ParagraphPreview] Response status:', response.status);
         if (!response.ok) {
+          const errorText = await response.text();
+          console.error('[ParagraphPreview] Error response:', errorText);
           if (response.status === 404) {
             setError("Article not found");
           } else {
@@ -48,9 +54,10 @@ export function ParagraphPreview({ url }: ParagraphPreviewProps) {
         }
 
         const data = await response.json();
+        console.log('[ParagraphPreview] Received post data:', data);
         setPost(data);
       } catch (err) {
-        console.error("Error fetching Paragraph post:", err);
+        console.error("[ParagraphPreview] Error fetching Paragraph post:", err);
         setError("Failed to load article");
       } finally {
         setLoading(false);
@@ -82,18 +89,26 @@ export function ParagraphPreview({ url }: ParagraphPreviewProps) {
   }
 
   const displayContent = post.markdown || "";
-  const excerpt = displayContent.split("\n").slice(0, 3).join("\n").substring(0, 200);
-  const hasMoreContent = displayContent.length > excerpt.length;
+  
+  // Extract the first paragraph (everything up to the first double newline or end of content)
+  const firstParagraphMatch = displayContent.match(/^([^\n]+(?:\n(?!\n)[^\n]+)*)/);
+  const firstParagraph = firstParagraphMatch ? firstParagraphMatch[1].trim() : displayContent.split('\n')[0] || displayContent.substring(0, 500);
+  
+  // Check if there's more content after the first paragraph
+  const remainingContent = firstParagraphMatch 
+    ? displayContent.substring(firstParagraphMatch[0].length).trim()
+    : displayContent.substring(firstParagraph.length).trim();
+  const hasMoreContent = remainingContent.length > 0;
 
   return (
     <div className="my-3 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-gray-300 dark:hover:border-gray-700 transition-colors">
       {/* Cover Image */}
       {post.coverImage && (
-        <div className="w-full h-48 sm:h-64 overflow-hidden">
+        <div className="w-full overflow-hidden">
           <img
             src={post.coverImage}
             alt={post.title}
-            className="w-full h-full object-cover"
+            className="w-full h-auto object-contain"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = "none";
             }}
@@ -137,11 +152,11 @@ export function ParagraphPreview({ url }: ParagraphPreviewProps) {
               )}
             </div>
           ) : (
-            <div className="line-clamp-4">
+            <div>
               {post.markdown ? (
-                <MarkdownRenderer content={excerpt + (hasMoreContent ? "..." : "")} />
+                <MarkdownRenderer content={firstParagraph} />
               ) : (
-                <p>{excerpt}{hasMoreContent ? "..." : ""}</p>
+                <p className="mb-4 text-gray-700 dark:text-gray-300 leading-relaxed">{firstParagraph}</p>
               )}
             </div>
           )}
@@ -156,11 +171,11 @@ export function ParagraphPreview({ url }: ParagraphPreviewProps) {
             {expanded ? (
               <>
                 <ChevronUp className="w-4 h-4" />
-                Show less
+                Collapse Article
               </>
             ) : (
               <>
-                Read more
+                Expand Article
                 <ChevronDown className="w-4 h-4" />
               </>
             )}

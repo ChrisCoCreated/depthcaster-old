@@ -11,7 +11,10 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const url = searchParams.get("url");
 
+    console.log('[Paragraph API] Received request for URL:', url);
+
     if (!url) {
+      console.log('[Paragraph API] Missing URL parameter');
       return NextResponse.json(
         { error: "URL parameter is required" },
         { status: 400 }
@@ -20,8 +23,10 @@ export async function GET(request: NextRequest) {
 
     // Parse the Paragraph URL
     const parsed = parseParagraphUrl(url);
+    console.log('[Paragraph API] Parsed URL:', parsed);
     
     if (!parsed.publicationSlug || !parsed.postSlug) {
+      console.log('[Paragraph API] Invalid URL format - missing publicationSlug or postSlug');
       return NextResponse.json(
         { error: "Invalid Paragraph URL format" },
         { status: 400 }
@@ -30,6 +35,7 @@ export async function GET(request: NextRequest) {
 
     // Remove @ prefix from publication slug if present
     const cleanPublicationSlug = parsed.publicationSlug.replace(/^@/, "");
+    console.log('[Paragraph API] Clean publication slug:', cleanPublicationSlug, 'post slug:', parsed.postSlug);
 
     // Initialize Paragraph API client
     const api = new ParagraphAPI();
@@ -41,6 +47,7 @@ export async function GET(request: NextRequest) {
       // Try to fetch post directly using publication slug and post slug
       // This is the most efficient approach
       try {
+        console.log('[Paragraph API] Attempting to fetch post by slugs...');
         postData = await api.getPost(
           {
             publicationSlug: cleanPublicationSlug,
@@ -48,12 +55,16 @@ export async function GET(request: NextRequest) {
           },
           { includeContent: true }
         );
+        console.log('[Paragraph API] Successfully fetched post:', postData.id);
       } catch (error: unknown) {
+        console.log('[Paragraph API] Failed to fetch by slugs, error:', error);
         // If that fails and it's a custom domain, try alternative approach
         if (parsed.isCustomDomain && parsed.domain) {
+          console.log('[Paragraph API] Trying custom domain approach for:', parsed.domain);
           // For custom domains, first get publication by domain
           try {
             publicationData = await api.getPublicationByDomain(parsed.domain);
+            console.log('[Paragraph API] Found publication by domain:', publicationData.id);
             
             // Then fetch post by publication ID and post slug
             postData = await api.getPost(
@@ -63,7 +74,9 @@ export async function GET(request: NextRequest) {
               },
               { includeContent: true }
             );
-          } catch {
+            console.log('[Paragraph API] Successfully fetched post by domain:', postData.id);
+          } catch (domainError) {
+            console.log('[Paragraph API] Custom domain approach failed:', domainError);
             // If custom domain approach fails, throw original error
             throw error;
           }
@@ -76,10 +89,12 @@ export async function GET(request: NextRequest) {
       // Fetch publication data if we don't have it yet
       if (!publicationData) {
         try {
+          console.log('[Paragraph API] Fetching publication by slug:', cleanPublicationSlug);
           publicationData = await api.getPublicationBySlug(cleanPublicationSlug);
-        } catch {
+          console.log('[Paragraph API] Found publication:', publicationData.id);
+        } catch (pubError) {
           // Publication fetch is optional, continue without it
-          console.warn("Could not fetch publication data");
+          console.warn('[Paragraph API] Could not fetch publication data:', pubError);
         }
       }
 

@@ -15,20 +15,43 @@ export interface ParsedParagraphUrl {
  */
 export function isParagraphLink(url: string): boolean {
   try {
-    const urlObj = new URL(url);
+    // Normalize URL - add protocol if missing
+    let normalizedUrl = url;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      normalizedUrl = 'https://' + url;
+    }
+    
+    const urlObj = new URL(normalizedUrl);
     const hostname = urlObj.hostname.toLowerCase();
     
-    // Check for paragraph.xyz domain
-    if (hostname === 'paragraph.xyz' || hostname === 'www.paragraph.xyz') {
-      return true;
+    console.log('[Paragraph] Checking URL:', url, 'hostname:', hostname);
+    
+    // Check for paragraph.com or paragraph.xyz domain (with or without www)
+    const isParagraphDomain = hostname === 'paragraph.com' || 
+                              hostname === 'www.paragraph.com' ||
+                              hostname === 'paragraph.xyz' || 
+                              hostname === 'www.paragraph.xyz';
+    
+    if (isParagraphDomain) {
+      // Also check if it has a path that looks like a post (publication/post-slug)
+      const pathname = urlObj.pathname;
+      const pathMatch = pathname.match(/^\/(?:@)?[^/]+\/[^/]+/);
+      console.log('[Paragraph] Pathname:', pathname, 'matches pattern:', !!pathMatch);
+      // Should have at least /publication/post-slug pattern
+      if (pathMatch) {
+        console.log('[Paragraph] ✓ Detected Paragraph link:', url);
+        return true;
+      }
     }
     
     // Check for paragraph.xyz subdomains (like custom domains)
     // Note: Custom domains would need to be checked via API
     // For now, we'll check if it matches paragraph.xyz patterns
     
+    console.log('[Paragraph] ✗ Not a Paragraph link:', url);
     return false;
-  } catch {
+  } catch (error) {
+    console.log('[Paragraph] ✗ Error checking URL:', url, error);
     return false;
   }
 }
@@ -54,8 +77,9 @@ export function parseParagraphUrl(url: string): ParsedParagraphUrl {
     const hostname = urlObj.hostname.toLowerCase();
     const pathname = urlObj.pathname;
 
-    // Check if it's paragraph.xyz
-    if (hostname === 'paragraph.xyz' || hostname === 'www.paragraph.xyz') {
+    // Check if it's paragraph.com or paragraph.xyz
+    if (hostname === 'paragraph.com' || hostname === 'www.paragraph.com' ||
+        hostname === 'paragraph.xyz' || hostname === 'www.paragraph.xyz') {
       // Parse path: /@publication/post-slug or /publication/post-slug
       const pathMatch = pathname.match(/^\/(?:@)?([^/]+)\/([^/]+)/);
       if (pathMatch) {
