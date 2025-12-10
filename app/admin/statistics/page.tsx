@@ -341,34 +341,34 @@ export default function AdminStatisticsPage() {
                             </div>
                           </div>
                         </div>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex gap-1.5 overflow-x-auto pb-1">
                           {day.users.map((user) => {
                             const displayName = user.displayName || user.username || `User ${user.fid}`;
                             return (
                               <div
                                 key={user.fid}
-                                className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded-full border border-gray-200 dark:border-gray-700"
-                                style={{ minWidth: '140px', maxWidth: '140px' }}
+                                className="flex items-center gap-1.5 px-2 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-full border border-gray-200 dark:border-gray-700 flex-shrink-0"
+                                style={{ width: '110px', minWidth: '110px', maxWidth: '110px' }}
                               >
                                 <AvatarImage
                                   src={user.pfpUrl}
                                   alt={displayName}
-                                  size={24}
-                                  className="w-6 h-6 rounded-full flex-shrink-0 object-cover"
+                                  size={18}
+                                  className="w-[18px] h-[18px] rounded-full flex-shrink-0 object-cover"
                                 />
                                 <div className="flex-1 min-w-0">
-                                  <div className="text-xs font-medium text-gray-900 dark:text-gray-100 truncate">
+                                  <div className="text-[11px] font-medium text-gray-900 dark:text-gray-100 truncate">
                                     {displayName}
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-1 flex-shrink-0">
+                                <div className="flex items-center gap-0.5 flex-shrink-0">
                                   {user.curated && (
-                                    <span className="text-yellow-500 text-xs" title="Curated">
+                                    <span className="text-yellow-500 text-[10px]" title="Curated">
                                       ⭐
                                     </span>
                                   )}
                                   {user.onchain && (
-                                    <span className="text-blue-500 text-xs" title="Onchain action">
+                                    <span className="text-blue-500 text-[10px]" title="Onchain action">
                                       ⛓️
                                     </span>
                                   )}
