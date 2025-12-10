@@ -11,6 +11,7 @@ import { sdk } from "@farcaster/miniapp-sdk";
 interface FeedItem {
   castHash: string;
   text: string;
+  firstEmbedImageUrl: string | null;
   authorFid: number | null;
   authorUsername: string | null;
   authorDisplayName: string | null;
@@ -815,11 +816,28 @@ function MiniappContent() {
                   </div>
                 )}
 
-                {/* Cast text */}
+                {/* Cast text or first embed image */}
                 <div className="mb-2">
-                  <p className="text-gray-900 dark:text-gray-100 text-sm leading-relaxed line-clamp-8">
-                    {item.text || "No text content"}
-                  </p>
+                  {item.text ? (
+                    <p className="text-gray-900 dark:text-gray-100 text-sm leading-relaxed line-clamp-8">
+                      {item.text}
+                    </p>
+                  ) : item.firstEmbedImageUrl ? (
+                    <div className="w-full rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
+                      <img
+                        src={item.firstEmbedImageUrl}
+                        alt="Embedded image"
+                        className="w-full h-auto max-h-96 object-contain"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 dark:text-gray-400 text-sm italic">
+                      No text content
+                    </p>
+                  )}
                 </div>
 
                 {/* Curated time, quality score, and replies */}

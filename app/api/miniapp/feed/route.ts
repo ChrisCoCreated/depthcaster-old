@@ -16,6 +16,55 @@ const toDate = (value: Date | string | null | undefined, fallback: Date): Date =
   return fallback;
 };
 
+// Helper function to extract first embed image URL from cast data
+function extractFirstEmbedImageUrl(castData: any): string | null {
+  if (!castData?.embeds || !Array.isArray(castData.embeds)) {
+    return null;
+  }
+
+  for (const embed of castData.embeds) {
+    // Check if it's a direct image embed
+    if (embed.metadata?.image || (embed.metadata?.content_type && embed.metadata.content_type.startsWith('image/'))) {
+      // Filter out Twitter emoji SVGs
+      const isXEmbed = embed.url && (embed.url.includes('twitter.com') || embed.url.includes('x.com'));
+      if (isXEmbed && (embed.url.includes('twimg.com/emoji') || embed.url.includes('/svg/'))) {
+        continue;
+      }
+      return embed.url;
+    }
+    
+    // Check for ogImage in link embeds
+    if (embed.url && embed.metadata?.html?.ogImage) {
+      const ogImages = Array.isArray(embed.metadata.html.ogImage) 
+        ? embed.metadata.html.ogImage 
+        : [embed.metadata.html.ogImage];
+      const nonEmojiImage = ogImages.find((img: any) => {
+        if (!img.url) return false;
+        if (img.type === 'svg') return false;
+        const isXEmbed = embed.url && (embed.url.includes('twitter.com') || embed.url.includes('x.com'));
+        if (isXEmbed && (img.url.includes('twimg.com/emoji') || img.url.includes('/svg/'))) return false;
+        return true;
+      });
+      if (nonEmojiImage) return nonEmojiImage.url;
+    }
+    
+    // Check metadata.image
+    if (embed.metadata?.image) {
+      const img = typeof embed.metadata.image === 'string' 
+        ? embed.metadata.image 
+        : embed.metadata.image?.url || null;
+      if (img) {
+        const isXEmbed = embed.url && (embed.url.includes('twitter.com') || embed.url.includes('x.com'));
+        if (!isXEmbed || (!img.includes('twimg.com/emoji') && !img.includes('/svg/'))) {
+          return img;
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
@@ -29,6 +78,7 @@ export async function GET(request: NextRequest) {
       .select({
         castHash: curatedCasts.castHash,
         castText: curatedCasts.castText,
+        castData: curatedCasts.castData,
         authorFid: curatedCasts.authorFid,
         repliesCount: curatedCasts.repliesCount,
         qualityScore: curatedCasts.qualityScore,
@@ -138,10 +188,12 @@ export async function GET(request: NextRequest) {
       const castCreatedAtDate = cast.castCreatedAt ? toDate(cast.castCreatedAt, new Date()) : null;
       const curatedAtDate = toDate(cast.firstCurationTime, new Date());
       const authorInfo = cast.authorFid ? authorMap.get(cast.authorFid) : null;
+      const firstEmbedImageUrl = cast.castData ? extractFirstEmbedImageUrl(cast.castData) : null;
       
       return {
         castHash: cast.castHash,
         text: cast.castText || "",
+        firstEmbedImageUrl,
         authorFid: cast.authorFid,
         authorUsername: authorInfo?.username || null,
         authorDisplayName: authorInfo?.displayName || null,
