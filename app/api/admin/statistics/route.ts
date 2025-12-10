@@ -85,6 +85,12 @@ export async function GET(request: NextRequest) {
     const sinceFixFilter = sinceFixDate ? sql`AND created_at >= ${sinceFixDate.toISOString()}` : sql``;
     const sinceFixDateFilter = sinceFixDate ? sql`AND date >= ${sinceFixDate.toISOString()}` : sql``;
 
+    // Calculate effective date filter: use the maximum (most recent) of timeFilter and sinceFixDate
+    // This ensures we don't create impossible conditions like ">= 24h_ago AND >= today"
+    const effectiveDateFilter = timeFilter && sinceFixDate
+      ? (timeFilter > sinceFixDate ? timeFilter : sinceFixDate)
+      : (timeFilter || sinceFixDate);
+
     // User Statistics (only authenticated users - users table only contains logged-in users)
     const totalUsers = await db
       .select({ count: sql<number>`count(*)::int` })
@@ -272,13 +278,8 @@ export async function GET(request: NextRequest) {
     // Feed Analytics - UNION data from both main table and daily aggregates
     // Exclude admin users and optionally exclude historical data before fix
     let feedViewStatsRecentWhere = sql`1=1`;
-    if (timeFilter) {
-      feedViewStatsRecentWhere = sql`created_at >= ${timeFilter.toISOString()}`;
-    }
-    if (sinceFixDate) {
-      feedViewStatsRecentWhere = timeFilter
-        ? sql`${feedViewStatsRecentWhere} AND created_at >= ${sinceFixDate.toISOString()}`
-        : sql`created_at >= ${sinceFixDate.toISOString()}`;
+    if (effectiveDateFilter) {
+      feedViewStatsRecentWhere = sql`created_at >= ${effectiveDateFilter.toISOString()}`;
     }
     if (excludeAdminsFilter) {
       feedViewStatsRecentWhere = sql`${feedViewStatsRecentWhere} ${excludeAdminsFilter}`;
@@ -299,12 +300,8 @@ export async function GET(request: NextRequest) {
     // Daily aggregates - exclude historical data if requested
     // Note: Daily aggregates don't have user_fid, so we can't exclude admins from them
     // But we can exclude historical dates
-    const feedViewStatsDailyWhere = timeFilter && sinceFixDate
-      ? sql`date >= ${timeFilter.toISOString()} AND date >= ${sinceFixDate.toISOString()}`
-      : timeFilter
-      ? sql`date >= ${timeFilter.toISOString()}`
-      : sinceFixDate
-      ? sql`date >= ${sinceFixDate.toISOString()}`
+    const feedViewStatsDailyWhere = effectiveDateFilter
+      ? sql`date >= ${effectiveDateFilter.toISOString()}`
       : sql`1=1`;
     
     const feedViewStatsDaily = await db
@@ -366,13 +363,8 @@ export async function GET(request: NextRequest) {
     // Cast Views - UNION data from both main table and daily aggregates
     // Exclude admin users and optionally exclude historical data
     let castViewStatsRecentWhere = sql`1=1`;
-    if (timeFilter) {
-      castViewStatsRecentWhere = sql`created_at >= ${timeFilter.toISOString()}`;
-    }
-    if (sinceFixDate) {
-      castViewStatsRecentWhere = timeFilter
-        ? sql`${castViewStatsRecentWhere} AND created_at >= ${sinceFixDate.toISOString()}`
-        : sql`created_at >= ${sinceFixDate.toISOString()}`;
+    if (effectiveDateFilter) {
+      castViewStatsRecentWhere = sql`created_at >= ${effectiveDateFilter.toISOString()}`;
     }
     if (excludeAdminsFilter) {
       castViewStatsRecentWhere = sql`${castViewStatsRecentWhere} ${excludeAdminsFilter}`;
@@ -390,12 +382,8 @@ export async function GET(request: NextRequest) {
       .groupBy(sql`COALESCE(${castViews.feedType}, 'unknown')`);
 
     // Daily cast views - exclude historical data if requested
-    const castViewStatsDailyWhere = timeFilter && sinceFixDate
-      ? sql`date >= ${timeFilter.toISOString()} AND date >= ${sinceFixDate.toISOString()}`
-      : timeFilter
-      ? sql`date >= ${timeFilter.toISOString()}`
-      : sinceFixDate
-      ? sql`date >= ${sinceFixDate.toISOString()}`
+    const castViewStatsDailyWhere = effectiveDateFilter
+      ? sql`date >= ${effectiveDateFilter.toISOString()}`
       : sql`1=1`;
     
     const castViewStatsDaily = await db
@@ -524,26 +512,16 @@ export async function GET(request: NextRequest) {
 
     // Daily Usage Breakdowns - exclude admins and historical data
     let dailyBreakdownRecentWhere = sql`1=1`;
-    if (timeFilter) {
-      dailyBreakdownRecentWhere = sql`created_at >= ${timeFilter.toISOString()}`;
-    }
-    if (sinceFixDate) {
-      dailyBreakdownRecentWhere = timeFilter
-        ? sql`${dailyBreakdownRecentWhere} AND created_at >= ${sinceFixDate.toISOString()}`
-        : sql`created_at >= ${sinceFixDate.toISOString()}`;
+    if (effectiveDateFilter) {
+      dailyBreakdownRecentWhere = sql`created_at >= ${effectiveDateFilter.toISOString()}`;
     }
     if (excludeAdminsFilter) {
       dailyBreakdownRecentWhere = sql`${dailyBreakdownRecentWhere} ${excludeAdminsFilter}`;
     }
     
     let dailyBreakdownDailyWhere = sql`1=1`;
-    if (timeFilter) {
-      dailyBreakdownDailyWhere = sql`date >= ${timeFilter.toISOString()}`;
-    }
-    if (sinceFixDate) {
-      dailyBreakdownDailyWhere = timeFilter
-        ? sql`${dailyBreakdownDailyWhere} AND date >= ${sinceFixDate.toISOString()}`
-        : sql`date >= ${sinceFixDate.toISOString()}`;
+    if (effectiveDateFilter) {
+      dailyBreakdownDailyWhere = sql`date >= ${effectiveDateFilter.toISOString()}`;
     }
     
     const dailyBreakdownQuery = sql`
@@ -593,26 +571,16 @@ export async function GET(request: NextRequest) {
 
     // Daily Cast Views Breakdown - exclude admins and historical data
     let dailyCastViewsRecentWhere = sql`1=1`;
-    if (timeFilter) {
-      dailyCastViewsRecentWhere = sql`created_at >= ${timeFilter.toISOString()}`;
-    }
-    if (sinceFixDate) {
-      dailyCastViewsRecentWhere = timeFilter
-        ? sql`${dailyCastViewsRecentWhere} AND created_at >= ${sinceFixDate.toISOString()}`
-        : sql`created_at >= ${sinceFixDate.toISOString()}`;
+    if (effectiveDateFilter) {
+      dailyCastViewsRecentWhere = sql`created_at >= ${effectiveDateFilter.toISOString()}`;
     }
     if (excludeAdminsFilter) {
       dailyCastViewsRecentWhere = sql`${dailyCastViewsRecentWhere} ${excludeAdminsFilter}`;
     }
     
     let dailyCastViewsDailyWhere = sql`1=1`;
-    if (timeFilter) {
-      dailyCastViewsDailyWhere = sql`date >= ${timeFilter.toISOString()}`;
-    }
-    if (sinceFixDate) {
-      dailyCastViewsDailyWhere = timeFilter
-        ? sql`${dailyCastViewsDailyWhere} AND date >= ${sinceFixDate.toISOString()}`
-        : sql`date >= ${sinceFixDate.toISOString()}`;
+    if (effectiveDateFilter) {
+      dailyCastViewsDailyWhere = sql`date >= ${effectiveDateFilter.toISOString()}`;
     }
     
     const dailyCastViewsQuery = sql`

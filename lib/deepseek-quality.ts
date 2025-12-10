@@ -643,7 +643,6 @@ export async function analyzeCastQuality(
   }
 
   // Detect if this is an image-only cast (no text, only images, no quoted casts, no links)
-  const hasText = castText && castText.trim().length > 0;
   const isImageOnly = !hasText && 
                      embedContent.hasImageEmbeds && 
                      embedContent.quotedCastTexts.length === 0 && 
