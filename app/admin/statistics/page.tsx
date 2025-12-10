@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useNeynarContext } from "@neynar/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { AvatarImage } from "@/app/components/AvatarImage";
 
 interface Statistics {
   period: string;
@@ -96,6 +97,9 @@ interface Statistics {
     date: string;
     users: Array<{
       fid: number;
+      username: string | null;
+      displayName: string | null;
+      pfpUrl: string | null;
       curated: boolean;
       onchain: boolean;
     }>;
@@ -303,55 +307,75 @@ export default function AdminStatisticsPage() {
           </div>
         ) : statistics ? (
           <div className="space-y-6">
-            {/* Active Users View - Past 7 Days */}
+            {/* Active Users View - Past 30 Days */}
             {statistics.activeUsers && statistics.activeUsers.length > 0 && (
               <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">
-                  Active Users (Past 7 Days)
+                  Active Users (Past 30 Days)
                 </h2>
-                <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
+                <div className="space-y-3">
                   {statistics.activeUsers.map((day, idx) => {
                     const date = new Date(day.date);
-                    const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' });
                     const isToday = date.toDateString() === new Date().toDateString();
                     
                     return (
                       <div
                         key={idx}
-                        className={`border rounded-lg p-3 ${
+                        className={`border rounded-lg p-4 ${
                           isToday
                             ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
                             : 'border-gray-200 dark:border-gray-700'
                         }`}
                       >
-                        <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          {dateStr}
-                          {isToday && (
-                            <span className="ml-1 text-xs text-blue-600 dark:text-blue-400">(Today)</span>
-                          )}
-                        </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                          {day.users.length} active
-                        </div>
-                        <div className="space-y-1 max-h-48 overflow-y-auto">
-                          {day.users.map((user) => (
-                            <div
-                              key={user.fid}
-                              className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400"
-                            >
-                              <span className="font-mono">{user.fid}</span>
-                              {user.curated && (
-                                <span className="text-yellow-500" title="Curated">
-                                  ⭐
-                                </span>
-                              )}
-                              {user.onchain && (
-                                <span className="text-blue-500" title="Onchain action">
-                                  ⛓️
-                                </span>
-                              )}
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                              {dateStr}
                             </div>
-                          ))}
+                            {isToday && (
+                              <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">(Today)</span>
+                            )}
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              {day.users.length} active
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {day.users.map((user) => {
+                            const displayName = user.displayName || user.username || `User ${user.fid}`;
+                            return (
+                              <div
+                                key={user.fid}
+                                className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded-full border border-gray-200 dark:border-gray-700"
+                                style={{ minWidth: '140px', maxWidth: '140px' }}
+                              >
+                                <AvatarImage
+                                  src={user.pfpUrl}
+                                  alt={displayName}
+                                  size={24}
+                                  className="w-6 h-6 rounded-full flex-shrink-0 object-cover"
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-xs font-medium text-gray-900 dark:text-gray-100 truncate">
+                                    {displayName}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1 flex-shrink-0">
+                                  {user.curated && (
+                                    <span className="text-yellow-500 text-xs" title="Curated">
+                                      ⭐
+                                    </span>
+                                  )}
+                                  {user.onchain && (
+                                    <span className="text-blue-500 text-xs" title="Onchain action">
+                                      ⛓️
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     );

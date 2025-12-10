@@ -622,11 +622,11 @@ export async function GET(request: NextRequest) {
       uniqueUsers: parseInt(r.unique_users) || 0,
     })) || [];
 
-    // Active Users for Past 7 Days
+    // Active Users for Past 30 Days
     const activeUsersQuery = sql`
       WITH date_range AS (
         SELECT generate_series(
-          DATE_TRUNC('day', NOW() - INTERVAL '6 days'),
+          DATE_TRUNC('day', NOW() - INTERVAL '29 days'),
           DATE_TRUNC('day', NOW()),
           '1 day'::interval
         )::date as date
@@ -654,7 +654,7 @@ export async function GET(request: NextRequest) {
         FROM page_views
         WHERE user_fid IS NOT NULL
           AND user_fid NOT IN (${sql.join(adminFids.map(fid => sql`${fid}`), sql`, `)})
-          AND created_at >= DATE_TRUNC('day', NOW() - INTERVAL '6 days')
+          AND created_at >= DATE_TRUNC('day', NOW() - INTERVAL '29 days')
       ),
       daily_curators AS (
         SELECT DISTINCT
@@ -663,7 +663,7 @@ export async function GET(request: NextRequest) {
         FROM curated_casts
         WHERE curator_fid IS NOT NULL
           AND curator_fid NOT IN (${sql.join(adminFids.map(fid => sql`${fid}`), sql`, `)})
-          AND created_at >= DATE_TRUNC('day', NOW() - INTERVAL '6 days')
+          AND created_at >= DATE_TRUNC('day', NOW() - INTERVAL '29 days')
       ),
       daily_onchain_actions AS (
         SELECT DISTINCT
@@ -671,14 +671,14 @@ export async function GET(request: NextRequest) {
           user_fid
         FROM curated_cast_interactions
         WHERE user_fid NOT IN (${sql.join(adminFids.map(fid => sql`${fid}`), sql`, `)})
-          AND created_at >= DATE_TRUNC('day', NOW() - INTERVAL '6 days')
+          AND created_at >= DATE_TRUNC('day', NOW() - INTERVAL '29 days')
         UNION
         SELECT DISTINCT
           DATE_TRUNC('day', created_at)::date as date,
           watcher_fid as user_fid
         FROM user_watches
         WHERE watcher_fid NOT IN (${sql.join(adminFids.map(fid => sql`${fid}`), sql`, `)})
-          AND created_at >= DATE_TRUNC('day', NOW() - INTERVAL '6 days')
+          AND created_at >= DATE_TRUNC('day', NOW() - INTERVAL '29 days')
       ),
       daily_users_with_flags AS (
         SELECT 
@@ -696,6 +696,9 @@ export async function GET(request: NextRequest) {
           json_agg(
             json_build_object(
               'fid', duwf.user_fid,
+              'username', u.username,
+              'displayName', u.display_name,
+              'pfpUrl', u.pfp_url,
               'curated', duwf.curated,
               'onchain', duwf.onchain
             ) ORDER BY duwf.user_fid
@@ -704,6 +707,7 @@ export async function GET(request: NextRequest) {
         ) as users
       FROM date_range dr
       LEFT JOIN daily_users_with_flags duwf ON dr.date = duwf.date
+      LEFT JOIN users u ON duwf.user_fid = u.fid
       GROUP BY dr.date
       ORDER BY dr.date DESC
     `;
@@ -713,6 +717,9 @@ export async function GET(request: NextRequest) {
       date: row.date,
       users: (row.users || []).map((user: any) => ({
         fid: parseInt(user.fid),
+        username: user.username || null,
+        displayName: user.displayName || null,
+        pfpUrl: user.pfpUrl || null,
         curated: user.curated || false,
         onchain: user.onchain || false,
       })),

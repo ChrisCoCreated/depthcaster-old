@@ -126,47 +126,81 @@ export function BlogPreview({ url }: BlogPreviewProps) {
   
   const lines = displayContent.split('\n');
   let firstParagraphRaw = "";
+  const MIN_PREVIEW_LENGTH = 150; // Minimum characters for a good preview
+  const MAX_PARAGRAPHS = 5; // Maximum paragraphs to collect
   
-  // Find the first line with substantial text content (after removing markdown syntax)
+  // Collect lines, skipping only images and empty lines at the start
+  let collectedLines: string[] = [];
+  let paragraphCount = 0;
+  let foundFirstContent = false;
+  let lastWasEmpty = false;
+  
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
-    if (!line) continue;
     
-    // Skip lines that are just images or image fragments
-    if (line.match(/^!?\[.*?\]\([^)]+\)$/) || 
-        line.match(/^\]\([^)]+\)$/) ||
-        line.match(/^https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|svg)/i)) {
+    // Skip empty lines at the very beginning (before any content)
+    if (!foundFirstContent && !line) {
       continue;
     }
     
-    const textContent = extractTextFromMarkdown(line);
-    // Skip if line is just markdown syntax with no real text
-    if (textContent && textContent.length > 10) {
-      // Found first substantial line, collect until double newline
-      let paragraphLines = [line];
-      
-      for (let j = i + 1; j < lines.length; j++) {
-        const nextLine = lines[j].trim();
-        if (nextLine === "") {
-          // Double newline found, stop
+    // Skip only actual image markdown syntax (not regular links or text with URLs)
+    const isImageOnly = line.match(/^!\[([^\]]*)\]\([^)]+\)$/) || 
+                        line.match(/^\]\(https?:\/\/[^)]+\)$/) ||
+                        (line.match(/^https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|svg)(\?[^\s]*)?$/i));
+    
+    if (isImageOnly) {
+      continue;
+    }
+    
+    // Found first content line
+    if (line && !foundFirstContent) {
+      foundFirstContent = true;
+    }
+    
+    if (line === "") {
+      // Empty line - paragraph break
+      if (collectedLines.length > 0 && !lastWasEmpty) {
+        collectedLines.push("");
+        paragraphCount++;
+        lastWasEmpty = true;
+        
+        // Check if we have enough content
+        const collectedText = extractTextFromMarkdown(collectedLines.join('\n'));
+        if (collectedText.length >= MIN_PREVIEW_LENGTH && paragraphCount >= 2) {
           break;
         }
-        // Skip image lines in the paragraph
-        if (!nextLine.match(/^!?\[.*?\]\([^)]+\)$/) && 
-            !nextLine.match(/^\]\([^)]+\)$/) &&
-            !nextLine.match(/^https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|svg)/i)) {
-          paragraphLines.push(nextLine);
+        
+        // Stop if we've collected enough paragraphs
+        if (paragraphCount >= MAX_PARAGRAPHS) {
+          break;
         }
       }
-      
-      firstParagraphRaw = paragraphLines.join('\n');
-      break;
+      continue;
     }
+    
+    lastWasEmpty = false;
+    // Add the line (all non-image lines)
+    collectedLines.push(line);
   }
   
-  // Fallback: if no substantial paragraph found, take first 500 chars and clean it
-  if (!firstParagraphRaw || extractTextFromMarkdown(firstParagraphRaw).length < 10) {
-    firstParagraphRaw = displayContent.substring(0, 500).trim();
+  firstParagraphRaw = collectedLines.join('\n').trim();
+  
+  // Fallback: if we didn't collect enough, take first 10 lines that aren't images
+  if (!firstParagraphRaw || extractTextFromMarkdown(firstParagraphRaw).length < 50) {
+    let fallbackLines: string[] = [];
+    for (let i = 0; i < lines.length && fallbackLines.length < 10; i++) {
+      const line = lines[i].trim();
+      const isImageOnly = line.match(/^!\[([^\]]*)\]\([^)]+\)$/) || 
+                          line.match(/^\]\(https?:\/\/[^)]+\)$/);
+      if (line && !isImageOnly) {
+        fallbackLines.push(line);
+      }
+    }
+    if (fallbackLines.length > 0) {
+      firstParagraphRaw = fallbackLines.join('\n');
+    } else {
+      firstParagraphRaw = displayContent.substring(0, 500).trim();
+    }
   }
   
   // Clean the first paragraph to remove images for preview (but keep markdown structure)
