@@ -11,6 +11,8 @@ import { LookupCastConversationTypeEnum } from "@neynar/nodejs-sdk/build/api";
 import { extractCastTimestamp } from "@/lib/cast-timestamp";
 import { extractCastMetadata } from "@/lib/cast-metadata";
 import { upsertBulkUsers } from "@/lib/users";
+import { isParagraphLink, parseParagraphUrl } from "@/lib/paragraph";
+import { ParagraphAPI } from "@paragraph_xyz/sdk";
 
 const DEEPSEEK_API_URL = process.env.DEEPSEEK_API_URL || "https://api.deepseek.com";
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
@@ -45,18 +47,50 @@ function extractCastText(castData: any): string {
 }
 
 /**
- * Extract content from embeds (quoted casts, links, images)
+ * Extract content from embeds (quoted casts, links, images, Paragraph articles)
+ * Also checks cast text for Paragraph links
  */
-function extractEmbedContent(castData: any): {
+async function extractEmbedContent(castData: any): Promise<{
   quotedCastTexts: string[];
   linkMetadata: Array<{ title?: string; description?: string; url: string }>;
+  paragraphArticles: Array<{ url: string; title?: string; content?: string; markdown?: string }>;
   imageAlts: string[];
   hasImageEmbeds: boolean;
-} {
+}> {
   const quotedCastTexts: string[] = [];
   const linkMetadata: Array<{ title?: string; description?: string; url: string }> = [];
+  const paragraphArticles: Array<{ url: string; title?: string; content?: string; markdown?: string }> = [];
   const imageAlts: string[] = [];
   let hasImageEmbeds = false;
+  const processedParagraphUrls = new Set<string>();
+  
+  // First, collect all Paragraph URLs from embeds
+  if (castData.embeds && Array.isArray(castData.embeds)) {
+    for (const embed of castData.embeds) {
+      if (embed.url && isParagraphLink(embed.url)) {
+        processedParagraphUrls.add(embed.url);
+      }
+    }
+  }
+  
+  // Also check cast text for Paragraph links
+  const castText = extractCastText(castData);
+  if (castText) {
+    const urlRegex = /(https?:\/\/[^\s<>"']+)|(www\.[^\s<>"']+)/g;
+    let match;
+    while ((match = urlRegex.exec(castText)) !== null) {
+      let url = match[1] || match[2];
+      if (url && !url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'https://' + url;
+      }
+      if (url && isParagraphLink(url)) {
+        processedParagraphUrls.add(url);
+      }
+    }
+  }
+  
+  // Process embeds and fetch Paragraph articles in parallel
+  const paragraphPromises: Promise<void>[] = [];
   
   if (castData.embeds && Array.isArray(castData.embeds)) {
     for (const embed of castData.embeds) {
@@ -79,19 +113,73 @@ function extractEmbedContent(castData: any): {
         continue; // Skip link metadata check for image embeds
       }
       
-      // Link embed metadata (synchronous, no API call)
+      // Link embed
       if (embed.url && !embed.cast && !embed.cast_id) {
-        const meta = embed.metadata || {};
-        linkMetadata.push({
-          url: embed.url,
-          title: meta.title || meta.html?.ogTitle,
-          description: meta.description || meta.html?.ogDescription,
-        });
+        // Check if it's a Paragraph link
+        if (isParagraphLink(embed.url)) {
+          // Fetch Paragraph article content (will be handled in the loop below)
+          // For now, just skip adding to linkMetadata - we'll fetch it separately
+        } else {
+          // Regular link - just use metadata
+          const meta = embed.metadata || {};
+          linkMetadata.push({
+            url: embed.url,
+            title: meta.title || meta.html?.ogTitle,
+            description: meta.description || meta.html?.ogDescription,
+          });
+        }
       }
     }
   }
   
-  return { quotedCastTexts, linkMetadata, imageAlts, hasImageEmbeds };
+  // Fetch all Paragraph articles in parallel
+  for (const paragraphUrl of processedParagraphUrls) {
+    const fetchPromise = (async () => {
+      try {
+        console.log('[DeepSeek] Fetching Paragraph article for quality assessment:', paragraphUrl);
+        const api = new ParagraphAPI();
+        const parsed = parseParagraphUrl(paragraphUrl);
+        
+        if (!parsed.publicationSlug || !parsed.postSlug) {
+          console.warn('[DeepSeek] Invalid Paragraph URL format:', paragraphUrl);
+          return;
+        }
+        
+        const cleanPublicationSlug = parsed.publicationSlug.replace(/^@/, "");
+        
+        try {
+          const postData = await api.getPost(
+            {
+              publicationSlug: cleanPublicationSlug,
+              postSlug: parsed.postSlug,
+            },
+            { includeContent: true }
+          );
+          
+          paragraphArticles.push({
+            url: paragraphUrl,
+            title: postData.title,
+            content: postData.staticHtml,
+            markdown: postData.markdown,
+          });
+          console.log('[DeepSeek] Successfully fetched Paragraph article:', postData.title);
+        } catch (error) {
+          console.warn('[DeepSeek] Failed to fetch Paragraph article:', paragraphUrl, error);
+          // Don't add to linkMetadata - we'll just skip it if fetch fails
+        }
+      } catch (error) {
+        console.error('[DeepSeek] Error processing Paragraph link:', paragraphUrl, error);
+      }
+    })();
+    paragraphPromises.push(fetchPromise);
+  }
+  
+  // Wait for all Paragraph article fetches to complete
+  if (paragraphPromises.length > 0) {
+    await Promise.all(paragraphPromises);
+  }
+  
+  return { quotedCastTexts, linkMetadata, paragraphArticles, imageAlts, hasImageEmbeds };
 }
 
 /**
@@ -580,13 +668,14 @@ export async function analyzeCastQuality(
     }
   }
   
-  // Extract embed content
-  const embedContent = extractEmbedContent(castData);
+  // Extract embed content (including Paragraph articles)
+  const embedContent = await extractEmbedContent(castData);
   
   // Log embed information for debugging
   const hasText = castText && castText.trim().length > 0;
   const hasEmbeds = embedContent.quotedCastTexts.length > 0 || 
                     embedContent.linkMetadata.length > 0 || 
+                    embedContent.paragraphArticles.length > 0 ||
                     embedContent.imageAlts.length > 0 ||
                     embedContent.hasImageEmbeds;
   
@@ -595,9 +684,11 @@ export async function analyzeCastQuality(
       hasText,
       quotedCasts: embedContent.quotedCastTexts.length,
       links: embedContent.linkMetadata.length,
+      paragraphArticles: embedContent.paragraphArticles.length,
       images: embedContent.imageAlts.length,
       hasImageEmbeds: embedContent.hasImageEmbeds,
       linkUrls: embedContent.linkMetadata.map(l => l.url),
+      paragraphUrls: embedContent.paragraphArticles.map(p => p.url),
       imageAlts: embedContent.imageAlts,
     });
   }
@@ -611,6 +702,24 @@ export async function analyzeCastQuality(
   
   if (embedContent.quotedCastTexts.length > 0) {
     contentParts.push(`\nQuoted casts:\n${embedContent.quotedCastTexts.map((text, i) => `[Quoted cast ${i + 1}]: ${text.substring(0, 500)}${text.length > 500 ? "..." : ""}`).join('\n')}`);
+  }
+  
+  if (embedContent.paragraphArticles.length > 0) {
+    const paragraphInfo = embedContent.paragraphArticles.map((article, i) => {
+      let info = `[Paragraph Article ${i + 1}]: ${article.url}`;
+      if (article.title) info += `\n  Title: ${article.title}`;
+      if (article.markdown) {
+        // Include first 2000 characters of article content
+        const contentPreview = article.markdown.substring(0, 2000);
+        info += `\n  Content:\n${contentPreview}${article.markdown.length > 2000 ? "\n[... article continues ...]" : ""}`;
+      } else if (article.content) {
+        // Strip HTML tags for preview
+        const textContent = article.content.replace(/<[^>]+>/g, ' ').substring(0, 2000);
+        info += `\n  Content:\n${textContent}${article.content.length > 2000 ? "\n[... article continues ...]" : ""}`;
+      }
+      return info;
+    }).join('\n\n');
+    contentParts.push(`\nParagraph Articles:\n${paragraphInfo}`);
   }
   
   if (embedContent.linkMetadata.length > 0) {
@@ -642,11 +751,12 @@ export async function analyzeCastQuality(
     };
   }
 
-  // Detect if this is an image-only cast (no text, only images, no quoted casts, no links)
+  // Detect if this is an image-only cast (no text, only images, no quoted casts, no links, no Paragraph articles)
   const isImageOnly = !hasText && 
                      embedContent.hasImageEmbeds && 
                      embedContent.quotedCastTexts.length === 0 && 
-                     embedContent.linkMetadata.length === 0;
+                     embedContent.linkMetadata.length === 0 &&
+                     embedContent.paragraphArticles.length === 0;
 
   const prompt = `Analyze this Farcaster cast and provide:
 1. A quality score from 0-100 based on depth, clarity, and value
