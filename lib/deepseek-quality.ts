@@ -51,16 +51,32 @@ function extractEmbedContent(castData: any): {
   quotedCastTexts: string[];
   linkMetadata: Array<{ title?: string; description?: string; url: string }>;
   imageAlts: string[];
+  hasImageEmbeds: boolean;
 } {
   const quotedCastTexts: string[] = [];
   const linkMetadata: Array<{ title?: string; description?: string; url: string }> = [];
   const imageAlts: string[] = [];
+  let hasImageEmbeds = false;
   
   if (castData.embeds && Array.isArray(castData.embeds)) {
     for (const embed of castData.embeds) {
       // Quoted cast - extract text if available (synchronous, no API call)
-      if (embed.cast?.text) {
-        quotedCastTexts.push(embed.cast.text);
+      if (embed.cast?.text || embed.cast_id) {
+        quotedCastTexts.push(embed.cast?.text || "");
+        continue; // Skip other checks for quoted casts
+      }
+      
+      // Check if it's an image embed
+      const isImageEmbed = embed.metadata?.image || 
+                           (embed.metadata?.content_type && embed.metadata.content_type.startsWith('image/'));
+      
+      if (isImageEmbed) {
+        hasImageEmbeds = true;
+        // Image alt text
+        if (embed.metadata?.alt) {
+          imageAlts.push(embed.metadata.alt);
+        }
+        continue; // Skip link metadata check for image embeds
       }
       
       // Link embed metadata (synchronous, no API call)
@@ -72,15 +88,10 @@ function extractEmbedContent(castData: any): {
           description: meta.description || meta.html?.ogDescription,
         });
       }
-      
-      // Image alt text
-      if (embed.metadata?.alt) {
-        imageAlts.push(embed.metadata.alt);
-      }
     }
   }
   
-  return { quotedCastTexts, linkMetadata, imageAlts };
+  return { quotedCastTexts, linkMetadata, imageAlts, hasImageEmbeds };
 }
 
 /**
@@ -576,7 +587,8 @@ export async function analyzeCastQuality(
   const hasText = castText && castText.trim().length > 0;
   const hasEmbeds = embedContent.quotedCastTexts.length > 0 || 
                     embedContent.linkMetadata.length > 0 || 
-                    embedContent.imageAlts.length > 0;
+                    embedContent.imageAlts.length > 0 ||
+                    embedContent.hasImageEmbeds;
   
   if (hasEmbeds) {
     console.log(`[DeepSeek] Extracted embed content for analysis:`, {
@@ -584,6 +596,7 @@ export async function analyzeCastQuality(
       quotedCasts: embedContent.quotedCastTexts.length,
       links: embedContent.linkMetadata.length,
       images: embedContent.imageAlts.length,
+      hasImageEmbeds: embedContent.hasImageEmbeds,
       linkUrls: embedContent.linkMetadata.map(l => l.url),
       imageAlts: embedContent.imageAlts,
     });
@@ -610,12 +623,16 @@ export async function analyzeCastQuality(
     contentParts.push(`\nLinks:\n${linkInfo}`);
   }
   
-  if (embedContent.imageAlts.length > 0) {
-    contentParts.push(`\nImages:\n${embedContent.imageAlts.map((alt, i) => `[Image ${i + 1}]: ${alt}`).join('\n')}`);
+  if (embedContent.hasImageEmbeds) {
+    if (embedContent.imageAlts.length > 0) {
+      contentParts.push(`\nImages:\n${embedContent.imageAlts.map((alt, i) => `[Image ${i + 1}]: ${alt}`).join('\n')}`);
+    } else {
+      contentParts.push(`\nImages:\n[Image(s) present but no alt text available]`);
+    }
   }
   
   const fullContent = contentParts.join('\n\n');
-  
+
   // If no content at all, assign defaults
   if (!fullContent || fullContent.trim().length < 10) {
     return {
@@ -625,10 +642,18 @@ export async function analyzeCastQuality(
     };
   }
 
+  // Detect if this is an image-only cast (no text, only images, no quoted casts, no links)
+  const hasText = castText && castText.trim().length > 0;
+  const isImageOnly = !hasText && 
+                     embedContent.hasImageEmbeds && 
+                     embedContent.quotedCastTexts.length === 0 && 
+                     embedContent.linkMetadata.length === 0;
+
   const prompt = `Analyze this Farcaster cast and provide:
 1. A quality score from 0-100 based on depth, clarity, and value
    - Extremely low-effort content (single emoji, "gm", "lol", "👀", or similar) should be scored between 0 and 5
    - Very short acknowledgements that add only a tiny bit of signal (e.g. "that's fair", "ok true") should typically be scored between 5 and 20
+   ${isImageOnly ? `   - IMPORTANT: Image-only casts (no text, only images) should typically be scored between 5 and 30, unless the image is clearly high-effort original art, meaningful visual commentary, or substantial visual content. Most image-only posts without context should score 5-20.` : ''}
    - Reserve scores above 60 for posts with substantial thought, argument, reflection, or original perspective
 2. A category from this list: crypto-critique, platform-analysis, creator-economy, art-culture, ai-philosophy, community-culture, life-reflection, market-news, playful, other
 
