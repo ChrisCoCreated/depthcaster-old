@@ -117,6 +117,16 @@ export default function AdminStatisticsPage() {
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    activeUsers: true,
+    feedAnalytics: true,
+    popularPages: true,
+    databaseMonitoring: true,
+    analyticsBreakdown: true,
+    contentStatistics: true,
+    userActions: true,
+    apiCallStatistics: true,
+  });
 
   useEffect(() => {
     const checkAdminAccess = async () => {
@@ -310,11 +320,35 @@ export default function AdminStatisticsPage() {
             {/* Active Users View - Past 30 Days */}
             {statistics.activeUsers && statistics.activeUsers.length > 0 && (
               <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">
-                  Active Users (Past 30 Days)
-                </h2>
-                <div className="space-y-3">
-                  {statistics.activeUsers.map((day, idx) => {
+                <div className="flex items-center justify-between mb-4">
+                  <button
+                    onClick={() => setExpandedSections(prev => ({ ...prev, activeUsers: !prev.activeUsers }))}
+                    className="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-gray-100 hover:text-gray-700 dark:hover:text-gray-300"
+                  >
+                    <span className={`transition-transform ${expandedSections.activeUsers ? 'rotate-90' : ''}`}>
+                      ▶
+                    </span>
+                    <span>Active Users (Past 30 Days)</span>
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-gray-600 dark:text-gray-400">Show names</label>
+                    <button
+                      onClick={() => setShowNamesOnly(!showNamesOnly)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        showNamesOnly ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          showNamesOnly ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+                {expandedSections.activeUsers && (
+                  <div className="space-y-3">
+                    {statistics.activeUsers.map((day, idx) => {
                     const date = new Date(day.date);
                     const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' });
                     const isToday = date.toDateString() === new Date().toDateString();
@@ -344,53 +378,85 @@ export default function AdminStatisticsPage() {
                         <div className="flex gap-1.5 overflow-x-auto pb-1">
                           {day.users.map((user) => {
                             const displayName = user.displayName || user.username || `User ${user.fid}`;
-                            return (
-                              <div
-                                key={user.fid}
-                                className="flex items-center gap-1.5 px-2 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-full border border-gray-200 dark:border-gray-700 flex-shrink-0"
-                                style={{ width: '110px', minWidth: '110px', maxWidth: '110px' }}
-                              >
-                                <AvatarImage
-                                  src={user.pfpUrl}
-                                  alt={displayName}
-                                  size={18}
-                                  className="w-[18px] h-[18px] rounded-full flex-shrink-0 object-cover"
-                                />
-                                <div className="flex-1 min-w-0">
-                                  <div className="text-[11px] font-medium text-gray-900 dark:text-gray-100 truncate">
-                                    {displayName}
+                            if (showNamesOnly) {
+                              return (
+                                <div
+                                  key={user.fid}
+                                  className="flex items-center gap-1.5 px-2 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-full border border-gray-200 dark:border-gray-700 flex-shrink-0"
+                                  style={{ width: '110px', minWidth: '110px', maxWidth: '110px' }}
+                                >
+                                  <AvatarImage
+                                    src={user.pfpUrl}
+                                    alt={displayName}
+                                    size={18}
+                                    className="w-[18px] h-[18px] rounded-full flex-shrink-0 object-cover"
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-[11px] font-medium text-gray-900 dark:text-gray-100 truncate">
+                                      {displayName}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-0.5 flex-shrink-0">
+                                    {user.curated && (
+                                      <span className="text-yellow-500 text-[10px]" title="Curated">
+                                        ⭐
+                                      </span>
+                                    )}
+                                    {user.onchain && (
+                                      <span className="text-blue-500 text-[10px]" title="Onchain action">
+                                        ⛓️
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-0.5 flex-shrink-0">
-                                  {user.curated && (
-                                    <span className="text-yellow-500 text-[10px]" title="Curated">
-                                      ⭐
-                                    </span>
-                                  )}
-                                  {user.onchain && (
-                                    <span className="text-blue-500 text-[10px]" title="Onchain action">
-                                      ⛓️
-                                    </span>
-                                  )}
+                              );
+                            } else {
+                              return (
+                                <div
+                                  key={user.fid}
+                                  className="relative flex-shrink-0 group"
+                                  title={displayName}
+                                >
+                                  <AvatarImage
+                                    src={user.pfpUrl}
+                                    alt={displayName}
+                                    size={32}
+                                    className="w-8 h-8 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
+                                  />
+                                  <div className="absolute -bottom-0.5 -right-0.5 flex items-center gap-0.5">
+                                    {user.curated && (
+                                      <span className="text-yellow-500 text-[10px] bg-white dark:bg-gray-800 rounded-full" title="Curated">
+                                        ⭐
+                                      </span>
+                                    )}
+                                    {user.onchain && (
+                                      <span className="text-blue-500 text-[10px] bg-white dark:bg-gray-800 rounded-full" title="Onchain action">
+                                        ⛓️
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            );
+                              );
+                            }
                           })}
                         </div>
                       </div>
                     );
                   })}
-                </div>
-                <div className="mt-4 flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-                  <div className="flex items-center gap-1">
-                    <span>⭐</span>
-                    <span>Curated</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <span>⛓️</span>
-                    <span>Onchain action</span>
+                )}
+                {expandedSections.activeUsers && (
+                  <div className="mt-4 flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+                    <div className="flex items-center gap-1">
+                      <span>⭐</span>
+                      <span>Curated</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span>⛓️</span>
+                      <span>Onchain action</span>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
 
@@ -448,10 +514,17 @@ export default function AdminStatisticsPage() {
 
             {/* Feed Analytics */}
             <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                Feed Analytics
-              </h2>
-              <div className="space-y-4">
+              <button
+                onClick={() => setExpandedSections(prev => ({ ...prev, feedAnalytics: !prev.feedAnalytics }))}
+                className="flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4 hover:text-gray-700 dark:hover:text-gray-300"
+              >
+                <span className={`transition-transform ${expandedSections.feedAnalytics ? 'rotate-90' : ''}`}>
+                  ▶
+                </span>
+                <span>Feed Analytics</span>
+              </button>
+              {expandedSections.feedAnalytics && (
+                <div className="space-y-4">
                 <div>
                   <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Time Spent by Feed
@@ -655,15 +728,23 @@ export default function AdminStatisticsPage() {
                     </div>
                   </div>
                 )}
-              </div>
+                </div>
+              )}
             </div>
 
             {/* Popular Pages */}
             <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                Popular Pages
-              </h2>
-              <div className="space-y-2">
+              <button
+                onClick={() => setExpandedSections(prev => ({ ...prev, popularPages: !prev.popularPages }))}
+                className="flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4 hover:text-gray-700 dark:hover:text-gray-300"
+              >
+                <span className={`transition-transform ${expandedSections.popularPages ? 'rotate-90' : ''}`}>
+                  ▶
+                </span>
+                <span>Popular Pages</span>
+              </button>
+              {expandedSections.popularPages && (
+                <div className="space-y-2">
                 {statistics.popularPages.map((page, idx) => (
                   <div
                     key={page.path}
@@ -675,15 +756,23 @@ export default function AdminStatisticsPage() {
                     </span>
                   </div>
                 ))}
-              </div>
+                </div>
+              )}
             </div>
 
             {/* Database Monitoring */}
             <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                Database Monitoring
-              </h2>
-              <div className="space-y-4">
+              <button
+                onClick={() => setExpandedSections(prev => ({ ...prev, databaseMonitoring: !prev.databaseMonitoring }))}
+                className="flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4 hover:text-gray-700 dark:hover:text-gray-300"
+              >
+                <span className={`transition-transform ${expandedSections.databaseMonitoring ? 'rotate-90' : ''}`}>
+                  ▶
+                </span>
+                <span>Database Monitoring</span>
+              </button>
+              {expandedSections.databaseMonitoring && (
+                <div className="space-y-4">
                 <div>
                   <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Table Sizes
@@ -803,10 +892,17 @@ export default function AdminStatisticsPage() {
 
             {/* Analytics Breakdown */}
             <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                Analytics: Authenticated vs Anonymous
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <button
+                onClick={() => setExpandedSections(prev => ({ ...prev, analyticsBreakdown: !prev.analyticsBreakdown }))}
+                className="flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4 hover:text-gray-700 dark:hover:text-gray-300"
+              >
+                <span className={`transition-transform ${expandedSections.analyticsBreakdown ? 'rotate-90' : ''}`}>
+                  ▶
+                </span>
+                <span>Analytics: Authenticated vs Anonymous</span>
+              </button>
+              {expandedSections.analyticsBreakdown && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Page Views</h3>
                   <div className="space-y-1 text-sm">
@@ -876,16 +972,24 @@ export default function AdminStatisticsPage() {
                     </div>
                   </div>
                 </div>
-              </div>
+                </div>
+              )}
             </div>
 
             {/* Additional Stats */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                  Content Statistics
-                </h2>
-                <div className="space-y-2 text-sm">
+                <button
+                  onClick={() => setExpandedSections(prev => ({ ...prev, contentStatistics: !prev.contentStatistics }))}
+                  className="flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4 hover:text-gray-700 dark:hover:text-gray-300"
+                >
+                  <span className={`transition-transform ${expandedSections.contentStatistics ? 'rotate-90' : ''}`}>
+                    ▶
+                  </span>
+                  <span>Content Statistics</span>
+                </button>
+                {expandedSections.contentStatistics && (
+                  <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Curator Packs</span>
                     <span className="font-medium text-gray-900 dark:text-gray-100">
@@ -914,10 +1018,17 @@ export default function AdminStatisticsPage() {
               </div>
 
               <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                  User Actions
-                </h2>
-                <div className="space-y-2 text-sm">
+                <button
+                  onClick={() => setExpandedSections(prev => ({ ...prev, userActions: !prev.userActions }))}
+                  className="flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4 hover:text-gray-700 dark:hover:text-gray-300"
+                >
+                  <span className={`transition-transform ${expandedSections.userActions ? 'rotate-90' : ''}`}>
+                    ▶
+                  </span>
+                  <span>User Actions</span>
+                </button>
+                {expandedSections.userActions && (
+                  <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">User Watches</span>
                     <span className="font-medium text-gray-900 dark:text-gray-100">
@@ -944,6 +1055,7 @@ export default function AdminStatisticsPage() {
                     </span>
                   </div>
                 </div>
+                )}
               </div>
             </div>
           </div>
@@ -956,10 +1068,17 @@ export default function AdminStatisticsPage() {
         {/* API Call Statistics */}
         {statistics && (
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
-              API Call Statistics
-            </h2>
-            <div className="space-y-4">
+            <button
+              onClick={() => setExpandedSections(prev => ({ ...prev, apiCallStatistics: !prev.apiCallStatistics }))}
+              className="flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4 hover:text-gray-700 dark:hover:text-gray-300"
+            >
+              <span className={`transition-transform ${expandedSections.apiCallStatistics ? 'rotate-90' : ''}`}>
+                ▶
+              </span>
+              <span>API Call Statistics</span>
+            </button>
+            {expandedSections.apiCallStatistics && (
+              <div className="space-y-4">
               <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
                 <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Reaction Fetches (Incremental Sync)
@@ -985,7 +1104,7 @@ export default function AdminStatisticsPage() {
                   </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         )}
         </>
