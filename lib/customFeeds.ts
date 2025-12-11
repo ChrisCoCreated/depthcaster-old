@@ -41,6 +41,8 @@ export interface DisplayMode {
   buttonBackgroundColor?: string;
   buttonTextColor?: string;
   expandMentionedProfiles?: boolean;
+  hideCuratedButton?: boolean;
+  hideShareButton?: boolean;
 }
 
 export interface HeaderConfig {
