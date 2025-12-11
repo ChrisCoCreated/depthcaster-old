@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { collections, users } from "@/lib/schema";
 import { eq, desc } from "drizzle-orm";
-import { hasCollectionsOrAdminRole, getUserRoles } from "@/lib/roles";
+import { hasCollectionsOrAdminRole, getUserRoles, isAdmin } from "@/lib/roles";
 import { canUserAddToCollection } from "@/lib/collection-gating";
 
 export const runtime = "nodejs";

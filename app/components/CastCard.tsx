@@ -1828,7 +1828,6 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
     // Curate the cast (either not curated, or curated by others)
     try {
       setIsCurating(true);
-      setShowCurateConfirm(false);
       setShowCollectionSelectModal(false);
       
       // If collectionName is provided, add to collection instead of main feed
