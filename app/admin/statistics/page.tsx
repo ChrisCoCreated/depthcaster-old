@@ -524,7 +524,7 @@ export default function AdminStatisticsPage() {
                 <span>Feed Analytics</span>
               </button>
               {expandedSections.feedAnalytics && (
-                <div className="space-y-4">
+              <div className="space-y-4">
                 <div>
                   <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Time Spent by Feed
@@ -728,7 +728,7 @@ export default function AdminStatisticsPage() {
                     </div>
                   </div>
                 )}
-                </div>
+              </div>
               )}
             </div>
 
@@ -744,7 +744,7 @@ export default function AdminStatisticsPage() {
                 <span>Popular Pages</span>
               </button>
               {expandedSections.popularPages && (
-                <div className="space-y-2">
+              <div className="space-y-2">
                 {statistics.popularPages.map((page, idx) => (
                   <div
                     key={page.path}
@@ -756,7 +756,7 @@ export default function AdminStatisticsPage() {
                     </span>
                   </div>
                 ))}
-                </div>
+              </div>
               )}
             </div>
 
@@ -772,7 +772,7 @@ export default function AdminStatisticsPage() {
                 <span>Database Monitoring</span>
               </button>
               {expandedSections.databaseMonitoring && (
-                <div className="space-y-4">
+              <div className="space-y-4">
                 <div>
                   <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Table Sizes
@@ -888,6 +888,7 @@ export default function AdminStatisticsPage() {
                   </div>
                 </div>
               </div>
+              )}
             </div>
 
             {/* Analytics Breakdown */}
@@ -902,7 +903,7 @@ export default function AdminStatisticsPage() {
                 <span>Analytics: Authenticated vs Anonymous</span>
               </button>
               {expandedSections.analyticsBreakdown && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Page Views</h3>
                   <div className="space-y-1 text-sm">
@@ -972,7 +973,7 @@ export default function AdminStatisticsPage() {
                     </div>
                   </div>
                 </div>
-                </div>
+              </div>
               )}
             </div>
 
@@ -989,7 +990,7 @@ export default function AdminStatisticsPage() {
                   <span>Content Statistics</span>
                 </button>
                 {expandedSections.contentStatistics && (
-                  <div className="space-y-2 text-sm">
+                <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Curator Packs</span>
                     <span className="font-medium text-gray-900 dark:text-gray-100">
@@ -1015,6 +1016,7 @@ export default function AdminStatisticsPage() {
                     </span>
                   </div>
                 </div>
+                )}
               </div>
 
               <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
@@ -1028,7 +1030,7 @@ export default function AdminStatisticsPage() {
                   <span>User Actions</span>
                 </button>
                 {expandedSections.userActions && (
-                  <div className="space-y-2 text-sm">
+                <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">User Watches</span>
                     <span className="font-medium text-gray-900 dark:text-gray-100">
@@ -1078,7 +1080,7 @@ export default function AdminStatisticsPage() {
               <span>API Call Statistics</span>
             </button>
             {expandedSections.apiCallStatistics && (
-              <div className="space-y-4">
+            <div className="space-y-4">
               <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
                 <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Reaction Fetches (Incremental Sync)
@@ -1104,6 +1106,7 @@ export default function AdminStatisticsPage() {
                   </div>
                 </div>
               </div>
+            </div>
             )}
           </div>
         )}
