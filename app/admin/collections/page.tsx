@@ -631,6 +631,33 @@ function CollectionModal({
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Display Name
+              </label>
+              <input
+                type="text"
+                value={formData.displayName}
+                onChange={(e) => {
+                  const newDisplayName = e.target.value;
+                  setFormData({ 
+                    ...formData, 
+                    displayName: newDisplayName,
+                    // Auto-generate name from display name when creating (not editing)
+                    name: !collection ? newDisplayName
+                      .toLowerCase()
+                      .trim()
+                      .replace(/\s+/g, '-')
+                      .replace(/[^a-z0-9-]/g, '')
+                      .replace(/-+/g, '-')
+                      .replace(/^-|-$/g, '') : formData.name
+                  });
+                }}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                placeholder="My Collection"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Name (URL-friendly, unique) *
               </label>
               <input
@@ -645,19 +672,9 @@ function CollectionModal({
               {collection && (
                 <p className="mt-1 text-xs text-gray-500">Name cannot be changed after creation</p>
               )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Display Name
-              </label>
-              <input
-                type="text"
-                value={formData.displayName}
-                onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                placeholder="My Collection"
-              />
+              {!collection && (
+                <p className="mt-1 text-xs text-gray-500">Auto-generated from display name. You can edit it manually.</p>
+              )}
             </div>
 
             <div>
@@ -691,9 +708,18 @@ function CollectionModal({
 
             {formData.accessType === "gated_user" && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Gated User FID *
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Gated User FID *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, gatedUserId: userFid.toString() })}
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline"
+                  >
+                    Default to me
+                  </button>
+                </div>
                 <input
                   type="number"
                   value={formData.gatedUserId}
