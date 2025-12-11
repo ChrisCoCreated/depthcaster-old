@@ -117,15 +117,26 @@ export function CollectionSelectModal({
 
   // Handle creating a new collection
   const handleCreateCollection = async (e: React.FormEvent) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/aacf9ca3-f70e-4e37-81d4-14d45a449972',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CollectionSelectModal.tsx:119',message:'handleCreateCollection called',data:{newCollectionName,userFid:user?.fid},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C,D'})}).catch(()=>{});
+    // #endregion
     e.preventDefault();
     e.stopPropagation();
     
-    if (!newCollectionName.trim() || !user?.fid) return;
+    if (!newCollectionName.trim() || !user?.fid) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/aacf9ca3-f70e-4e37-81d4-14d45a449972',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CollectionSelectModal.tsx:125',message:'Early return - missing name or user',data:{hasName:!!newCollectionName.trim(),hasUser:!!user?.fid},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+      return;
+    }
 
     setIsCreatingCollection(true);
     setCreateError(null);
 
     try {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/aacf9ca3-f70e-4e37-81d4-14d45a449972',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CollectionSelectModal.tsx:132',message:'Before API call',data:{name:newCollectionName.trim(),userFid:user.fid},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       const response = await fetch("/api/collections", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -138,15 +149,28 @@ export function CollectionSelectModal({
         }),
       });
 
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/aacf9ca3-f70e-4e37-81d4-14d45a449972',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CollectionSelectModal.tsx:145',message:'API response received',data:{ok:response.ok,status:response.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+
       if (!response.ok) {
         const data = await response.json();
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/aacf9ca3-f70e-4e37-81d4-14d45a449972',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CollectionSelectModal.tsx:150',message:'API error',data:{error:data.error,status:response.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
         throw new Error(data.error || "Failed to create collection");
       }
 
       const data = await response.json();
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/aacf9ca3-f70e-4e37-81d4-14d45a449972',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CollectionSelectModal.tsx:155',message:'Collection created successfully',data:{collectionName:data.collection?.name,collectionId:data.collection?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       
       // Select the newly created collection
       setSelectedCollection(data.collection.name);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/aacf9ca3-f70e-4e37-81d4-14d45a449972',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CollectionSelectModal.tsx:160',message:'Selected collection set',data:{selectedCollection:data.collection.name},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
       setShowCreateForm(false);
       setNewCollectionName("");
       setNewCollectionDisplayName("");
@@ -157,26 +181,49 @@ export function CollectionSelectModal({
       if (refreshResponse.ok) {
         const refreshData = await refreshResponse.json();
         setCollections(refreshData.collections || []);
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/aacf9ca3-f70e-4e37-81d4-14d45a449972',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CollectionSelectModal.tsx:170',message:'Collections refreshed',data:{collectionCount:refreshData.collections?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+        // #endregion
       }
     } catch (error: any) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/aacf9ca3-f70e-4e37-81d4-14d45a449972',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CollectionSelectModal.tsx:173',message:'Error caught',data:{error:error.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       setCreateError(error.message || "Failed to create collection");
     } finally {
       setIsCreatingCollection(false);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/aacf9ca3-f70e-4e37-81d4-14d45a449972',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CollectionSelectModal.tsx:178',message:'handleCreateCollection finished',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B'})}).catch(()=>{});
+      // #endregion
     }
   };
 
   // Handle selection
   const handleSubmit = async (e: React.FormEvent) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/aacf9ca3-f70e-4e37-81d4-14d45a449972',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CollectionSelectModal.tsx:169',message:'handleSubmit called',data:{selectedCollection,isSubmitting},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     e.preventDefault();
     
-    if (isSubmitting) return;
+    if (isSubmitting) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/aacf9ca3-f70e-4e37-81d4-14d45a449972',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CollectionSelectModal.tsx:175',message:'Early return - already submitting',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      return;
+    }
 
     setIsSubmitting(true);
     try {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/aacf9ca3-f70e-4e37-81d4-14d45a449972',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CollectionSelectModal.tsx:182',message:'Calling onSelect and onClose',data:{selectedCollection},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       onSelect(selectedCollection);
       onClose();
     } finally {
       setIsSubmitting(false);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/aacf9ca3-f70e-4e37-81d4-14d45a449972',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CollectionSelectModal.tsx:189',message:'handleSubmit finished',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
     }
   };
 
@@ -328,7 +375,7 @@ export function CollectionSelectModal({
                         <X className="w-4 h-4" />
                       </button>
                     </div>
-                    <form onSubmit={handleCreateCollection} className="space-y-3">
+                    <div className="space-y-3">
                       <div>
                         <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                           Name *
@@ -386,14 +433,19 @@ export function CollectionSelectModal({
                           Cancel
                         </button>
                         <button
-                          type="submit"
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleCreateCollection(e as any);
+                          }}
                           disabled={isCreatingCollection || !newCollectionName.trim()}
                           className="flex-1 px-3 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {isCreatingCollection ? "Creating..." : "Create"}
                         </button>
                       </div>
-                    </form>
+                    </div>
                   </div>
                 )}
 
