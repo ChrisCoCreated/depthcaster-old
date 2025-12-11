@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { sql, eq, notInArray } from "drizzle-orm";
+import { sql, eq } from "drizzle-orm";
 import {
   users,
   userRoles,
@@ -23,7 +23,7 @@ import {
   pageViewsDaily,
   apiCallStats,
 } from "@/lib/schema";
-import { isAdmin, getUserRoles, getAllAdminFids } from "@/lib/roles";
+import { isAdmin, getUserRoles } from "@/lib/roles";
 
 function getTimeRangeFilter(period: string) {
   const now = new Date();
@@ -72,25 +72,6 @@ export async function GET(request: NextRequest) {
       ? sql`AND created_at >= ${timeFilter.toISOString()}`
       : sql``;
 
-    // Get admin FIDs to exclude from statistics
-    const adminFids = await getAllAdminFids();
-    const excludeAdminsFilter = adminFids.length > 0
-      ? sql`AND user_fid NOT IN (${sql.join(adminFids.map(fid => sql`${fid}`), sql`, `)})`
-      : sql``;
-
-    // Date filter to exclude data before the fix (default: today to exclude all historical inflated data)
-    const excludeHistoricalParam = searchParams.get("excludeHistorical");
-    const excludeHistorical = excludeHistoricalParam === "true" || excludeHistoricalParam === null; // Default to true
-    const sinceFixDate = excludeHistorical ? new Date() : null; // Default to today
-    const sinceFixFilter = sinceFixDate ? sql`AND created_at >= ${sinceFixDate.toISOString()}` : sql``;
-    const sinceFixDateFilter = sinceFixDate ? sql`AND date >= ${sinceFixDate.toISOString()}` : sql``;
-
-    // Calculate effective date filter: use the maximum (most recent) of timeFilter and sinceFixDate
-    // This ensures we don't create impossible conditions like ">= 24h_ago AND >= today"
-    const effectiveDateFilter = timeFilter && sinceFixDate
-      ? (timeFilter > sinceFixDate ? timeFilter : sinceFixDate)
-      : (timeFilter || sinceFixDate);
-
     // User Statistics (only authenticated users - users table only contains logged-in users)
     const totalUsers = await db
       .select({ count: sql<number>`count(*)::int` })
@@ -107,73 +88,42 @@ export async function GET(request: NextRequest) {
       .select({ count: sql<number>`count(distinct user_fid)::int` })
       .from(userRoles);
 
-    // Anonymous vs Authenticated analytics - exclude admins and historical data
-    let pageViewsWhere = sql`user_fid IS NOT NULL`;
-    if (timeFilter) {
-      pageViewsWhere = sql`${pageViewsWhere} AND created_at >= ${timeFilter.toISOString()}`;
-    }
-    if (sinceFixDate) {
-      pageViewsWhere = sql`${pageViewsWhere} AND created_at >= ${sinceFixDate.toISOString()}`;
-    }
-    if (excludeAdminsFilter) {
-      pageViewsWhere = sql`${pageViewsWhere} ${excludeAdminsFilter}`;
-    }
-    
-    const authenticatedPageViews = await db.select({ count: sql<number>`count(*)::int` }).from(pageViews).where(pageViewsWhere);
+    // Anonymous vs Authenticated analytics
+    const authenticatedPageViewsQuery = timeFilter
+      ? db.select({ count: sql<number>`count(*)::int` }).from(pageViews).where(sql`user_fid IS NOT NULL AND created_at >= ${timeFilter.toISOString()}`)
+      : db.select({ count: sql<number>`count(*)::int` }).from(pageViews).where(sql`user_fid IS NOT NULL`);
+    const authenticatedPageViews = await authenticatedPageViewsQuery;
 
-    let anonymousPageViewsWhere = sql`user_fid IS NULL`;
-    if (timeFilter) {
-      anonymousPageViewsWhere = sql`${anonymousPageViewsWhere} AND created_at >= ${timeFilter.toISOString()}`;
-    }
-    if (sinceFixDate) {
-      anonymousPageViewsWhere = sql`${anonymousPageViewsWhere} AND created_at >= ${sinceFixDate.toISOString()}`;
-    }
-    const anonymousPageViews = await db.select({ count: sql<number>`count(*)::int` }).from(pageViews).where(anonymousPageViewsWhere);
+    const anonymousPageViewsQuery = timeFilter
+      ? db.select({ count: sql<number>`count(*)::int` }).from(pageViews).where(sql`user_fid IS NULL AND created_at >= ${timeFilter.toISOString()}`)
+      : db.select({ count: sql<number>`count(*)::int` }).from(pageViews).where(sql`user_fid IS NULL`);
+    const anonymousPageViews = await anonymousPageViewsQuery;
 
-    let authenticatedFeedSessionsWhere = sql`user_fid IS NOT NULL`;
-    if (timeFilter) {
-      authenticatedFeedSessionsWhere = sql`${authenticatedFeedSessionsWhere} AND created_at >= ${timeFilter.toISOString()}`;
-    }
-    if (sinceFixDate) {
-      authenticatedFeedSessionsWhere = sql`${authenticatedFeedSessionsWhere} AND created_at >= ${sinceFixDate.toISOString()}`;
-    }
-    if (excludeAdminsFilter) {
-      authenticatedFeedSessionsWhere = sql`${authenticatedFeedSessionsWhere} ${excludeAdminsFilter}`;
-    }
-    const authenticatedFeedSessions = await db.select({ count: sql<number>`count(*)::int` }).from(feedViewSessions).where(authenticatedFeedSessionsWhere);
+    const authenticatedFeedSessionsQuery = timeFilter
+      ? db.select({ count: sql<number>`count(*)::int` }).from(feedViewSessions).where(sql`user_fid IS NOT NULL AND created_at >= ${timeFilter.toISOString()}`)
+      : db.select({ count: sql<number>`count(*)::int` }).from(feedViewSessions).where(sql`user_fid IS NOT NULL`);
+    const authenticatedFeedSessions = await authenticatedFeedSessionsQuery;
 
-    let anonymousFeedSessionsWhere = sql`user_fid IS NULL`;
-    if (timeFilter) {
-      anonymousFeedSessionsWhere = sql`${anonymousFeedSessionsWhere} AND created_at >= ${timeFilter.toISOString()}`;
-    }
-    if (sinceFixDate) {
-      anonymousFeedSessionsWhere = sql`${anonymousFeedSessionsWhere} AND created_at >= ${sinceFixDate.toISOString()}`;
-    }
-    const anonymousFeedSessions = await db.select({ count: sql<number>`count(*)::int` }).from(feedViewSessions).where(anonymousFeedSessionsWhere);
+    const anonymousFeedSessionsQuery = timeFilter
+      ? db.select({ count: sql<number>`count(*)::int` }).from(feedViewSessions).where(sql`user_fid IS NULL AND created_at >= ${timeFilter.toISOString()}`)
+      : db.select({ count: sql<number>`count(*)::int` }).from(feedViewSessions).where(sql`user_fid IS NULL`);
+    const anonymousFeedSessions = await anonymousFeedSessionsQuery;
 
-    let authenticatedCastViewsWhere = sql`user_fid IS NOT NULL`;
-    if (timeFilter) {
-      authenticatedCastViewsWhere = sql`${authenticatedCastViewsWhere} AND created_at >= ${timeFilter.toISOString()}`;
-    }
-    if (sinceFixDate) {
-      authenticatedCastViewsWhere = sql`${authenticatedCastViewsWhere} AND created_at >= ${sinceFixDate.toISOString()}`;
-    }
-    if (excludeAdminsFilter) {
-      authenticatedCastViewsWhere = sql`${authenticatedCastViewsWhere} ${excludeAdminsFilter}`;
-    }
-    const authenticatedCastViews = await db.select({ count: sql<number>`count(*)::int` }).from(castViews).where(authenticatedCastViewsWhere);
+    const authenticatedCastViewsQuery = timeFilter
+      ? db.select({ count: sql<number>`count(*)::int` }).from(castViews).where(sql`user_fid IS NOT NULL AND created_at >= ${timeFilter.toISOString()}`)
+      : db.select({ count: sql<number>`count(*)::int` }).from(castViews).where(sql`user_fid IS NOT NULL`);
+    const authenticatedCastViews = await authenticatedCastViewsQuery;
 
-    let anonymousCastViewsWhere = sql`user_fid IS NULL`;
-    if (timeFilter) {
-      anonymousCastViewsWhere = sql`${anonymousCastViewsWhere} AND created_at >= ${timeFilter.toISOString()}`;
-    }
-    if (sinceFixDate) {
-      anonymousCastViewsWhere = sql`${anonymousCastViewsWhere} AND created_at >= ${sinceFixDate.toISOString()}`;
-    }
-    const anonymousCastViews = await db.select({ count: sql<number>`count(*)::int` }).from(castViews).where(anonymousCastViewsWhere);
+    const anonymousCastViewsQuery = timeFilter
+      ? db.select({ count: sql<number>`count(*)::int` }).from(castViews).where(sql`user_fid IS NULL AND created_at >= ${timeFilter.toISOString()}`)
+      : db.select({ count: sql<number>`count(*)::int` }).from(castViews).where(sql`user_fid IS NULL`);
+    const anonymousCastViews = await anonymousCastViewsQuery;
 
-    // Unique authenticated users in analytics - exclude admins
-    const uniqueAuthenticatedUsers = await db.select({ count: sql<number>`count(distinct user_fid)::int` }).from(pageViews).where(pageViewsWhere);
+    // Unique authenticated users in analytics
+    const uniqueAuthenticatedUsersQuery = timeFilter
+      ? db.select({ count: sql<number>`count(distinct user_fid)::int` }).from(pageViews).where(sql`user_fid IS NOT NULL AND created_at >= ${timeFilter.toISOString()}`)
+      : db.select({ count: sql<number>`count(distinct user_fid)::int` }).from(pageViews).where(sql`user_fid IS NOT NULL`);
+    const uniqueAuthenticatedUsers = await uniqueAuthenticatedUsersQuery;
 
     // Content Statistics
     const totalCuratedCasts = await db
@@ -276,45 +226,52 @@ export async function GET(request: NextRequest) {
       .limit(20);
 
     // Feed Analytics - UNION data from both main table and daily aggregates
-    // Exclude admin users and optionally exclude historical data before fix
-    let feedViewStatsRecentWhere = sql`1=1`;
-    if (effectiveDateFilter) {
-      feedViewStatsRecentWhere = sql`created_at >= ${effectiveDateFilter.toISOString()}`;
-    }
-    if (excludeAdminsFilter) {
-      feedViewStatsRecentWhere = sql`${feedViewStatsRecentWhere} ${excludeAdminsFilter}`;
-    }
-    
-    const feedViewStatsRecent = await db
-      .select({
-        feedType: feedViewSessions.feedType,
-        totalSessions: sql<number>`count(*)::int`,
-        totalDuration: sql<number>`COALESCE(sum(duration_seconds), 0)::bigint`,
-        avgDuration: sql<number | null>`ROUND(COALESCE(avg(duration_seconds), 0))::bigint`,
-        uniqueUsers: sql<number>`count(distinct user_fid)::int`,
-      })
-      .from(feedViewSessions)
-      .where(feedViewStatsRecentWhere)
-      .groupBy(feedViewSessions.feedType);
+    // For unique users, we need to get distinct users from main table and max from daily (since daily stores aggregated unique_users)
+    const feedViewStatsRecent = timeFilter
+      ? await db
+          .select({
+            feedType: feedViewSessions.feedType,
+            totalSessions: sql<number>`count(*)::int`,
+            totalDuration: sql<number>`COALESCE(sum(duration_seconds), 0)::bigint`,
+            avgDuration: sql<number | null>`ROUND(COALESCE(avg(duration_seconds), 0))::bigint`,
+            uniqueUsers: sql<number>`count(distinct user_fid)::int`,
+          })
+          .from(feedViewSessions)
+          .where(sql`created_at >= ${timeFilter.toISOString()}`)
+          .groupBy(feedViewSessions.feedType)
+      : await db
+          .select({
+            feedType: feedViewSessions.feedType,
+            totalSessions: sql<number>`count(*)::int`,
+            totalDuration: sql<number>`COALESCE(sum(duration_seconds), 0)::bigint`,
+            avgDuration: sql<number | null>`ROUND(COALESCE(avg(duration_seconds), 0))::bigint`,
+            uniqueUsers: sql<number>`count(distinct user_fid)::int`,
+          })
+          .from(feedViewSessions)
+          .groupBy(feedViewSessions.feedType);
 
-    // Daily aggregates - exclude historical data if requested
-    // Note: Daily aggregates don't have user_fid, so we can't exclude admins from them
-    // But we can exclude historical dates
-    const feedViewStatsDailyWhere = effectiveDateFilter
-      ? sql`date >= ${effectiveDateFilter.toISOString()}`
-      : sql`1=1`;
-    
-    const feedViewStatsDaily = await db
-      .select({
-        feedType: feedViewSessionsDaily.feedType,
-        totalSessions: sql<number>`COALESCE(sum(total_sessions), 0)::int`,
-        totalDuration: sql<number>`COALESCE(sum(total_duration_seconds), 0)::bigint`,
-        avgDuration: sql<number | null>`ROUND(COALESCE(avg(avg_duration), 0))::bigint`,
-        uniqueUsers: sql<number>`COALESCE(max(unique_users), 0)::int`,
-      })
-      .from(feedViewSessionsDaily)
-      .where(feedViewStatsDailyWhere)
-      .groupBy(feedViewSessionsDaily.feedType);
+    const feedViewStatsDaily = timeFilter
+      ? await db
+          .select({
+            feedType: feedViewSessionsDaily.feedType,
+            totalSessions: sql<number>`COALESCE(sum(total_sessions), 0)::int`,
+            totalDuration: sql<number>`COALESCE(sum(total_duration_seconds), 0)::bigint`,
+            avgDuration: sql<number | null>`ROUND(COALESCE(avg(avg_duration), 0))::bigint`,
+            uniqueUsers: sql<number>`COALESCE(max(unique_users), 0)::int`,
+          })
+          .from(feedViewSessionsDaily)
+          .where(sql`date >= ${timeFilter.toISOString()}`)
+          .groupBy(feedViewSessionsDaily.feedType)
+      : await db
+          .select({
+            feedType: feedViewSessionsDaily.feedType,
+            totalSessions: sql<number>`COALESCE(sum(total_sessions), 0)::int`,
+            totalDuration: sql<number>`COALESCE(sum(total_duration_seconds), 0)::bigint`,
+            avgDuration: sql<number | null>`ROUND(COALESCE(avg(avg_duration), 0))::bigint`,
+            uniqueUsers: sql<number>`COALESCE(max(unique_users), 0)::int`,
+          })
+          .from(feedViewSessionsDaily)
+          .groupBy(feedViewSessionsDaily.feedType);
 
     // Merge results by feed type
     const feedViewStatsMap = new Map<string, {
@@ -361,41 +318,47 @@ export async function GET(request: NextRequest) {
     const feedViewStats = Array.from(feedViewStatsMap.values());
 
     // Cast Views - UNION data from both main table and daily aggregates
-    // Exclude admin users and optionally exclude historical data
-    let castViewStatsRecentWhere = sql`1=1`;
-    if (effectiveDateFilter) {
-      castViewStatsRecentWhere = sql`created_at >= ${effectiveDateFilter.toISOString()}`;
-    }
-    if (excludeAdminsFilter) {
-      castViewStatsRecentWhere = sql`${castViewStatsRecentWhere} ${excludeAdminsFilter}`;
-    }
-    
-    const castViewStatsRecent = await db
-      .select({
-        feedType: sql<string>`COALESCE(${castViews.feedType}, 'unknown')`,
-        totalViews: sql<number>`count(*)::int`,
-        uniqueCasts: sql<number>`count(distinct cast_hash)::int`,
-        uniqueUsers: sql<number>`count(distinct user_fid)::int`,
-      })
-      .from(castViews)
-      .where(castViewStatsRecentWhere)
-      .groupBy(sql`COALESCE(${castViews.feedType}, 'unknown')`);
+    const castViewStatsRecent = timeFilter
+      ? await db
+          .select({
+            feedType: sql<string>`COALESCE(${castViews.feedType}, 'unknown')`,
+            totalViews: sql<number>`count(*)::int`,
+            uniqueCasts: sql<number>`count(distinct cast_hash)::int`,
+            uniqueUsers: sql<number>`count(distinct user_fid)::int`,
+          })
+          .from(castViews)
+          .where(sql`created_at >= ${timeFilter.toISOString()}`)
+          .groupBy(sql`COALESCE(${castViews.feedType}, 'unknown')`)
+      : await db
+          .select({
+            feedType: sql<string>`COALESCE(${castViews.feedType}, 'unknown')`,
+            totalViews: sql<number>`count(*)::int`,
+            uniqueCasts: sql<number>`count(distinct cast_hash)::int`,
+            uniqueUsers: sql<number>`count(distinct user_fid)::int`,
+          })
+          .from(castViews)
+          .groupBy(sql`COALESCE(${castViews.feedType}, 'unknown')`);
 
-    // Daily cast views - exclude historical data if requested
-    const castViewStatsDailyWhere = effectiveDateFilter
-      ? sql`date >= ${effectiveDateFilter.toISOString()}`
-      : sql`1=1`;
-    
-    const castViewStatsDaily = await db
-      .select({
-        feedType: castViewsDaily.feedType,
-        totalViews: sql<number>`COALESCE(sum(view_count), 0)::int`,
-        uniqueCasts: sql<number>`count(distinct cast_hash)::int`,
-        uniqueUsers: sql<number>`COALESCE(max(unique_users), 0)::int`,
-      })
-      .from(castViewsDaily)
-      .where(castViewStatsDailyWhere)
-      .groupBy(castViewsDaily.feedType);
+    const castViewStatsDaily = timeFilter
+      ? await db
+          .select({
+            feedType: castViewsDaily.feedType,
+            totalViews: sql<number>`COALESCE(sum(view_count), 0)::int`,
+            uniqueCasts: sql<number>`count(distinct cast_hash)::int`,
+            uniqueUsers: sql<number>`COALESCE(max(unique_users), 0)::int`,
+          })
+          .from(castViewsDaily)
+          .where(sql`date >= ${timeFilter.toISOString()}`)
+          .groupBy(castViewsDaily.feedType)
+      : await db
+          .select({
+            feedType: castViewsDaily.feedType,
+            totalViews: sql<number>`COALESCE(sum(view_count), 0)::int`,
+            uniqueCasts: sql<number>`count(distinct cast_hash)::int`,
+            uniqueUsers: sql<number>`COALESCE(max(unique_users), 0)::int`,
+          })
+          .from(castViewsDaily)
+          .groupBy(castViewsDaily.feedType);
 
     // Merge results by feed type
     const castViewStatsMap = new Map<string, {
@@ -510,54 +473,74 @@ export async function GET(request: NextRequest) {
       SELECT 'cast_views', min(created_at) FROM cast_views
     `);
 
-    // Daily Usage Breakdowns - exclude admins and historical data
-    let dailyBreakdownRecentWhere = sql`1=1`;
-    if (effectiveDateFilter) {
-      dailyBreakdownRecentWhere = sql`created_at >= ${effectiveDateFilter.toISOString()}`;
-    }
-    if (excludeAdminsFilter) {
-      dailyBreakdownRecentWhere = sql`${dailyBreakdownRecentWhere} ${excludeAdminsFilter}`;
-    }
-    
-    let dailyBreakdownDailyWhere = sql`1=1`;
-    if (effectiveDateFilter) {
-      dailyBreakdownDailyWhere = sql`date >= ${effectiveDateFilter.toISOString()}`;
-    }
-    
-    const dailyBreakdownQuery = sql`
-      SELECT 
-        date,
-        feed_type,
-        SUM(total_sessions)::int as total_sessions,
-        SUM(total_duration_seconds)::bigint as total_duration_seconds,
-        CASE 
-          WHEN SUM(total_sessions) > 0 
-          THEN ROUND(SUM(total_duration_seconds)::float / SUM(total_sessions)::float)::bigint
-          ELSE 0::bigint
-        END as avg_duration_seconds,
-        COUNT(DISTINCT user_fid)::int as unique_users
-      FROM (
-        SELECT 
-          DATE_TRUNC('day', created_at) as date,
-          feed_type,
-          1 as total_sessions,
-          duration_seconds as total_duration_seconds,
-          user_fid
-        FROM feed_view_sessions
-        WHERE ${dailyBreakdownRecentWhere}
-        UNION ALL
+    // Daily Usage Breakdowns
+    const dailyBreakdownQuery = timeFilter
+      ? sql`
         SELECT 
           date,
           feed_type,
-          total_sessions,
-          total_duration_seconds,
-          NULL as user_fid
-        FROM feed_view_sessions_daily
-        WHERE ${dailyBreakdownDailyWhere}
-      ) combined
-      GROUP BY date, feed_type
-      ORDER BY date DESC, feed_type
-    `;
+          SUM(total_sessions)::int as total_sessions,
+          SUM(total_duration_seconds)::bigint as total_duration_seconds,
+          CASE 
+            WHEN SUM(total_sessions) > 0 
+            THEN ROUND(SUM(total_duration_seconds)::float / SUM(total_sessions)::float)::bigint
+            ELSE 0::bigint
+          END as avg_duration_seconds,
+          COUNT(DISTINCT user_fid)::int as unique_users
+        FROM (
+          SELECT 
+            DATE_TRUNC('day', created_at) as date,
+            feed_type,
+            1 as total_sessions,
+            duration_seconds as total_duration_seconds,
+            user_fid
+          FROM feed_view_sessions
+          WHERE created_at >= ${timeFilter.toISOString()}
+          UNION ALL
+          SELECT 
+            date,
+            feed_type,
+            total_sessions,
+            total_duration_seconds,
+            NULL as user_fid
+          FROM feed_view_sessions_daily
+          WHERE date >= ${timeFilter.toISOString()}
+        ) combined
+        GROUP BY date, feed_type
+        ORDER BY date DESC, feed_type
+      `
+      : sql`
+        SELECT 
+          date,
+          feed_type,
+          SUM(total_sessions)::int as total_sessions,
+          SUM(total_duration_seconds)::bigint as total_duration_seconds,
+          CASE 
+            WHEN SUM(total_sessions) > 0 
+            THEN ROUND(SUM(total_duration_seconds)::float / SUM(total_sessions)::float)::bigint
+            ELSE 0::bigint
+          END as avg_duration_seconds,
+          COUNT(DISTINCT user_fid)::int as unique_users
+        FROM (
+          SELECT 
+            DATE_TRUNC('day', created_at) as date,
+            feed_type,
+            1 as total_sessions,
+            duration_seconds as total_duration_seconds,
+            user_fid
+          FROM feed_view_sessions
+          UNION ALL
+          SELECT 
+            date,
+            feed_type,
+            total_sessions,
+            total_duration_seconds,
+            NULL as user_fid
+          FROM feed_view_sessions_daily
+        ) combined
+        GROUP BY date, feed_type
+        ORDER BY date DESC, feed_type
+      `;
     
     const dailyBreakdownRaw = await db.execute(dailyBreakdownQuery);
     const dailyBreakdown = (dailyBreakdownRaw as any).rows?.map((r: any) => ({
@@ -569,49 +552,64 @@ export async function GET(request: NextRequest) {
       uniqueUsers: parseInt(r.unique_users) || 0,
     })) || [];
 
-    // Daily Cast Views Breakdown - exclude admins and historical data
-    let dailyCastViewsRecentWhere = sql`1=1`;
-    if (effectiveDateFilter) {
-      dailyCastViewsRecentWhere = sql`created_at >= ${effectiveDateFilter.toISOString()}`;
-    }
-    if (excludeAdminsFilter) {
-      dailyCastViewsRecentWhere = sql`${dailyCastViewsRecentWhere} ${excludeAdminsFilter}`;
-    }
-    
-    let dailyCastViewsDailyWhere = sql`1=1`;
-    if (effectiveDateFilter) {
-      dailyCastViewsDailyWhere = sql`date >= ${effectiveDateFilter.toISOString()}`;
-    }
-    
-    const dailyCastViewsQuery = sql`
-      SELECT 
-        date,
-        feed_type,
-        SUM(view_count)::int as total_views,
-        COUNT(DISTINCT cast_hash)::int as unique_casts,
-        COUNT(DISTINCT user_fid)::int as unique_users
-      FROM (
-        SELECT 
-          DATE_TRUNC('day', created_at) as date,
-          COALESCE(feed_type, 'unknown') as feed_type,
-          1 as view_count,
-          cast_hash,
-          user_fid
-        FROM cast_views
-        WHERE ${dailyCastViewsRecentWhere}
-        UNION ALL
+    // Daily Cast Views Breakdown
+    const dailyCastViewsQuery = timeFilter
+      ? sql`
         SELECT 
           date,
           feed_type,
-          view_count,
-          cast_hash,
-          NULL as user_fid
-        FROM cast_views_daily
-        WHERE ${dailyCastViewsDailyWhere}
-      ) combined
-      GROUP BY date, feed_type
-      ORDER BY date DESC, feed_type
-    `;
+          SUM(view_count)::int as total_views,
+          COUNT(DISTINCT cast_hash)::int as unique_casts,
+          COUNT(DISTINCT user_fid)::int as unique_users
+        FROM (
+          SELECT 
+            DATE_TRUNC('day', created_at) as date,
+            COALESCE(feed_type, 'unknown') as feed_type,
+            1 as view_count,
+            cast_hash,
+            user_fid
+          FROM cast_views
+          WHERE created_at >= ${timeFilter.toISOString()}
+          UNION ALL
+          SELECT 
+            date,
+            feed_type,
+            view_count,
+            cast_hash,
+            NULL as user_fid
+          FROM cast_views_daily
+          WHERE date >= ${timeFilter.toISOString()}
+        ) combined
+        GROUP BY date, feed_type
+        ORDER BY date DESC, feed_type
+      `
+      : sql`
+        SELECT 
+          date,
+          feed_type,
+          SUM(view_count)::int as total_views,
+          COUNT(DISTINCT cast_hash)::int as unique_casts,
+          COUNT(DISTINCT user_fid)::int as unique_users
+        FROM (
+          SELECT 
+            DATE_TRUNC('day', created_at) as date,
+            COALESCE(feed_type, 'unknown') as feed_type,
+            1 as view_count,
+            cast_hash,
+            user_fid
+          FROM cast_views
+          UNION ALL
+          SELECT 
+            date,
+            feed_type,
+            view_count,
+            cast_hash,
+            NULL as user_fid
+          FROM cast_views_daily
+        ) combined
+        GROUP BY date, feed_type
+        ORDER BY date DESC, feed_type
+      `;
     
     const dailyCastViewsRaw = await db.execute(dailyCastViewsQuery);
     const dailyCastViews = (dailyCastViewsRaw as any).rows?.map((r: any) => ({
@@ -620,109 +618,6 @@ export async function GET(request: NextRequest) {
       totalViews: parseInt(r.total_views) || 0,
       uniqueCasts: parseInt(r.unique_casts) || 0,
       uniqueUsers: parseInt(r.unique_users) || 0,
-    })) || [];
-
-    // Active Users for Past 30 Days
-    const activeUsersQuery = sql`
-      WITH date_range AS (
-        SELECT generate_series(
-          DATE_TRUNC('day', NOW() - INTERVAL '29 days'),
-          DATE_TRUNC('day', NOW()),
-          '1 day'::interval
-        )::date as date
-      ),
-      daily_active_users AS (
-        SELECT DISTINCT
-          DATE_TRUNC('day', created_at)::date as date,
-          user_fid
-        FROM feed_view_sessions
-        WHERE user_fid IS NOT NULL
-          AND user_fid NOT IN (${sql.join(adminFids.map(fid => sql`${fid}`), sql`, `)})
-          AND created_at >= DATE_TRUNC('day', NOW() - INTERVAL '6 days')
-        UNION
-        SELECT DISTINCT
-          DATE_TRUNC('day', created_at)::date as date,
-          user_fid
-        FROM cast_views
-        WHERE user_fid IS NOT NULL
-          AND user_fid NOT IN (${sql.join(adminFids.map(fid => sql`${fid}`), sql`, `)})
-          AND created_at >= DATE_TRUNC('day', NOW() - INTERVAL '6 days')
-        UNION
-        SELECT DISTINCT
-          DATE_TRUNC('day', created_at)::date as date,
-          user_fid
-        FROM page_views
-        WHERE user_fid IS NOT NULL
-          AND user_fid NOT IN (${sql.join(adminFids.map(fid => sql`${fid}`), sql`, `)})
-          AND created_at >= DATE_TRUNC('day', NOW() - INTERVAL '29 days')
-      ),
-      daily_curators AS (
-        SELECT DISTINCT
-          DATE_TRUNC('day', created_at)::date as date,
-          curator_fid as user_fid
-        FROM curated_casts
-        WHERE curator_fid IS NOT NULL
-          AND curator_fid NOT IN (${sql.join(adminFids.map(fid => sql`${fid}`), sql`, `)})
-          AND created_at >= DATE_TRUNC('day', NOW() - INTERVAL '29 days')
-      ),
-      daily_onchain_actions AS (
-        SELECT DISTINCT
-          DATE_TRUNC('day', created_at)::date as date,
-          user_fid
-        FROM curated_cast_interactions
-        WHERE user_fid NOT IN (${sql.join(adminFids.map(fid => sql`${fid}`), sql`, `)})
-          AND created_at >= DATE_TRUNC('day', NOW() - INTERVAL '29 days')
-        UNION
-        SELECT DISTINCT
-          DATE_TRUNC('day', created_at)::date as date,
-          watcher_fid as user_fid
-        FROM user_watches
-        WHERE watcher_fid NOT IN (${sql.join(adminFids.map(fid => sql`${fid}`), sql`, `)})
-          AND created_at >= DATE_TRUNC('day', NOW() - INTERVAL '29 days')
-      ),
-      daily_users_with_flags AS (
-        SELECT 
-          dau.date,
-          dau.user_fid,
-          CASE WHEN dc.user_fid IS NOT NULL THEN true ELSE false END as curated,
-          CASE WHEN doa.user_fid IS NOT NULL THEN true ELSE false END as onchain
-        FROM daily_active_users dau
-        LEFT JOIN daily_curators dc ON dau.date = dc.date AND dau.user_fid = dc.user_fid
-        LEFT JOIN daily_onchain_actions doa ON dau.date = doa.date AND dau.user_fid = doa.user_fid
-      )
-      SELECT 
-        dr.date,
-        COALESCE(
-          json_agg(
-            json_build_object(
-              'fid', duwf.user_fid,
-              'username', u.username,
-              'displayName', u.display_name,
-              'pfpUrl', u.pfp_url,
-              'curated', duwf.curated,
-              'onchain', duwf.onchain
-            ) ORDER BY duwf.user_fid
-          ) FILTER (WHERE duwf.user_fid IS NOT NULL),
-          '[]'::json
-        ) as users
-      FROM date_range dr
-      LEFT JOIN daily_users_with_flags duwf ON dr.date = duwf.date
-      LEFT JOIN users u ON duwf.user_fid = u.fid
-      GROUP BY dr.date
-      ORDER BY dr.date DESC
-    `;
-
-    const activeUsersResult = await db.execute(activeUsersQuery);
-    const activeUsersData = (activeUsersResult as any).rows?.map((row: any) => ({
-      date: row.date,
-      users: (row.users || []).map((user: any) => ({
-        fid: parseInt(user.fid),
-        username: user.username || null,
-        displayName: user.displayName || null,
-        pfpUrl: user.pfpUrl || null,
-        curated: user.curated || false,
-        onchain: user.onchain || false,
-      })),
     })) || [];
 
     // API Call Statistics
@@ -849,7 +744,6 @@ export async function GET(request: NextRequest) {
           cuCostPerCall: 2,
         },
       },
-      activeUsers: activeUsersData,
     });
   } catch (error: unknown) {
     const err = error as { message?: string; cause?: any };

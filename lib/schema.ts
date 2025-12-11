@@ -271,15 +271,12 @@ export const feedViewSessions = pgTable("feed_view_sessions", {
   sortBy: text("sort_by"),
   curatorFids: jsonb("curator_fids"), // Array of curator FIDs if filtered
   packIds: jsonb("pack_ids"), // Array of pack IDs if filtered
-  sessionStartTime: timestamp("session_start_time"), // When this session started (for identifying active sessions)
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   feedTypeIdx: index("feed_view_sessions_feed_type_idx").on(table.feedType),
   userFidIdx: index("feed_view_sessions_user_fid_idx").on(table.userFid),
   createdAtIdx: index("feed_view_sessions_created_at_idx").on(table.createdAt),
   feedTypeCreatedAtIdx: index("feed_view_sessions_feed_type_created_at_idx").on(table.feedType, table.createdAt),
-  // Index to help find active sessions quickly
-  sessionStartTimeIdx: index("feed_view_sessions_session_start_time_idx").on(table.sessionStartTime),
 }));
 
 export const castViews = pgTable("cast_views", {
@@ -443,8 +440,6 @@ export const collections = pgTable("collections", {
   displayMode: jsonb("display_mode"), // DisplayMode from customFeeds
   headerConfig: jsonb("header_config"), // HeaderConfig from customFeeds
   hiddenEmbedUrls: jsonb("hidden_embed_urls"), // Array of URLs/domains to hide embeds from
-  orderMode: text("order_mode").default("manual").notNull(), // 'manual' or 'auto'
-  orderDirection: text("order_direction").default("desc").notNull(), // 'asc' or 'desc'
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
