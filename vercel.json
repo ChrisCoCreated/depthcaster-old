@@ -16,6 +16,10 @@
     {
       "path": "/api/cron/auto-curate-collections",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/timeout-feed-sessions",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

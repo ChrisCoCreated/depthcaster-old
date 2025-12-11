@@ -5,7 +5,7 @@ import { feedViewSessions } from "@/lib/schema";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { feedType, durationSeconds, userFid, sortBy, curatorFids, packIds } = body;
+    const { feedType, durationSeconds, sessionStartTime, userFid, sortBy, curatorFids, packIds } = body;
 
     if (!feedType || typeof durationSeconds !== "number") {
       return NextResponse.json(
@@ -14,11 +14,38 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate duration if sessionStartTime is provided
+    let validatedDuration = durationSeconds;
+    if (sessionStartTime) {
+      try {
+        const startTime = new Date(sessionStartTime).getTime();
+        const now = Date.now();
+        const maxPossibleDuration = Math.floor((now - startTime) / 1000);
+        
+        // Duration should not exceed time since session start
+        if (durationSeconds > maxPossibleDuration) {
+          // Use the maximum possible duration instead
+          validatedDuration = maxPossibleDuration;
+          console.warn(`Session duration ${durationSeconds}s exceeds max possible ${maxPossibleDuration}s, capping to ${maxPossibleDuration}s`);
+        }
+        
+        // Also cap at 4 hours (14400 seconds) to prevent unrealistic durations
+        const MAX_DURATION = 4 * 60 * 60; // 4 hours
+        if (validatedDuration > MAX_DURATION) {
+          validatedDuration = MAX_DURATION;
+          console.warn(`Session duration capped at ${MAX_DURATION}s (4 hours)`);
+        }
+      } catch (error) {
+        // If sessionStartTime is invalid, just use the provided duration
+        console.warn("Invalid sessionStartTime, using provided duration:", error);
+      }
+    }
+
     // Insert feed view session (non-blocking, don't fail if it errors)
     try {
       await db.insert(feedViewSessions).values({
         feedType,
-        durationSeconds,
+        durationSeconds: validatedDuration,
         userFid: userFid ? Number(userFid) : null,
         sortBy: sortBy || null,
         curatorFids: curatorFids && curatorFids.length > 0 ? curatorFids : null,

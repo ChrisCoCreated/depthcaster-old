@@ -143,8 +143,8 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   });
   const [allCurators, setAllCurators] = useState<Curator[]>([]);
   
-  // Use shared activity monitor for curated feed refresh
-  const { isUserActive, isTabVisible } = useActivityMonitor({
+  // Use shared activity monitor for curated feed refresh and session tracking
+  const { isUserActive, isTabVisible, lastActiveAt } = useActivityMonitor({
     inactivityThreshold: 3 * 60 * 1000, // 3 minutes
   });
   
@@ -1014,68 +1014,174 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
     lastFetchTimeRef.current = 0;
   }, [feedType]);
 
-  // Track feed view time - only track on feed change and unmount, not periodically
-  useEffect(() => {
-    // Helper to track feed view to database
-    const trackFeedViewToDB = async (feedTypeToTrack: string, duration: number) => {
-      try {
-        await fetch("/api/analytics/feed-view", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            feedType: feedTypeToTrack,
-            durationSeconds: duration,
-            userFid: viewerFid || null,
-            sortBy: sortBy || null,
-            curatorFids: selectedCuratorFids.length > 0 ? selectedCuratorFids : null,
-            packIds: selectedPackIds.length > 0 ? selectedPackIds : null,
-          }),
-        });
-      } catch (error) {
-        // Silently fail - analytics shouldn't break the app
-        console.error("Failed to track feed view:", error);
-      }
-    };
+  // Track feed view sessions - only create record when session ends
+  // Session ends on: feed change, inactivity (5 min), tab hidden (5 min), unmount, beforeunload
+  const sessionStartTimeRef = useRef<number | null>(null);
+  const activeSessionFeedTypeRef = useRef<string | null>(null);
+  const inactivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const tabHiddenTimeRef = useRef<number | null>(null);
+  const tabHiddenTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const MAX_SESSION_DURATION = 4 * 60 * 60 * 1000; // 4 hours max
+  const INACTIVITY_THRESHOLD = 5 * 60 * 1000; // 5 minutes
+  const TAB_HIDDEN_THRESHOLD = 5 * 60 * 1000; // 5 minutes
 
-    // End previous feed view if feed type changed
-    if (feedViewStartTimeRef.current !== null && prevFeedTypeRef.current && prevFeedTypeRef.current !== feedType) {
-      const duration = Math.floor((Date.now() - feedViewStartTimeRef.current) / 1000);
-      if (duration > 0) {
-        analytics.trackFeedViewTime(
-          prevFeedTypeRef.current,
-          duration,
-          sortBy,
-          selectedCuratorFids,
-          selectedPackIds
-        );
-        // Also track to database
-        trackFeedViewToDB(prevFeedTypeRef.current, duration);
-      }
+  // Helper to end current session and create record
+  const endSession = useCallback((reason: string) => {
+    if (sessionStartTimeRef.current === null || activeSessionFeedTypeRef.current === null) {
+      return;
     }
 
-    // Start tracking new feed view
-    feedViewStartTimeRef.current = Date.now();
+    const sessionStartTime = sessionStartTimeRef.current;
+    const feedTypeToTrack = activeSessionFeedTypeRef.current;
+    const now = Date.now();
+    const duration = Math.floor((now - sessionStartTime) / 1000);
 
-    // Cleanup on unmount or feed change - track final session
-    return () => {
-      if (feedViewStartTimeRef.current !== null) {
-        const duration = Math.floor((Date.now() - feedViewStartTimeRef.current) / 1000);
-        if (duration > 0) {
-          const feedTypeToTrack = prevFeedTypeRef.current || feedType;
-          analytics.trackFeedViewTime(
-            feedTypeToTrack,
-            duration,
-            sortBy,
-            selectedCuratorFids,
-            selectedPackIds
-          );
-          // Also track to database
-          trackFeedViewToDB(feedTypeToTrack, duration);
+    // Clear timeouts
+    if (inactivityTimeoutRef.current) {
+      clearTimeout(inactivityTimeoutRef.current);
+      inactivityTimeoutRef.current = null;
+    }
+    if (tabHiddenTimeoutRef.current) {
+      clearTimeout(tabHiddenTimeoutRef.current);
+      tabHiddenTimeoutRef.current = null;
+    }
+
+    // Reset session tracking immediately
+    sessionStartTimeRef.current = null;
+    activeSessionFeedTypeRef.current = null;
+    tabHiddenTimeRef.current = null;
+
+    // Only track if duration is valid
+    if (duration > 0 && duration < MAX_SESSION_DURATION / 1000) {
+      // Track to analytics
+      analytics.trackFeedViewTime(
+        feedTypeToTrack,
+        duration,
+        sortBy,
+        selectedCuratorFids,
+        selectedPackIds
+      );
+
+      // Track to database with sessionStartTime for validation (fire and forget)
+      const body = JSON.stringify({
+        feedType: feedTypeToTrack,
+        durationSeconds: duration,
+        sessionStartTime: new Date(sessionStartTime).toISOString(),
+        userFid: viewerFid || null,
+        sortBy: sortBy || null,
+        curatorFids: selectedCuratorFids.length > 0 ? selectedCuratorFids : null,
+        packIds: selectedPackIds.length > 0 ? selectedPackIds : null,
+      });
+
+      // Use sendBeacon for beforeunload, regular fetch otherwise
+      if (reason === 'beforeunload') {
+        navigator.sendBeacon('/api/analytics/feed-view', body);
+      } else {
+        fetch("/api/analytics/feed-view", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body,
+        }).catch((error) => {
+          // Silently fail - analytics shouldn't break the app
+          console.error("Failed to track feed view:", error);
+        });
+      }
+    }
+  }, [sortBy, selectedCuratorFids, selectedPackIds, viewerFid]);
+
+  // Start a new session
+  const startSession = useCallback(() => {
+    // End previous session if exists
+    if (sessionStartTimeRef.current !== null && activeSessionFeedTypeRef.current !== null) {
+      endSession('feed_change');
+    }
+
+    // Start new session
+    sessionStartTimeRef.current = Date.now();
+    activeSessionFeedTypeRef.current = feedType;
+    tabHiddenTimeRef.current = null;
+
+    // Set max duration timeout
+    const maxDurationTimeout = setTimeout(() => {
+      endSession('max_duration');
+    }, MAX_SESSION_DURATION);
+
+    // Monitor tab visibility
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        tabHiddenTimeRef.current = Date.now();
+        if (tabHiddenTimeoutRef.current) {
+          clearTimeout(tabHiddenTimeoutRef.current);
         }
-        feedViewStartTimeRef.current = null;
+        tabHiddenTimeoutRef.current = setTimeout(() => {
+          if (tabHiddenTimeRef.current && Date.now() - tabHiddenTimeRef.current >= TAB_HIDDEN_THRESHOLD) {
+            endSession('tab_hidden');
+          }
+        }, TAB_HIDDEN_THRESHOLD);
+      } else {
+        // Tab visible again - reset hidden time
+        tabHiddenTimeRef.current = null;
+        if (tabHiddenTimeoutRef.current) {
+          clearTimeout(tabHiddenTimeoutRef.current);
+          tabHiddenTimeoutRef.current = null;
+        }
       }
     };
-  }, [feedType, sortBy, selectedCuratorFids, selectedPackIds, viewerFid]);
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Handle beforeunload
+    const handleBeforeUnload = () => {
+      endSession('beforeunload');
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      clearTimeout(maxDurationTimeout);
+      if (inactivityTimeoutRef.current) {
+        clearTimeout(inactivityTimeoutRef.current);
+      }
+      if (tabHiddenTimeoutRef.current) {
+        clearTimeout(tabHiddenTimeoutRef.current);
+      }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [feedType, endSession]);
+
+  // Track session lifecycle - only depends on feedType and viewerFid
+  useEffect(() => {
+    // Start new session when feed type changes or component mounts
+    const cleanup = startSession();
+
+    // Cleanup on unmount
+    return () => {
+      if (cleanup) cleanup();
+      endSession('unmount');
+    };
+  }, [feedType, viewerFid, startSession, endSession]);
+
+  // Monitor activity changes for inactivity detection
+  useEffect(() => {
+    if (sessionStartTimeRef.current === null) return;
+
+    if (!isUserActive) {
+      const inactiveTime = lastActiveAt ? Date.now() - lastActiveAt : 0;
+      if (inactiveTime >= INACTIVITY_THRESHOLD) {
+        endSession('inactivity');
+      } else if (inactivityTimeoutRef.current === null) {
+        inactivityTimeoutRef.current = setTimeout(() => {
+          endSession('inactivity');
+        }, INACTIVITY_THRESHOLD - inactiveTime);
+      }
+    } else {
+      // User active - clear inactivity timeout
+      if (inactivityTimeoutRef.current) {
+        clearTimeout(inactivityTimeoutRef.current);
+        inactivityTimeoutRef.current = null;
+      }
+    }
+  }, [isUserActive, lastActiveAt, endSession]);
 
   // Close login prompt when user logs in
   useEffect(() => {
