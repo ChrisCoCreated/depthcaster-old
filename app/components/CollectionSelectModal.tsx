@@ -44,6 +44,7 @@ export function CollectionSelectModal({
   const [newCollectionName, setNewCollectionName] = useState("");
   const [newCollectionDisplayName, setNewCollectionDisplayName] = useState("");
   const [newCollectionDescription, setNewCollectionDescription] = useState("");
+  const [newCollectionAccessType, setNewCollectionAccessType] = useState<"open" | "gated_user">("gated_user");
   const [isCreatingCollection, setIsCreatingCollection] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
@@ -145,7 +146,8 @@ export function CollectionSelectModal({
           name: newCollectionName.trim(),
           displayName: newCollectionDisplayName.trim() || null,
           description: newCollectionDescription.trim() || null,
-          accessType: "open",
+          accessType: newCollectionAccessType,
+          gatedUserId: newCollectionAccessType === "gated_user" ? user.fid : null,
         }),
       });
 
@@ -175,6 +177,7 @@ export function CollectionSelectModal({
       setNewCollectionName("");
       setNewCollectionDisplayName("");
       setNewCollectionDescription("");
+      setNewCollectionAccessType("gated_user"); // Reset to default
       
       // Refresh collections list
       const refreshResponse = await fetch(`/api/collections?userFid=${user.fid}`);
@@ -413,6 +416,49 @@ export function CollectionSelectModal({
                           className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
                         />
                       </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Who can add casts?
+                        </label>
+                        <div className="space-y-2">
+                          <label className="flex items-center gap-2 p-2 border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
+                            <input
+                              type="radio"
+                              name="accessType"
+                              value="gated_user"
+                              checked={newCollectionAccessType === "gated_user"}
+                              onChange={(e) => setNewCollectionAccessType(e.target.value as "gated_user")}
+                              className="w-4 h-4 text-purple-600"
+                            />
+                            <div className="flex-1">
+                              <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                Only I can edit
+                              </div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                Only you can add casts to this collection
+                              </div>
+                            </div>
+                          </label>
+                          <label className="flex items-center gap-2 p-2 border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
+                            <input
+                              type="radio"
+                              name="accessType"
+                              value="open"
+                              checked={newCollectionAccessType === "open"}
+                              onChange={(e) => setNewCollectionAccessType(e.target.value as "open")}
+                              className="w-4 h-4 text-purple-600"
+                            />
+                            <div className="flex-1">
+                              <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                Anyone can add
+                              </div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                Anyone can add casts to this collection
+                              </div>
+                            </div>
+                          </label>
+                        </div>
+                      </div>
                       {createError && (
                         <div className="text-xs text-red-600 dark:text-red-400">
                           {createError}
@@ -427,6 +473,7 @@ export function CollectionSelectModal({
                             setNewCollectionName("");
                             setNewCollectionDisplayName("");
                             setNewCollectionDescription("");
+                            setNewCollectionAccessType("gated_user"); // Reset to default
                           }}
                           className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                         >

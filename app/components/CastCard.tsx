@@ -1807,16 +1807,8 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
       return;
     }
 
-    // Check if current user has already curated this cast
-    const isCuratedByCurrentUser = curators.some(c => c.fid === user.fid);
-
-    // If already curated by current user, show confirmation to uncurate
-    if (isCuratedByCurrentUser) {
-      setShowUncurateConfirm(true);
-      return;
-    }
-
-    // Show collection selection modal (available to all logged-in users)
+    // Always show collection selection modal (available to all logged-in users)
+    // Users can add casts to collections even if they've already curated them
     setShowCollectionSelectModal(true);
   };
 
@@ -1854,15 +1846,27 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
           // Silently fail for non-curators
           return;
         } else if (response.status === 409) {
-          // Already curated by this user, refresh status
-          const checkResponse = await fetch(`/api/curate?castHash=${cast.hash}`);
-          if (checkResponse.ok) {
-            const data = await checkResponse.json();
-            setIsCurated(data.isCurated);
-            // Use curators in chronological order (oldest first) from API
-            setCurators(data.curatorInfo || []);
+          // Already curated or already in collection
+          if (collectionName) {
+            // Show message for collection
+            window.dispatchEvent(new CustomEvent("showToast", { 
+              detail: { message: errorData.error || "Cast is already in this collection", type: "info" } 
+            }));
+          } else {
+            // Already curated to main feed, refresh status
+            const checkResponse = await fetch(`/api/curate?castHash=${cast.hash}`);
+            if (checkResponse.ok) {
+              const data = await checkResponse.json();
+              setIsCurated(data.isCurated);
+              // Use curators in chronological order (oldest first) from API
+              setCurators(data.curatorInfo || []);
+            }
           }
         } else {
+          // Show error message
+          window.dispatchEvent(new CustomEvent("showToast", { 
+            detail: { message: errorData.error || "Failed to add cast to collection", type: "error" } 
+          }));
           console.error("Curate error:", errorData.error || "Failed to curate cast");
         }
         return;
