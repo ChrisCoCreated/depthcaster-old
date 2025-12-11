@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { collections, users } from "@/lib/schema";
 import { eq } from "drizzle-orm";
-import { isAdmin, getUserRoles } from "@/lib/roles";
+import { hasCollectionsOrAdminRole, getUserRoles } from "@/lib/roles";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,8 +30,8 @@ export async function PUT(
       return NextResponse.json({ error: "Admin user not found" }, { status: 404 });
     }
     const roles = await getUserRoles(adminFidNum);
-    if (!isAdmin(roles)) {
-      return NextResponse.json({ error: "User does not have admin or superadmin role" }, { status: 403 });
+    if (!hasCollectionsOrAdminRole(roles)) {
+      return NextResponse.json({ error: "User does not have admin, superadmin, or collections role" }, { status: 403 });
     }
 
     const existing = await db.select().from(collections).where(eq(collections.name, name)).limit(1);
@@ -112,8 +112,8 @@ export async function DELETE(
       return NextResponse.json({ error: "Admin user not found" }, { status: 404 });
     }
     const roles = await getUserRoles(adminFidNum);
-    if (!isAdmin(roles)) {
-      return NextResponse.json({ error: "User does not have admin or superadmin role" }, { status: 403 });
+    if (!hasCollectionsOrAdminRole(roles)) {
+      return NextResponse.json({ error: "User does not have admin, superadmin, or collections role" }, { status: 403 });
     }
 
     const existing = await db.select().from(collections).where(eq(collections.name, name)).limit(1);

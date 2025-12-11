@@ -22,7 +22,6 @@ import { VideoPlayer } from "./VideoPlayer";
 import { CuratorBadge } from "./CuratorBadge";
 import { DisplayMode } from "@/lib/customFeeds";
 import { CollectionSelectModal } from "./CollectionSelectModal";
-import { isFeatureEnabledClient, FEATURE_FLAGS } from "@/lib/feature-flags";
 import { MentionedProfileCard } from "./MentionedProfileCard";
 import { BlogPreview } from "./BlogPreview";
 import { isBlogLink } from "@/lib/blog";
@@ -946,7 +945,6 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
   const [isCurated, setIsCurated] = useState(false);
   const [curators, setCurators] = useState<Array<{ fid: number; username?: string; display_name?: string; pfp_url?: string }>>([]);
   const [showUncurateConfirm, setShowUncurateConfirm] = useState(false);
-  const [showCurateConfirm, setShowCurateConfirm] = useState(false);
   const [showCollectionSelectModal, setShowCollectionSelectModal] = useState(false);
   const [topReplies, setTopReplies] = useState<any[]>(cast._topReplies || []);
   const [hasAnyReplies, setHasAnyReplies] = useState<boolean | undefined>(undefined);
@@ -1818,20 +1816,8 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
       return;
     }
 
-    // Check if collections feature is enabled
-    const isCollectionsEnabled = isFeatureEnabledClient(FEATURE_FLAGS.COLLECTIONS_ENABLED);
-    const isCollectionsEnabledForSuperadmins = isFeatureEnabledClient(FEATURE_FLAGS.COLLECTIONS_ENABLED_FOR_SUPERADMINS);
-    
-    // Show collection modal if:
-    // 1. Feature flag is enabled for everyone, OR
-    // 2. Superadmin feature flag is enabled AND user is a superadmin
-    if (isCollectionsEnabled || (isCollectionsEnabledForSuperadmins && isSuperAdmin)) {
-      // Show collection selection modal
-      setShowCollectionSelectModal(true);
-    } else {
-      // Show simple confirmation dialog (existing behavior)
-      setShowCurateConfirm(true);
-    }
+    // Show collection selection modal (available to all logged-in users)
+    setShowCollectionSelectModal(true);
   };
 
   const handleConfirmCurate = async (collectionName: string | null = null) => {
@@ -3817,40 +3803,6 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
         />
       )}
 
-      {/* Simple Curate Confirm Modal (when feature disabled) */}
-      {showCurateConfirm && !isFeatureEnabledClient(FEATURE_FLAGS.COLLECTIONS_ENABLED) && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-          onClick={() => setShowCurateConfirm(false)}
-        >
-          <div
-            className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-sm w-full p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-              Curate to your feed?
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-              This cast will be added to your curated feed.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowCurateConfirm(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleConfirmCurate(null)}
-                disabled={isCurating}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isCurating ? "Curating..." : "Curate to your feed"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (

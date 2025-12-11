@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { collections, users } from "@/lib/schema";
 import { eq, desc } from "drizzle-orm";
-import { isAdmin, getUserRoles } from "@/lib/roles";
+import { hasCollectionsOrAdminRole, getUserRoles } from "@/lib/roles";
 import { canUserAddToCollection } from "@/lib/collection-gating";
 
 export const runtime = "nodejs";
@@ -98,8 +98,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Admin user not found" }, { status: 404 });
     }
     const roles = await getUserRoles(adminFidNum);
-    if (!isAdmin(roles)) {
-      return NextResponse.json({ error: "User does not have admin or superadmin role" }, { status: 403 });
+    if (!hasCollectionsOrAdminRole(roles)) {
+      return NextResponse.json({ error: "User does not have admin, superadmin, or collections role" }, { status: 403 });
     }
 
     if (!name) {

@@ -22,6 +22,13 @@ export const PLUS_ROLES = ["plus"] as const;
 export type PlusRole = typeof PLUS_ROLES[number];
 
 /**
+ * Centralized array of collections roles
+ */
+export const COLLECTIONS_ROLES = ["collections"] as const;
+
+export type CollectionsRole = typeof COLLECTIONS_ROLES[number];
+
+/**
  * Check if any role in the array is a curator role
  * Note: admin and superadmin do NOT automatically confer curator permissions
  */
@@ -56,4 +63,22 @@ export function hasPlusRole(roles: string[] | string | null | undefined): boolea
   if (!roles) return false;
   const roleArray = Array.isArray(roles) ? roles : [roles];
   return roleArray.some((role) => PLUS_ROLES.includes(role as PlusRole));
+}
+
+/**
+ * Check if any role in the array is collections role
+ */
+export function hasCollectionsRole(roles: string[] | string | null | undefined): boolean {
+  if (!roles) return false;
+  const roleArray = Array.isArray(roles) ? roles : [roles];
+  return roleArray.some((role) => COLLECTIONS_ROLES.includes(role as CollectionsRole));
+}
+
+/**
+ * Check if any role in the array is collections role or admin/superadmin
+ */
+export function hasCollectionsOrAdminRole(roles: string[] | string | null | undefined): boolean {
+  if (!roles) return false;
+  const roleArray = Array.isArray(roles) ? roles : [roles];
+  return hasCollectionsRole(roleArray) || isAdmin(roleArray);
 }
