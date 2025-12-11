@@ -2172,7 +2172,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
           )}
 
           {/* Curated by pill - show when cast has curators */}
-          {curators.length > 0 && (
+          {curators.length > 0 && !displayMode?.hideCuratedButton && (
             <div className="flex items-center gap-1.5 px-2 sm:px-3 py-1 bg-blue-50 dark:bg-blue-900/30 rounded-full border border-blue-200 dark:border-blue-800">
               {/* First curator name */}
               <span className="hidden sm:inline text-xs text-blue-700 dark:text-blue-300 font-medium">
@@ -3352,7 +3352,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                     {displayMode.embedButtonText || "Open Link"}
                   </button>
                 )}
-                {user && !displayMode?.hideCuratedButton && (
+                {user && (
                   <button
                     onClick={(e) => {
                       e.preventDefault();

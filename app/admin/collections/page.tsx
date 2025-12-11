@@ -374,7 +374,7 @@ function CollectionModal({
     displayName: collection?.displayName || "",
     description: collection?.description || "",
     accessType: collection?.accessType || "open",
-    gatedUserId: collection?.gatedUserId?.toString() || "",
+    gatedUserId: collection?.gatedUserId?.toString() || (collection ? "" : userFid.toString()),
     gatingRule: collection?.gatingRule || null,
     displayType: collection?.displayType || "text",
     autoCurationEnabled: collection?.autoCurationEnabled || false,
@@ -696,7 +696,17 @@ function CollectionModal({
               </label>
               <select
                 value={formData.accessType}
-                onChange={(e) => setFormData({ ...formData, accessType: e.target.value as any })}
+                onChange={(e) => {
+                  const newAccessType = e.target.value as any;
+                  setFormData({ 
+                    ...formData, 
+                    accessType: newAccessType,
+                    // Default to user's FID when switching to gated_user (if not editing or field is empty)
+                    gatedUserId: newAccessType === "gated_user" && (!collection || !formData.gatedUserId) 
+                      ? userFid.toString() 
+                      : formData.gatedUserId
+                  });
+                }}
                 required
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
               >
@@ -708,26 +718,20 @@ function CollectionModal({
 
             {formData.accessType === "gated_user" && (
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Gated User FID *
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, gatedUserId: userFid.toString() })}
-                    className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline"
-                  >
-                    Default to me
-                  </button>
-                </div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Only I can edit *
+                </label>
                 <input
                   type="number"
                   value={formData.gatedUserId}
                   onChange={(e) => setFormData({ ...formData, gatedUserId: e.target.value })}
                   required
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                  placeholder="12345"
+                  placeholder={userFid.toString()}
                 />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  User FID who can add casts to this collection. Defaults to your FID.
+                </p>
               </div>
             )}
 
@@ -1193,10 +1197,10 @@ function CollectionModal({
                       className="mr-2"
                     />
                     <label htmlFor="hideCuratedButton" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Hide Curated Button
+                      Hide Curated By Details
                     </label>
                     <p className="ml-2 text-xs text-gray-500 dark:text-gray-400">
-                      Hide the curated button on cast cards
+                      Hide the "Curated by" pill showing curator information
                     </p>
                   </div>
 
