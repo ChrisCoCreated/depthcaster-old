@@ -155,8 +155,8 @@ export async function GET(
     }
 
     const collectionData = collection[0];
-    const orderMode = (collectionData.orderMode as "manual" | "auto") || "manual";
-    const orderDirection = (collectionData.orderDirection as "asc" | "desc") || "desc";
+    const orderMode = "manual" as "manual" | "auto";
+    const orderDirection = "desc" as "asc" | "desc";
     
     let collectionCastsList;
     

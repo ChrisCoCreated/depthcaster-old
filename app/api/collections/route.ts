@@ -151,8 +151,6 @@ export async function POST(request: NextRequest) {
       displayMode: displayMode || null,
       headerConfig: headerConfig || null,
       hiddenEmbedUrls: hiddenEmbedUrls || null,
-      orderMode: orderMode || "manual",
-      orderDirection: orderDirection || "desc",
     }).returning();
 
     return NextResponse.json({ collection: newCollection[0] });
