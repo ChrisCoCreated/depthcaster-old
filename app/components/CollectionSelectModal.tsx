@@ -21,6 +21,7 @@ interface CollectionSelectModalProps {
   onSelect: (collectionName: string | null) => void; // null = main feed, string = collection name
   castHash: string;
   castData: any;
+  onRemove?: () => void; // Optional callback after removal
 }
 
 export function CollectionSelectModal({
@@ -29,6 +30,7 @@ export function CollectionSelectModal({
   onSelect,
   castHash,
   castData,
+  onRemove,
 }: CollectionSelectModalProps) {
   const { user } = useNeynarContext();
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -47,6 +49,16 @@ export function CollectionSelectModal({
   const [newCollectionAccessType, setNewCollectionAccessType] = useState<"open" | "gated_user">("gated_user");
   const [isCreatingCollection, setIsCreatingCollection] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+
+  // Remove curation state
+  const [isCuratedByUser, setIsCuratedByUser] = useState(false);
+  const [collectionsWithCast, setCollectionsWithCast] = useState<Array<{ name: string; displayName: string | null; curatorFid: number }>>([]);
+  const [showRemoveOptions, setShowRemoveOptions] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [selectedRemovals, setSelectedRemovals] = useState<{
+    mainCuration: boolean;
+    collections: Set<string>;
+  }>({ mainCuration: false, collections: new Set() });
 
   // Check if user can create collections
   useEffect(() => {
@@ -100,6 +112,30 @@ export function CollectionSelectModal({
 
     fetchCollections();
   }, [isOpen, user?.fid, checkingPermissions]);
+
+  // Fetch curation status and collections containing this cast
+  useEffect(() => {
+    if (!isOpen || !user?.fid || !castHash || checkingPermissions) {
+      setIsCuratedByUser(false);
+      setCollectionsWithCast([]);
+      return;
+    }
+
+    const fetchCurationStatus = async () => {
+      try {
+        const response = await fetch(`/api/collections/cast/${castHash}?curatorFid=${user.fid}`);
+        if (response.ok) {
+          const data = await response.json();
+          setIsCuratedByUser(data.isCurated || false);
+          setCollectionsWithCast(data.collections || []);
+        }
+      } catch (error) {
+        console.error("Failed to fetch curation status:", error);
+      }
+    };
+
+    fetchCurationStatus();
+  }, [isOpen, user?.fid, castHash, checkingPermissions]);
 
   // Separate collections into user's collections and open collections
   // User's collections: collections user created OR has access to via gating (excluding auto ones)
@@ -201,6 +237,104 @@ export function CollectionSelectModal({
     }
   };
 
+  // Handle removal
+  const handleRemove = async () => {
+    if (!user?.fid || removing) return;
+
+    const removalsToProcess: Array<{ type: "main" | "collection"; name?: string }> = [];
+
+    if (selectedRemovals.mainCuration) {
+      removalsToProcess.push({ type: "main" });
+    }
+
+    selectedRemovals.collections.forEach((collectionName) => {
+      removalsToProcess.push({ type: "collection", name: collectionName });
+    });
+
+    if (removalsToProcess.length === 0) {
+      return;
+    }
+
+    setRemoving(true);
+
+    try {
+      const results = await Promise.allSettled(
+        removalsToProcess.map(async (removal) => {
+          if (removal.type === "main") {
+            const response = await fetch(
+              `/api/curate?castHash=${castHash}&curatorFid=${user.fid}`,
+              { method: "DELETE" }
+            );
+            if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(errorData.error || "Failed to remove from main curation");
+            }
+          } else if (removal.type === "collection" && removal.name) {
+            const response = await fetch(
+              `/api/collections/${encodeURIComponent(removal.name)}/curate?castHash=${castHash}&curatorFid=${user.fid}`,
+              { method: "DELETE" }
+            );
+            if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(errorData.error || `Failed to remove from ${removal.name}`);
+            }
+          }
+        })
+      );
+
+      // Check for errors
+      const errors = results
+        .filter((r) => r.status === "rejected")
+        .map((r) => (r as PromiseRejectedResult).reason?.message || "Unknown error");
+
+      if (errors.length > 0) {
+        window.dispatchEvent(
+          new CustomEvent("showToast", {
+            detail: { message: errors.join(", "), type: "error" },
+          })
+        );
+      } else {
+        window.dispatchEvent(
+          new CustomEvent("showToast", {
+            detail: { message: "Removed successfully", type: "success" },
+          })
+        );
+      }
+
+      // Refresh curation status and collections
+      const statusResponse = await fetch(`/api/collections/cast/${castHash}?curatorFid=${user.fid}`);
+      if (statusResponse.ok) {
+        const statusData = await statusResponse.json();
+        setIsCuratedByUser(statusData.isCurated || false);
+        setCollectionsWithCast(statusData.collections || []);
+      }
+
+      // Refresh collections list
+      const collectionsResponse = await fetch(`/api/collections?userFid=${user.fid}`);
+      if (collectionsResponse.ok) {
+        const collectionsData = await collectionsResponse.json();
+        setCollections(collectionsData.collections || []);
+      }
+
+      // Reset selection
+      setSelectedRemovals({ mainCuration: false, collections: new Set() });
+      setShowRemoveOptions(false);
+
+      // Notify parent component to refresh
+      if (onRemove) {
+        onRemove();
+      }
+    } catch (error: any) {
+      window.dispatchEvent(
+        new CustomEvent("showToast", {
+          detail: { message: error.message || "Failed to remove", type: "error" },
+        })
+      );
+    } finally {
+      setRemoving(false);
+    }
+  };
+
   // Handle selection
   const handleSubmit = async (e: React.FormEvent) => {
     // #region agent log
@@ -230,6 +364,16 @@ export function CollectionSelectModal({
     }
   };
 
+  // Reset state when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setShowRemoveOptions(false);
+      setSelectedRemovals({ mainCuration: false, collections: new Set() });
+      setShowCreateForm(false);
+      setCreateError(null);
+    }
+  }, [isOpen]);
+
   // Handle escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -237,6 +381,8 @@ export function CollectionSelectModal({
         if (showCreateForm) {
           setShowCreateForm(false);
           setCreateError(null);
+        } else if (showRemoveOptions) {
+          setShowRemoveOptions(false);
         } else {
           onClose();
         }
@@ -250,7 +396,7 @@ export function CollectionSelectModal({
     return () => {
       window.removeEventListener("keydown", handleEscape);
     };
-  }, [isOpen, onClose, showCreateForm]);
+  }, [isOpen, onClose, showCreateForm, showRemoveOptions]);
 
   if (!isOpen) return null;
 
@@ -552,6 +698,102 @@ export function CollectionSelectModal({
                   </div>
                 )}
               </>
+            )}
+
+            {/* Remove Section */}
+            {(isCuratedByUser || collectionsWithCast.length > 0) && (
+              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <button
+                  type="button"
+                  onClick={() => setShowRemoveOptions(!showRemoveOptions)}
+                  className="w-full flex items-center justify-between p-3 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                >
+                  <span className="text-sm font-medium text-red-700 dark:text-red-400">
+                    Remove from...
+                  </span>
+                  {showRemoveOptions ? (
+                    <ChevronUp className="w-4 h-4 text-red-500" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-red-500" />
+                  )}
+                </button>
+                {showRemoveOptions && (
+                  <div className="mt-2 space-y-2 pl-4">
+                    {/* Remove from main curation */}
+                    {isCuratedByUser && (
+                      <label className="flex items-center gap-2 p-2 border border-red-200 dark:border-red-800 rounded-lg cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20">
+                        <input
+                          type="checkbox"
+                          checked={selectedRemovals.mainCuration}
+                          onChange={(e) =>
+                            setSelectedRemovals((prev) => ({
+                              ...prev,
+                              mainCuration: e.target.checked,
+                            }))
+                          }
+                          className="w-4 h-4 text-red-600"
+                        />
+                        <span className="text-sm text-red-700 dark:text-red-400">
+                          Remove from main curation
+                        </span>
+                      </label>
+                    )}
+                    {/* Remove from individual collections */}
+                    {collectionsWithCast.map((collection) => (
+                      <label
+                        key={collection.name}
+                        className="flex items-center gap-2 p-2 border border-red-200 dark:border-red-800 rounded-lg cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedRemovals.collections.has(collection.name)}
+                          onChange={(e) => {
+                            setSelectedRemovals((prev) => {
+                              const newCollections = new Set(prev.collections);
+                              if (e.target.checked) {
+                                newCollections.add(collection.name);
+                              } else {
+                                newCollections.delete(collection.name);
+                              }
+                              return { ...prev, collections: newCollections };
+                            });
+                          }}
+                          className="w-4 h-4 text-red-600"
+                        />
+                        <span className="text-sm text-red-700 dark:text-red-400">
+                          Remove from {collection.displayName || collection.name}
+                        </span>
+                      </label>
+                    ))}
+                    {/* Remove from all button */}
+                    {(isCuratedByUser || collectionsWithCast.length > 0) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedRemovals({
+                            mainCuration: isCuratedByUser,
+                            collections: new Set(collectionsWithCast.map((c) => c.name)),
+                          });
+                        }}
+                        className="w-full text-left px-2 py-1 text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
+                      >
+                        Select all
+                      </button>
+                    )}
+                    {/* Execute removal button */}
+                    {(selectedRemovals.mainCuration || selectedRemovals.collections.size > 0) && (
+                      <button
+                        type="button"
+                        onClick={handleRemove}
+                        disabled={removing}
+                        className="w-full mt-3 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                      >
+                        {removing ? "Removing..." : "Remove Selected"}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
           </div>
 

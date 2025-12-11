@@ -3803,6 +3803,19 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
           onSelect={handleConfirmCurate}
           castHash={cast.hash}
           castData={cast}
+          onRemove={async () => {
+            // Refresh curation status after removal
+            try {
+              const response = await fetch(`/api/curate?castHash=${cast.hash}`);
+              if (response.ok) {
+                const data = await response.json();
+                setIsCurated(data.isCurated);
+                setCurators(data.curatorInfo || []);
+              }
+            } catch (error) {
+              console.error("Failed to refresh curation status:", error);
+            }
+          }}
         />
       )}
 
