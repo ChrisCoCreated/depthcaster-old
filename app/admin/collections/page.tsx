@@ -430,6 +430,8 @@ function CollectionModal({
   const [buttonTextColor, setButtonTextColor] = useState(
     existingDisplayMode.buttonTextColor || "#ffffff"
   );
+  const [hideCuratedButton, setHideCuratedButton] = useState(existingDisplayMode.hideCuratedButton || false);
+  const [hideShareButton, setHideShareButton] = useState(existingDisplayMode.hideShareButton || false);
 
   // Header Config state
   const existingHeaderConfig = (collection?.headerConfig as any) || {};
@@ -521,6 +523,8 @@ function CollectionModal({
         buttonBackgroundColor: replaceEmbeds ? buttonBackgroundColor : undefined,
         buttonTextColor: replaceEmbeds ? buttonTextColor : undefined,
         expandMentionedProfiles,
+        hideCuratedButton,
+        hideShareButton,
       } : null;
 
       // Build headerConfig object
@@ -793,10 +797,10 @@ function CollectionModal({
                 onChange={(e) => setHiddenEmbedUrlsText(e.target.value)}
                 rows={4}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-mono text-sm"
-                placeholder="youtube.com&#10;twitter.com&#10;https://example.com/video"
+                placeholder="youtube.com&#10;twitter.com&#10;https://example.com/video&#10;0x1234567890abcdef..."
               />
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Enter URLs or domains to hide embeds from. One per line. Supports domains (e.g., 'youtube.com') or full URLs. Casts will still be displayed, but matching embeds will be hidden.
+                Enter URLs, domains, or cast hashes to hide embeds from. One per line. Supports domains (e.g., 'youtube.com'), full URLs, or cast hashes (e.g., '0x1234...'). Casts will still be displayed, but matching embeds will be hidden.
               </p>
             </div>
 
@@ -1151,6 +1155,38 @@ function CollectionModal({
                     </label>
                     <p className="ml-2 text-xs text-gray-500 dark:text-gray-400">
                       Make the first line of cast text bold
+                    </p>
+                  </div>
+
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="hideCuratedButton"
+                      checked={hideCuratedButton}
+                      onChange={(e) => setHideCuratedButton(e.target.checked)}
+                      className="mr-2"
+                    />
+                    <label htmlFor="hideCuratedButton" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Hide Curated Button
+                    </label>
+                    <p className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                      Hide the curated button on cast cards
+                    </p>
+                  </div>
+
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="hideShareButton"
+                      checked={hideShareButton}
+                      onChange={(e) => setHideShareButton(e.target.checked)}
+                      className="mr-2"
+                    />
+                    <label htmlFor="hideShareButton" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Hide Share Button
+                    </label>
+                    <p className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                      Hide the share button on cast cards
                     </p>
                   </div>
                 </div>

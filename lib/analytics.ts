@@ -260,6 +260,9 @@ export const analytics = {
   trackNavProfile: (fid: number) => {
     trackIfEssential("nav_profile", { fid });
   },
+  trackNavCollections: () => {
+    trackIfEssential("nav_collections");
+  },
   
   // Settings
   trackSettingsFeedChange: (settingName: string, settingValue: any) => {

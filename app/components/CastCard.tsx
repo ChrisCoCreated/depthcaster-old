@@ -2090,17 +2090,18 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
             </div>
           )}
           {/* Share button */}
-          <div className="relative share-menu" ref={shareMenuRef}>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowShareMenu(!showShareMenu);
-              }}
-              className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
-              title="Share"
-            >
-              <Share2 className="w-4 h-4" />
-            </button>
+          {!displayMode?.hideShareButton && (
+            <div className="relative share-menu" ref={shareMenuRef}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowShareMenu(!showShareMenu);
+                }}
+                className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+                title="Share"
+              >
+                <Share2 className="w-4 h-4" />
+              </button>
 
             {/* Share dropdown menu */}
             {showShareMenu && (
@@ -2153,7 +2154,8 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                 </button>
               </div>
             )}
-          </div>
+            </div>
+          )}
 
           {/* Tags - show when cast has tags */}
           {tags.length > 0 && (
@@ -3350,7 +3352,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                     {displayMode.embedButtonText || "Open Link"}
                   </button>
                 )}
-                {user && (
+                {user && !displayMode?.hideCuratedButton && (
                   <button
                     onClick={(e) => {
                       e.preventDefault();

@@ -29,14 +29,19 @@ export async function PUT(
     if (adminUser.length === 0) {
       return NextResponse.json({ error: "Admin user not found" }, { status: 404 });
     }
-    const roles = await getUserRoles(adminFidNum);
-    if (!hasCollectionsOrAdminRole(roles)) {
-      return NextResponse.json({ error: "User does not have admin, superadmin, or collections role" }, { status: 403 });
-    }
 
     const existing = await db.select().from(collections).where(eq(collections.name, name)).limit(1);
     if (existing.length === 0) {
       return NextResponse.json({ error: "Collection not found" }, { status: 404 });
+    }
+
+    // Allow editing if user is the creator OR has collections/admin role
+    const isCreator = existing[0].creatorFid === adminFidNum;
+    const roles = await getUserRoles(adminFidNum);
+    const hasRole = hasCollectionsOrAdminRole(roles);
+    
+    if (!isCreator && !hasRole) {
+      return NextResponse.json({ error: "User does not have permission to edit this collection" }, { status: 403 });
     }
 
     if (accessType && !["open", "gated_user", "gated_rule"].includes(accessType)) {
