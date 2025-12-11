@@ -127,6 +127,7 @@ export default function AdminStatisticsPage() {
     userActions: true,
     apiCallStatistics: true,
   });
+  const [showNamesOnly, setShowNamesOnly] = useState(true);
 
   useEffect(() => {
     const checkAdminAccess = async () => {
