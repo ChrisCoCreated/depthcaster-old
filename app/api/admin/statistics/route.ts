@@ -23,7 +23,7 @@ import {
   pageViewsDaily,
   apiCallStats,
 } from "@/lib/schema";
-import { isAdmin, getUserRoles } from "@/lib/roles";
+import { isAdmin, getUserRoles, getAllAdminFids } from "@/lib/roles";
 
 function getTimeRangeFilter(period: string) {
   const now = new Date();
@@ -744,6 +744,112 @@ export async function GET(request: NextRequest) {
           cuCostPerCall: 2,
         },
       },
+      activeUsers: await (async () => {
+        // Get admin FIDs to exclude
+        const adminFids = await getAllAdminFids();
+
+        // Get date range for past 30 days
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const startDate = thirtyDaysAgo.toISOString().split('T')[0];
+
+        // Build admin exclusion clause
+        const adminExclusion = adminFids.length > 0 
+          ? sql`AND ua.user_fid NOT IN (${sql.join(adminFids.map(fid => sql`${fid}`), sql`, `)})`
+          : sql``;
+
+        // Query active users for past 30 days
+        // Combine data from feedViewSessions, castViews, and pageViews
+        const activeUsersQuery = await db.execute(sql`
+          WITH user_activity AS (
+            SELECT DISTINCT
+              user_fid,
+              DATE(created_at) as activity_date
+            FROM feed_view_sessions
+            WHERE user_fid IS NOT NULL
+              AND created_at >= ${startDate}
+            
+            UNION
+            
+            SELECT DISTINCT
+              user_fid,
+              DATE(created_at) as activity_date
+            FROM cast_views
+            WHERE user_fid IS NOT NULL
+              AND created_at >= ${startDate}
+            
+            UNION
+            
+            SELECT DISTINCT
+              user_fid,
+              DATE(created_at) as activity_date
+            FROM page_views
+            WHERE user_fid IS NOT NULL
+              AND created_at >= ${startDate}
+          ),
+          curation_activity AS (
+            SELECT DISTINCT
+              curator_fid as user_fid,
+              DATE(created_at) as activity_date
+            FROM curator_cast_curations
+            WHERE created_at >= ${startDate}
+          ),
+          onchain_activity AS (
+            SELECT DISTINCT
+              user_fid,
+              DATE(created_at) as activity_date
+            FROM curated_cast_interactions
+            WHERE user_fid IS NOT NULL
+              AND created_at >= ${startDate}
+              AND interaction_type IN ('like', 'recast', 'reply', 'quote')
+          )
+          SELECT
+            ua.activity_date::text as date,
+            ua.user_fid as fid,
+            u.username,
+            u.display_name as "displayName",
+            u.pfp_url as "pfpUrl",
+            CASE WHEN ca.user_fid IS NOT NULL THEN true ELSE false END as curated,
+            CASE WHEN oa.user_fid IS NOT NULL THEN true ELSE false END as onchain
+          FROM user_activity ua
+          LEFT JOIN users u ON u.fid = ua.user_fid
+          LEFT JOIN curation_activity ca ON ca.user_fid = ua.user_fid AND ca.activity_date = ua.activity_date
+          LEFT JOIN onchain_activity oa ON oa.user_fid = ua.user_fid AND oa.activity_date = ua.activity_date
+          WHERE 1=1 ${adminExclusion}
+          ORDER BY ua.activity_date DESC, ua.user_fid
+        `);
+
+        // Group by date
+        const usersByDate = new Map<string, Array<{
+          fid: number;
+          username: string | null;
+          displayName: string | null;
+          pfpUrl: string | null;
+          curated: boolean;
+          onchain: boolean;
+        }>>();
+
+        for (const row of activeUsersQuery.rows as any[]) {
+          const date = row.date;
+          if (!usersByDate.has(date)) {
+            usersByDate.set(date, []);
+          }
+          usersByDate.get(date)!.push({
+            fid: row.fid,
+            username: row.username,
+            displayName: row.displayName,
+            pfpUrl: row.pfpUrl,
+            curated: row.curated,
+            onchain: row.onchain,
+          });
+        }
+
+        // Convert to array format
+        return Array.from(usersByDate.entries()).map(([date, users]) => ({
+          date,
+          users,
+        })).sort((a, b) => b.date.localeCompare(a.date)); // Sort by date descending
+      })(),
     });
   } catch (error: unknown) {
     const err = error as { message?: string; cause?: any };

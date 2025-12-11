@@ -127,7 +127,7 @@ export default function AdminStatisticsPage() {
     userActions: true,
     apiCallStatistics: true,
   });
-  const [showNamesOnly, setShowNamesOnly] = useState(true);
+  const [miniview, setMiniview] = useState(true);
 
   useEffect(() => {
     const checkAdminAccess = async () => {
@@ -332,119 +332,182 @@ export default function AdminStatisticsPage() {
                     <span>Active Users (Past 30 Days)</span>
                   </button>
                   <div className="flex items-center gap-2">
-                    <label className="text-sm text-gray-600 dark:text-gray-400">Show names</label>
+                    <label className="text-sm text-gray-600 dark:text-gray-400">Miniview</label>
                     <button
-                      onClick={() => setShowNamesOnly(!showNamesOnly)}
+                      onClick={() => setMiniview(!miniview)}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        showNamesOnly ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+                        miniview ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
                       }`}
                     >
                       <span
                         className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          showNamesOnly ? 'translate-x-6' : 'translate-x-1'
+                          miniview ? 'translate-x-6' : 'translate-x-1'
                         }`}
                       />
                     </button>
                   </div>
                 </div>
                 {expandedSections.activeUsers && (
-                  <div className="space-y-3">
-                    {statistics.activeUsers.map((day, idx) => {
-                    const date = new Date(day.date);
-                    const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' });
-                    const isToday = date.toDateString() === new Date().toDateString();
-                    
-                    return (
-                      <div
-                        key={idx}
-                        className={`border rounded-lg p-4 ${
-                          isToday
-                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                            : 'border-gray-200 dark:border-gray-700'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-2">
-                            <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                              {dateStr}
-                            </div>
-                            {isToday && (
-                              <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">(Today)</span>
-                            )}
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              {day.users.length} active
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex gap-1.5 overflow-x-auto pb-1">
-                          {day.users.map((user) => {
-                            const displayName = user.displayName || user.username || `User ${user.fid}`;
-                            if (showNamesOnly) {
-                              return (
-                                <div
-                                  key={user.fid}
-                                  className="flex items-center gap-1.5 px-2 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-full border border-gray-200 dark:border-gray-700 flex-shrink-0"
-                                  style={{ width: '110px', minWidth: '110px', maxWidth: '110px' }}
-                                >
-                                  <AvatarImage
-                                    src={user.pfpUrl}
-                                    alt={displayName}
-                                    size={18}
-                                    className="w-[18px] h-[18px] rounded-full flex-shrink-0 object-cover"
-                                  />
-                                  <div className="flex-1 min-w-0">
-                                    <div className="text-[11px] font-medium text-gray-900 dark:text-gray-100 truncate">
-                                      {displayName}
+                  miniview ? (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead className="bg-gray-50 dark:bg-gray-800">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              Day/Date
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              Users
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                          {statistics.activeUsers.map((day, idx) => {
+                            const date = new Date(day.date);
+                            const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' });
+                            const isToday = date.toDateString() === new Date().toDateString();
+                            
+                            // Sort users alphabetically by displayName or username
+                            const sortedUsers = [...day.users].sort((a, b) => {
+                              const aName = (a.displayName || a.username || `User ${a.fid}`).toLowerCase();
+                              const bName = (b.displayName || b.username || `User ${b.fid}`).toLowerCase();
+                              return aName.localeCompare(bName);
+                            });
+                            
+                            return (
+                              <tr
+                                key={idx}
+                                className={isToday ? 'bg-blue-50 dark:bg-blue-900/20' : ''}
+                              >
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  <div className="flex items-center gap-2">
+                                    <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                      {dateStr}
+                                    </div>
+                                    {isToday && (
+                                      <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">(Today)</span>
+                                    )}
+                                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                                      {day.users.length} active
                                     </div>
                                   </div>
-                                  <div className="flex items-center gap-0.5 flex-shrink-0">
-                                    {user.curated && (
-                                      <span className="text-yellow-500 text-[10px]" title="Curated">
-                                        ⭐
-                                      </span>
-                                    )}
-                                    {user.onchain && (
-                                      <span className="text-blue-500 text-[10px]" title="Onchain action">
-                                        ⛓️
-                                      </span>
-                                    )}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {sortedUsers.map((user) => {
+                                      const displayName = user.displayName || user.username || `User ${user.fid}`;
+                                      return (
+                                        <div
+                                          key={user.fid}
+                                          className="relative flex-shrink-0 group"
+                                          title={displayName}
+                                        >
+                                          <AvatarImage
+                                            src={user.pfpUrl}
+                                            alt={displayName}
+                                            size={32}
+                                            className="w-8 h-8 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
+                                          />
+                                          <div className="absolute -bottom-0.5 -right-0.5 flex items-center gap-0.5">
+                                            {user.curated && (
+                                              <span className="text-yellow-500 text-[10px] bg-white dark:bg-gray-800 rounded-full" title="Curated">
+                                                ⭐
+                                              </span>
+                                            )}
+                                            {user.onchain && (
+                                              <span className="text-blue-500 text-[10px] bg-white dark:bg-gray-800 rounded-full" title="Onchain action">
+                                                ⛓️
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
                                   </div>
-                                </div>
-                              );
-                            } else {
-                              return (
-                                <div
-                                  key={user.fid}
-                                  className="relative flex-shrink-0 group"
-                                  title={displayName}
-                                >
-                                  <AvatarImage
-                                    src={user.pfpUrl}
-                                    alt={displayName}
-                                    size={32}
-                                    className="w-8 h-8 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
-                                  />
-                                  <div className="absolute -bottom-0.5 -right-0.5 flex items-center gap-0.5">
-                                    {user.curated && (
-                                      <span className="text-yellow-500 text-[10px] bg-white dark:bg-gray-800 rounded-full" title="Curated">
-                                        ⭐
-                                      </span>
-                                    )}
-                                    {user.onchain && (
-                                      <span className="text-blue-500 text-[10px] bg-white dark:bg-gray-800 rounded-full" title="Onchain action">
-                                        ⛓️
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            }
+                                </td>
+                              </tr>
+                            );
                           })}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  </div>
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {statistics.activeUsers.map((day, idx) => {
+                        const date = new Date(day.date);
+                        const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' });
+                        const isToday = date.toDateString() === new Date().toDateString();
+                        
+                        // Sort users alphabetically by displayName or username
+                        const sortedUsers = [...day.users].sort((a, b) => {
+                          const aName = (a.displayName || a.username || `User ${a.fid}`).toLowerCase();
+                          const bName = (b.displayName || b.username || `User ${b.fid}`).toLowerCase();
+                          return aName.localeCompare(bName);
+                        });
+                        
+                        return (
+                          <div
+                            key={idx}
+                            className={`border rounded-lg p-4 ${
+                              isToday
+                                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                                : 'border-gray-200 dark:border-gray-700'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-2">
+                                <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                  {dateStr}
+                                </div>
+                                {isToday && (
+                                  <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">(Today)</span>
+                                )}
+                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                  {day.users.length} active
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex gap-1.5 overflow-x-auto pb-1">
+                              {sortedUsers.map((user) => {
+                                const displayName = user.displayName || user.username || `User ${user.fid}`;
+                                return (
+                                  <div
+                                    key={user.fid}
+                                    className="flex items-center gap-1.5 px-2 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-full border border-gray-200 dark:border-gray-700 flex-shrink-0"
+                                    style={{ width: '110px', minWidth: '110px', maxWidth: '110px' }}
+                                  >
+                                    <AvatarImage
+                                      src={user.pfpUrl}
+                                      alt={displayName}
+                                      size={18}
+                                      className="w-[18px] h-[18px] rounded-full flex-shrink-0 object-cover"
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-[11px] font-medium text-gray-900 dark:text-gray-100 truncate">
+                                        {displayName}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-0.5 flex-shrink-0">
+                                      {user.curated && (
+                                        <span className="text-yellow-500 text-[10px]" title="Curated">
+                                          ⭐
+                                        </span>
+                                      )}
+                                      {user.onchain && (
+                                        <span className="text-blue-500 text-[10px]" title="Onchain action">
+                                          ⛓️
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )
                 )}
                 {expandedSections.activeUsers && (
                   <div className="mt-4 flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
