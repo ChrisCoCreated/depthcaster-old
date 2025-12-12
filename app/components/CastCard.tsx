@@ -25,6 +25,7 @@ import { CollectionSelectModal } from "./CollectionSelectModal";
 import { MentionedProfileCard } from "./MentionedProfileCard";
 import { BlogPreview } from "./BlogPreview";
 import { isBlogLink } from "@/lib/blog";
+import { useTouchSafeClick } from "@/lib/hooks/useTouchSafeClick";
 
 const CURATED_FEED_COLLAPSE_LINE_LIMIT = 8;
 
@@ -1812,6 +1813,9 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
     setShowCollectionSelectModal(true);
   };
 
+  // Use touch-safe click handler to prevent accidental clicks during scroll
+  const curateHandlers = useTouchSafeClick(handleCurate);
+
   const handleConfirmCurate = async (collectionName: string | null = null) => {
     if (!user?.fid) {
       return;
@@ -3354,16 +3358,9 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                 )}
                 {user && (
                   <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleCurate();
-                    }}
-                    onTouchEnd={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleCurate();
-                    }}
+                    onClick={curateHandlers.onClick}
+                    onTouchStart={curateHandlers.onTouchStart}
+                    onTouchEnd={curateHandlers.onTouchEnd}
                     disabled={isCurating}
                     className={`flex items-center gap-1 sm:gap-2 text-xs sm:text-sm transition-colors py-1 px-1 sm:px-0 ${
                       isCurated && curators.some(c => c.fid === user.fid)
