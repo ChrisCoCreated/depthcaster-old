@@ -11,6 +11,7 @@ import {
   getUtf8ByteLength,
   hasActiveProSubscription,
 } from "@/lib/castLimits";
+import { isSuperAdmin } from "@/lib/roles-client";
 
 interface CastComposerProps {
   parentHash?: string;
@@ -22,6 +23,8 @@ export function CastComposer({ parentHash, onSuccess }: CastComposerProps) {
   const [isPosting, setIsPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isFocused, setIsFocused] = useState(false);
+  const [isSuperAdminUser, setIsSuperAdminUser] = useState(false);
+  const [useThinkingParent, setUseThinkingParent] = useState(false);
   const { user } = useNeynarContext();
 
   const userWithPro = user as (typeof user) & ProSubscriptionLike;
@@ -37,6 +40,32 @@ export function CastComposer({ parentHash, onSuccess }: CastComposerProps) {
       : `dc_cast_draft_${user.fid}_root`;
   }, [user?.fid, parentHash]);
   const hasLoadedDraftRef = useRef(false);
+
+  // Check if user is superadmin
+  useEffect(() => {
+    const checkSuperAdmin = async () => {
+      if (!user?.fid) {
+        setIsSuperAdminUser(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/admin/check?fid=${user.fid}`);
+        if (response.ok) {
+          const data = await response.json();
+          const roles = data.roles || [];
+          setIsSuperAdminUser(isSuperAdmin(roles));
+        } else {
+          setIsSuperAdminUser(false);
+        }
+      } catch (error) {
+        console.error("Failed to check superadmin status:", error);
+        setIsSuperAdminUser(false);
+      }
+    };
+
+    checkSuperAdmin();
+  }, [user?.fid]);
 
   useEffect(() => {
     if (!draftStorageKey || typeof window === "undefined") {
@@ -110,6 +139,11 @@ export function CastComposer({ parentHash, onSuccess }: CastComposerProps) {
       setIsPosting(true);
       setError(null);
 
+      // Determine parent: use thinking URL if superadmin enabled it, otherwise use parentHash
+      const finalParent = useThinkingParent && isSuperAdminUser && !parentHash
+        ? "https://www.depthcaster.com/thinking"
+        : parentHash;
+
       const response = await fetch("/api/cast", {
         method: "POST",
         headers: {
@@ -118,7 +152,7 @@ export function CastComposer({ parentHash, onSuccess }: CastComposerProps) {
         body: JSON.stringify({
           signerUuid: user.signer_uuid,
           text: text.trim(),
-          parent: parentHash,
+          parent: finalParent,
         }),
       });
 
@@ -254,17 +288,30 @@ export function CastComposer({ parentHash, onSuccess }: CastComposerProps) {
           )}
 
           {showControls && (
-            <div className="flex items-center justify-between mt-2">
-              <span className={`text-xs ${isOverLimit ? "text-red-600 dark:text-red-400" : "text-gray-500 dark:text-gray-400"}`}>
-                {byteLength}/{maxBytes}
-              </span>
-              <button
-                type="submit"
-                disabled={isPosting || !text.trim() || isOverLimit}
-                className="px-4 sm:px-6 py-1.5 sm:py-2 bg-blue-600 dark:bg-blue-500 text-white text-sm sm:text-base rounded-full font-medium hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {isPosting ? "Posting..." : parentHash ? "Reply" : "Cast"}
-              </button>
+            <div className="flex flex-col gap-2 mt-2">
+              {isSuperAdminUser && !parentHash && (
+                <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={useThinkingParent}
+                    onChange={(e) => setUseThinkingParent(e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-300 dark:border-gray-700 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span>Cast as reply to /thinking</span>
+                </label>
+              )}
+              <div className="flex items-center justify-between">
+                <span className={`text-xs ${isOverLimit ? "text-red-600 dark:text-red-400" : "text-gray-500 dark:text-gray-400"}`}>
+                  {byteLength}/{maxBytes}
+                </span>
+                <button
+                  type="submit"
+                  disabled={isPosting || !text.trim() || isOverLimit}
+                  className="px-4 sm:px-6 py-1.5 sm:py-2 bg-blue-600 dark:bg-blue-500 text-white text-sm sm:text-base rounded-full font-medium hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isPosting ? "Posting..." : parentHash || useThinkingParent ? "Reply" : "Cast"}
+                </button>
+              </div>
             </div>
           )}
         </div>

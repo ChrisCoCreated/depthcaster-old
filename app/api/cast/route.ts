@@ -15,6 +15,7 @@ import {
   hasActiveProSubscription,
 } from "@/lib/castLimits";
 import { analyzeCastQualityAsync } from "@/lib/deepseek-quality";
+import { isSuperAdmin, getUserRoles } from "@/lib/roles";
 
 export async function POST(request: NextRequest) {
   try {
@@ -101,13 +102,44 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get user FID from signer before publishing (needed for pro checks)
+    // Get user FID from signer before publishing (needed for pro checks and superadmin validation)
     let userFid: number | undefined;
     try {
       const signer = await neynarClient.lookupSigner({ signerUuid });
       userFid = signer.fid;
     } catch (error) {
       console.error("Error fetching signer:", error);
+    }
+
+    // Validate parent URL: only superadmins can use URL parents
+    if (parent && typeof parent === "string" && parent.startsWith("http")) {
+      if (!userFid) {
+        return NextResponse.json(
+          { error: "Unable to verify user permissions for URL parent" },
+          { status: 400 }
+        );
+      }
+
+      const userRoles = await getUserRoles(userFid);
+      if (!isSuperAdmin(userRoles)) {
+        return NextResponse.json(
+          { error: "Only superadmins can use URL parents" },
+          { status: 403 }
+        );
+      }
+
+      // Validate that it's the specific thinking URL
+      if (parent !== "https://www.depthcaster.com/thinking") {
+        return NextResponse.json(
+          { error: "Invalid parent URL. Only https://www.depthcaster.com/thinking is allowed" },
+          { status: 400 }
+        );
+      }
+
+      console.log("[Cast API] Superadmin casting with thinking URL as parent:", {
+        userFid,
+        parent,
+      });
     }
 
     const textByteLength = getUtf8ByteLength(trimmedText);
