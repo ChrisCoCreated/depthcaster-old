@@ -1,4 +1,5 @@
 import { pgTable, uuid, text, bigint, boolean, integer, jsonb, timestamp, uniqueIndex, index } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const users = pgTable("users", {
   fid: bigint("fid", { mode: "number" }).primaryKey(),
@@ -447,6 +448,19 @@ export const collections = pgTable("collections", {
   creatorFidIdx: index("collections_creator_fid_idx").on(table.creatorFid),
   accessTypeIdx: index("collections_access_type_idx").on(table.accessType),
   autoCurationEnabledIdx: index("collections_auto_curation_enabled_idx").on(table.autoCurationEnabled),
+}));
+
+export const thinkingCasts = pgTable("thinking_casts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  castHash: text("cast_hash").notNull().unique(),
+  castData: jsonb("cast_data").notNull(),
+  castCreatedAt: timestamp("cast_created_at"),
+  authorFid: bigint("author_fid", { mode: "number" }).references(() => users.fid, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  castHashIdx: index("thinking_casts_cast_hash_idx").on(table.castHash),
+  castCreatedAtIdx: index("thinking_casts_cast_created_at_idx").on(table.castCreatedAt),
+  authorFidIdx: index("thinking_casts_author_fid_idx").on(table.authorFid),
 }));
 
 export const collectionCasts = pgTable("collection_casts", {
