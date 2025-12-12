@@ -46,9 +46,6 @@ export default function CuratePersonPage({
   const [selectedCasts, setSelectedCasts] = useState<Map<string, SelectedCast>>(new Map());
   const [showBulkModal, setShowBulkModal] = useState(false);
 
-  const fid = parseInt(fidParam);
-  const isFid = !isNaN(fid);
-
   // Check collector role
   useEffect(() => {
     if (!user?.fid) {
@@ -74,17 +71,16 @@ export default function CuratePersonPage({
     checkRole();
   }, [user?.fid]);
 
-  // Fetch profile
+  // Fetch profile (works with both FID and username)
   useEffect(() => {
-    if (!isFid) return;
     fetchProfile();
-  }, [fidParam, user?.fid, isFid]);
+  }, [fidParam, user?.fid]);
 
-  // Fetch casts
+  // Fetch casts (after profile is loaded, we have the FID)
   useEffect(() => {
-    if (!isFid || !profile) return;
+    if (!profile?.fid) return;
     fetchCasts();
-  }, [fid, profile, isFid]);
+  }, [profile?.fid, user?.fid]);
 
   const fetchProfile = async () => {
     try {
@@ -118,13 +114,16 @@ export default function CuratePersonPage({
   };
 
   const fetchCasts = async () => {
+    if (!profile?.fid) return;
+    
     try {
       setLoadingCasts(true);
       const viewerFid = user?.fid;
+      const userFid = profile.fid;
 
       // Fetch current cast (most recent, limit 1)
       const currentResponse = await fetch(
-        `/api/user/${fid}/casts?limit=1${viewerFid ? `&viewerFid=${viewerFid}` : ""}`
+        `/api/user/${userFid}/casts?limit=1${viewerFid ? `&viewerFid=${viewerFid}` : ""}`
       );
       if (currentResponse.ok) {
         const currentData = await currentResponse.json();
@@ -134,7 +133,7 @@ export default function CuratePersonPage({
 
       // Fetch popular casts (top 25)
       const popularResponse = await fetch(
-        `/api/user/${fid}/popular-casts?limit=25${viewerFid ? `&viewerFid=${viewerFid}` : ""}`
+        `/api/user/${userFid}/popular-casts?limit=25${viewerFid ? `&viewerFid=${viewerFid}` : ""}`
       );
       if (popularResponse.ok) {
         const popularData = await popularResponse.json();

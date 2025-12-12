@@ -128,6 +128,8 @@ export default function AdminStatisticsPage() {
     apiCallStatistics: true,
   });
   const [miniview, setMiniview] = useState(true);
+  const [selectedUserFid, setSelectedUserFid] = useState<number | null>(null);
+  const [userSearchQuery, setUserSearchQuery] = useState<string>("");
 
   useEffect(() => {
     const checkAdminAccess = async () => {
@@ -348,7 +350,74 @@ export default function AdminStatisticsPage() {
                   </div>
                 </div>
                 {expandedSections.activeUsers && (
-                  miniview ? (
+                  <div className="mb-4 flex items-center gap-3">
+                    <div className="flex-1">
+                      <input
+                        type="text"
+                        placeholder="Search by name..."
+                        value={userSearchQuery}
+                        onChange={(e) => setUserSearchQuery(e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    {(selectedUserFid !== null || userSearchQuery) && (
+                      <button
+                        onClick={() => {
+                          setSelectedUserFid(null);
+                          setUserSearchQuery("");
+                        }}
+                        className="px-3 py-2 text-sm text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors"
+                      >
+                        Clear Filter
+                      </button>
+                    )}
+                  </div>
+                )}
+                {expandedSections.activeUsers && (() => {
+                  // Filter active users based on selected user and search query
+                  const filteredActiveUsers = statistics.activeUsers.map(day => {
+                    let filteredUsers = day.users;
+                    
+                    // Filter by selected user FID
+                    if (selectedUserFid !== null) {
+                      filteredUsers = filteredUsers.filter(user => user.fid === selectedUserFid);
+                    }
+                    
+                    // Filter by search query
+                    if (userSearchQuery.trim()) {
+                      const query = userSearchQuery.toLowerCase().trim();
+                      filteredUsers = filteredUsers.filter(user => {
+                        const displayName = (user.displayName || user.username || `User ${user.fid}`).toLowerCase();
+                        return displayName.includes(query);
+                      });
+                    }
+                    
+                    return {
+                      ...day,
+                      users: filteredUsers
+                    };
+                  }).filter(day => day.users.length > 0); // Only show days with matching users
+                  
+                  if (filteredActiveUsers.length === 0) {
+                    return (
+                      <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                        <p>No users found matching your filter.</p>
+                        {(selectedUserFid !== null || userSearchQuery) && (
+                          <button
+                            onClick={() => {
+                              setSelectedUserFid(null);
+                              setUserSearchQuery("");
+                            }}
+                            className="mt-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                          >
+                            Clear filter
+                          </button>
+                        )}
+                      </div>
+                    );
+                  }
+                  
+                  return miniview ? (
                     <div className="overflow-x-auto">
                       <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                         <thead className="bg-gray-50 dark:bg-gray-800">
@@ -362,7 +431,7 @@ export default function AdminStatisticsPage() {
                           </tr>
                         </thead>
                         <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-                          {statistics.activeUsers.map((day, idx) => {
+                          {filteredActiveUsers.map((day, idx) => {
                             const date = new Date(day.date);
                             const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' });
                             const isToday = date.toDateString() === new Date().toDateString();
@@ -396,10 +465,14 @@ export default function AdminStatisticsPage() {
                                   <div className="flex flex-wrap gap-1.5">
                                     {sortedUsers.map((user) => {
                                       const displayName = user.displayName || user.username || `User ${user.fid}`;
+                                      const isSelected = selectedUserFid === user.fid;
                                       return (
                                         <div
                                           key={user.fid}
-                                          className="relative flex-shrink-0 group"
+                                          onClick={() => setSelectedUserFid(isSelected ? null : user.fid)}
+                                          className={`relative flex-shrink-0 group cursor-pointer transition-all ${
+                                            isSelected ? 'ring-2 ring-blue-500 ring-offset-2' : 'hover:ring-2 hover:ring-gray-300 dark:hover:ring-gray-600'
+                                          }`}
                                           title={displayName}
                                         >
                                           <AvatarImage
@@ -433,7 +506,7 @@ export default function AdminStatisticsPage() {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {statistics.activeUsers.map((day, idx) => {
+                      {filteredActiveUsers.map((day, idx) => {
                         const date = new Date(day.date);
                         const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' });
                         const isToday = date.toDateString() === new Date().toDateString();
@@ -470,10 +543,16 @@ export default function AdminStatisticsPage() {
                             <div className="flex gap-1.5 overflow-x-auto pb-1">
                               {sortedUsers.map((user) => {
                                 const displayName = user.displayName || user.username || `User ${user.fid}`;
+                                const isSelected = selectedUserFid === user.fid;
                                 return (
                                   <div
                                     key={user.fid}
-                                    className="flex items-center gap-1.5 px-2 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-full border border-gray-200 dark:border-gray-700 flex-shrink-0"
+                                    onClick={() => setSelectedUserFid(isSelected ? null : user.fid)}
+                                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full border flex-shrink-0 cursor-pointer transition-all ${
+                                      isSelected
+                                        ? 'bg-blue-100 dark:bg-blue-900 border-blue-500 ring-2 ring-blue-500 ring-offset-1'
+                                        : 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700'
+                                    }`}
                                     style={{ width: '110px', minWidth: '110px', maxWidth: '110px' }}
                                   >
                                     <AvatarImage
@@ -507,8 +586,8 @@ export default function AdminStatisticsPage() {
                         );
                       })}
                     </div>
-                  )
-                )}
+                  );
+                })()}
                 {expandedSections.activeUsers && (
                   <div className="mt-4 flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
                     <div className="flex items-center gap-1">
