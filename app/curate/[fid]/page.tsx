@@ -403,7 +403,7 @@ export default function CuratePersonPage({
                       <div className="flex-1">
                         <CastCard
                           cast={cast}
-                          feedType="curated"
+                          feedType={undefined}
                           disableClick={false}
                           compressedView={isMiniView}
                         />
@@ -480,7 +480,7 @@ export default function CuratePersonPage({
                       <div className="flex-1">
                         <CastCard
                           cast={cast}
-                          feedType="curated"
+                          feedType={undefined}
                           disableClick={false}
                           compressedView={isMiniView}
                         />
