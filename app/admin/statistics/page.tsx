@@ -448,39 +448,43 @@ export default function AdminStatisticsPage() {
                                 </td>
                                 <td className="px-4 py-3">
                                   <div className="flex flex-wrap gap-1.5">
-                                    {sortedUsers.map((user) => {
-                                      const displayName = user.displayName || user.username || `User ${user.fid}`;
-                                      const isSelected = selectedUserFid === user.fid;
-                                      return (
-                                        <div
-                                          key={user.fid}
-                                          onClick={() => setSelectedUserFid(isSelected ? null : user.fid)}
-                                          className={`relative flex-shrink-0 group cursor-pointer transition-all ${
-                                            isSelected ? 'ring-2 ring-blue-500 ring-offset-2' : 'hover:ring-2 hover:ring-gray-300 dark:hover:ring-gray-600'
-                                          }`}
-                                          title={displayName}
-                                        >
-                                          <AvatarImage
-                                            src={user.pfpUrl}
-                                            alt={displayName}
-                                            size={32}
-                                            className="w-8 h-8 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
-                                          />
-                                          <div className="absolute -bottom-0.5 -right-0.5 flex items-center gap-0.5">
-                                            {user.curated && (
-                                              <span className="text-yellow-500 text-[10px] bg-white dark:bg-gray-800 rounded-full" title="Curated">
-                                                ⭐
-                                              </span>
-                                            )}
-                                            {user.onchain && (
-                                              <span className="text-blue-500 text-[10px] bg-white dark:bg-gray-800 rounded-full" title="Onchain action">
-                                                ⛓️
-                                              </span>
-                                            )}
+                                    {sortedUsers.length === 0 ? (
+                                      <span className="text-sm text-gray-400 dark:text-gray-500 italic">No users match the filter</span>
+                                    ) : (
+                                      sortedUsers.map((user) => {
+                                        const displayName = user.displayName || user.username || `User ${user.fid}`;
+                                        const isSelected = selectedUserFid === user.fid;
+                                        return (
+                                          <div
+                                            key={user.fid}
+                                            onClick={() => setSelectedUserFid(isSelected ? null : user.fid)}
+                                            className={`relative flex-shrink-0 group cursor-pointer transition-all ${
+                                              isSelected ? 'ring-2 ring-blue-500 ring-offset-2' : 'hover:ring-2 hover:ring-gray-300 dark:hover:ring-gray-600'
+                                            }`}
+                                            title={displayName}
+                                          >
+                                            <AvatarImage
+                                              src={user.pfpUrl}
+                                              alt={displayName}
+                                              size={32}
+                                              className="w-8 h-8 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
+                                            />
+                                            <div className="absolute -bottom-0.5 -right-0.5 flex items-center gap-0.5">
+                                              {user.curated && (
+                                                <span className="text-yellow-500 text-[10px] bg-white dark:bg-gray-800 rounded-full" title="Curated">
+                                                  ⭐
+                                                </span>
+                                              )}
+                                              {user.onchain && (
+                                                <span className="text-blue-500 text-[10px] bg-white dark:bg-gray-800 rounded-full" title="Onchain action">
+                                                  ⛓️
+                                                </span>
+                                              )}
+                                            </div>
                                           </div>
-                                        </div>
-                                      );
-                                    }))}
+                                        );
+                                      })
+                                    )}
                                   </div>
                                 </td>
                               </tr>
@@ -534,45 +538,46 @@ export default function AdminStatisticsPage() {
                                 <span className="text-sm text-gray-400 dark:text-gray-500 italic">No users match the filter</span>
                               ) : (
                                 sortedUsers.map((user) => {
-                                const displayName = user.displayName || user.username || `User ${user.fid}`;
-                                const isSelected = selectedUserFid === user.fid;
-                                return (
-                                  <div
-                                    key={user.fid}
-                                    onClick={() => setSelectedUserFid(isSelected ? null : user.fid)}
-                                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full border flex-shrink-0 cursor-pointer transition-all ${
-                                      isSelected
-                                        ? 'bg-blue-100 dark:bg-blue-900 border-blue-500 ring-2 ring-blue-500 ring-offset-1'
-                                        : 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700'
-                                    }`}
-                                    style={{ width: '110px', minWidth: '110px', maxWidth: '110px' }}
-                                  >
-                                    <AvatarImage
-                                      src={user.pfpUrl}
-                                      alt={displayName}
-                                      size={18}
-                                      className="w-[18px] h-[18px] rounded-full flex-shrink-0 object-cover"
-                                    />
-                                    <div className="flex-1 min-w-0">
-                                      <div className="text-[11px] font-medium text-gray-900 dark:text-gray-100 truncate">
-                                        {displayName}
+                                  const displayName = user.displayName || user.username || `User ${user.fid}`;
+                                  const isSelected = selectedUserFid === user.fid;
+                                  return (
+                                    <div
+                                      key={user.fid}
+                                      onClick={() => setSelectedUserFid(isSelected ? null : user.fid)}
+                                      className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full border flex-shrink-0 cursor-pointer transition-all ${
+                                        isSelected
+                                          ? 'bg-blue-100 dark:bg-blue-900 border-blue-500 ring-2 ring-blue-500 ring-offset-1'
+                                          : 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700'
+                                      }`}
+                                      style={{ width: '110px', minWidth: '110px', maxWidth: '110px' }}
+                                    >
+                                      <AvatarImage
+                                        src={user.pfpUrl}
+                                        alt={displayName}
+                                        size={18}
+                                        className="w-[18px] h-[18px] rounded-full flex-shrink-0 object-cover"
+                                      />
+                                      <div className="flex-1 min-w-0">
+                                        <div className="text-[11px] font-medium text-gray-900 dark:text-gray-100 truncate">
+                                          {displayName}
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-0.5 flex-shrink-0">
+                                        {user.curated && (
+                                          <span className="text-yellow-500 text-[10px]" title="Curated">
+                                            ⭐
+                                          </span>
+                                        )}
+                                        {user.onchain && (
+                                          <span className="text-blue-500 text-[10px]" title="Onchain action">
+                                            ⛓️
+                                          </span>
+                                        )}
                                       </div>
                                     </div>
-                                    <div className="flex items-center gap-0.5 flex-shrink-0">
-                                      {user.curated && (
-                                        <span className="text-yellow-500 text-[10px]" title="Curated">
-                                          ⭐
-                                        </span>
-                                      )}
-                                      {user.onchain && (
-                                        <span className="text-blue-500 text-[10px]" title="Onchain action">
-                                          ⛓️
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              }))}
+                                  );
+                                })
+                              )}
                             </div>
                           </div>
                         );
