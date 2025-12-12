@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { thinkingCasts } from "@/lib/schema";
-import { desc } from "drizzle-orm";
+import { neynarClient } from "@/lib/neynar";
+import { deduplicateRequest } from "@/lib/neynar-batch";
 import { enrichCastsWithViewerContext } from "@/lib/interactions";
+
+const THINKING_URL = "https://www.depthcaster.com/thinking";
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,33 +14,59 @@ export async function GET(request: NextRequest) {
       ? parseInt(searchParams.get("viewerFid")!)
       : undefined;
 
-    // Query thinking casts from database, ordered by creation time (most recent first)
-    const offset = cursor ? parseInt(cursor) : 0;
-    
-    const storedCasts = await db
-      .select()
-      .from(thinkingCasts)
-      .orderBy(desc(thinkingCasts.castCreatedAt))
-      .limit(limit + 1) // Fetch one extra to check if there's more
-      .offset(offset);
+    // Use Neynar's parent_urls endpoint
+    const feed = await deduplicateRequest(
+      `thinking-${viewerFid || "none"}-${cursor || "initial"}-${limit}`,
+      async () => {
+        // Use the Neynar SDK's fetchFeedByParentUrls method if available, otherwise make direct API call
+        const apiKey = process.env.NEYNAR_API_KEY;
+        if (!apiKey) {
+          throw new Error("NEYNAR_API_KEY is not set");
+        }
 
-    // Check if there are more casts
-    const hasMore = storedCasts.length > limit;
-    const castsToReturn = hasMore ? storedCasts.slice(0, limit) : storedCasts;
-    
-    // Extract cast data from stored casts
-    let casts = castsToReturn.map((row) => row.castData as any);
+        const params = new URLSearchParams({
+          limit: limit.toString(),
+          parent_urls: THINKING_URL,
+        });
+
+        if (cursor) {
+          params.append("cursor", cursor);
+        }
+
+        if (viewerFid) {
+          params.append("viewer_fid", viewerFid.toString());
+        }
+
+        const response = await fetch(
+          `https://api.neynar.com/v2/farcaster/feed/parent_urls/?${params.toString()}`,
+          {
+            method: "GET",
+            headers: {
+              "x-api-key": apiKey,
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Neynar API error: ${response.status} ${response.statusText}`);
+        }
+
+        return await response.json();
+      }
+    );
+
+    const casts = feed.casts || [];
+    const neynarCursor = feed.next?.cursor || null;
 
     // Enrich casts with viewer context from database
+    let enrichedCasts = casts;
     if (viewerFid && casts.length > 0) {
-      casts = await enrichCastsWithViewerContext(casts, viewerFid);
+      enrichedCasts = await enrichCastsWithViewerContext(casts, viewerFid);
     }
 
-    const nextCursor = hasMore ? (offset + limit).toString() : null;
-
     return NextResponse.json({
-      casts,
-      next: nextCursor ? { cursor: nextCursor } : null,
+      casts: enrichedCasts,
+      next: neynarCursor ? { cursor: neynarCursor } : null,
     });
   } catch (error: any) {
     console.error("Thinking API error:", error);

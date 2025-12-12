@@ -3,7 +3,7 @@ import { neynarClient } from "@/lib/neynar";
 import { trackCuratedCastInteraction } from "@/lib/interactions";
 import { LookupCastConversationTypeEnum } from "@neynar/nodejs-sdk/build/api";
 import { db } from "@/lib/db";
-import { curatedCasts, castReplies, thinkingCasts } from "@/lib/schema";
+import { curatedCasts, castReplies } from "@/lib/schema";
 import { eq, sql } from "drizzle-orm";
 import { isQuoteCast, extractQuotedCastHashes, getRootCastHash, fetchAndStoreConversation } from "@/lib/conversation";
 import { meetsCastQualityThreshold } from "@/lib/cast-quality";
@@ -518,41 +518,6 @@ export async function POST(request: NextRequest) {
       } catch (error: any) {
         // Don't fail the cast publish if database update fails
         console.error(`[Cast API] Error updating database for cast ${castHash}:`, error);
-      }
-    }
-
-    // Store cast if it has thinking URL as parent
-    // Check both the input parent parameter and the cast's parent_url field
-    const hasThinkingParent = parent === "https://www.depthcaster.com/thinking" || 
-                              fullCastData?.parent_url === "https://www.depthcaster.com/thinking";
-    
-    if (castHash && hasThinkingParent && fullCastData) {
-      try {
-        const { extractCastTimestamp } = await import("@/lib/cast-timestamp");
-        const { extractCastMetadata } = await import("@/lib/cast-metadata");
-        const metadata = extractCastMetadata(fullCastData as any);
-        
-        await db
-          .insert(thinkingCasts)
-          .values({
-            castHash: castHash,
-            castData: fullCastData,
-            castCreatedAt: extractCastTimestamp(fullCastData as any),
-            authorFid: metadata.authorFid,
-          })
-          .onConflictDoUpdate({
-            target: thinkingCasts.castHash,
-            set: {
-              castData: sql`excluded.cast_data`,
-              castCreatedAt: sql`excluded.cast_created_at`,
-              authorFid: sql`excluded.author_fid`,
-            },
-          });
-        
-        console.log(`[Cast API] Stored thinking cast ${castHash}`);
-      } catch (error: any) {
-        // Don't fail the cast publish if database update fails
-        console.error(`[Cast API] Error storing thinking cast ${castHash}:`, error);
       }
     }
 

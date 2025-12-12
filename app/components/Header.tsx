@@ -11,6 +11,7 @@ import { createPortal } from "react-dom";
 import { AvatarImage } from "./AvatarImage";
 import { analytics } from "@/lib/analytics";
 import { HelpCircle, User, Settings, Shield, Users, Download, Folder } from "lucide-react";
+import { throttle } from "@/lib/feedState";
 
 export function Header() {
   const { user } = useNeynarContext();
@@ -30,10 +31,13 @@ export function Header() {
   const [pfpDropdownPosition, setPfpDropdownPosition] = useState({ top: 0, right: 0 });
   const [helpDropdownPosition, setHelpDropdownPosition] = useState({ top: 0, right: 0 });
   const [mounted, setMounted] = useState(false);
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const pfpDropdownRef = useRef<HTMLDivElement>(null);
   const helpDropdownRef = useRef<HTMLDivElement>(null);
   const pfpButtonRef = useRef<HTMLButtonElement>(null);
   const helpButtonRef = useRef<HTMLButtonElement>(null);
+  const lastScrollY = useRef(0);
+  const scrollThreshold = 10; // Minimum scroll distance to trigger hide/show
 
   const checkPreviewAccess = useCallback(async (fid: number) => {
     try {
@@ -120,6 +124,31 @@ export function Header() {
       canRenderPortalsRef.current = false;
       setIsPfpDropdownOpen(false);
       setIsHelpDropdownOpen(false);
+    };
+  }, []);
+
+  // Track scroll direction and show/hide header
+  useEffect(() => {
+    const handleScroll = throttle(() => {
+      const currentScrollY = window.scrollY || document.documentElement.scrollTop;
+      const scrollDifference = Math.abs(currentScrollY - lastScrollY.current);
+
+      // Only update if scroll difference is significant
+      if (scrollDifference > scrollThreshold) {
+        if (currentScrollY > lastScrollY.current && currentScrollY > 100) {
+          // Scrolling down - hide header
+          setIsHeaderVisible(false);
+        } else if (currentScrollY < lastScrollY.current) {
+          // Scrolling up - show header
+          setIsHeaderVisible(true);
+        }
+        lastScrollY.current = currentScrollY;
+      }
+    }, 100);
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
     };
   }, []);
 
@@ -630,9 +659,10 @@ export function Header() {
         </div>
       )}
       <header 
-        className="sticky top-0 z-[200] bg-white/80 dark:bg-black/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 overflow-x-hidden w-full" 
+        className="sticky top-0 z-[200] bg-white/80 dark:bg-black/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 overflow-x-hidden w-full transition-transform duration-300 ease-in-out" 
         style={{ 
-          paddingTop: 'env(safe-area-inset-top, 0px)' 
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+          transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)'
         }}
       >
         <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between">

@@ -6,6 +6,7 @@ import { ProfileHeader } from "../../components/ProfileHeader";
 import { CastCard } from "../../components/CastCard";
 import { BulkCollectionSelectModal } from "../../components/BulkCollectionSelectModal";
 import { hasCollectionsOrAdminRole } from "@/lib/roles-client";
+import { ChevronDown, ChevronUp, LayoutGrid, List } from "lucide-react";
 
 interface UserProfile {
   fid: number;
@@ -37,10 +38,24 @@ export default function CuratePersonPage({
   const [hasCollectorRole, setHasCollectorRole] = useState(false);
   const [checkingRole, setCheckingRole] = useState(true);
   
+  // View toggle
+  const [viewMode, setViewMode] = useState<"mini" | "standard">("mini");
+  
   // Cast data
-  const [currentCast, setCurrentCast] = useState<any | null>(null);
   const [popularCasts, setPopularCasts] = useState<any[]>([]);
-  const [loadingCasts, setLoadingCasts] = useState(false);
+  const [chronoCasts, setChronoCasts] = useState<any[]>([]);
+  const [loadingPopular, setLoadingPopular] = useState(false);
+  const [loadingChrono, setLoadingChrono] = useState(false);
+  
+  // Pagination
+  const [popularCursor, setPopularCursor] = useState<string | null>(null);
+  const [chronoCursor, setChronoCursor] = useState<string | null>(null);
+  const [hasMorePopular, setHasMorePopular] = useState(false);
+  const [hasMoreChrono, setHasMoreChrono] = useState(false);
+  
+  // Collapsible sections
+  const [popularExpanded, setPopularExpanded] = useState(true);
+  const [chronoExpanded, setChronoExpanded] = useState(true);
   
   // Selection state
   const [selectedCasts, setSelectedCasts] = useState<Map<string, SelectedCast>>(new Map());
@@ -76,10 +91,11 @@ export default function CuratePersonPage({
     fetchProfile();
   }, [fidParam, user?.fid]);
 
-  // Fetch casts (after profile is loaded, we have the FID)
+  // Fetch initial casts (after profile is loaded, we have the FID)
   useEffect(() => {
     if (!profile?.fid) return;
-    fetchCasts();
+    fetchPopularCasts(10, null, true);
+    fetchChronoCasts(25, null, true);
   }, [profile?.fid, user?.fid]);
 
   const fetchProfile = async () => {
@@ -113,36 +129,73 @@ export default function CuratePersonPage({
     }
   };
 
-  const fetchCasts = async () => {
+  const fetchPopularCasts = async (limit: number, cursor: string | null, isInitial: boolean = false) => {
     if (!profile?.fid) return;
     
     try {
-      setLoadingCasts(true);
+      if (isInitial) {
+        setLoadingPopular(true);
+      }
       const viewerFid = user?.fid;
       const userFid = profile.fid;
 
-      // Fetch current cast (most recent, limit 1)
-      const currentResponse = await fetch(
-        `/api/user/${userFid}/casts?limit=1${viewerFid ? `&viewerFid=${viewerFid}` : ""}`
-      );
-      if (currentResponse.ok) {
-        const currentData = await currentResponse.json();
-        const casts = currentData.casts || [];
-        setCurrentCast(casts.length > 0 ? casts[0] : null);
-      }
-
-      // Fetch popular casts (top 25)
-      const popularResponse = await fetch(
-        `/api/user/${userFid}/popular-casts?limit=25${viewerFid ? `&viewerFid=${viewerFid}` : ""}`
-      );
-      if (popularResponse.ok) {
-        const popularData = await popularResponse.json();
-        setPopularCasts(popularData.casts || []);
+      const url = `/api/user/${userFid}/popular-casts?limit=${limit}${cursor ? `&cursor=${cursor}` : ""}${viewerFid ? `&viewerFid=${viewerFid}` : ""}`;
+      const response = await fetch(url);
+      
+      if (response.ok) {
+        const data = await response.json();
+        const casts = data.casts || [];
+        
+        if (isInitial) {
+          setPopularCasts(casts);
+        } else {
+          setPopularCasts((prev) => [...prev, ...casts]);
+        }
+        
+        setPopularCursor(data.next?.cursor || null);
+        setHasMorePopular(!!data.next?.cursor);
       }
     } catch (err: any) {
-      console.error("Failed to fetch casts:", err);
+      console.error("Failed to fetch popular casts:", err);
     } finally {
-      setLoadingCasts(false);
+      if (isInitial) {
+        setLoadingPopular(false);
+      }
+    }
+  };
+
+  const fetchChronoCasts = async (limit: number, cursor: string | null, isInitial: boolean = false) => {
+    if (!profile?.fid) return;
+    
+    try {
+      if (isInitial) {
+        setLoadingChrono(true);
+      }
+      const viewerFid = user?.fid;
+      const userFid = profile.fid;
+
+      const url = `/api/user/${userFid}/casts?limit=${limit}${cursor ? `&cursor=${cursor}` : ""}${viewerFid ? `&viewerFid=${viewerFid}` : ""}`;
+      const response = await fetch(url);
+      
+      if (response.ok) {
+        const data = await response.json();
+        const casts = data.casts || [];
+        
+        if (isInitial) {
+          setChronoCasts(casts);
+        } else {
+          setChronoCasts((prev) => [...prev, ...casts]);
+        }
+        
+        setChronoCursor(data.next?.cursor || null);
+        setHasMoreChrono(!!data.next?.cursor);
+      }
+    } catch (err: any) {
+      console.error("Failed to fetch chronological casts:", err);
+    } finally {
+      if (isInitial) {
+        setLoadingChrono(false);
+      }
     }
   };
 
@@ -178,6 +231,18 @@ export default function CuratePersonPage({
 
   const handleDeselectAll = () => {
     setSelectedCasts(new Map());
+  };
+
+  const handleLoadMorePopular = () => {
+    if (popularCursor && !loadingPopular) {
+      fetchPopularCasts(10, popularCursor, false);
+    }
+  };
+
+  const handleLoadMoreChrono = () => {
+    if (chronoCursor && !loadingChrono) {
+      fetchChronoCasts(25, chronoCursor, false);
+    }
   };
 
   if (checkingRole || loading) {
@@ -218,10 +283,7 @@ export default function CuratePersonPage({
 
   const viewerFid = user?.fid;
   const selectedCount = selectedCasts.size;
-  const allCasts = [
-    ...(currentCast ? [currentCast] : []),
-    ...popularCasts,
-  ];
+  const isMiniView = viewMode === "mini";
 
   return (
     <div className="min-h-screen">
@@ -241,13 +303,36 @@ export default function CuratePersonPage({
           onProfileUpdate={handleProfileUpdate}
         />
 
-        {/* Bulk Actions Bar */}
-        {selectedCount > 0 && (
-          <div className="sticky top-0 bg-white dark:bg-black border-b border-gray-200 dark:border-gray-800 z-40 p-4 mb-4">
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                {selectedCount} cast{selectedCount !== 1 ? "s" : ""} selected
+        {/* View Toggle and Bulk Actions Bar */}
+        <div className="sticky top-0 bg-white dark:bg-black border-b border-gray-200 dark:border-gray-800 z-40 p-4 mb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              {/* View Toggle */}
+              <div className="flex items-center gap-2 border border-gray-300 dark:border-gray-700 rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode("mini")}
+                  className={`p-1.5 rounded ${isMiniView ? "bg-blue-600 text-white" : "text-gray-600 dark:text-gray-400"}`}
+                  title="Mini View"
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode("standard")}
+                  className={`p-1.5 rounded ${!isMiniView ? "bg-blue-600 text-white" : "text-gray-600 dark:text-gray-400"}`}
+                  title="Standard View"
+                >
+                  <List className="w-4 h-4" />
+                </button>
               </div>
+              
+              {selectedCount > 0 && (
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  {selectedCount} cast{selectedCount !== 1 ? "s" : ""} selected
+                </div>
+              )}
+            </div>
+            
+            {selectedCount > 0 && (
               <div className="flex gap-2">
                 <button
                   onClick={handleDeselectAll}
@@ -262,58 +347,29 @@ export default function CuratePersonPage({
                   Add Selected to Collection
                 </button>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Current Cast Section */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-              Current Cast
-            </h2>
-            {currentCast && (
-              <button
-                onClick={() => handleSelectAll([currentCast])}
-                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-              >
-                Select
-              </button>
             )}
           </div>
-          {loadingCasts ? (
-            <div className="text-center text-gray-500 dark:text-gray-400 py-8">
-              Loading current cast...
-            </div>
-          ) : currentCast ? (
-            <div className="flex items-start gap-3">
-              <input
-                type="checkbox"
-                checked={selectedCasts.has(currentCast.hash)}
-                onChange={() => toggleCastSelection(currentCast)}
-                className="mt-4 w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-              />
-              <div className="flex-1">
-                <CastCard
-                  cast={currentCast}
-                  feedType="curated"
-                  disableClick={false}
-                />
-              </div>
-            </div>
-          ) : (
-            <div className="text-center text-gray-500 dark:text-gray-400 py-8">
-              No current cast found
-            </div>
-          )}
         </div>
 
         {/* Popular Casts Section */}
-        <div>
+        <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-              Popular Casts (Top 25)
-            </h2>
+            <button
+              onClick={() => setPopularExpanded(!popularExpanded)}
+              className="flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-gray-100 hover:text-gray-700 dark:hover:text-gray-300"
+            >
+              {popularExpanded ? (
+                <ChevronDown className="w-5 h-5" />
+              ) : (
+                <ChevronUp className="w-5 h-5" />
+              )}
+              <span>Popular Casts</span>
+              {popularCasts.length > 0 && (
+                <span className="text-sm font-normal text-gray-500 dark:text-gray-400">
+                  ({popularCasts.length})
+                </span>
+              )}
+            </button>
             {popularCasts.length > 0 && (
               <button
                 onClick={() => handleSelectAll(popularCasts)}
@@ -323,34 +379,129 @@ export default function CuratePersonPage({
               </button>
             )}
           </div>
-          {loadingCasts ? (
-            <div className="text-center text-gray-500 dark:text-gray-400 py-8">
-              Loading popular casts...
-            </div>
-          ) : popularCasts.length === 0 ? (
-            <div className="text-center text-gray-500 dark:text-gray-400 py-8">
-              No popular casts found
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {popularCasts.map((cast) => (
-                <div key={cast.hash} className="flex items-start gap-3">
-                  <input
-                    type="checkbox"
-                    checked={selectedCasts.has(cast.hash)}
-                    onChange={() => toggleCastSelection(cast)}
-                    className="mt-4 w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                  />
-                  <div className="flex-1">
-                    <CastCard
-                      cast={cast}
-                      feedType="curated"
-                      disableClick={false}
-                    />
-                  </div>
+          
+          {popularExpanded && (
+            <>
+              {loadingPopular && popularCasts.length === 0 ? (
+                <div className="text-center text-gray-500 dark:text-gray-400 py-8">
+                  Loading popular casts...
                 </div>
-              ))}
-            </div>
+              ) : popularCasts.length === 0 ? (
+                <div className="text-center text-gray-500 dark:text-gray-400 py-8">
+                  No popular casts found
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {popularCasts.map((cast) => (
+                    <div key={cast.hash} className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedCasts.has(cast.hash)}
+                        onChange={() => toggleCastSelection(cast)}
+                        className="mt-4 w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <div className="flex-1">
+                        <CastCard
+                          cast={cast}
+                          feedType="curated"
+                          disableClick={false}
+                          compressedView={isMiniView}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {hasMorePopular && (
+                    <div className="text-center pt-4">
+                      <button
+                        onClick={handleLoadMorePopular}
+                        disabled={loadingPopular}
+                        className="px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {loadingPopular ? "Loading..." : "Load More"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Chronological Casts Section */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <button
+              onClick={() => setChronoExpanded(!chronoExpanded)}
+              className="flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-gray-100 hover:text-gray-700 dark:hover:text-gray-300"
+            >
+              {chronoExpanded ? (
+                <ChevronDown className="w-5 h-5" />
+              ) : (
+                <ChevronUp className="w-5 h-5" />
+              )}
+              <span>Chronological Casts</span>
+              {chronoCasts.length > 0 && (
+                <span className="text-sm font-normal text-gray-500 dark:text-gray-400">
+                  ({chronoCasts.length})
+                </span>
+              )}
+            </button>
+            {chronoCasts.length > 0 && (
+              <button
+                onClick={() => handleSelectAll(chronoCasts)}
+                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                Select All
+              </button>
+            )}
+          </div>
+          
+          {chronoExpanded && (
+            <>
+              {loadingChrono && chronoCasts.length === 0 ? (
+                <div className="text-center text-gray-500 dark:text-gray-400 py-8">
+                  Loading chronological casts...
+                </div>
+              ) : chronoCasts.length === 0 ? (
+                <div className="text-center text-gray-500 dark:text-gray-400 py-8">
+                  No casts found
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {chronoCasts.map((cast) => (
+                    <div key={cast.hash} className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedCasts.has(cast.hash)}
+                        onChange={() => toggleCastSelection(cast)}
+                        className="mt-4 w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <div className="flex-1">
+                        <CastCard
+                          cast={cast}
+                          feedType="curated"
+                          disableClick={false}
+                          compressedView={isMiniView}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {hasMoreChrono && (
+                    <div className="text-center pt-4">
+                      <button
+                        onClick={handleLoadMoreChrono}
+                        disabled={loadingChrono}
+                        className="px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {loadingChrono ? "Loading..." : "Load More"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -369,4 +520,3 @@ export default function CuratePersonPage({
     </div>
   );
 }
-
