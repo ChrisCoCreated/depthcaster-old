@@ -396,26 +396,7 @@ export default function AdminStatisticsPage() {
                       ...day,
                       users: filteredUsers
                     };
-                  }).filter(day => day.users.length > 0); // Only show days with matching users
-                  
-                  if (filteredActiveUsers.length === 0) {
-                    return (
-                      <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                        <p>No users found matching your filter.</p>
-                        {(selectedUserFid !== null || userSearchQuery) && (
-                          <button
-                            onClick={() => {
-                              setSelectedUserFid(null);
-                              setUserSearchQuery("");
-                            }}
-                            className="mt-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
-                          >
-                            Clear filter
-                          </button>
-                        )}
-                      </div>
-                    );
-                  }
+                  }); // Show all days, even if no matching users
                   
                   return miniview ? (
                     <div className="overflow-x-auto">
@@ -457,7 +438,11 @@ export default function AdminStatisticsPage() {
                                       <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">(Today)</span>
                                     )}
                                     <div className="text-xs text-gray-500 dark:text-gray-400">
-                                      {day.users.length} active
+                                      {day.users.length > 0 ? (
+                                        <span>{day.users.length} active</span>
+                                      ) : (
+                                        <span className="text-gray-400 dark:text-gray-500 italic">No matches</span>
+                                      )}
                                     </div>
                                   </div>
                                 </td>
@@ -495,7 +480,7 @@ export default function AdminStatisticsPage() {
                                           </div>
                                         </div>
                                       );
-                                    })}
+                                    }))}
                                   </div>
                                 </td>
                               </tr>
@@ -536,12 +521,19 @@ export default function AdminStatisticsPage() {
                                   <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">(Today)</span>
                                 )}
                                 <div className="text-xs text-gray-500 dark:text-gray-400">
-                                  {day.users.length} active
+                                  {day.users.length > 0 ? (
+                                    <span>{day.users.length} active</span>
+                                  ) : (
+                                    <span className="text-gray-400 dark:text-gray-500 italic">No matches</span>
+                                  )}
                                 </div>
                               </div>
                             </div>
                             <div className="flex gap-1.5 overflow-x-auto pb-1">
-                              {sortedUsers.map((user) => {
+                              {sortedUsers.length === 0 ? (
+                                <span className="text-sm text-gray-400 dark:text-gray-500 italic">No users match the filter</span>
+                              ) : (
+                                sortedUsers.map((user) => {
                                 const displayName = user.displayName || user.username || `User ${user.fid}`;
                                 const isSelected = selectedUserFid === user.fid;
                                 return (
@@ -580,7 +572,7 @@ export default function AdminStatisticsPage() {
                                     </div>
                                   </div>
                                 );
-                              })}
+                              }))}
                             </div>
                           </div>
                         );
