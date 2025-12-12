@@ -354,8 +354,52 @@ export default function CollectionPage({
           </div>
         )}
 
-        {/* Text/Image-Text View */}
-        {(displayType === "text" || displayType === "image-text") && (
+        {/* Image-Text Gallery View */}
+        {displayType === "image-text" && images.length > 0 && (
+          <div className="pb-16">
+            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5">
+              {images.map((image, index) => (
+                <div
+                  key={`${image.castHash}-${index}`}
+                  className="flex flex-col"
+                >
+                  <button
+                    onClick={() => {
+                      setHasUserClosedModal(false);
+                      setIsModalOpen(true);
+                      setModalImageUrl(image.imageUrl);
+                      setCurrentIndex(index);
+                    }}
+                    className="relative group aspect-square overflow-hidden rounded-xl bg-black/5 dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+                  >
+                    <img
+                      src={image.imageUrl}
+                      alt={image.castText || "Collection image"}
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      loading={index < 6 ? "eager" : "lazy"}
+                      crossOrigin="anonymous"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        if (!target.src.includes("/api/image-proxy")) {
+                          target.src = `/api/image-proxy?url=${encodeURIComponent(image.imageUrl)}`;
+                        }
+                      }}
+                    />
+                    <div className="pointer-events-none absolute inset-0 rounded-xl border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </button>
+                  {image.castText && (
+                    <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-3 break-words">
+                      {image.castText}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Text View */}
+        {displayType === "text" && (
           <div className="space-y-4">
             {casts.map((cast) => (
               <CastCard
