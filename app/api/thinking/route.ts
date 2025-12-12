@@ -25,37 +25,24 @@ export async function GET(request: NextRequest) {
           type: LookupCastConversationTypeEnum.Url,
           replyDepth: 1, // Get direct replies
           viewerFid,
-          sortType: LookupCastConversationSortTypeEnum.Chronological,
+          sortType: LookupCastConversationSortTypeEnum.DescChron,
         });
       }
     );
 
     // Extract casts from the conversation
-    // For URL parents, the structure might be different
+    // For URL parents, replies are in cast.direct_replies
     let casts: any[] = [];
     
     const conv = conversation.conversation;
-    if (conv) {
-      // Try to get direct replies first
-      if (conv.direct_replies && Array.isArray(conv.direct_replies)) {
-        casts = conv.direct_replies;
-      } 
-      // If no direct_replies, check if there's a cast with replies
-      else if (conv.cast) {
-        // If the URL itself is a cast, get its replies
-        if (conv.cast.replies) {
-          casts = conv.cast.replies.casts || [];
-        }
-        // Otherwise, the cast itself might be the first reply
-        // Check if it has parent_url matching our URL
-        if (conv.cast.parent_url === THINKING_URL) {
-          casts = [conv.cast, ...casts];
-        }
+    if (conv?.cast) {
+      // Get direct replies from the cast
+      if (conv.cast.direct_replies && Array.isArray(conv.cast.direct_replies)) {
+        casts = conv.cast.direct_replies;
       }
-      // Check if there are other casts in the conversation
-      else if (conv.casts && Array.isArray(conv.casts)) {
-        // Filter casts that have parent_url matching our URL
-        casts = conv.casts.filter((cast: any) => cast.parent_url === THINKING_URL);
+      // If the cast itself has parent_url matching our URL, include it
+      else if (conv.cast.parent_url === THINKING_URL) {
+        casts = [conv.cast];
       }
     }
 
