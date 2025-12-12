@@ -522,7 +522,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Store cast if it has thinking URL as parent
-    if (castHash && parent === "https://www.depthcaster.com/thinking" && fullCastData) {
+    // Check both the input parent parameter and the cast's parent_url field
+    const hasThinkingParent = parent === "https://www.depthcaster.com/thinking" || 
+                              fullCastData?.parent_url === "https://www.depthcaster.com/thinking";
+    
+    if (castHash && hasThinkingParent && fullCastData) {
       try {
         const { extractCastTimestamp } = await import("@/lib/cast-timestamp");
         const { extractCastMetadata } = await import("@/lib/cast-metadata");

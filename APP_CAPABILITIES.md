@@ -541,3 +541,4 @@ The system is designed to be extensible with:
 ---
 
 This document provides a comprehensive overview of all capabilities in the Depthcaster application. The system is designed to be modular, extensible, and focused on quality content discovery and meaningful conversations.
+
