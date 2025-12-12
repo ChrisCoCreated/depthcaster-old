@@ -24,7 +24,7 @@ export type PlusRole = typeof PLUS_ROLES[number];
 /**
  * Centralized array of collections roles
  */
-export const COLLECTIONS_ROLES = ["collections"] as const;
+export const COLLECTIONS_ROLES = ["collections", "collector"] as const;
 
 export type CollectionsRole = typeof COLLECTIONS_ROLES[number];
 

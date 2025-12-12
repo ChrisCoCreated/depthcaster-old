@@ -5,7 +5,7 @@ import { useNeynarContext } from "@neynar/react";
 import { ProfileHeader } from "../../components/ProfileHeader";
 import { CastCard } from "../../components/CastCard";
 import { BulkCollectionSelectModal } from "../../components/BulkCollectionSelectModal";
-import { hasCollectionsRole } from "@/lib/roles-client";
+import { hasCollectionsOrAdminRole } from "@/lib/roles-client";
 
 interface UserProfile {
   fid: number;
@@ -59,7 +59,7 @@ export default function CuratePersonPage({
         if (response.ok) {
           const data = await response.json();
           const roles = data.roles || [];
-          setHasCollectorRole(hasCollectionsRole(roles));
+          setHasCollectorRole(hasCollectionsOrAdminRole(roles));
         }
       } catch (error) {
         console.error("Failed to check role:", error);
