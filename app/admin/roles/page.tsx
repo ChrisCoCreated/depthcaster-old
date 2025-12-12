@@ -15,7 +15,7 @@ interface UserWithRoles {
   lastActivity: string | null;
 }
 
-const VALID_ROLES = ["tester", "curator", "admin", "superadmin", "plus"] as const;
+const VALID_ROLES = ["tester", "curator", "admin", "superadmin", "plus", "collector"] as const;
 type ValidRole = typeof VALID_ROLES[number];
 
 export default function AdminRolesPage() {
@@ -313,6 +313,8 @@ export default function AdminRolesPage() {
         return "bg-orange-100 dark:bg-orange-900/20 text-orange-800 dark:text-orange-200 border-orange-300 dark:border-orange-700";
       case "plus":
         return "bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700";
+      case "collector":
+        return "bg-indigo-100 dark:bg-indigo-900/20 text-indigo-800 dark:text-indigo-200 border-indigo-300 dark:border-indigo-700";
       default:
         return "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-700";
     }
@@ -429,7 +431,7 @@ thanks and looking forward to what you curate!`;
           User Roles Management
         </h1>
         <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
-          Manage user roles: curator, admin, superadmin, tester, and plus
+          Manage user roles: curator, admin, superadmin, tester, plus, and collector
         </p>
       </div>
 
