@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     const roles = await getUserRoles(curatorFidNum);
     if (!hasCollectionsOrAdminRole(roles)) {
       return NextResponse.json(
-        { error: "User does not have collections role" },
+        { error: "User does not have collector role" },
         { status: 403 }
       );
     }

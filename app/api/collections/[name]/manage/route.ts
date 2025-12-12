@@ -35,7 +35,7 @@ export async function PUT(
       return NextResponse.json({ error: "Collection not found" }, { status: 404 });
     }
 
-    // Allow editing if user is the creator OR has collections/admin role
+    // Allow editing if user is the creator OR has collector/admin role
     const isCreator = existing[0].creatorFid === adminFidNum;
     const roles = await getUserRoles(adminFidNum);
     const hasRole = hasCollectionsOrAdminRole(roles);
@@ -118,7 +118,7 @@ export async function DELETE(
     }
     const roles = await getUserRoles(adminFidNum);
     if (!hasCollectionsOrAdminRole(roles)) {
-      return NextResponse.json({ error: "User does not have admin, superadmin, or collections role" }, { status: 403 });
+      return NextResponse.json({ error: "User does not have admin, superadmin, or collector role" }, { status: 403 });
     }
 
     const existing = await db.select().from(collections).where(eq(collections.name, name)).limit(1);

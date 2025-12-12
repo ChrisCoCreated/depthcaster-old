@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
     }
     const roles = await getUserRoles(adminFidNum);
     if (!hasCollectionsOrAdminRole(roles)) {
-      return NextResponse.json({ error: "User does not have admin, superadmin, or collections role" }, { status: 403 });
+      return NextResponse.json({ error: "User does not have admin, superadmin, or collector role" }, { status: 403 });
     }
 
     if (!name) {

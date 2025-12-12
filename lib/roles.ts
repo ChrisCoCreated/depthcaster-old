@@ -20,9 +20,9 @@ export const PLUS_ROLES = ["plus"] as const;
 export type PlusRole = typeof PLUS_ROLES[number];
 
 /**
- * Centralized array of collections roles
+ * Centralized array of collector roles
  */
-export const COLLECTIONS_ROLES = ["collections", "collector"] as const;
+export const COLLECTIONS_ROLES = ["collector"] as const;
 
 export type CollectionsRole = typeof COLLECTIONS_ROLES[number];
 
@@ -137,7 +137,7 @@ export async function getAllCuratorFids(): Promise<number[]> {
 }
 
 /**
- * Check if any role in the array is collections role
+ * Check if any role in the array is collector role
  */
 export function hasCollectionsRole(roles: string[] | string | null | undefined): boolean {
   if (!roles) return false;
@@ -146,7 +146,7 @@ export function hasCollectionsRole(roles: string[] | string | null | undefined):
 }
 
 /**
- * Check if any role in the array is collections role or admin/superadmin
+ * Check if any role in the array is collector role or admin/superadmin
  */
 export function hasCollectionsOrAdminRole(roles: string[] | string | null | undefined): boolean {
   if (!roles) return false;
@@ -155,7 +155,7 @@ export function hasCollectionsOrAdminRole(roles: string[] | string | null | unde
 }
 
 /**
- * Check if user has collections role (fetches roles from DB if needed)
+ * Check if user has collector role (fetches roles from DB if needed)
  */
 export async function hasCollectionsRoleUser(user: User | null | undefined, roles?: string[]): Promise<boolean> {
   if (!user) return false;
@@ -164,7 +164,7 @@ export async function hasCollectionsRoleUser(user: User | null | undefined, role
 }
 
 /**
- * Check if user has collections role or admin role (fetches roles from DB if needed)
+ * Check if user has collector role or admin role (fetches roles from DB if needed)
  */
 export async function hasCollectionsOrAdminRoleUser(user: User | null | undefined, roles?: string[]): Promise<boolean> {
   if (!user) return false;

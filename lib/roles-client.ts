@@ -22,9 +22,9 @@ export const PLUS_ROLES = ["plus"] as const;
 export type PlusRole = typeof PLUS_ROLES[number];
 
 /**
- * Centralized array of collections roles
+ * Centralized array of collector roles
  */
-export const COLLECTIONS_ROLES = ["collections", "collector"] as const;
+export const COLLECTIONS_ROLES = ["collector"] as const;
 
 export type CollectionsRole = typeof COLLECTIONS_ROLES[number];
 
@@ -66,7 +66,7 @@ export function hasPlusRole(roles: string[] | string | null | undefined): boolea
 }
 
 /**
- * Check if any role in the array is collections role
+ * Check if any role in the array is collector role
  */
 export function hasCollectionsRole(roles: string[] | string | null | undefined): boolean {
   if (!roles) return false;
@@ -75,7 +75,7 @@ export function hasCollectionsRole(roles: string[] | string | null | undefined):
 }
 
 /**
- * Check if any role in the array is collections role or admin/superadmin
+ * Check if any role in the array is collector role or admin/superadmin
  */
 export function hasCollectionsOrAdminRole(roles: string[] | string | null | undefined): boolean {
   if (!roles) return false;
