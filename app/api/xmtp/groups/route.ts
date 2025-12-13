@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     if (!client) {
       return NextResponse.json(
         { error: "XMTP client not initialized. Please initialize first." },
-        { status: 400 }
+        { status: 404 }
       );
     }
 

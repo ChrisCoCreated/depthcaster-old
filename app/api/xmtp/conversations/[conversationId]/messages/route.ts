@@ -31,12 +31,22 @@ export async function GET(
     if (!client) {
       return NextResponse.json(
         { error: "XMTP client not initialized. Please initialize first." },
-        { status: 400 }
+        { status: 404 }
       );
     }
 
     // Get conversation from XMTP
-    const conversations = await client.conversations.list();
+    let conversations: any[] = [];
+    try {
+      conversations = await client.conversations.list();
+    } catch (error: any) {
+      console.error("Error listing conversations:", error);
+      return NextResponse.json(
+        { error: "Failed to list conversations" },
+        { status: 500 }
+      );
+    }
+    
     const conversation = conversations.find((c) => c.topic === conversationId);
 
     if (!conversation) {
@@ -47,9 +57,18 @@ export async function GET(
     }
 
     // Get messages from XMTP
-    const messages = await conversation.messages({
-      limit,
-    });
+    let messages: any[] = [];
+    try {
+      messages = await conversation.messages({
+        limit,
+      });
+    } catch (error: any) {
+      console.error("Error fetching messages:", error);
+      return NextResponse.json(
+        { error: "Failed to fetch messages" },
+        { status: 500 }
+      );
+    }
 
     // Get local messages for persistence
     const localMessages = await db
@@ -102,12 +121,22 @@ export async function POST(
     if (!client) {
       return NextResponse.json(
         { error: "XMTP client not initialized. Please initialize first." },
-        { status: 400 }
+        { status: 404 }
       );
     }
 
     // Get conversation from XMTP
-    const conversations = await client.conversations.list();
+    let conversations: any[] = [];
+    try {
+      conversations = await client.conversations.list();
+    } catch (error: any) {
+      console.error("Error listing conversations:", error);
+      return NextResponse.json(
+        { error: "Failed to list conversations" },
+        { status: 500 }
+      );
+    }
+    
     const conversation = conversations.find((c) => c.topic === conversationId);
 
     if (!conversation) {
@@ -118,7 +147,16 @@ export async function POST(
     }
 
     // Send message
-    const sentMessage = await conversation.send(content);
+    let sentMessage: any;
+    try {
+      sentMessage = await conversation.send(content);
+    } catch (error: any) {
+      console.error("Error sending message:", error);
+      return NextResponse.json(
+        { error: error.message || "Failed to send message" },
+        { status: 500 }
+      );
+    }
 
     // Store message locally
     await db.insert(xmtpMessages).values({

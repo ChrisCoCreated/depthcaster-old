@@ -112,7 +112,7 @@ export async function POST(
     if (!client) {
       return NextResponse.json(
         { error: "XMTP client not initialized. Please initialize first." },
-        { status: 400 }
+        { status: 404 }
       );
     }
 

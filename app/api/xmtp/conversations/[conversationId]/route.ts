@@ -30,12 +30,22 @@ export async function GET(
     if (!client) {
       return NextResponse.json(
         { error: "XMTP client not initialized. Please initialize first." },
-        { status: 400 }
+        { status: 404 }
       );
     }
 
     // Get conversation from XMTP
-    const conversations = await client.conversations.list();
+    let conversations: any[] = [];
+    try {
+      conversations = await client.conversations.list();
+    } catch (error: any) {
+      console.error("Error listing conversations:", error);
+      return NextResponse.json(
+        { error: "Failed to list conversations" },
+        { status: 500 }
+      );
+    }
+    
     const conversation = conversations.find((c) => c.topic === conversationId);
 
     if (!conversation) {

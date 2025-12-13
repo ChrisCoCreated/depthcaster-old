@@ -25,14 +25,19 @@ export async function GET(request: NextRequest) {
     // Get XMTP client
     const client = await getClientForUser(fid, address);
     if (!client) {
-      return NextResponse.json(
-        { error: "XMTP client not initialized. Please initialize first." },
-        { status: 400 }
-      );
+      // Return empty list if client not initialized instead of error
+      return NextResponse.json({ conversations: [] });
     }
 
     // List conversations from XMTP
-    const conversations = await client.conversations.list();
+    let conversations: Conversation[] = [];
+    try {
+      conversations = await client.conversations.list();
+    } catch (error: any) {
+      console.error("Error listing XMTP conversations:", error);
+      // Return empty list on error instead of failing
+      return NextResponse.json({ conversations: [] });
+    }
 
     // Get local conversation records
     const localConversations = await db
@@ -117,16 +122,26 @@ export async function POST(request: NextRequest) {
     if (!client) {
       return NextResponse.json(
         { error: "XMTP client not initialized. Please initialize first." },
-        { status: 400 }
+        { status: 404 }
       );
     }
 
     // Check if address can receive messages
-    const canMsg = await client.canMessage(peer);
+    let canMsg = false;
+    try {
+      canMsg = await client.canMessage(peer);
+    } catch (error: any) {
+      console.error("Error checking if address can message:", error);
+      return NextResponse.json(
+        { error: "Unable to verify if address can receive messages" },
+        { status: 500 }
+      );
+    }
+    
     if (!canMsg) {
       return NextResponse.json(
         { error: "Address is not on XMTP network" },
-        { status: 400 }
+        { status: 422 }
       );
     }
 
