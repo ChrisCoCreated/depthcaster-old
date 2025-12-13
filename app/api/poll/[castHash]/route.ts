@@ -200,3 +200,74 @@ export async function POST(
   }
 }
 
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ castHash: string }> }
+) {
+  try {
+    const { castHash } = await params;
+    const body = await request.json();
+    const { userFid } = body;
+
+    if (!castHash) {
+      return NextResponse.json(
+        { error: "Cast hash is required" },
+        { status: 400 }
+      );
+    }
+
+    if (!userFid) {
+      return NextResponse.json(
+        { error: "User FID is required" },
+        { status: 400 }
+      );
+    }
+
+    const fid = parseInt(userFid);
+    if (isNaN(fid)) {
+      return NextResponse.json(
+        { error: "Invalid FID" },
+        { status: 400 }
+      );
+    }
+
+    // Check if user is admin
+    const roles = await getUserRoles(fid);
+    if (!isAdmin(roles)) {
+      return NextResponse.json(
+        { error: "Unauthorized: Admin role required" },
+        { status: 403 }
+      );
+    }
+
+    // Check if poll exists
+    const existingPoll = await db
+      .select()
+      .from(polls)
+      .where(eq(polls.castHash, castHash))
+      .limit(1);
+
+    if (existingPoll.length === 0) {
+      return NextResponse.json(
+        { error: "Poll not found" },
+        { status: 404 }
+      );
+    }
+
+    // Delete poll (cascading deletes will handle options and responses)
+    await db.delete(polls).where(eq(polls.castHash, castHash));
+
+    return NextResponse.json({
+      success: true,
+      message: "Poll deleted successfully",
+    });
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    console.error("Poll DELETE API error:", err.message || error);
+    return NextResponse.json(
+      { error: err.message || "Failed to delete poll" },
+      { status: 500 }
+    );
+  }
+}
+

@@ -23,6 +23,7 @@ import {
   UserX,
   MessageCircle,
   FolderKanban,
+  Vote,
 } from "lucide-react";
 import { AvatarImage } from "@/app/components/AvatarImage";
 
@@ -42,6 +43,7 @@ const navItems: NavItem[] = [
   { href: "/admin/tags", label: "Cast Tags", icon: TagIcon, section: "content" },
   { href: "/admin/cast-quotes", label: "Cast Quotes", icon: MessageCircle, section: "content" },
   { href: "/admin/collections", label: "Collections", icon: FolderKanban, section: "content" },
+  { href: "/admin/polls", label: "Polls", icon: Vote, section: "content" },
   { href: "/admin/curators-leaderboard", label: "Curators Leaderboard", icon: Award, section: "content" },
   { href: "/admin/quality", label: "Quality Filter", icon: Filter, section: "content" },
   { href: "/admin/build-ideas", label: "Build Ideas", icon: Lightbulb, section: "system" },
