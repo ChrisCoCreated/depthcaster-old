@@ -140,3 +140,4 @@ export function ChatList({ walletAddress, onSelectConversation }: ChatListProps)
   );
 }
 
+
