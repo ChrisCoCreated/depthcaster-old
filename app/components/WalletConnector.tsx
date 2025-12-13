@@ -149,11 +149,57 @@ export function WalletConnector({ onConnected, onInitialized }: WalletConnectorP
       // Export and store keys on server
       // These keys may be newly created OR existing keys from other apps
       try {
-        // Try to get keys from the client
-        // XMTP v7 API - keys are stored internally, we need to export them
-        const keys = await (client as any).exportKey?.() || await (client as any).exportKeyBundle?.() || await (client as any).getKeys?.();
-        if (keys) {
-          const keysArray = keys instanceof Uint8Array ? Array.from(keys) : keys;
+        // XMTP v7: Try multiple methods to export keys
+        let keys: Uint8Array | null = null;
+        
+        // Debug: Log available methods on client
+        console.log("XMTP Client object keys:", Object.keys(client));
+        console.log("XMTP Client keystore:", (client as any).keystore ? Object.keys((client as any).keystore) : "no keystore");
+        
+        // Method 1: Try keystore exportKeyBundle
+        if ((client as any).keystore?.exportKeyBundle) {
+          try {
+            keys = await (client as any).keystore.exportKeyBundle();
+            console.log("Exported keys via keystore.exportKeyBundle");
+          } catch (e) {
+            console.warn("keystore.exportKeyBundle failed:", e);
+          }
+        }
+        // Method 2: Try direct exportKeyBundle
+        if (!keys && (client as any).exportKeyBundle) {
+          try {
+            keys = await (client as any).exportKeyBundle();
+            console.log("Exported keys via exportKeyBundle");
+          } catch (e) {
+            console.warn("exportKeyBundle failed:", e);
+          }
+        }
+        // Method 3: Try exportKey
+        if (!keys && (client as any).exportKey) {
+          try {
+            keys = await (client as any).exportKey();
+            console.log("Exported keys via exportKey");
+          } catch (e) {
+            console.warn("exportKey failed:", e);
+          }
+        }
+        // Method 4: Try accessing privateKey directly
+        if (!keys && (client as any).privateKey) {
+          keys = (client as any).privateKey;
+          console.log("Got keys via privateKey");
+        }
+        // Method 5: Try keystore.getPrivateKey
+        if (!keys && (client as any).keystore?.getPrivateKey) {
+          try {
+            keys = await (client as any).keystore.getPrivateKey();
+            console.log("Exported keys via keystore.getPrivateKey");
+          } catch (e) {
+            console.warn("keystore.getPrivateKey failed:", e);
+          }
+        }
+
+        if (keys && keys instanceof Uint8Array) {
+          const keysArray = Array.from(keys);
           const response = await fetch("/api/xmtp/init", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -168,13 +214,16 @@ export function WalletConnector({ onConnected, onInitialized }: WalletConnectorP
             const data = await response.json();
             throw new Error(data.error || "Failed to store XMTP keys");
           }
+          console.log("XMTP keys stored successfully");
         } else {
-          console.warn("Could not export keys from XMTP client - keys may not be accessible");
+          console.warn("Could not export keys from XMTP client - keys may not be accessible. Client address:", client.address);
+          // Still mark as initialized since the client works, but keys won't be persisted
+          // This means the user will need to re-initialize on each session
         }
       } catch (error: any) {
-        console.warn("Could not store XMTP keys:", error);
+        console.error("Error storing XMTP keys:", error);
         // Continue anyway - the client is initialized and can be used
-        // Keys will be stored on next initialization attempt
+        // Keys will need to be re-exported on next initialization
       }
 
       setIsInitialized(true);

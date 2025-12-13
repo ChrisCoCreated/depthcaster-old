@@ -133,10 +133,34 @@ export async function initializeXmtpClient(
   // Try to get keys from the client's keystore
   // These keys may be newly created OR existing keys from other apps
   try {
-    // Try to export keys - this will get existing keys if wallet was already registered
-    const keys = await (client as any).exportKey?.() || await (client as any).exportKeyBundle?.() || await (client as any).getKeys?.();
-    if (keys) {
+    // XMTP v7: Try multiple methods to export keys
+    let keys: Uint8Array | null = null;
+    
+    // Method 1: Try keystore export
+    if ((client as any).keystore?.exportKeyBundle) {
+      keys = await (client as any).keystore.exportKeyBundle();
+    }
+    // Method 2: Try direct exportKeyBundle
+    else if ((client as any).exportKeyBundle) {
+      keys = await (client as any).exportKeyBundle();
+    }
+    // Method 3: Try exportKey
+    else if ((client as any).exportKey) {
+      keys = await (client as any).exportKey();
+    }
+    // Method 4: Try accessing privateKey directly
+    else if ((client as any).privateKey) {
+      keys = (client as any).privateKey;
+    }
+    // Method 5: Try keystore.getPrivateKey
+    else if ((client as any).keystore?.getPrivateKey) {
+      keys = await (client as any).keystore.getPrivateKey();
+    }
+
+    if (keys && keys instanceof Uint8Array) {
       await storeClientKeys(address, keys);
+    } else {
+      console.warn("Could not export keys from XMTP client - no valid export method found");
     }
   } catch (error) {
     console.warn("Could not export keys from XMTP client:", error);
@@ -184,9 +208,34 @@ export async function getOrCreateClient(
   
   // Store keys in database for this user
   try {
-    const keys = await (client as any).exportKey?.() || await (client as any).exportKeyBundle?.();
-    if (keys) {
+    // XMTP v7: Try multiple methods to export keys
+    let keys: Uint8Array | null = null;
+    
+    // Method 1: Try keystore export
+    if ((client as any).keystore?.exportKeyBundle) {
+      keys = await (client as any).keystore.exportKeyBundle();
+    }
+    // Method 2: Try direct exportKeyBundle
+    else if ((client as any).exportKeyBundle) {
+      keys = await (client as any).exportKeyBundle();
+    }
+    // Method 3: Try exportKey
+    else if ((client as any).exportKey) {
+      keys = await (client as any).exportKey();
+    }
+    // Method 4: Try accessing privateKey directly
+    else if ((client as any).privateKey) {
+      keys = (client as any).privateKey;
+    }
+    // Method 5: Try keystore.getPrivateKey
+    else if ((client as any).keystore?.getPrivateKey) {
+      keys = await (client as any).keystore.getPrivateKey();
+    }
+
+    if (keys && keys instanceof Uint8Array) {
       await storeClientKeysForUser(userFid, address, keys);
+    } else {
+      console.warn("Could not export keys from XMTP client - no valid export method found");
     }
   } catch (error) {
     console.warn("Could not export keys from XMTP client:", error);

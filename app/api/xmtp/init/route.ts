@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getClientForUser, storeClientKeysForUser } from "@/lib/xmtp-server";
+import { getClientForUser, storeClientKeysForUser, getOrCreateClient, createXmtpSigner } from "@/lib/xmtp-server";
 import { getAddress, type Address } from "viem";
+import { createWalletClient, custom, http } from "viem";
+import { mainnet } from "viem/chains";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { userFid, walletAddress, keys } = body;
+    const { userFid, walletAddress, keys, signature, message } = body;
 
-    if (!userFid || !walletAddress || !keys) {
+    if (!userFid || !walletAddress) {
       return NextResponse.json(
-        { error: "userFid, walletAddress, and keys are required" },
+        { error: "userFid and walletAddress are required" },
         { status: 400 }
       );
     }
@@ -38,16 +40,27 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Store the keys (which may be from existing XMTP identity or newly created)
-    const keysArray = new Uint8Array(keys);
-    await storeClientKeysForUser(fid, address, keysArray);
+    // If keys are provided from client-side, store them
+    if (keys && Array.isArray(keys)) {
+      const keysArray = new Uint8Array(keys);
+      await storeClientKeysForUser(fid, address, keysArray);
+      return NextResponse.json({
+        success: true,
+        address,
+        env: process.env.XMTP_ENV || "dev",
+        initialized: true,
+      });
+    }
 
-    return NextResponse.json({
-      success: true,
-      address,
-      env: process.env.XMTP_ENV || "dev",
-      initialized: true,
-    });
+    // If no keys but we have signature, we can't initialize server-side without a signer
+    // The client should initialize and send keys
+    return NextResponse.json(
+      { 
+        error: "Keys are required. Please initialize XMTP client on the client side first.",
+        requiresClientInitialization: true 
+      },
+      { status: 400 }
+    );
   } catch (error: any) {
     console.error("Error storing XMTP client keys:", error);
     return NextResponse.json(
