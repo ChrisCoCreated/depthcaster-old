@@ -119,7 +119,7 @@ interface Statistics {
       pfpUrl: string | null;
       lastVisit: string;
     }>;
-    neverVisited: Array<{
+    neverSignedIn: Array<{
       fid: number;
       username: string | null;
       displayName: string | null;
@@ -652,14 +652,14 @@ export default function AdminStatisticsPage() {
                 </div>
                 {expandedSections.inactiveCurators && (
                   <div className="space-y-6">
-                    {/* Never Visited */}
-                    {statistics.inactiveCurators.neverVisited && statistics.inactiveCurators.neverVisited.length > 0 && (
+                    {/* Never Signed In */}
+                    {statistics.inactiveCurators.neverSignedIn && statistics.inactiveCurators.neverSignedIn.length > 0 && (
                       <div>
                         <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-                          Never Visited ({statistics.inactiveCurators.neverVisited.length})
+                          Never Signed In ({statistics.inactiveCurators.neverSignedIn.length})
                         </h4>
                         <div className="flex flex-wrap gap-2">
-                          {statistics.inactiveCurators.neverVisited.map((curator) => {
+                          {statistics.inactiveCurators.neverSignedIn.map((curator) => {
                             const displayName = curator.displayName || curator.username || `User ${curator.fid}`;
                             return (
                               <div
@@ -754,7 +754,7 @@ export default function AdminStatisticsPage() {
                       </div>
                     )}
 
-                      {(!statistics.inactiveCurators.neverVisited || statistics.inactiveCurators.neverVisited.length === 0) &&
+                      {(!statistics.inactiveCurators.neverSignedIn || statistics.inactiveCurators.neverSignedIn.length === 0) &&
                       (!statistics.inactiveCurators.notVisited14Days || statistics.inactiveCurators.notVisited14Days.length === 0) &&
                       (!statistics.inactiveCurators.notVisited7Days || statistics.inactiveCurators.notVisited7Days.length === 0) && (
                         <div className="text-center py-8 text-gray-500 dark:text-gray-400">

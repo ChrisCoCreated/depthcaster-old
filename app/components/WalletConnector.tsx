@@ -41,20 +41,25 @@ export function WalletConnector({ onConnected, onInitialized }: WalletConnectorP
     }
   };
 
-  const checkInitialization = async (address: Address) => {
-    if (!user?.fid) return;
+  const checkInitialization = async (address: Address): Promise<boolean> => {
+    if (!user?.fid) return false;
 
     try {
       const response = await fetch(
         `/api/xmtp/init?userFid=${user.fid}&walletAddress=${address}`
       );
       if (response.ok) {
-        setIsInitialized(true);
-        onInitialized?.(address);
+        const data = await response.json();
+        if (data.initialized || data.success) {
+          setIsInitialized(true);
+          onInitialized?.(address);
+          return true;
+        }
       }
     } catch (error) {
       // Not initialized yet
     }
+    return false;
   };
 
   const connectWallet = async () => {

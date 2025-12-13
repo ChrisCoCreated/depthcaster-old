@@ -869,27 +869,25 @@ export async function GET(request: NextRequest) {
             return {
               notVisited7Days: [],
               notVisited14Days: [],
-              neverVisited: [],
+              neverSignedIn: [],
               miniappInstalled: [],
               miniappNotInstalled: [],
             };
           }
 
-          // Filter out active users from curator FIDs
-          const inactiveCuratorFids = curatorFids.filter(fid => !activeUserFidsSet.has(fid));
-
-          const sevenDaysAgo = new Date();
-          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-          const fourteenDaysAgo = new Date();
-          fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
-
-          // Get last visit date for each curator from all activity sources:
-          // feed_view_sessions, cast_views, page_views, curator_cast_curations, curated_cast_interactions, sign_in_logs
-          // Exclude active users from this query
+          // Get last visit date for active users (past 30 days) from all activity sources
+          // We want to find which of these active users have been inactive for >7 or >14 days
           const activeUserFidsArray = Array.from(activeUserFidsSet);
-          const activeUserExclusion = activeUserFidsArray.length > 0
-            ? sql`AND user_fid NOT IN (${sql.join(activeUserFidsArray.map(fid => sql`${fid}`), sql`, `)})`
-            : sql``;
+          
+          if (activeUserFidsArray.length === 0) {
+            return {
+              notVisited7Days: [],
+              notVisited14Days: [],
+              neverSignedIn: [],
+              miniappInstalled: [],
+              miniappNotInstalled: [],
+            };
+          }
 
           const lastVisits = await db.execute(sql`
             WITH curator_visits AS (
@@ -913,8 +911,7 @@ export async function GET(request: NextRequest) {
                   WHERE user_fid IS NOT NULL 
                   AND success = true
               ) AS all_visits
-              WHERE user_fid = ANY(${sql.raw(`ARRAY[${inactiveCuratorFids.length > 0 ? inactiveCuratorFids.join(',') : 'NULL'}]`)})
-                ${activeUserExclusion}
+              WHERE user_fid = ANY(${sql.raw(`ARRAY[${activeUserFidsArray.join(',')}]`)})
               GROUP BY user_fid
             )
             SELECT
@@ -936,29 +933,60 @@ export async function GET(request: NextRequest) {
               pfpUrl: row.pfpUrl,
             });
           }
-
-
-          // Get user info for curators who never visited (no activity at all, including sign-in)
-          // First, filter out any FIDs that are in visitsMap (they have some activity)
-          let neverVisitedFids = inactiveCuratorFids.filter(fid => !visitsMap.has(fid));
           
-          // Additional safeguard: verify these users don't have sign-in logs
-          // If they have sign-in logs, they should have been in visitsMap, but double-check
-          if (neverVisitedFids.length > 0) {
-            const signInCheck = await db.execute(sql`
-              SELECT DISTINCT user_fid
-              FROM sign_in_logs
-              WHERE user_fid IS NOT NULL
-                AND success = true
-                AND user_fid = ANY(${sql.raw(`ARRAY[${neverVisitedFids.length > 0 ? neverVisitedFids.join(',') : 'NULL'}]`)})
-            `);
-            
-            const signInFids = new Set((signInCheck as any).rows?.map((r: any) => r.user_fid) || []);
-            // Remove any FIDs that have sign-in logs from neverVisitedFids
-            neverVisitedFids = neverVisitedFids.filter(fid => !signInFids.has(fid));
+          // For active users not in visitsMap, get their user info and use the most recent date from activeUsersResult
+          // This handles edge cases where they might have activity but it's not captured in the query
+          for (const fid of activeUserFidsArray) {
+            if (!visitsMap.has(fid)) {
+              // Find the most recent activity date from activeUsersResult
+              let mostRecentDate: Date | null = null;
+              let userInfo: { username: string | null; displayName: string | null; pfpUrl: string | null } | null = null;
+              
+              for (const day of activeUsersResult) {
+                const userInDay = day.users.find(u => u.fid === fid);
+                if (userInDay) {
+                  const dayDate = new Date(day.date);
+                  if (!mostRecentDate || dayDate > mostRecentDate) {
+                    mostRecentDate = dayDate;
+                    userInfo = {
+                      username: userInDay.username,
+                      displayName: userInDay.displayName,
+                      pfpUrl: userInDay.pfpUrl,
+                    };
+                  }
+                }
+              }
+              
+              // If we found activity in activeUsersResult, use that date
+              // Otherwise, skip this user as they shouldn't be in the inactive list
+              if (mostRecentDate && userInfo) {
+                visitsMap.set(fid, {
+                  lastVisit: mostRecentDate,
+                  username: userInfo.username,
+                  displayName: userInfo.displayName,
+                  pfpUrl: userInfo.pfpUrl,
+                });
+              }
+            }
           }
+
+
+          // Get curators who have never signed in (no successful sign-in records)
+          // Check all curators (not just inactive ones) for this check
+          const curatorsWithSignIn = await db.execute(sql`
+            SELECT DISTINCT user_fid
+            FROM sign_in_logs
+            WHERE user_fid IS NOT NULL
+              AND success = true
+              AND user_fid = ANY(${sql.raw(`ARRAY[${curatorFids.length > 0 ? curatorFids.join(',') : 'NULL'}]`)})
+          `);
           
-          const neverVisitedUsers = neverVisitedFids.length > 0
+          const signInFidsSet = new Set((curatorsWithSignIn as any).rows?.map((r: any) => r.user_fid) || []);
+          
+          // Find curators who have never signed in
+          const neverSignedInFids = curatorFids.filter(fid => !signInFidsSet.has(fid));
+          
+          const neverSignedInUsers = neverSignedInFids.length > 0
             ? await db.select({
                 fid: users.fid,
                 username: users.username,
@@ -966,18 +994,19 @@ export async function GET(request: NextRequest) {
                 pfpUrl: users.pfpUrl,
               })
               .from(users)
-              .where(sql`fid = ANY(${sql.raw(`ARRAY[${neverVisitedFids.length > 0 ? neverVisitedFids.join(',') : 'NULL'}]`)})`)
+              .where(sql`fid = ANY(${sql.raw(`ARRAY[${neverSignedInFids.length > 0 ? neverSignedInFids.join(',') : 'NULL'}]`)})`)
             : [];
 
           const now = new Date();
           const notVisited7Days: Array<{ fid: number; username: string | null; displayName: string | null; pfpUrl: string | null; lastVisit: Date }> = [];
           const notVisited14Days: Array<{ fid: number; username: string | null; displayName: string | null; pfpUrl: string | null; lastVisit: Date }> = [];
 
-          // Filter out active users from the visits map before categorizing
-          for (const [fid, visit] of visitsMap.entries()) {
-            // Skip if this user is in the active users list
-            if (activeUserFidsSet.has(fid)) {
-              continue;
+          // Categorize active users based on their last visit date
+          // Only include users who are in the active users list (past 30 days)
+          for (const fid of activeUserFidsArray) {
+            const visit = visitsMap.get(fid);
+            if (!visit) {
+              continue; // Skip if we don't have visit data
             }
             
             const daysSinceVisit = Math.floor((now.getTime() - visit.lastVisit.getTime()) / (1000 * 60 * 60 * 24));
@@ -1055,7 +1084,7 @@ export async function GET(request: NextRequest) {
           return {
             notVisited7Days: notVisited7Days.map(u => ({ ...u, lastVisit: u.lastVisit.toISOString() })),
             notVisited14Days: notVisited14Days.map(u => ({ ...u, lastVisit: u.lastVisit.toISOString() })),
-            neverVisited: neverVisitedUsers.map(u => ({
+            neverSignedIn: neverSignedInUsers.map(u => ({
               fid: u.fid,
               username: u.username,
               displayName: u.displayName,
