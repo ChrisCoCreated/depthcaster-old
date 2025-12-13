@@ -147,7 +147,6 @@ export default function AdminStatisticsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [statistics, setStatistics] = useState<Statistics | null>(null);
   const [period, setPeriod] = useState<string>("all-time");
-  const [excludeHistorical, setExcludeHistorical] = useState(true); // Default to true to exclude historical data
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
@@ -212,14 +211,14 @@ export default function AdminStatisticsPage() {
     if (isAdmin && user?.fid) {
       loadStatistics();
     }
-  }, [period, excludeHistorical]);
+  }, [period]);
 
   const loadStatistics = async () => {
     if (!user?.fid) return;
 
     setIsLoadingStats(true);
     try {
-      const response = await fetch(`/api/admin/statistics?fid=${user.fid}&period=${period}&excludeHistorical=${excludeHistorical}`);
+      const response = await fetch(`/api/admin/statistics?fid=${user.fid}&period=${period}`);
       const data = await response.json();
 
       if (response.ok) {
@@ -239,7 +238,7 @@ export default function AdminStatisticsPage() {
       loadStatistics();
       loadMiniappNotificationsFromStorage();
     }
-  }, [period, excludeHistorical, isAdmin, user?.fid]);
+  }, [period, isAdmin, user?.fid]);
 
   const loadMiniappNotificationsFromStorage = () => {
     try {
@@ -407,18 +406,6 @@ export default function AdminStatisticsPage() {
               <option value="7d">Last 7 Days</option>
               <option value="24h">Last 24 Hours</option>
             </select>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="excludeHistorical"
-              checked={excludeHistorical}
-              onChange={(e) => setExcludeHistorical(e.target.checked)}
-              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-            />
-            <label htmlFor="excludeHistorical" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Exclude Historical Data (before fix)
-            </label>
           </div>
           <div>
             <button

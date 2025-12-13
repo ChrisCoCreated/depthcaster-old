@@ -23,6 +23,7 @@ import {
   pageViewsDaily,
   apiCallStats,
   miniappInstallations,
+  signInLogs,
 } from "@/lib/schema";
 import { isAdmin, getUserRoles, getAllAdminFids, getAllCuratorFids } from "@/lib/roles";
 
@@ -73,21 +74,39 @@ export async function GET(request: NextRequest) {
       ? sql`AND created_at >= ${timeFilter.toISOString()}`
       : sql``;
 
-    // User Statistics (only authenticated users - users table only contains logged-in users)
+    // User Statistics - Authenticated users are those who have successfully logged in
     const totalUsers = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(users);
+      .select({ count: sql<number>`count(distinct user_fid)::int` })
+      .from(signInLogs)
+      .where(sql`success = true AND user_fid IS NOT NULL`);
     
     const newUsers = timeFilter
       ? await db
-          .select({ count: sql<number>`count(*)::int` })
-          .from(users)
-          .where(sql`created_at >= ${timeFilter.toISOString()}`)
+          .select({ count: sql<number>`count(distinct user_fid)::int` })
+          .from(signInLogs)
+          .where(sql`success = true AND user_fid IS NOT NULL AND created_at >= ${timeFilter.toISOString()}`)
       : [{ count: 0 }];
 
     const usersWithRoles = await db
       .select({ count: sql<number>`count(distinct user_fid)::int` })
       .from(userRoles);
+
+    // Active users are those with activity in the past 14 days
+    const fourteenDaysAgo = new Date();
+    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+    const uniqueActiveUsers = await db.execute(sql`
+      SELECT COUNT(DISTINCT user_fid)::int as count
+      FROM (
+        SELECT user_fid FROM feed_view_sessions 
+        WHERE user_fid IS NOT NULL AND created_at >= ${fourteenDaysAgo.toISOString()}
+        UNION
+        SELECT user_fid FROM cast_views 
+        WHERE user_fid IS NOT NULL AND created_at >= ${fourteenDaysAgo.toISOString()}
+        UNION
+        SELECT user_fid FROM page_views 
+        WHERE user_fid IS NOT NULL AND created_at >= ${fourteenDaysAgo.toISOString()}
+      ) active_users
+    `);
 
     // Anonymous vs Authenticated analytics
     const authenticatedPageViewsQuery = timeFilter
@@ -119,12 +138,6 @@ export async function GET(request: NextRequest) {
       ? db.select({ count: sql<number>`count(*)::int` }).from(castViews).where(sql`user_fid IS NULL AND created_at >= ${timeFilter.toISOString()}`)
       : db.select({ count: sql<number>`count(*)::int` }).from(castViews).where(sql`user_fid IS NULL`);
     const anonymousCastViews = await anonymousCastViewsQuery;
-
-    // Unique authenticated users in analytics
-    const uniqueAuthenticatedUsersQuery = timeFilter
-      ? db.select({ count: sql<number>`count(distinct user_fid)::int` }).from(pageViews).where(sql`user_fid IS NOT NULL AND created_at >= ${timeFilter.toISOString()}`)
-      : db.select({ count: sql<number>`count(distinct user_fid)::int` }).from(pageViews).where(sql`user_fid IS NOT NULL`);
-    const uniqueAuthenticatedUsers = await uniqueAuthenticatedUsersQuery;
 
     // Content Statistics
     const totalCuratedCasts = await db
@@ -226,43 +239,27 @@ export async function GET(request: NextRequest) {
       .orderBy(sql`count(*) DESC`)
       .limit(20);
 
-    // Feed Analytics - UNION data from both main table and daily aggregates
-    // For unique users, we need to get distinct users from main table and max from daily (since daily stores aggregated unique_users)
-    const feedViewStatsRecent = timeFilter
-      ? await db
-          .select({
-            feedType: feedViewSessions.feedType,
-            totalSessions: sql<number>`count(*)::int`,
-            totalDuration: sql<number>`COALESCE(sum(duration_seconds), 0)::bigint`,
-            avgDuration: sql<number | null>`ROUND(COALESCE(avg(duration_seconds), 0))::bigint`,
-            uniqueUsers: sql<number>`count(distinct user_fid)::int`,
-          })
-          .from(feedViewSessions)
-          .where(sql`created_at >= ${timeFilter.toISOString()}`)
-          .groupBy(feedViewSessions.feedType)
-      : await db
-          .select({
-            feedType: feedViewSessions.feedType,
-            totalSessions: sql<number>`count(*)::int`,
-            totalDuration: sql<number>`COALESCE(sum(duration_seconds), 0)::bigint`,
-            avgDuration: sql<number | null>`ROUND(COALESCE(avg(duration_seconds), 0))::bigint`,
-            uniqueUsers: sql<number>`count(distinct user_fid)::int`,
-          })
-          .from(feedViewSessions)
-          .groupBy(feedViewSessions.feedType);
+    // Feed Analytics - Merge data from main table and daily aggregates
+    // Strategy:
+    // - When timeFilter is set: Only query feed_view_sessions (recent data, no need for daily aggregates)
+    // - When timeFilter is null (all-time): Merge both feed_view_sessions and feed_view_sessions_daily
+    // - For unique users: Use MAX when merging (since daily stores aggregated unique_users)
+    const feedViewStatsRecent = await db
+      .select({
+        feedType: feedViewSessions.feedType,
+        totalSessions: sql<number>`count(*)::int`,
+        totalDuration: sql<number>`COALESCE(sum(duration_seconds), 0)::bigint`,
+        avgDuration: sql<number | null>`ROUND(COALESCE(avg(duration_seconds), 0))::bigint`,
+        uniqueUsers: sql<number>`count(distinct user_fid)::int`,
+      })
+      .from(feedViewSessions)
+      .where(timeFilter ? sql`created_at >= ${timeFilter.toISOString()}` : sql`1=1`)
+      .groupBy(feedViewSessions.feedType);
 
+    // Only query daily aggregates when timeFilter is null (all-time view)
+    // Daily aggregates contain older data (30+ days) that's been aggregated for cost savings
     const feedViewStatsDaily = timeFilter
-      ? await db
-          .select({
-            feedType: feedViewSessionsDaily.feedType,
-            totalSessions: sql<number>`COALESCE(sum(total_sessions), 0)::int`,
-            totalDuration: sql<number>`COALESCE(sum(total_duration_seconds), 0)::bigint`,
-            avgDuration: sql<number | null>`ROUND(COALESCE(avg(avg_duration), 0))::bigint`,
-            uniqueUsers: sql<number>`COALESCE(max(unique_users), 0)::int`,
-          })
-          .from(feedViewSessionsDaily)
-          .where(sql`date >= ${timeFilter.toISOString()}`)
-          .groupBy(feedViewSessionsDaily.feedType)
+      ? [] // Skip daily aggregates when time filter is set
       : await db
           .select({
             feedType: feedViewSessionsDaily.feedType,
@@ -283,7 +280,7 @@ export async function GET(request: NextRequest) {
       uniqueUsers: number;
     }>();
 
-    // Add recent data
+    // Add recent data from main table
     feedViewStatsRecent.forEach((r) => {
       feedViewStatsMap.set(r.feedType, {
         feedType: r.feedType,
@@ -294,14 +291,14 @@ export async function GET(request: NextRequest) {
       });
     });
 
-    // Add/merge daily data
+    // Add/merge daily aggregated data (only when viewing all-time)
     feedViewStatsDaily.forEach((d) => {
       const existing = feedViewStatsMap.get(d.feedType);
       if (existing) {
         existing.totalSessions += d.totalSessions;
         existing.totalDuration += typeof d.totalDuration === 'string' ? parseInt(d.totalDuration) : d.totalDuration;
-        existing.uniqueUsers = Math.max(existing.uniqueUsers, d.uniqueUsers); // Use max since daily is aggregated
-        // Recalculate average
+        existing.uniqueUsers = Math.max(existing.uniqueUsers, d.uniqueUsers); // Use MAX since daily is aggregated
+        // Recalculate average duration
         existing.avgDuration = existing.totalSessions > 0 
           ? Math.round(existing.totalDuration / existing.totalSessions)
           : 0;
@@ -318,39 +315,26 @@ export async function GET(request: NextRequest) {
 
     const feedViewStats = Array.from(feedViewStatsMap.values());
 
-    // Cast Views - UNION data from both main table and daily aggregates
-    const castViewStatsRecent = timeFilter
-      ? await db
-          .select({
-            feedType: sql<string>`COALESCE(${castViews.feedType}, 'unknown')`,
-            totalViews: sql<number>`count(*)::int`,
-            uniqueCasts: sql<number>`count(distinct cast_hash)::int`,
-            uniqueUsers: sql<number>`count(distinct user_fid)::int`,
-          })
-          .from(castViews)
-          .where(sql`created_at >= ${timeFilter.toISOString()}`)
-          .groupBy(sql`COALESCE(${castViews.feedType}, 'unknown')`)
-      : await db
-          .select({
-            feedType: sql<string>`COALESCE(${castViews.feedType}, 'unknown')`,
-            totalViews: sql<number>`count(*)::int`,
-            uniqueCasts: sql<number>`count(distinct cast_hash)::int`,
-            uniqueUsers: sql<number>`count(distinct user_fid)::int`,
-          })
-          .from(castViews)
-          .groupBy(sql`COALESCE(${castViews.feedType}, 'unknown')`);
+    // Cast Views - Merge data from main table and daily aggregates
+    // Strategy:
+    // - When timeFilter is set: Only query cast_views (recent data, no need for daily aggregates)
+    // - When timeFilter is null (all-time): Merge both cast_views and cast_views_daily
+    // - For unique users: Use MAX when merging (since daily stores aggregated unique_users)
+    const castViewStatsRecent = await db
+      .select({
+        feedType: sql<string>`COALESCE(${castViews.feedType}, 'unknown')`,
+        totalViews: sql<number>`count(*)::int`,
+        uniqueCasts: sql<number>`count(distinct cast_hash)::int`,
+        uniqueUsers: sql<number>`count(distinct user_fid)::int`,
+      })
+      .from(castViews)
+      .where(timeFilter ? sql`created_at >= ${timeFilter.toISOString()}` : sql`1=1`)
+      .groupBy(sql`COALESCE(${castViews.feedType}, 'unknown')`);
 
+    // Only query daily aggregates when timeFilter is null (all-time view)
+    // Daily aggregates contain older data (30+ days) that's been aggregated for cost savings
     const castViewStatsDaily = timeFilter
-      ? await db
-          .select({
-            feedType: castViewsDaily.feedType,
-            totalViews: sql<number>`COALESCE(sum(view_count), 0)::int`,
-            uniqueCasts: sql<number>`count(distinct cast_hash)::int`,
-            uniqueUsers: sql<number>`COALESCE(max(unique_users), 0)::int`,
-          })
-          .from(castViewsDaily)
-          .where(sql`date >= ${timeFilter.toISOString()}`)
-          .groupBy(castViewsDaily.feedType)
+      ? [] // Skip daily aggregates when time filter is set
       : await db
           .select({
             feedType: castViewsDaily.feedType,
@@ -369,7 +353,7 @@ export async function GET(request: NextRequest) {
       uniqueUsers: number;
     }>();
 
-    // Add recent data
+    // Add recent data from main table
     castViewStatsRecent.forEach((r) => {
       castViewStatsMap.set(r.feedType, {
         feedType: r.feedType,
@@ -379,13 +363,15 @@ export async function GET(request: NextRequest) {
       });
     });
 
-    // Add/merge daily data - for unique casts, we use the sum since daily table has distinct cast_hash per row
+    // Add/merge daily aggregated data (only when viewing all-time)
+    // For unique casts: Use sum since daily table has one row per cast_hash
+    // For unique users: Use MAX since daily stores aggregated unique_users
     castViewStatsDaily.forEach((d) => {
       const existing = castViewStatsMap.get(d.feedType);
       if (existing) {
         existing.totalViews += d.totalViews;
-        existing.uniqueCasts += d.uniqueCasts; // Daily table has one row per cast_hash, so count is accurate
-        existing.uniqueUsers = Math.max(existing.uniqueUsers, d.uniqueUsers);
+        existing.uniqueCasts += d.uniqueCasts; // Daily table has one row per cast_hash, so sum is accurate
+        existing.uniqueUsers = Math.max(existing.uniqueUsers, d.uniqueUsers); // Use MAX since daily is aggregated
       } else {
         castViewStatsMap.set(d.feedType, {
           feedType: d.feedType,
@@ -475,39 +461,24 @@ export async function GET(request: NextRequest) {
     `);
 
     // Daily Usage Breakdowns
+    // When timeFilter is set: Only query feed_view_sessions (recent data)
+    // When timeFilter is null (all-time): Merge both feed_view_sessions and feed_view_sessions_daily
     const dailyBreakdownQuery = timeFilter
       ? sql`
         SELECT 
-          date,
+          DATE_TRUNC('day', created_at) as date,
           feed_type,
-          SUM(total_sessions)::int as total_sessions,
-          SUM(total_duration_seconds)::bigint as total_duration_seconds,
+          COUNT(*)::int as total_sessions,
+          SUM(duration_seconds)::bigint as total_duration_seconds,
           CASE 
-            WHEN SUM(total_sessions) > 0 
-            THEN ROUND(SUM(total_duration_seconds)::float / SUM(total_sessions)::float)::bigint
+            WHEN COUNT(*) > 0 
+            THEN ROUND(AVG(duration_seconds))::bigint
             ELSE 0::bigint
           END as avg_duration_seconds,
           COUNT(DISTINCT user_fid)::int as unique_users
-        FROM (
-          SELECT 
-            DATE_TRUNC('day', created_at) as date,
-            feed_type,
-            1 as total_sessions,
-            duration_seconds as total_duration_seconds,
-            user_fid
-          FROM feed_view_sessions
-          WHERE created_at >= ${timeFilter.toISOString()}
-          UNION ALL
-          SELECT 
-            date,
-            feed_type,
-            total_sessions,
-            total_duration_seconds,
-            NULL as user_fid
-          FROM feed_view_sessions_daily
-          WHERE date >= ${timeFilter.toISOString()}
-        ) combined
-        GROUP BY date, feed_type
+        FROM feed_view_sessions
+        WHERE created_at >= ${timeFilter.toISOString()}
+        GROUP BY DATE_TRUNC('day', created_at), feed_type
         ORDER BY date DESC, feed_type
       `
       : sql`
@@ -554,34 +525,19 @@ export async function GET(request: NextRequest) {
     })) || [];
 
     // Daily Cast Views Breakdown
+    // When timeFilter is set: Only query cast_views (recent data)
+    // When timeFilter is null (all-time): Merge both cast_views and cast_views_daily
     const dailyCastViewsQuery = timeFilter
       ? sql`
         SELECT 
-          date,
-          feed_type,
-          SUM(view_count)::int as total_views,
+          DATE_TRUNC('day', created_at) as date,
+          COALESCE(feed_type, 'unknown') as feed_type,
+          COUNT(*)::int as total_views,
           COUNT(DISTINCT cast_hash)::int as unique_casts,
           COUNT(DISTINCT user_fid)::int as unique_users
-        FROM (
-          SELECT 
-            DATE_TRUNC('day', created_at) as date,
-            COALESCE(feed_type, 'unknown') as feed_type,
-            1 as view_count,
-            cast_hash,
-            user_fid
-          FROM cast_views
-          WHERE created_at >= ${timeFilter.toISOString()}
-          UNION ALL
-          SELECT 
-            date,
-            feed_type,
-            view_count,
-            cast_hash,
-            NULL as user_fid
-          FROM cast_views_daily
-          WHERE date >= ${timeFilter.toISOString()}
-        ) combined
-        GROUP BY date, feed_type
+        FROM cast_views
+        WHERE created_at >= ${timeFilter.toISOString()}
+        GROUP BY DATE_TRUNC('day', created_at), COALESCE(feed_type, 'unknown')
         ORDER BY date DESC, feed_type
       `
       : sql`
@@ -640,10 +596,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       period,
       users: {
-        total: totalUsers[0]?.count || 0, // All authenticated users (users table only contains logged-in users)
+        total: totalUsers[0]?.count || 0, // All authenticated users (users who have successfully logged in)
         new: newUsers[0]?.count || 0,
         withRoles: usersWithRoles[0]?.count || 0,
-        uniqueActiveUsers: uniqueAuthenticatedUsers[0]?.count || 0, // Unique authenticated users with analytics activity
+        uniqueActiveUsers: ((uniqueActiveUsers as any).rows?.[0]?.count || 0) as number, // Users with activity in past 14 days
       },
       analytics: {
         pageViews: {
@@ -854,15 +810,7 @@ export async function GET(request: NextRequest) {
           })).sort((a, b) => b.date.localeCompare(a.date)); // Sort by date descending
         })();
 
-        // Extract all unique FIDs from active users for exclusion
-        const activeUserFidsSet = new Set<number>();
-        for (const day of activeUsersResult) {
-          for (const user of day.users) {
-            activeUserFidsSet.add(user.fid);
-          }
-        }
-
-        // Now get inactive curators, excluding active users
+        // Get inactive curators - check ALL curators, not just recent ones
         const inactiveCuratorsResult = await (async () => {
           const curatorFids = await getAllCuratorFids();
           if (curatorFids.length === 0) {
@@ -875,20 +823,7 @@ export async function GET(request: NextRequest) {
             };
           }
 
-          // Get last visit date for active users (past 30 days) from all activity sources
-          // We want to find which of these active users have been inactive for >7 or >14 days
-          const activeUserFidsArray = Array.from(activeUserFidsSet);
-          
-          if (activeUserFidsArray.length === 0) {
-            return {
-              notVisited7Days: [],
-              notVisited14Days: [],
-              neverSignedIn: [],
-              miniappInstalled: [],
-              miniappNotInstalled: [],
-            };
-          }
-
+          // Get last activity date for ALL curators from all activity sources
           const lastVisits = await db.execute(sql`
             WITH curator_visits AS (
               SELECT DISTINCT
@@ -911,7 +846,7 @@ export async function GET(request: NextRequest) {
                   WHERE user_fid IS NOT NULL 
                   AND success = true
               ) AS all_visits
-              WHERE user_fid = ANY(${sql.raw(`ARRAY[${activeUserFidsArray.join(',')}]`)})
+              WHERE user_fid = ANY(${sql.raw(`ARRAY[${curatorFids.length > 0 ? curatorFids.join(',') : 'NULL'}]`)})
               GROUP BY user_fid
             )
             SELECT
@@ -933,46 +868,8 @@ export async function GET(request: NextRequest) {
               pfpUrl: row.pfpUrl,
             });
           }
-          
-          // For active users not in visitsMap, get their user info and use the most recent date from activeUsersResult
-          // This handles edge cases where they might have activity but it's not captured in the query
-          for (const fid of activeUserFidsArray) {
-            if (!visitsMap.has(fid)) {
-              // Find the most recent activity date from activeUsersResult
-              let mostRecentDate: Date | null = null;
-              let userInfo: { username: string | null; displayName: string | null; pfpUrl: string | null } | null = null;
-              
-              for (const day of activeUsersResult) {
-                const userInDay = day.users.find(u => u.fid === fid);
-                if (userInDay) {
-                  const dayDate = new Date(day.date);
-                  if (!mostRecentDate || dayDate > mostRecentDate) {
-                    mostRecentDate = dayDate;
-                    userInfo = {
-                      username: userInDay.username,
-                      displayName: userInDay.displayName,
-                      pfpUrl: userInDay.pfpUrl,
-                    };
-                  }
-                }
-              }
-              
-              // If we found activity in activeUsersResult, use that date
-              // Otherwise, skip this user as they shouldn't be in the inactive list
-              if (mostRecentDate && userInfo) {
-                visitsMap.set(fid, {
-                  lastVisit: mostRecentDate,
-                  username: userInfo.username,
-                  displayName: userInfo.displayName,
-                  pfpUrl: userInfo.pfpUrl,
-                });
-              }
-            }
-          }
-
 
           // Get curators who have never signed in (no successful sign-in records)
-          // Check all curators (not just inactive ones) for this check
           const curatorsWithSignIn = await db.execute(sql`
             SELECT DISTINCT user_fid
             FROM sign_in_logs
@@ -986,6 +883,7 @@ export async function GET(request: NextRequest) {
           // Find curators who have never signed in
           const neverSignedInFids = curatorFids.filter(fid => !signInFidsSet.has(fid));
           
+          // Get user info for never signed in curators
           const neverSignedInUsers = neverSignedInFids.length > 0
             ? await db.select({
                 fid: users.fid,
@@ -1001,12 +899,19 @@ export async function GET(request: NextRequest) {
           const notVisited7Days: Array<{ fid: number; username: string | null; displayName: string | null; pfpUrl: string | null; lastVisit: Date }> = [];
           const notVisited14Days: Array<{ fid: number; username: string | null; displayName: string | null; pfpUrl: string | null; lastVisit: Date }> = [];
 
-          // Categorize active users based on their last visit date
-          // Only include users who are in the active users list (past 30 days)
-          for (const fid of activeUserFidsArray) {
+          // Categorize ALL curators based on their last visit date
+          // Exclude those who have never signed in (they're in a separate category)
+          for (const fid of curatorFids) {
+            // Skip if never signed in (handled separately)
+            if (neverSignedInFids.includes(fid)) {
+              continue;
+            }
+
             const visit = visitsMap.get(fid);
             if (!visit) {
-              continue; // Skip if we don't have visit data
+              // If no visit data but they've signed in, treat as very old activity
+              // This shouldn't happen often, but handle edge case
+              continue;
             }
             
             const daysSinceVisit = Math.floor((now.getTime() - visit.lastVisit.getTime()) / (1000 * 60 * 60 * 24));
