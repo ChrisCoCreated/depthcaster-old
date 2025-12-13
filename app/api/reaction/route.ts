@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       target,
       reactionType,
       userFid,
-      reactionHash: reaction?.hash,
+      reactionHash: (reaction as any)?.hash || (reaction as any)?.cast?.hash,
     });
 
     // Track interaction if this is a reaction to a curated cast thread

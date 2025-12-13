@@ -31,8 +31,7 @@ export async function POST(request: NextRequest) {
         console.log(`[Incremental Reaction Sync API] Completed for user ${fid}:`, {
           fid,
           stats,
-          likesSynced: stats.likesSynced,
-          recastsSynced: stats.recastsSynced,
+          reactionsSynced: stats.reactionsSynced,
           errors: stats.errors,
         });
       })
