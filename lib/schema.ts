@@ -660,22 +660,3 @@ export type NewPollOption = typeof pollOptions.$inferInsert;
 export type PollResponse = typeof pollResponses.$inferSelect;
 export type NewPollResponse = typeof pollResponses.$inferInsert;
 
-export const nftMints = pgTable("nft_mints", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  tokenId: bigint("token_id", { mode: "number" }).notNull(),
-  ownerAddress: text("owner_address").notNull(),
-  imageUrl: text("image_url").notNull(),
-  metadataUrl: text("metadata_url").notNull(),
-  transactionHash: text("transaction_hash").notNull(),
-  mintedAt: timestamp("minted_at").defaultNow().notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-}, (table) => ({
-  tokenIdUnique: uniqueIndex("nft_mints_token_id_unique").on(table.tokenId),
-  ownerAddressIdx: index("nft_mints_owner_address_idx").on(table.ownerAddress),
-  transactionHashIdx: index("nft_mints_transaction_hash_idx").on(table.transactionHash),
-  mintedAtIdx: index("nft_mints_minted_at_idx").on(table.mintedAt),
-}));
-
-export type NftMint = typeof nftMints.$inferSelect;
-export type NewNftMint = typeof nftMints.$inferInsert;
-
