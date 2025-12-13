@@ -4,9 +4,11 @@ import { useEffect, useState, use } from "react";
 import { useNeynarContext } from "@neynar/react";
 import { ProfileHeader } from "../../components/ProfileHeader";
 import { CastCard } from "../../components/CastCard";
+import { MiniCastCard } from "../../components/MiniCastCard";
 import { BulkCollectionSelectModal } from "../../components/BulkCollectionSelectModal";
 import { hasCollectionsOrAdminRole } from "@/lib/roles-client";
 import { ChevronDown, ChevronUp, LayoutGrid, List } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface UserProfile {
   fid: number;
@@ -32,6 +34,7 @@ export default function CuratePersonPage({
 }) {
   const { fid: fidParam } = use(params);
   const { user } = useNeynarContext();
+  const router = useRouter();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -399,14 +402,21 @@ export default function CuratePersonPage({
                         checked={selectedCasts.has(cast.hash)}
                         onChange={() => toggleCastSelection(cast)}
                         className="mt-4 w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        onClick={(e) => e.stopPropagation()}
                       />
                       <div className="flex-1">
-                        <CastCard
-                          cast={cast}
-                          feedType={undefined}
-                          disableClick={false}
-                          compressedView={isMiniView}
-                        />
+                        {isMiniView ? (
+                          <MiniCastCard
+                            cast={cast}
+                            onClick={() => router.push(`/cast/${cast.hash}`)}
+                          />
+                        ) : (
+                          <CastCard
+                            cast={cast}
+                            feedType={undefined}
+                            disableClick={false}
+                          />
+                        )}
                       </div>
                     </div>
                   ))}
@@ -476,14 +486,21 @@ export default function CuratePersonPage({
                         checked={selectedCasts.has(cast.hash)}
                         onChange={() => toggleCastSelection(cast)}
                         className="mt-4 w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        onClick={(e) => e.stopPropagation()}
                       />
                       <div className="flex-1">
-                        <CastCard
-                          cast={cast}
-                          feedType={undefined}
-                          disableClick={false}
-                          compressedView={isMiniView}
-                        />
+                        {isMiniView ? (
+                          <MiniCastCard
+                            cast={cast}
+                            onClick={() => router.push(`/cast/${cast.hash}`)}
+                          />
+                        ) : (
+                          <CastCard
+                            cast={cast}
+                            feedType={undefined}
+                            disableClick={false}
+                          />
+                        )}
                       </div>
                     </div>
                   ))}
