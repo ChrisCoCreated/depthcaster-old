@@ -599,6 +599,84 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Check if cast exists but doesn't have a quality score (e.g., was added to collection first)
+    // If so, trigger quality analysis when it's curated to the main feed
+    if (!isFirstCuration && existingCast.length > 0) {
+      const castNeedsQualityAnalysis = existingCast[0].qualityScore === null || existingCast[0].qualityScore === undefined;
+      
+      if (castNeedsQualityAnalysis) {
+        console.log(`[Curate] Cast ${castHash} exists but lacks quality score, triggering analysis...`);
+        // Trigger async quality analysis (non-blocking)
+        analyzeCastQualityAsync(castHash, finalCastData, async (hash, result) => {
+          try {
+            await db
+              .update(curatedCasts)
+              .set({
+                qualityScore: result.qualityScore,
+                category: result.category,
+                qualityAnalyzedAt: new Date(),
+              })
+              .where(eq(curatedCasts.castHash, hash));
+            console.log(`[Curate] Quality analysis completed for cast ${hash}: score=${result.qualityScore}, category=${result.category}`);
+            
+            // Check if this is a new curation (first time curated to main feed)
+            const allCurators = await db
+              .select()
+              .from(curatorCastCurations)
+              .where(eq(curatorCastCurations.castHash, hash));
+            const isNewCuration = allCurators.length === 1;
+            
+            // Send miniapp notification only if quality score > 70 and it's a new curation
+            if (isNewCuration && result.qualityScore > 70) {
+              try {
+                const { notifyAllMiniappUsersAboutNewCuratedCast } = await import("@/lib/miniapp");
+                // Fetch the cast data for notification
+                const castRecord = await db
+                  .select({ castData: curatedCasts.castData })
+                  .from(curatedCasts)
+                  .where(eq(curatedCasts.castHash, hash))
+                  .limit(1);
+                
+                if (castRecord[0]?.castData) {
+                  notifyAllMiniappUsersAboutNewCuratedCast(hash, castRecord[0].castData).catch((error) => {
+                    console.error(`[Curate] Error sending miniapp notification for new curated cast ${hash}:`, error);
+                  });
+                }
+              } catch (error) {
+                console.error(`[Curate] Error sending miniapp notification for cast ${hash}:`, error);
+              }
+            }
+            
+            // Notify cast author about quality score
+            const castRecord = await db
+              .select({ authorFid: curatedCasts.authorFid })
+              .from(curatedCasts)
+              .where(eq(curatedCasts.castHash, hash))
+              .limit(1);
+            
+            if (castRecord[0]?.authorFid) {
+              sendPushNotificationToUser(castRecord[0].authorFid, {
+                title: "Your cast has been curated",
+                body: `Quality score: ${result.qualityScore}. DM @chris if this doesn't seem right.`,
+                icon: "/icon-192x192.webp",
+                badge: "/icon-96x96.webp",
+                data: {
+                  type: "cast_curated_quality",
+                  castHash: hash,
+                  qualityScore: result.qualityScore,
+                  url: `/cast/${hash}`
+                },
+              }).catch((error) => {
+                console.error(`[Curate] Error sending quality score notification to author ${castRecord[0].authorFid}:`, error);
+              });
+            }
+          } catch (error: any) {
+            console.error(`[Curate] Error updating quality analysis for cast ${hash}:`, error.message);
+          }
+        });
+      }
+    }
+
     // Fetch and store full conversation if this is the first curation OR if it's an additional curation (to refresh data)
     if (isFirstCuration || conversationNotFetched || isAdditionalCuration) {
       try {
