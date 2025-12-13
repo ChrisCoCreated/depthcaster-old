@@ -58,14 +58,19 @@ export function NewChatModal({
         throw new Error("Valid Ethereum address or FID required");
       }
 
-      // Check if address can receive messages
-      const canMsgResponse = await fetch(`/api/xmtp/can-message/${address}`);
-      if (!canMsgResponse.ok) {
-        throw new Error("Failed to check if address can receive messages");
-      }
-      const canMsgData = await canMsgResponse.json();
-      if (!canMsgData.canMessage) {
-        throw new Error("This address is not on the XMTP network");
+      // Allow self-messaging (same address as wallet)
+      const isSelfMessage = address.toLowerCase() === walletAddress.toLowerCase();
+      
+      if (!isSelfMessage) {
+        // Check if address can receive messages (skip for self-messaging)
+        const canMsgResponse = await fetch(`/api/xmtp/can-message/${address}`);
+        if (!canMsgResponse.ok) {
+          throw new Error("Failed to check if address can receive messages");
+        }
+        const canMsgData = await canMsgResponse.json();
+        if (!canMsgData.canMessage) {
+          throw new Error("This address is not on the XMTP network");
+        }
       }
 
       // Create conversation

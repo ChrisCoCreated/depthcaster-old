@@ -126,23 +126,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if address can receive messages
-    let canMsg = false;
-    try {
-      canMsg = await client.canMessage(peer);
-    } catch (error: any) {
-      console.error("Error checking if address can message:", error);
-      return NextResponse.json(
-        { error: "Unable to verify if address can receive messages" },
-        { status: 500 }
-      );
-    }
+    // Allow self-messaging (same address as wallet)
+    const isSelfMessage = address.toLowerCase() === peer.toLowerCase();
     
-    if (!canMsg) {
-      return NextResponse.json(
-        { error: "Address is not on XMTP network" },
-        { status: 422 }
-      );
+    if (!isSelfMessage) {
+      // Check if address can receive messages (skip for self-messaging)
+      let canMsg = false;
+      try {
+        canMsg = await client.canMessage(peer);
+      } catch (error: any) {
+        console.error("Error checking if address can message:", error);
+        return NextResponse.json(
+          { error: "Unable to verify if address can receive messages" },
+          { status: 500 }
+        );
+      }
+      
+      if (!canMsg) {
+        return NextResponse.json(
+          { error: "Address is not on XMTP network" },
+          { status: 422 }
+        );
+      }
     }
 
     // Create or get conversation
