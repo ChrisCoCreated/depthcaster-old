@@ -1,23 +1,22 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { Client } from "@xmtp/browser-sdk";
-import type { Signer, Identifier } from "@xmtp/browser-sdk";
+// Types imported dynamically to avoid Node.js checks
 import { getAddress, type Address } from "viem";
 
 interface XmtpContextType {
-  client: Client | null;
+  client: any | null; // Using any to avoid type issues with dynamic import
   isInitialized: boolean;
   isInitializing: boolean;
   error: string | null;
-  initializeClient: (signer: Signer) => Promise<void>;
+  initializeClient: (signer: any) => Promise<void>; // Signer type imported dynamically
   address: Address | null;
 }
 
 const XmtpContext = createContext<XmtpContextType | undefined>(undefined);
 
 export function XmtpProvider({ children }: { children: ReactNode }) {
-  const [client, setClient] = useState<Client | null>(null);
+  const [client, setClient] = useState<any | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +36,13 @@ export function XmtpProvider({ children }: { children: ReactNode }) {
     checkExistingClient();
   }, []);
 
-  const initializeClient = async (signer: Signer) => {
+  const initializeClient = async (signer: any) => {
+    // Ensure we're in the browser
+    if (typeof window === "undefined") {
+      setError("XMTP can only be initialized in the browser");
+      return;
+    }
+
     setIsInitializing(true);
     setError(null);
 
@@ -52,6 +57,10 @@ export function XmtpProvider({ children }: { children: ReactNode }) {
 
       // Check if client already exists in IndexedDB
       // Browser SDK automatically handles key storage
+      // Dynamically import to ensure it only loads on client side
+      // Only import when actually needed (not at module load time)
+      const xmtpModule = await import("@xmtp/browser-sdk");
+      const { Client } = xmtpModule;
       const xmtpEnv = (process.env.NEXT_PUBLIC_XMTP_ENV || "dev") as "dev" | "production";
       
       // Create client - browser SDK will use existing keys from IndexedDB if available

@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { useNeynarContext } from "@neynar/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, Edit, Trash2, ExternalLink } from "lucide-react";
+import { Plus, Edit, Trash2, ExternalLink, BarChart3, X } from "lucide-react";
 import { extractCastHashFromUrl } from "@/lib/link-converter";
+import { AvatarImage } from "@/app/components/AvatarImage";
 
 interface Poll {
   id: string;
@@ -27,6 +28,9 @@ export default function AdminPollsPage() {
   const [loading, setLoading] = useState(false);
   const [editingPoll, setEditingPoll] = useState<Poll | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [viewingResults, setViewingResults] = useState<Poll | null>(null);
+  const [resultsData, setResultsData] = useState<any>(null);
+  const [loadingResults, setLoadingResults] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -116,6 +120,29 @@ export default function AdminPollsPage() {
       }
     } catch (err) {
       console.error("Failed to load poll options:", err);
+    }
+  };
+
+  const handleViewResults = async (poll: Poll) => {
+    if (!user?.fid) return;
+
+    setViewingResults(poll);
+    setLoadingResults(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/poll/${poll.castHash}/results?userFid=${user.fid}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to load results");
+      }
+
+      setResultsData(data);
+    } catch (err: any) {
+      setError(err.message || "Failed to load results");
+    } finally {
+      setLoadingResults(false);
     }
   };
 
@@ -325,14 +352,23 @@ export default function AdminPollsPage() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex items-center gap-2">
                       <button
+                        onClick={() => handleViewResults(poll)}
+                        className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300"
+                        title="View Results"
+                      >
+                        <BarChart3 className="w-4 h-4" />
+                      </button>
+                      <button
                         onClick={() => handleEdit(poll)}
                         className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+                        title="Edit"
                       >
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleDelete(poll)}
                         className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
+                        title="Delete"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -440,6 +476,136 @@ export default function AdminPollsPage() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Results Modal */}
+      {viewingResults && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-lg max-w-5xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  Poll Results
+                </h2>
+                <button
+                  onClick={() => {
+                    setViewingResults(null);
+                    setResultsData(null);
+                  }}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {loadingResults ? (
+                <div className="text-center py-8 text-gray-500">Loading results...</div>
+              ) : resultsData ? (
+                <div className="space-y-6">
+                  {/* Poll Info */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                      {resultsData.poll.question}
+                    </h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      {resultsData.totalResponses} response{resultsData.totalResponses !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+
+                  {/* Collated Results */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                      Collated Results (Ranked by Average Position)
+                    </h3>
+                    <div className="space-y-3">
+                      {resultsData.collatedResults.map((result: any, index: number) => (
+                        <div
+                          key={result.optionId}
+                          className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800"
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-sm font-semibold text-blue-700 dark:text-blue-300">
+                                {index + 1}
+                              </div>
+                              <span className="font-medium text-gray-900 dark:text-gray-100">
+                                {result.optionText}
+                              </span>
+                            </div>
+                            <div className="text-sm text-gray-600 dark:text-gray-400">
+                              Avg Rank: {result.averageRank.toFixed(2)}
+                            </div>
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {result.voteCount} vote{result.voteCount !== 1 ? "s" : ""} • 
+                            Ranks: {result.rankings.join(", ")}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Individual Responses */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                      Individual Responses
+                    </h3>
+                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                      {resultsData.individualResponses.length === 0 ? (
+                        <p className="text-gray-500 dark:text-gray-400 text-center py-4">
+                          No responses yet
+                        </p>
+                      ) : (
+                        resultsData.individualResponses.map((response: any) => (
+                          <div
+                            key={response.id}
+                            className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-900"
+                          >
+                            <div className="flex items-center gap-3 mb-3">
+                              <AvatarImage
+                                src={response.pfpUrl}
+                                alt={response.displayName || response.username || `FID: ${response.userFid}`}
+                                size={32}
+                                className="w-8 h-8 rounded-full"
+                              />
+                              <div>
+                                <div className="font-medium text-gray-900 dark:text-gray-100">
+                                  {response.displayName || response.username || `FID: ${response.userFid}`}
+                                </div>
+                                {response.username && (
+                                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                                    @{response.username}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="space-y-1">
+                              {response.rankings.map((ranked: any) => (
+                                <div
+                                  key={ranked.optionId}
+                                  className="flex items-center gap-2 text-sm"
+                                >
+                                  <span className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-xs font-semibold text-blue-700 dark:text-blue-300">
+                                    {ranked.rank}
+                                  </span>
+                                  <span className="text-gray-700 dark:text-gray-300">
+                                    {ranked.optionText}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">No results data</div>
+              )}
             </div>
           </div>
         </div>

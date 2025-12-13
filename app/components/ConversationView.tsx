@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { CastCard } from "./CastCard";
 import { useNeynarContext } from "@neynar/react";
 import { formatDistanceToNow } from "date-fns";
@@ -12,6 +12,7 @@ interface ConversationViewProps {
   viewerFid?: number;
   focusReplyHash?: string;
   onFocusReply?: () => void;
+  customContentAfterRoot?: React.ReactNode;
 }
 
 interface ThreadedReply {
@@ -24,7 +25,7 @@ interface ThreadedReply {
   [key: string]: any;
 }
 
-export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusReply }: ConversationViewProps) {
+export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusReply, customContentAfterRoot }: ConversationViewProps) {
   const [rootCast, setRootCast] = useState<any>(null);
   const [replies, setReplies] = useState<ThreadedReply[]>([]);
   const [loading, setLoading] = useState(true);
@@ -482,6 +483,13 @@ export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusR
       <div className="border-b border-gray-100 dark:border-gray-800">
         <CastCard cast={rootCast} showThread={false} onUpdate={() => fetchConversation(true)} disableClick={true} rootCastHash={rootCast?.hash || castHash} />
       </div>
+
+      {/* Custom content after root cast (e.g., poll) */}
+      {customContentAfterRoot && (
+        <div className="mt-4 px-4">
+          {customContentAfterRoot}
+        </div>
+      )}
 
       {/* Sort options and quality filter */}
       {replies.length > 0 && (

@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Ensure XMTP browser SDK only runs on client side
+  serverExternalPackages: ['@xmtp/browser-sdk'],
   images: {
     localPatterns: [
       {

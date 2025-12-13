@@ -38,12 +38,12 @@ export function ChatView({ conversationId, walletAddress, userFid }: ChatViewPro
   }, [conversationId, client, isInitialized]);
 
   const fetchMessages = async () => {
-    if (!client) return;
+    if (!client || typeof window === "undefined") return;
 
     try {
       // Get all conversations and find the one we want
       const allConversations = await client.conversations.list();
-      const conversation = allConversations.find((c) => {
+      const conversation = allConversations.find((c: any) => {
         const id = 'inboxId' in c ? c.inboxId : ('topic' in c ? c.topic : '');
         return id === conversationId;
       });
@@ -58,7 +58,7 @@ export function ChatView({ conversationId, walletAddress, userFid }: ChatViewPro
       const xmtpMessages = await conversation.messages({ limit: BigInt(100) });
 
       // Transform to our format
-      const transformed = xmtpMessages.map((msg) => ({
+      const transformed = xmtpMessages.map((msg: any) => ({
         messageId: msg.id,
         conversationId,
         senderAddress: (msg as any).senderAddress || (msg as any).sender || '',

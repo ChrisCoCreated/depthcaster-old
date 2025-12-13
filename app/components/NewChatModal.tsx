@@ -35,7 +35,7 @@ export function NewChatModal({
   if (!isOpen) return null;
 
   const handleCreate1to1 = async () => {
-    if (!user?.fid || !client || !isInitialized) {
+    if (!user?.fid || !client || !isInitialized || typeof window === "undefined") {
       setError("XMTP client not initialized");
       return;
     }
@@ -100,7 +100,7 @@ export function NewChatModal({
   };
 
   const handleCreateGroup = async () => {
-    if (!user?.fid || !client || !isInitialized) {
+    if (!user?.fid || !client || !isInitialized || typeof window === "undefined") {
       setError("XMTP client not initialized");
       return;
     }

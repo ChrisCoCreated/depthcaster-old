@@ -6,7 +6,6 @@ import { getAddress, type Address } from "viem";
 import { createWalletClient, custom } from "viem";
 import { mainnet } from "viem/chains";
 import { useXmtp } from "../contexts/XmtpContext";
-import type { Signer } from "@xmtp/browser-sdk";
 
 interface WalletConnectorProps {
   onConnected?: (address: Address) => void;
@@ -108,12 +107,12 @@ export function WalletConnector({ onConnected, onInitialized }: WalletConnectorP
         transport: custom(ethereum as any),
       });
 
-      // Create signer for browser SDK
-      const signer: Signer = {
-        type: 'EOA',
+      // Create signer for browser SDK (Signer is a type, not a value)
+      const signer = {
+        type: 'EOA' as const,
         getIdentifier: async () => ({
           identifier: addr,
-          identifierKind: 'Ethereum',
+          identifierKind: 'Ethereum' as const,
         }),
         signMessage: async (message: string): Promise<Uint8Array> => {
           // Browser SDK expects Uint8Array, but viem returns hex string

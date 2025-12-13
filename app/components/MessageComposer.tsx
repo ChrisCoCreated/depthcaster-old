@@ -32,14 +32,14 @@ export function MessageComposer({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!message.trim() || sending || !client) return;
+    if (!message.trim() || sending || !client || typeof window === "undefined") return;
 
     setSending(true);
 
     try {
       // Get all conversations and find the one we want
       const allConversations = await client.conversations.list();
-      const conversation = allConversations.find((c) => {
+      const conversation = allConversations.find((c: any) => {
         const id = 'inboxId' in c ? c.inboxId : ('topic' in c ? c.topic : '');
         return id === conversationId;
       });

@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { useXmtp } from "../contexts/XmtpContext";
-import { ConsentState } from "@xmtp/browser-sdk";
 
 interface Conversation {
   conversationId: string;
@@ -40,12 +39,15 @@ export function ChatList({ walletAddress, onSelectConversation }: ChatListProps)
   }, [client, isInitialized]);
 
   const fetchConversations = async () => {
-    if (!client) return;
+    if (!client || typeof window === "undefined") return;
 
     setLoading(true);
     setError(null);
 
     try {
+      // Dynamically import ConsentState to avoid Node.js checks
+      const { ConsentState } = await import("@xmtp/browser-sdk");
+      
       // List conversations directly from XMTP client
       const allConversations = await client.conversations.list({
         consentStates: [ConsentState.Allowed],
@@ -53,7 +55,7 @@ export function ChatList({ walletAddress, onSelectConversation }: ChatListProps)
 
       // Transform to our format
       const transformed = await Promise.all(
-        allConversations.map(async (conv) => {
+        allConversations.map(async (conv: any) => {
           // Get last message
           const messages = await conv.messages({ limit: BigInt(1) });
           const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;

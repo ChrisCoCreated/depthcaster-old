@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { use } from "react";
 import { useNeynarContext } from "@neynar/react";
-import { CastThread } from "../../components/CastThread";
+import { ConversationView } from "../../components/ConversationView";
 import { ArrowUp, ArrowDown, GripVertical } from "lucide-react";
 
 interface PollOption {
@@ -153,121 +153,122 @@ export default function PollPage({
     );
   }
 
-  if (!poll) {
+  const renderPollComponent = () => {
+    if (!poll) {
+      return (
+        <div className="px-4 py-3 border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/60 rounded-md text-sm text-gray-700 dark:text-gray-300">
+          No poll has been set up for this cast yet.
+        </div>
+      );
+    }
+
     return (
-      <div className="min-h-screen">
-        <main className="max-w-7xl mx-auto px-4 py-8">
-          <CastThread castHash={castHash} viewerFid={user?.fid} />
-          <div className="mt-8 max-w-3xl mx-auto">
-            <div className="px-4 py-3 border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/60 rounded-md text-sm text-gray-700 dark:text-gray-300">
-              No poll has been set up for this cast yet.
-            </div>
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
+        <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-gray-100">
+          {poll.question}
+        </h2>
+
+        {submitted ? (
+          <div className="px-4 py-3 border border-green-200 dark:border-green-700 bg-green-50 dark:bg-green-900/40 text-sm text-green-800 dark:text-green-100 rounded-md">
+            Your ranking has been submitted successfully!
           </div>
-        </main>
+        ) : (
+          <>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              Rank the options from best to worst by dragging them or using the arrow buttons.
+            </p>
+
+            <div className="space-y-2 mb-6">
+              {rankings.map((optionId, index) => {
+                const option = poll.options.find((opt) => opt.id === optionId);
+                if (!option) return null;
+
+                return (
+                  <div
+                    key={option.id}
+                    draggable
+                    onDragStart={() => handleDragStart(index)}
+                    onDragOver={(e) => handleDragOver(e, index)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, index)}
+                    className={`
+                      flex items-center gap-3 p-4 border rounded-lg
+                      ${draggedIndex === index ? "opacity-50" : ""}
+                      ${dragOverIndex === index ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" : "border-gray-200 dark:border-gray-700"}
+                      bg-white dark:bg-gray-800
+                      cursor-move
+                      transition-colors
+                    `}
+                  >
+                    <div className="shrink-0 text-gray-400 dark:text-gray-500">
+                      <GripVertical className="w-5 h-5" />
+                    </div>
+                    <div className="shrink-0 w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-sm font-semibold text-blue-700 dark:text-blue-300">
+                      {index + 1}
+                    </div>
+                    <div className="flex-1 text-gray-900 dark:text-gray-100">
+                      {option.optionText}
+                    </div>
+                    <div className="shrink-0 flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() => moveUp(index)}
+                        disabled={index === 0}
+                        className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        aria-label="Move up"
+                      >
+                        <ArrowUp className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveDown(index)}
+                        disabled={index === rankings.length - 1}
+                        className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        aria-label="Move down"
+                      >
+                        <ArrowDown className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {error && (
+              <div className="mb-4 px-4 py-3 border border-red-200 dark:border-red-700 bg-red-50 dark:bg-red-900/40 text-sm text-red-800 dark:text-red-100 rounded-md">
+                {error}
+              </div>
+            )}
+
+            {user ? (
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={submitting}
+                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+              >
+                {submitting ? "Submitting..." : "Submit Ranking"}
+              </button>
+            ) : (
+              <div className="px-4 py-3 border border-yellow-200 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900/40 text-sm text-yellow-800 dark:text-yellow-100 rounded-md">
+                Please sign in to submit your ranking.
+              </div>
+            )}
+          </>
+        )}
       </div>
     );
-  }
+  };
 
   return (
     <div className="min-h-screen">
       <main className="max-w-7xl mx-auto px-4 py-8">
-        <CastThread castHash={castHash} viewerFid={user?.fid} />
-
-        <div className="mt-8 max-w-3xl mx-auto">
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
-            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-gray-100">
-              {poll.question}
-            </h2>
-
-            {submitted ? (
-              <div className="px-4 py-3 border border-green-200 dark:border-green-700 bg-green-50 dark:bg-green-900/40 text-sm text-green-800 dark:text-green-100 rounded-md">
-                Your ranking has been submitted successfully!
-              </div>
-            ) : (
-              <>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-                  Rank the options from best to worst by dragging them or using the arrow buttons.
-                </p>
-
-                <div className="space-y-2 mb-6">
-                  {rankings.map((optionId, index) => {
-                    const option = poll.options.find((opt) => opt.id === optionId);
-                    if (!option) return null;
-
-                    return (
-                      <div
-                        key={option.id}
-                        draggable
-                        onDragStart={() => handleDragStart(index)}
-                        onDragOver={(e) => handleDragOver(e, index)}
-                        onDragLeave={handleDragLeave}
-                        onDrop={(e) => handleDrop(e, index)}
-                        className={`
-                          flex items-center gap-3 p-4 border rounded-lg
-                          ${draggedIndex === index ? "opacity-50" : ""}
-                          ${dragOverIndex === index ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" : "border-gray-200 dark:border-gray-700"}
-                          bg-white dark:bg-gray-800
-                          cursor-move
-                          transition-colors
-                        `}
-                      >
-                        <div className="shrink-0 text-gray-400 dark:text-gray-500">
-                          <GripVertical className="w-5 h-5" />
-                        </div>
-                        <div className="shrink-0 w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-sm font-semibold text-blue-700 dark:text-blue-300">
-                          {index + 1}
-                        </div>
-                        <div className="flex-1 text-gray-900 dark:text-gray-100">
-                          {option.optionText}
-                        </div>
-                        <div className="shrink-0 flex gap-1">
-                          <button
-                            type="button"
-                            onClick={() => moveUp(index)}
-                            disabled={index === 0}
-                            className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                            aria-label="Move up"
-                          >
-                            <ArrowUp className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => moveDown(index)}
-                            disabled={index === rankings.length - 1}
-                            className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                            aria-label="Move down"
-                          >
-                            <ArrowDown className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {error && (
-                  <div className="mb-4 px-4 py-3 border border-red-200 dark:border-red-700 bg-red-50 dark:bg-red-900/40 text-sm text-red-800 dark:text-red-100 rounded-md">
-                    {error}
-                  </div>
-                )}
-
-                {user ? (
-                  <button
-                    type="button"
-                    onClick={handleSubmit}
-                    disabled={submitting}
-                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
-                  >
-                    {submitting ? "Submitting..." : "Submit Ranking"}
-                  </button>
-                ) : (
-                  <div className="px-4 py-3 border border-yellow-200 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900/40 text-sm text-yellow-800 dark:text-yellow-100 rounded-md">
-                    Please sign in to submit your ranking.
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+        <div className="max-w-3xl mx-auto">
+          <ConversationView 
+            castHash={castHash} 
+            viewerFid={user?.fid}
+            customContentAfterRoot={renderPollComponent()}
+          />
         </div>
       </main>
     </div>
