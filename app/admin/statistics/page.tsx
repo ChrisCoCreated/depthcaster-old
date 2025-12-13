@@ -104,6 +104,28 @@ interface Statistics {
       onchain: boolean;
     }>;
   }>;
+  inactiveCurators: {
+    notVisited7Days: Array<{
+      fid: number;
+      username: string | null;
+      displayName: string | null;
+      pfpUrl: string | null;
+      lastVisit: string;
+    }>;
+    notVisited14Days: Array<{
+      fid: number;
+      username: string | null;
+      displayName: string | null;
+      pfpUrl: string | null;
+      lastVisit: string;
+    }>;
+    neverVisited: Array<{
+      fid: number;
+      username: string | null;
+      displayName: string | null;
+      pfpUrl: string | null;
+    }>;
+  };
 }
 
 export default function AdminStatisticsPage() {
@@ -119,6 +141,7 @@ export default function AdminStatisticsPage() {
   const [testResult, setTestResult] = useState<string | null>(null);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     activeUsers: true,
+    inactiveCurators: true,
     feedAnalytics: true,
     popularPages: true,
     databaseMonitoring: true,

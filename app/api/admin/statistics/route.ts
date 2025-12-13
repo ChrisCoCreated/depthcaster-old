@@ -23,7 +23,7 @@ import {
   pageViewsDaily,
   apiCallStats,
 } from "@/lib/schema";
-import { isAdmin, getUserRoles, getAllAdminFids } from "@/lib/roles";
+import { isAdmin, getUserRoles, getAllAdminFids, getAllCuratorFids } from "@/lib/roles";
 
 function getTimeRangeFilter(period: string) {
   const now = new Date();
@@ -849,6 +849,112 @@ export async function GET(request: NextRequest) {
           date,
           users,
         })).sort((a, b) => b.date.localeCompare(a.date)); // Sort by date descending
+      })(),
+      
+      // Curators who haven't visited recently
+      inactiveCurators: (async () => {
+        const curatorFids = await getAllCuratorFids();
+        if (curatorFids.length === 0) {
+          return {
+            notVisited7Days: [],
+            notVisited14Days: [],
+            neverVisited: [],
+          };
+        }
+
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const fourteenDaysAgo = new Date();
+        fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+
+        // Get last visit date for each curator from feed_view_sessions, cast_views, or page_views
+        const lastVisits = await db.execute(sql`
+          WITH curator_visits AS (
+            SELECT DISTINCT
+              user_fid,
+              MAX(created_at) as last_visit
+            FROM (
+              SELECT user_fid, created_at FROM feed_view_sessions WHERE user_fid IS NOT NULL
+              UNION ALL
+              SELECT user_fid, created_at FROM cast_views WHERE user_fid IS NOT NULL
+              UNION ALL
+              SELECT user_fid, created_at FROM page_views WHERE user_fid IS NOT NULL
+            ) AS all_visits
+            WHERE user_fid = ANY(${curatorFids})
+            GROUP BY user_fid
+          )
+          SELECT
+            cv.user_fid as fid,
+            cv.last_visit,
+            u.username,
+            u.display_name as "displayName",
+            u.pfp_url as "pfpUrl"
+          FROM curator_visits cv
+          LEFT JOIN users u ON u.fid = cv.user_fid
+        `);
+
+        const visitsMap = new Map<number, { lastVisit: Date; username: string | null; displayName: string | null; pfpUrl: string | null }>();
+        for (const row of (lastVisits as any).rows || []) {
+          visitsMap.set(row.fid, {
+            lastVisit: new Date(row.last_visit),
+            username: row.username,
+            displayName: row.displayName,
+            pfpUrl: row.pfpUrl,
+          });
+        }
+
+        // Get user info for curators who never visited
+        const neverVisitedFids = curatorFids.filter(fid => !visitsMap.has(fid));
+        const neverVisitedUsers = neverVisitedFids.length > 0
+          ? await db.select({
+              fid: users.fid,
+              username: users.username,
+              displayName: users.displayName,
+              pfpUrl: users.pfpUrl,
+            })
+            .from(users)
+            .where(sql`fid = ANY(${neverVisitedFids})`)
+          : [];
+
+        const now = new Date();
+        const notVisited7Days: Array<{ fid: number; username: string | null; displayName: string | null; pfpUrl: string | null; lastVisit: Date }> = [];
+        const notVisited14Days: Array<{ fid: number; username: string | null; displayName: string | null; pfpUrl: string | null; lastVisit: Date }> = [];
+
+        for (const [fid, visit] of visitsMap.entries()) {
+          const daysSinceVisit = Math.floor((now.getTime() - visit.lastVisit.getTime()) / (1000 * 60 * 60 * 24));
+          if (daysSinceVisit > 14) {
+            notVisited14Days.push({
+              fid,
+              username: visit.username,
+              displayName: visit.displayName,
+              pfpUrl: visit.pfpUrl,
+              lastVisit: visit.lastVisit,
+            });
+          } else if (daysSinceVisit > 7) {
+            notVisited7Days.push({
+              fid,
+              username: visit.username,
+              displayName: visit.displayName,
+              pfpUrl: visit.pfpUrl,
+              lastVisit: visit.lastVisit,
+            });
+          }
+        }
+
+        // Sort by last visit date (oldest first)
+        notVisited7Days.sort((a, b) => a.lastVisit.getTime() - b.lastVisit.getTime());
+        notVisited14Days.sort((a, b) => a.lastVisit.getTime() - b.lastVisit.getTime());
+
+        return {
+          notVisited7Days: notVisited7Days.map(u => ({ ...u, lastVisit: u.lastVisit.toISOString() })),
+          notVisited14Days: notVisited14Days.map(u => ({ ...u, lastVisit: u.lastVisit.toISOString() })),
+          neverVisited: neverVisitedUsers.map(u => ({
+            fid: u.fid,
+            username: u.username,
+            displayName: u.displayName,
+            pfpUrl: u.pfpUrl,
+          })),
+        };
       })(),
     });
   } catch (error: unknown) {
