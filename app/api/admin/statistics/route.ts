@@ -868,8 +868,9 @@ export async function GET(request: NextRequest) {
         const fourteenDaysAgo = new Date();
         fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
 
-        // Get last visit date for each curator from all activity sources:
-        // feed_view_sessions, cast_views, page_views, curator_cast_curations, curated_cast_interactions, sign_in_logs
+        // Get last visit date for each curator from actual activity sources:
+        // feed_view_sessions, cast_views, page_views, curator_cast_curations, curated_cast_interactions
+        // Note: sign_in_logs is excluded - we only count actual visits/interactions, not just logins
         const lastVisits = await db.execute(sql`
           WITH curator_visits AS (
             SELECT DISTINCT
@@ -887,10 +888,6 @@ export async function GET(request: NextRequest) {
               SELECT user_fid, created_at FROM curated_cast_interactions 
                 WHERE user_fid IS NOT NULL 
                 AND interaction_type IN ('like', 'recast', 'reply', 'quote')
-              UNION ALL
-              SELECT user_fid, created_at FROM sign_in_logs 
-                WHERE user_fid IS NOT NULL 
-                AND success = true
             ) AS all_visits
             WHERE user_fid = ANY(${sql.raw(`ARRAY[${curatorFids.join(',')}]`)})
             GROUP BY user_fid
