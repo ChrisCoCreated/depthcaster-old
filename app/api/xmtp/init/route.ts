@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getClientForUser, storeClientKeysForUser, getOrCreateClient, createXmtpSigner } from "@/lib/xmtp-server";
+import { getClientForUser, storeClientKeysForUser } from "@/lib/xmtp-server";
 import { getAddress, type Address } from "viem";
-import { createWalletClient, custom, http } from "viem";
-import { mainnet } from "viem/chains";
 
 export async function POST(request: NextRequest) {
   try {
