@@ -478,6 +478,11 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
       return notif.actor.pfp_url;
     }
     
+    // For curated notifications, check castData._actor (stored when creating notification)
+    if (notif.castData?._actor?.pfp_url) {
+      return notif.castData._actor.pfp_url;
+    }
+    
     // For Neynar notifications, check follows array
     if (notif.follows && notif.follows.length > 0) {
       const follower = notif.follows[0];
@@ -548,6 +553,8 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
         return "❤️";
       case "curated.recast":
         return "🔄";
+      case "curated.thanked":
+        return "🙏";
       case "app.update":
         return "📢";
       case "feedback.new":
@@ -607,7 +614,8 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
       type === "curated.quality_score" ||
       type === "curated.curated" ||
       type === "curated.liked" ||
-      type === "curated.recast"
+      type === "curated.recast" ||
+      type === "curated.thanked"
     ) {
       // For these types, castHash should be the curated/root cast hash
       const curatedHash: string | undefined =
@@ -845,6 +853,8 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
         return `${firstName} liked your curated cast`;
       case "curated.recast":
         return `${firstName} recast your curated cast`;
+      case "curated.thanked":
+        return `${firstName} said thank you`;
       default:
         return "New notification";
     }

@@ -590,6 +590,19 @@ export const xmtpGroupMembers = pgTable("xmtp_group_members", {
   memberAddressIdx: index("xmtp_group_members_member_address_idx").on(table.memberAddress),
 }));
 
+export const castThanks = pgTable("cast_thanks", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  castHash: text("cast_hash").notNull().references(() => curatedCasts.castHash, { onDelete: "cascade" }),
+  fromFid: bigint("from_fid", { mode: "number" }).notNull().references(() => users.fid, { onDelete: "cascade" }),
+  toFid: bigint("to_fid", { mode: "number" }).notNull().references(() => users.fid, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  castHashFromToUnique: uniqueIndex("cast_thanks_cast_hash_from_to_unique").on(table.castHash, table.fromFid, table.toFid),
+  castHashIdx: index("cast_thanks_cast_hash_idx").on(table.castHash),
+  fromFidIdx: index("cast_thanks_from_fid_idx").on(table.fromFid),
+  toFidIdx: index("cast_thanks_to_fid_idx").on(table.toFid),
+}));
+
 export type Collection = typeof collections.$inferSelect;
 export type NewCollection = typeof collections.$inferInsert;
 export type CollectionCast = typeof collectionCasts.$inferSelect;
@@ -602,4 +615,6 @@ export type XmtpMessage = typeof xmtpMessages.$inferSelect;
 export type NewXmtpMessage = typeof xmtpMessages.$inferInsert;
 export type XmtpGroupMember = typeof xmtpGroupMembers.$inferSelect;
 export type NewXmtpGroupMember = typeof xmtpGroupMembers.$inferInsert;
+export type CastThanks = typeof castThanks.$inferSelect;
+export type NewCastThanks = typeof castThanks.$inferInsert;
 

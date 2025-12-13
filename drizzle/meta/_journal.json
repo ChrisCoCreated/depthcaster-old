@@ -92,6 +92,13 @@
       "when": 1765608726752,
       "tag": "0012_magical_tombstone",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1765613263731,
+      "tag": "0013_slim_zaran",
+      "breakpoints": true
     }
   ]
 }

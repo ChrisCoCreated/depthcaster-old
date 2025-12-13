@@ -942,6 +942,9 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
     ? ((cast.embeds[0] as any)?.url || cast.parent_url)
     : null;
   const [isReacting, setIsReacting] = useState(false);
+  const [isThanking, setIsThanking] = useState(false);
+  const [isThanked, setIsThanked] = useState(false);
+  const [showThankAnimation, setShowThankAnimation] = useState(false);
   const [isCurating, setIsCurating] = useState(false);
   const [isCurated, setIsCurated] = useState(false);
   const [curators, setCurators] = useState<Array<{ fid: number; username?: string; display_name?: string; pfp_url?: string }>>([]);
@@ -1543,6 +1546,51 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
       alert(error.message || "Failed to toggle like");
     } finally {
       setIsReacting(false);
+    }
+  };
+
+  const handleThankYou = async () => {
+    if (!user?.signer_uuid) {
+      alert("Please sign in to say thank you");
+      return;
+    }
+
+    try {
+      setIsThanking(true);
+      const wasThanked = isThanked;
+      
+      // Trigger animation
+      setShowThankAnimation(true);
+      setTimeout(() => setShowThankAnimation(false), 300);
+      
+      // Optimistic update
+      setIsThanked(!wasThanked);
+
+      const response = await fetch("/api/thanks", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          signerUuid: user.signer_uuid,
+          castHash: cast.hash,
+        }),
+      });
+
+      if (!response.ok) {
+        // Revert optimistic update on error
+        setIsThanked(wasThanked);
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to say thank you");
+      }
+
+      const data = await response.json();
+      setIsThanked(data.thanked);
+    } catch (error: any) {
+      console.error("Thank you error:", error);
+      alert(error.message || "Failed to say thank you");
+    } finally {
+      setIsThanking(false);
     }
   };
 
@@ -3229,6 +3277,22 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                   </div>
                 )}
               </div>
+
+              {/* Thank You */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleThankYou();
+                }}
+                disabled={isThanking || !user}
+                className={`flex items-center gap-1 sm:gap-2 text-xs sm:text-sm transition-all py-1 px-1 sm:px-0 ${
+                  isThanked
+                    ? "text-yellow-600 dark:text-yellow-400"
+                    : "text-gray-500 dark:text-gray-400 hover:text-yellow-600 dark:hover:text-yellow-400"
+                } disabled:opacity-50 disabled:cursor-not-allowed ${showThankAnimation ? "thank-animate" : ""}`}
+              >
+                <span className="text-base sm:text-lg">🙏</span>
+              </button>
 
               {/* Quality score indicator and feedback button */}
               {qualityScore !== null && qualityScore !== undefined && (

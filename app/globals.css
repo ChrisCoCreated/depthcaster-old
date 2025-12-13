@@ -49,6 +49,23 @@ body {
     @apply text-base leading-7;
   }
   
+  /* Thank you button animation */
+  @keyframes thankPulse {
+    0% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.3);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+  
+  .thank-animate {
+    animation: thankPulse 0.3s ease-in-out;
+  }
+  
   /* Hide scrollbar for mobile horizontal scrolling */
   .scrollbar-hide {
     -ms-overflow-style: none;

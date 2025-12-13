@@ -1648,47 +1648,32 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
                   const isOptional = tab.id !== "curated" && tab.id !== "my-37";
                   
                   return (
-                    <div key={tab.id} className="relative flex items-center group">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (isDisabled) {
-                            setShowLoginPrompt(true);
-                            return;
-                          }
-                          const newType = tab.id as "curated" | "following" | "for-you" | "trending" | "my-37" | "1500+";
-                          // Update state optimistically for immediate UI feedback
-                          const normalized = normalizeFeedType(newType);
-                          setFeedType(normalized);
-                          // Update URL - this is the source of truth and will sync via useEffect
-                          const params = new URLSearchParams(window.location.search);
-                          params.set("feed", normalized);
-                          router.replace(`/?${params.toString()}`, { scroll: false });
-                        }}
-                        className={`px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap flex items-center gap-1 ${
-                          isDisabled
-                            ? "text-gray-400 dark:text-gray-600 cursor-pointer"
-                            : isActive
-                            ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
-                            : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
-                        }`}
-                      >
-                        {tab.label}
-                      </button>
-                      {/* Remove button for optional feeds */}
-                      {isOptional && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeFeed(tab.id);
-                          }}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-                          aria-label={`Remove ${tab.label} feed`}
-                        >
-                          <X className="w-3 h-3 text-gray-500 dark:text-gray-400" />
-                        </button>
-                      )}
-                    </div>
+                    <button
+                      key={tab.id}
+                      onClick={() => {
+                        if (isDisabled) {
+                          setShowLoginPrompt(true);
+                          return;
+                        }
+                        const newType = tab.id as "curated" | "following" | "for-you" | "trending" | "my-37" | "1500+";
+                        // Update state optimistically for immediate UI feedback
+                        const normalized = normalizeFeedType(newType);
+                        setFeedType(normalized);
+                        // Update URL - this is the source of truth and will sync via useEffect
+                        const params = new URLSearchParams(window.location.search);
+                        params.set("feed", normalized);
+                        router.replace(`/?${params.toString()}`, { scroll: false });
+                      }}
+                      className={`px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+                        isDisabled
+                          ? "text-gray-400 dark:text-gray-600 cursor-pointer"
+                          : isActive
+                          ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
+                          : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
                   );
                 })}
               
@@ -1744,26 +1729,47 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
                   { id: "for-you", label: "For You", requiresAuth: true },
                   { id: "following", label: "Following", requiresAuth: true },
                 ]
-                  .filter((tab) => !enabledFeeds.includes(tab.id) && (!tab.requiresAuth || viewerFid))
-                  .map((tab) => (
-                    <button
-                      key={tab.id}
-                      onClick={() => {
-                        addFeed(tab.id);
-                        setShowMoreFeeds(false);
-                        // Switch to the newly added feed
-                        const newType = tab.id as "curated" | "following" | "for-you" | "trending" | "my-37" | "1500+";
-                        const normalized = normalizeFeedType(newType);
-                        setFeedType(normalized);
-                        const params = new URLSearchParams(window.location.search);
-                        params.set("feed", normalized);
-                        router.replace(`/?${params.toString()}`, { scroll: false });
-                      }}
-                      className="px-3 py-1.5 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors"
-                    >
-                      + {tab.label}
-                    </button>
-                  ))}
+                  .filter((tab) => !tab.requiresAuth || viewerFid)
+                  .map((tab) => {
+                    const isEnabled = enabledFeeds.includes(tab.id);
+                    return (
+                      <div key={tab.id} className="flex items-center gap-1 group">
+                        {isEnabled ? (
+                          <>
+                            <span className="px-3 py-1.5 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">
+                              {tab.label}
+                            </span>
+                            <button
+                              onClick={() => {
+                                removeFeed(tab.id);
+                              }}
+                              className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
+                              aria-label={`Remove ${tab.label} feed`}
+                            >
+                              <X className="w-3 h-3 text-gray-500 dark:text-gray-400" />
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              addFeed(tab.id);
+                              setShowMoreFeeds(false);
+                              // Switch to the newly added feed
+                              const newType = tab.id as "curated" | "following" | "for-you" | "trending" | "my-37" | "1500+";
+                              const normalized = normalizeFeedType(newType);
+                              setFeedType(normalized);
+                              const params = new URLSearchParams(window.location.search);
+                              params.set("feed", normalized);
+                              router.replace(`/?${params.toString()}`, { scroll: false });
+                            }}
+                            className="px-3 py-1.5 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors"
+                          >
+                            + {tab.label}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
               </div>
             </div>
           )}

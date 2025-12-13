@@ -77,7 +77,7 @@ export async function shouldNotifyCurator(
  */
 export async function createCuratorNotification(
   curatorFid: number,
-  type: "curated.quality_reply" | "curated.curated" | "curated.liked" | "curated.recast" | "curated.quality_score",
+  type: "curated.quality_reply" | "curated.curated" | "curated.liked" | "curated.recast" | "curated.quality_score" | "curated.thanked",
   castHash: string,
   castData: any,
   authorFid: number
@@ -404,6 +404,69 @@ export async function notifyCuratorsAboutInteraction(
       });
     } catch (error) {
       console.error(`[Notifications] Error notifying curator ${curatorFid} about ${interactionType}:`, error);
+      // Continue with other curators even if one fails
+    }
+  }
+}
+
+/**
+ * Notify curators when someone says thank you to their curated cast
+ */
+export async function notifyCuratorsAboutThanks(
+  castHash: string,
+  castData: any,
+  userFid: number,
+  user: { username?: string | null; displayName?: string | null; pfpUrl?: string | null } | null
+): Promise<void> {
+  const curators = await getCuratorsForCast(castHash);
+  // Don't notify if the curator themselves is the one thanking
+  const curatorsToNotify = curators.filter((fid) => fid !== userFid);
+
+  if (curatorsToNotify.length === 0) {
+    return;
+  }
+
+  const userName = user?.displayName || user?.username || `User ${userFid}`;
+  const authorFid = castData?.author?.fid || userFid;
+
+  for (const curatorFid of curatorsToNotify) {
+    try {
+      // Store actor (user who thanked) info in castData for display
+      const castDataWithActor = {
+        ...castData,
+        _actor: {
+          fid: userFid,
+          username: user?.username,
+          display_name: user?.displayName,
+          pfp_url: user?.pfpUrl,
+        },
+      };
+
+      await createCuratorNotification(
+        curatorFid,
+        "curated.thanked",
+        castHash,
+        castDataWithActor,
+        authorFid
+      );
+
+      // Send push notification
+      await sendPushNotificationToUser(curatorFid, {
+        title: "Someone said thank you",
+        body: `${userName} said thank you`,
+        icon: user?.pfpUrl || "/icon-192x192.webp",
+        badge: "/icon-96x96.webp",
+        data: {
+          type: "curated.thanked",
+          castHash,
+          userFid,
+          url: `/cast/${castHash}`,
+        },
+      }).catch((error) => {
+        console.error(`[Notifications] Error sending push notification to curator ${curatorFid}:`, error);
+      });
+    } catch (error) {
+      console.error(`[Notifications] Error notifying curator ${curatorFid} about thanks:`, error);
       // Continue with other curators even if one fails
     }
   }
