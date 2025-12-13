@@ -177,7 +177,64 @@ export function WalletConnector({ onConnected, onInitialized }: WalletConnectorP
           if (typeof keyData === 'object') {
             console.log(`[${source}] Found object, keys: ${Object.keys(keyData).join(', ')}`);
             
-            // Try common property names
+            // XMTP key bundle structure: has identityKey, preKeys, etc.
+            // Try to extract from identityKey first (this is the main private key)
+            if (keyData.identityKey) {
+              console.log(`[${source}] Found identityKey property`);
+              const identityKey = keyData.identityKey;
+              
+              // Check if identityKey has private key bytes
+              if (identityKey.privateKey) {
+                console.log(`[${source}] identityKey.privateKey found, type: ${typeof identityKey.privateKey}`);
+                if (identityKey.privateKey instanceof Uint8Array) {
+                  return identityKey.privateKey;
+                }
+                if (Array.isArray(identityKey.privateKey)) {
+                  return new Uint8Array(identityKey.privateKey);
+                }
+              }
+              if (identityKey.privateKeyBytes) {
+                console.log(`[${source}] identityKey.privateKeyBytes found`);
+                if (identityKey.privateKeyBytes instanceof Uint8Array) {
+                  return identityKey.privateKeyBytes;
+                }
+                if (Array.isArray(identityKey.privateKeyBytes)) {
+                  return new Uint8Array(identityKey.privateKeyBytes);
+                }
+              }
+              if (identityKey.keyBytes) {
+                console.log(`[${source}] identityKey.keyBytes found`);
+                if (identityKey.keyBytes instanceof Uint8Array) {
+                  return identityKey.keyBytes;
+                }
+                if (Array.isArray(identityKey.keyBytes)) {
+                  return new Uint8Array(identityKey.keyBytes);
+                }
+              }
+              // Try to serialize the identityKey if it has a serialize method
+              if (typeof identityKey.serialize === 'function') {
+                try {
+                  const serialized = identityKey.serialize();
+                  if (serialized instanceof Uint8Array) {
+                    return serialized;
+                  }
+                  if (Array.isArray(serialized)) {
+                    return new Uint8Array(serialized);
+                  }
+                } catch (e) {
+                  console.warn(`[${source}] identityKey.serialize() failed:`, e);
+                }
+              }
+              // If identityKey itself is a Uint8Array or array
+              if (identityKey instanceof Uint8Array) {
+                return identityKey;
+              }
+              if (Array.isArray(identityKey)) {
+                return new Uint8Array(identityKey);
+              }
+            }
+            
+            // Try common property names on the root object
             if (keyData.privateKey) {
               console.log(`[${source}] Found privateKey property, type: ${typeof keyData.privateKey}`);
               if (keyData.privateKey instanceof Uint8Array) {
@@ -212,6 +269,21 @@ export function WalletConnector({ onConnected, onInitialized }: WalletConnectorP
               }
               if (Array.isArray(keyData.bytes)) {
                 return new Uint8Array(keyData.bytes);
+              }
+            }
+            // Try serialize method on the root object
+            if (typeof keyData.serialize === 'function') {
+              try {
+                console.log(`[${source}] Trying serialize() method`);
+                const serialized = keyData.serialize();
+                if (serialized instanceof Uint8Array) {
+                  return serialized;
+                }
+                if (Array.isArray(serialized)) {
+                  return new Uint8Array(serialized);
+                }
+              } catch (e) {
+                console.warn(`[${source}] serialize() failed:`, e);
               }
             }
             // If it's an array-like object, try to convert
