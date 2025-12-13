@@ -105,6 +105,16 @@ export async function loadClientKeys(
 
 /**
  * Initialize XMTP client with wallet
+ * 
+ * IMPORTANT: This will automatically use existing XMTP keys if the wallet is already registered
+ * on the XMTP network (from other apps like Converse, Coinbase Wallet, etc.).
+ * 
+ * When Client.create() is called with a signer, the XMTP SDK automatically:
+ * 1. Checks if the wallet address already has an XMTP identity on the network
+ * 2. If yes, uses those existing keys (so messages from other apps will be visible)
+ * 3. If no, creates new keys and registers the wallet
+ * 
+ * This means users will see their existing XMTP conversations from other apps!
  */
 export async function initializeXmtpClient(
   walletAddress: Address,
@@ -112,40 +122,33 @@ export async function initializeXmtpClient(
 ): Promise<Client> {
   const address = getAddress(walletAddress);
   
-  // Check if we have stored keys
-  const stored = await loadClientKeys(address);
+  // Always create client with signer first - this will use existing network keys if available
+  // Client.create() with signer automatically detects if wallet already has XMTP identity
+  // This is the key to seeing messages from other apps!
+  const client = await Client.create(signer, {
+    env: XMTP_ENV as any,
+  });
   
-  if (stored) {
-    // Create client from stored keys
-    const keys = decryptKeys(stored.keys);
-    return await Client.create(null, {
-      privateKeyOverride: keys,
-      env: XMTP_ENV as any,
-    });
-  } else {
-    // Create new client
-    const client = await Client.create(signer, {
-      env: XMTP_ENV as any,
-    });
-    
-    // Store keys - XMTP v7 uses different API
-    // Try to get keys from the client's keystore
-    try {
-      const keys = await (client as any).exportKey?.() || await (client as any).exportKeyBundle?.();
-      if (keys) {
-        await storeClientKeys(address, keys);
-      }
-    } catch (error) {
-      console.warn("Could not export keys from XMTP client:", error);
-      // Keys will be stored on next initialization
+  // Store keys for future use - XMTP v7 uses different API
+  // Try to get keys from the client's keystore
+  // These keys may be newly created OR existing keys from other apps
+  try {
+    // Try to export keys - this will get existing keys if wallet was already registered
+    const keys = await (client as any).exportKey?.() || await (client as any).exportKeyBundle?.() || await (client as any).getKeys?.();
+    if (keys) {
+      await storeClientKeys(address, keys);
     }
-    
-    return client;
+  } catch (error) {
+    console.warn("Could not export keys from XMTP client:", error);
+    // Keys will be stored on next initialization
   }
+  
+  return client;
 }
 
 /**
  * Get or create XMTP client for a user
+ * If wallet already has XMTP keys from other apps, they will be automatically used
  */
 export async function getOrCreateClient(
   userFid: number,
@@ -154,7 +157,7 @@ export async function getOrCreateClient(
 ): Promise<Client> {
   const address = getAddress(walletAddress);
   
-  // Check if user already has a client for this wallet
+  // Check if we have stored keys for this user/wallet combination
   const existing = await db
     .select()
     .from(xmtpClients)
@@ -167,7 +170,7 @@ export async function getOrCreateClient(
     .limit(1);
 
   if (existing.length > 0) {
-    // Load existing client
+    // Use stored keys for faster initialization
     const keys = decryptKeys(existing[0].keys);
     return await Client.create(null, {
       privateKeyOverride: keys,
@@ -175,10 +178,11 @@ export async function getOrCreateClient(
     });
   }
 
-  // Initialize new client
+  // Initialize client with signer - this will automatically use existing network keys
+  // if the wallet is already registered on XMTP (from other apps)
   const client = await initializeXmtpClient(address, signer);
   
-  // Store in database - XMTP v7 uses different API
+  // Store keys in database for this user
   try {
     const keys = await (client as any).exportKey?.() || await (client as any).exportKeyBundle?.();
     if (keys) {

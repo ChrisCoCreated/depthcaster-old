@@ -104,28 +104,56 @@ export function WalletConnector({ onConnected, onInitialized }: WalletConnectorP
         transport: custom((window as any).ethereum),
       });
 
-      // Request signature for XMTP initialization
-      const message = "Initialize XMTP for Depthcaster";
-      const signature = await walletClient.signMessage({
-        account: address,
-        message,
+      // Create signer for XMTP
+      const signer = {
+        getAddress: async () => address,
+        signMessage: async (message: string | Uint8Array) => {
+          const messageStr = typeof message === "string" ? message : new TextDecoder().decode(message);
+          return await walletClient.signMessage({
+            account: address,
+            message: messageStr,
+          });
+        },
+      };
+
+      // Initialize XMTP client directly - this will automatically use existing keys
+      // if the wallet is already registered on XMTP (from other apps like Converse, Coinbase Wallet, etc.)
+      // Client.create() with a signer automatically detects and uses existing XMTP identity
+      const { Client } = await import("@xmtp/xmtp-js");
+      const xmtpEnv = (process.env.NEXT_PUBLIC_XMTP_ENV || process.env.XMTP_ENV || "dev") as "dev" | "production";
+      const client = await Client.create(signer, {
+        env: xmtpEnv,
       });
 
-      // Initialize XMTP client
-      const response = await fetch("/api/xmtp/init", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userFid: user.fid,
-          walletAddress: address,
-          signature,
-          message,
-        }),
-      });
+      // Export and store keys on server
+      // These keys may be newly created OR existing keys from other apps
+      try {
+        // Try to get keys from the client
+        // XMTP v7 API - keys are stored internally, we need to export them
+        const keys = await (client as any).exportKey?.() || await (client as any).exportKeyBundle?.() || await (client as any).getKeys?.();
+        if (keys) {
+          const keysArray = keys instanceof Uint8Array ? Array.from(keys) : keys;
+          const response = await fetch("/api/xmtp/init", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userFid: user.fid,
+              walletAddress: address,
+              keys: keysArray,
+            }),
+          });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to initialize XMTP");
+          if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.error || "Failed to store XMTP keys");
+          }
+        } else {
+          console.warn("Could not export keys from XMTP client - keys may not be accessible");
+        }
+      } catch (error: any) {
+        console.warn("Could not store XMTP keys:", error);
+        // Continue anyway - the client is initialized and can be used
+        // Keys will be stored on next initialization attempt
       }
 
       setIsInitialized(true);
