@@ -640,7 +640,7 @@ export default function AdminStatisticsPage() {
                 {expandedSections.inactiveCurators && (
                   <div className="space-y-6">
                     {/* Never Visited */}
-                    {statistics.inactiveCurators.neverVisited.length > 0 && (
+                    {statistics.inactiveCurators.neverVisited && statistics.inactiveCurators.neverVisited.length > 0 && (
                       <div>
                         <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                           Never Visited ({statistics.inactiveCurators.neverVisited.length})
@@ -670,7 +670,7 @@ export default function AdminStatisticsPage() {
                     )}
 
                     {/* Not Visited in 14+ Days */}
-                    {statistics.inactiveCurators.notVisited14Days.length > 0 && (
+                    {statistics.inactiveCurators.notVisited14Days && statistics.inactiveCurators.notVisited14Days.length > 0 && (
                       <div>
                         <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                           Not Visited in 14+ Days ({statistics.inactiveCurators.notVisited14Days.length})
@@ -706,7 +706,7 @@ export default function AdminStatisticsPage() {
                     )}
 
                     {/* Not Visited in 7+ Days */}
-                    {statistics.inactiveCurators.notVisited7Days.length > 0 && (
+                    {statistics.inactiveCurators.notVisited7Days && statistics.inactiveCurators.notVisited7Days.length > 0 && (
                       <div>
                         <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                           Not Visited in 7+ Days ({statistics.inactiveCurators.notVisited7Days.length})
@@ -741,9 +741,9 @@ export default function AdminStatisticsPage() {
                       </div>
                     )}
 
-                    {statistics.inactiveCurators.neverVisited.length === 0 &&
-                      statistics.inactiveCurators.notVisited14Days.length === 0 &&
-                      statistics.inactiveCurators.notVisited7Days.length === 0 && (
+                    {(!statistics.inactiveCurators.neverVisited || statistics.inactiveCurators.neverVisited.length === 0) &&
+                      (!statistics.inactiveCurators.notVisited14Days || statistics.inactiveCurators.notVisited14Days.length === 0) &&
+                      (!statistics.inactiveCurators.notVisited7Days || statistics.inactiveCurators.notVisited7Days.length === 0) && (
                         <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                           <p>All curators have been active recently! 🎉</p>
                         </div>
