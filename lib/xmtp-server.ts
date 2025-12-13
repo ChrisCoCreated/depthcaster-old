@@ -154,7 +154,52 @@ export async function initializeXmtpClient(
         if (keyData.identityKey) {
           const identityKey = keyData.identityKey;
           
-          // Check if identityKey has private key bytes
+          // Check for secp256k1 property (based on XMTP proto types)
+          if (identityKey.secp256k1) {
+            const secp256k1 = identityKey.secp256k1;
+            
+            // Try to extract bytes from secp256k1
+            if (secp256k1.bytes) {
+              if (secp256k1.bytes instanceof Uint8Array) {
+                return secp256k1.bytes;
+              }
+              if (Array.isArray(secp256k1.bytes)) {
+                return new Uint8Array(secp256k1.bytes);
+              }
+            }
+            if (secp256k1.privateKeyBytes) {
+              if (secp256k1.privateKeyBytes instanceof Uint8Array) {
+                return secp256k1.privateKeyBytes;
+              }
+              if (Array.isArray(secp256k1.privateKeyBytes)) {
+                return new Uint8Array(secp256k1.privateKeyBytes);
+              }
+            }
+            if (secp256k1.keyBytes) {
+              if (secp256k1.keyBytes instanceof Uint8Array) {
+                return secp256k1.keyBytes;
+              }
+              if (Array.isArray(secp256k1.keyBytes)) {
+                return new Uint8Array(secp256k1.keyBytes);
+              }
+            }
+            // Try serialize on secp256k1
+            if (typeof secp256k1.serialize === 'function') {
+              try {
+                const serialized = secp256k1.serialize();
+                if (serialized instanceof Uint8Array) {
+                  return serialized;
+                }
+                if (Array.isArray(serialized)) {
+                  return new Uint8Array(serialized);
+                }
+              } catch (e) {
+                // Ignore errors
+              }
+            }
+          }
+          
+          // Check if identityKey has private key bytes directly
           if (identityKey.privateKey) {
             if (identityKey.privateKey instanceof Uint8Array) {
               return identityKey.privateKey;
@@ -357,7 +402,52 @@ export async function getOrCreateClient(
         if (keyData.identityKey) {
           const identityKey = keyData.identityKey;
           
-          // Check if identityKey has private key bytes
+          // Check for secp256k1 property (based on XMTP proto types)
+          if (identityKey.secp256k1) {
+            const secp256k1 = identityKey.secp256k1;
+            
+            // Try to extract bytes from secp256k1
+            if (secp256k1.bytes) {
+              if (secp256k1.bytes instanceof Uint8Array) {
+                return secp256k1.bytes;
+              }
+              if (Array.isArray(secp256k1.bytes)) {
+                return new Uint8Array(secp256k1.bytes);
+              }
+            }
+            if (secp256k1.privateKeyBytes) {
+              if (secp256k1.privateKeyBytes instanceof Uint8Array) {
+                return secp256k1.privateKeyBytes;
+              }
+              if (Array.isArray(secp256k1.privateKeyBytes)) {
+                return new Uint8Array(secp256k1.privateKeyBytes);
+              }
+            }
+            if (secp256k1.keyBytes) {
+              if (secp256k1.keyBytes instanceof Uint8Array) {
+                return secp256k1.keyBytes;
+              }
+              if (Array.isArray(secp256k1.keyBytes)) {
+                return new Uint8Array(secp256k1.keyBytes);
+              }
+            }
+            // Try serialize on secp256k1
+            if (typeof secp256k1.serialize === 'function') {
+              try {
+                const serialized = secp256k1.serialize();
+                if (serialized instanceof Uint8Array) {
+                  return serialized;
+                }
+                if (Array.isArray(serialized)) {
+                  return new Uint8Array(serialized);
+                }
+              } catch (e) {
+                // Ignore errors
+              }
+            }
+          }
+          
+          // Check if identityKey has private key bytes directly
           if (identityKey.privateKey) {
             if (identityKey.privateKey instanceof Uint8Array) {
               return identityKey.privateKey;

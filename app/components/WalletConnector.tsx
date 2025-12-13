@@ -183,42 +183,116 @@ export function WalletConnector({ onConnected, onInitialized }: WalletConnectorP
               console.log(`[${source}] Found identityKey property`);
               const identityKey = keyData.identityKey;
               
-              // Check if identityKey has private key bytes
+              // DETAILED INSPECTION: Log the structure of identityKey
+              console.log(`[${source}] identityKey object keys:`, Object.keys(identityKey));
+              console.log(`[${source}] identityKey constructor:`, identityKey.constructor?.name);
+              console.log(`[${source}] identityKey.secp256k1 exists:`, !!identityKey.secp256k1);
+              
+              // Check for secp256k1 property (based on XMTP proto types)
+              if (identityKey.secp256k1) {
+                console.log(`[${source}] identityKey.secp256k1 found!`);
+                const secp256k1 = identityKey.secp256k1;
+                console.log(`[${source}] secp256k1 object keys:`, Object.keys(secp256k1));
+                console.log(`[${source}] secp256k1 constructor:`, secp256k1.constructor?.name);
+                
+                // Try to extract bytes from secp256k1
+                if (secp256k1.bytes) {
+                  console.log(`[${source}] secp256k1.bytes found, type: ${typeof secp256k1.bytes}, isUint8Array: ${secp256k1.bytes instanceof Uint8Array}`);
+                  if (secp256k1.bytes instanceof Uint8Array) {
+                    console.log(`[${source}] ✓ Extracted keys via secp256k1.bytes`);
+                    return secp256k1.bytes;
+                  }
+                  if (Array.isArray(secp256k1.bytes)) {
+                    console.log(`[${source}] ✓ Extracted keys via secp256k1.bytes (array)`);
+                    return new Uint8Array(secp256k1.bytes);
+                  }
+                }
+                if (secp256k1.privateKeyBytes) {
+                  console.log(`[${source}] secp256k1.privateKeyBytes found`);
+                  if (secp256k1.privateKeyBytes instanceof Uint8Array) {
+                    console.log(`[${source}] ✓ Extracted keys via secp256k1.privateKeyBytes`);
+                    return secp256k1.privateKeyBytes;
+                  }
+                  if (Array.isArray(secp256k1.privateKeyBytes)) {
+                    console.log(`[${source}] ✓ Extracted keys via secp256k1.privateKeyBytes (array)`);
+                    return new Uint8Array(secp256k1.privateKeyBytes);
+                  }
+                }
+                if (secp256k1.keyBytes) {
+                  console.log(`[${source}] secp256k1.keyBytes found`);
+                  if (secp256k1.keyBytes instanceof Uint8Array) {
+                    console.log(`[${source}] ✓ Extracted keys via secp256k1.keyBytes`);
+                    return secp256k1.keyBytes;
+                  }
+                  if (Array.isArray(secp256k1.keyBytes)) {
+                    console.log(`[${source}] ✓ Extracted keys via secp256k1.keyBytes (array)`);
+                    return new Uint8Array(secp256k1.keyBytes);
+                  }
+                }
+                // Try serialize on secp256k1
+                if (typeof secp256k1.serialize === 'function') {
+                  try {
+                    console.log(`[${source}] Trying secp256k1.serialize()`);
+                    const serialized = secp256k1.serialize();
+                    if (serialized instanceof Uint8Array) {
+                      console.log(`[${source}] ✓ Extracted keys via secp256k1.serialize()`);
+                      return serialized;
+                    }
+                    if (Array.isArray(serialized)) {
+                      console.log(`[${source}] ✓ Extracted keys via secp256k1.serialize() (array)`);
+                      return new Uint8Array(serialized);
+                    }
+                  } catch (e) {
+                    console.warn(`[${source}] secp256k1.serialize() failed:`, e);
+                  }
+                }
+              }
+              
+              // Check if identityKey has private key bytes directly
               if (identityKey.privateKey) {
                 console.log(`[${source}] identityKey.privateKey found, type: ${typeof identityKey.privateKey}`);
                 if (identityKey.privateKey instanceof Uint8Array) {
+                  console.log(`[${source}] ✓ Extracted keys via identityKey.privateKey`);
                   return identityKey.privateKey;
                 }
                 if (Array.isArray(identityKey.privateKey)) {
+                  console.log(`[${source}] ✓ Extracted keys via identityKey.privateKey (array)`);
                   return new Uint8Array(identityKey.privateKey);
                 }
               }
               if (identityKey.privateKeyBytes) {
                 console.log(`[${source}] identityKey.privateKeyBytes found`);
                 if (identityKey.privateKeyBytes instanceof Uint8Array) {
+                  console.log(`[${source}] ✓ Extracted keys via identityKey.privateKeyBytes`);
                   return identityKey.privateKeyBytes;
                 }
                 if (Array.isArray(identityKey.privateKeyBytes)) {
+                  console.log(`[${source}] ✓ Extracted keys via identityKey.privateKeyBytes (array)`);
                   return new Uint8Array(identityKey.privateKeyBytes);
                 }
               }
               if (identityKey.keyBytes) {
                 console.log(`[${source}] identityKey.keyBytes found`);
                 if (identityKey.keyBytes instanceof Uint8Array) {
+                  console.log(`[${source}] ✓ Extracted keys via identityKey.keyBytes`);
                   return identityKey.keyBytes;
                 }
                 if (Array.isArray(identityKey.keyBytes)) {
+                  console.log(`[${source}] ✓ Extracted keys via identityKey.keyBytes (array)`);
                   return new Uint8Array(identityKey.keyBytes);
                 }
               }
               // Try to serialize the identityKey if it has a serialize method
               if (typeof identityKey.serialize === 'function') {
                 try {
+                  console.log(`[${source}] Trying identityKey.serialize()`);
                   const serialized = identityKey.serialize();
                   if (serialized instanceof Uint8Array) {
+                    console.log(`[${source}] ✓ Extracted keys via identityKey.serialize()`);
                     return serialized;
                   }
                   if (Array.isArray(serialized)) {
+                    console.log(`[${source}] ✓ Extracted keys via identityKey.serialize() (array)`);
                     return new Uint8Array(serialized);
                   }
                 } catch (e) {
@@ -227,9 +301,11 @@ export function WalletConnector({ onConnected, onInitialized }: WalletConnectorP
               }
               // If identityKey itself is a Uint8Array or array
               if (identityKey instanceof Uint8Array) {
+                console.log(`[${source}] ✓ identityKey is Uint8Array`);
                 return identityKey;
               }
               if (Array.isArray(identityKey)) {
+                console.log(`[${source}] ✓ identityKey is array`);
                 return new Uint8Array(identityKey);
               }
             }
