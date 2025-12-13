@@ -26,6 +26,13 @@ export function WalletConnector({ onConnected, onInitialized }: WalletConnectorP
     }
   }, []);
 
+  // Re-check initialization when user changes
+  useEffect(() => {
+    if (walletAddress && user?.fid) {
+      checkInitialization(walletAddress);
+    }
+  }, [user?.fid, walletAddress]);
+
   const checkConnection = async () => {
     try {
       const accounts = await (window as any).ethereum.request({
@@ -42,7 +49,10 @@ export function WalletConnector({ onConnected, onInitialized }: WalletConnectorP
   };
 
   const checkInitialization = async (address: Address): Promise<boolean> => {
-    if (!user?.fid) return false;
+    if (!user?.fid) {
+      setIsInitialized(false);
+      return false;
+    }
 
     try {
       const response = await fetch(
@@ -54,12 +64,18 @@ export function WalletConnector({ onConnected, onInitialized }: WalletConnectorP
           setIsInitialized(true);
           onInitialized?.(address);
           return true;
+        } else {
+          setIsInitialized(false);
+          return false;
         }
+      } else {
+        setIsInitialized(false);
+        return false;
       }
     } catch (error) {
-      // Not initialized yet
+      setIsInitialized(false);
+      return false;
     }
-    return false;
   };
 
   const connectWallet = async () => {
@@ -192,9 +208,13 @@ export function WalletConnector({ onConnected, onInitialized }: WalletConnectorP
 
   return (
     <div className="p-4 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg">
-      <h3 className="text-lg font-semibold mb-2">Connect Wallet for XMTP</h3>
+      <h3 className="text-lg font-semibold mb-2">
+        {walletAddress ? "Initialize XMTP" : "Connect Wallet for XMTP"}
+      </h3>
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-        Connect your Ethereum wallet to enable XMTP messaging.
+        {walletAddress
+          ? `Wallet connected: ${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}. Initialize XMTP to start messaging.`
+          : "Connect your Ethereum wallet to enable XMTP messaging."}
       </p>
 
       {error && (

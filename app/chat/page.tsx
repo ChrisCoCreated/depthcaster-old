@@ -72,10 +72,17 @@ export default function ChatPage() {
         `/api/xmtp/init?userFid=${user.fid}&walletAddress=${address}`
       );
       if (response.ok) {
-        setIsInitialized(true);
+        const data = await response.json();
+        if (data.initialized || data.success) {
+          setIsInitialized(true);
+        } else {
+          setIsInitialized(false);
+        }
+      } else {
+        setIsInitialized(false);
       }
     } catch (error) {
-      // Not initialized
+      setIsInitialized(false);
     }
   };
 
@@ -113,6 +120,7 @@ export default function ChatPage() {
     );
   }
 
+  // Show WalletConnector if wallet not connected OR not initialized
   if (!walletAddress || !isInitialized) {
     return (
       <div className="min-h-screen max-w-4xl mx-auto px-4 py-8">
