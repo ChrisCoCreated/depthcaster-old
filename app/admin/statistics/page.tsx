@@ -623,6 +623,136 @@ export default function AdminStatisticsPage() {
               </div>
             )}
 
+            {/* Inactive Curators */}
+            {statistics.inactiveCurators && (
+              <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <button
+                    onClick={() => setExpandedSections(prev => ({ ...prev, inactiveCurators: !prev.inactiveCurators }))}
+                    className="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-gray-100 hover:text-gray-700 dark:hover:text-gray-300"
+                  >
+                    <span className={`transition-transform ${expandedSections.inactiveCurators ? 'rotate-90' : ''}`}>
+                      ▶
+                    </span>
+                    <span>Inactive Curators</span>
+                  </button>
+                </div>
+                {expandedSections.inactiveCurators && (
+                  <div className="space-y-6">
+                    {/* Never Visited */}
+                    {statistics.inactiveCurators.neverVisited.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                          Never Visited ({statistics.inactiveCurators.neverVisited.length})
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {statistics.inactiveCurators.neverVisited.map((curator) => {
+                            const displayName = curator.displayName || curator.username || `User ${curator.fid}`;
+                            return (
+                              <div
+                                key={curator.fid}
+                                className="flex items-center gap-2 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg"
+                              >
+                                <AvatarImage
+                                  src={curator.pfpUrl}
+                                  alt={displayName}
+                                  size={24}
+                                  className="w-6 h-6 rounded-full object-cover"
+                                />
+                                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                  {displayName}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Not Visited in 14+ Days */}
+                    {statistics.inactiveCurators.notVisited14Days.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                          Not Visited in 14+ Days ({statistics.inactiveCurators.notVisited14Days.length})
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {statistics.inactiveCurators.notVisited14Days.map((curator) => {
+                            const displayName = curator.displayName || curator.username || `User ${curator.fid}`;
+                            const lastVisit = new Date(curator.lastVisit);
+                            const daysAgo = Math.floor((Date.now() - lastVisit.getTime()) / (1000 * 60 * 60 * 24));
+                            return (
+                              <div
+                                key={curator.fid}
+                                className="flex items-center gap-2 px-3 py-2 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg"
+                                title={`Last visit: ${lastVisit.toLocaleDateString()} (${daysAgo} days ago)`}
+                              >
+                                <AvatarImage
+                                  src={curator.pfpUrl}
+                                  alt={displayName}
+                                  size={24}
+                                  className="w-6 h-6 rounded-full object-cover"
+                                />
+                                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                  {displayName}
+                                </span>
+                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                  ({daysAgo}d ago)
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Not Visited in 7+ Days */}
+                    {statistics.inactiveCurators.notVisited7Days.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                          Not Visited in 7+ Days ({statistics.inactiveCurators.notVisited7Days.length})
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {statistics.inactiveCurators.notVisited7Days.map((curator) => {
+                            const displayName = curator.displayName || curator.username || `User ${curator.fid}`;
+                            const lastVisit = new Date(curator.lastVisit);
+                            const daysAgo = Math.floor((Date.now() - lastVisit.getTime()) / (1000 * 60 * 60 * 24));
+                            return (
+                              <div
+                                key={curator.fid}
+                                className="flex items-center gap-2 px-3 py-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg"
+                                title={`Last visit: ${lastVisit.toLocaleDateString()} (${daysAgo} days ago)`}
+                              >
+                                <AvatarImage
+                                  src={curator.pfpUrl}
+                                  alt={displayName}
+                                  size={24}
+                                  className="w-6 h-6 rounded-full object-cover"
+                                />
+                                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                  {displayName}
+                                </span>
+                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                  ({daysAgo}d ago)
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {statistics.inactiveCurators.neverVisited.length === 0 &&
+                      statistics.inactiveCurators.notVisited14Days.length === 0 &&
+                      statistics.inactiveCurators.notVisited7Days.length === 0 && (
+                        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                          <p>All curators have been active recently! 🎉</p>
+                        </div>
+                      )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Overview Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
