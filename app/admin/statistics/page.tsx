@@ -162,10 +162,21 @@ export default function AdminStatisticsPage() {
     contentStatistics: true,
     userActions: true,
     apiCallStatistics: true,
+    miniappNotifications: true,
   });
   const [miniview, setMiniview] = useState(true);
   const [selectedUserFid, setSelectedUserFid] = useState<number | null>(null);
   const [userSearchQuery, setUserSearchQuery] = useState<string>("");
+  const [miniappNotifications, setMiniappNotifications] = useState<Array<{
+    token: string;
+    fid: number;
+    created_at: string;
+    updated_at: string;
+    status?: string;
+    [key: string]: any;
+  }>>([]);
+  const [isLoadingMiniappNotifications, setIsLoadingMiniappNotifications] = useState(false);
+  const [miniappNotificationsLastUpdated, setMiniappNotificationsLastUpdated] = useState<string | null>(null);
 
   useEffect(() => {
     const checkAdminAccess = async () => {
@@ -226,8 +237,83 @@ export default function AdminStatisticsPage() {
   useEffect(() => {
     if (isAdmin && user?.fid) {
       loadStatistics();
+      loadMiniappNotificationsFromStorage();
     }
   }, [period, excludeHistorical, isAdmin, user?.fid]);
+
+  const loadMiniappNotificationsFromStorage = () => {
+    try {
+      const stored = localStorage.getItem("miniapp_notifications");
+      const lastUpdated = localStorage.getItem("miniapp_notifications_last_updated");
+      if (stored) {
+        setMiniappNotifications(JSON.parse(stored));
+      }
+      if (lastUpdated) {
+        setMiniappNotificationsLastUpdated(lastUpdated);
+      }
+    } catch (error) {
+      console.error("Failed to load miniapp notifications from storage:", error);
+    }
+  };
+
+  const fetchAllMiniappNotifications = async () => {
+    if (!user?.fid) return;
+
+    setIsLoadingMiniappNotifications(true);
+    try {
+      const allTokens: Array<{
+        token: string;
+        fid: number;
+        created_at: string;
+        updated_at: string;
+        status?: string;
+        [key: string]: any;
+      }> = [];
+      let cursor: string | null = null;
+      let hasMore = true;
+
+      while (hasMore) {
+        let url = `/api/admin/miniapp-notifications?fid=${user.fid}&limit=20`;
+        if (cursor) {
+          url += `&cursor=${cursor}`;
+        }
+
+        const response = await fetch(url);
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || "Failed to fetch notifications");
+        }
+
+        const data = await response.json();
+        if (data.notification_tokens && Array.isArray(data.notification_tokens)) {
+          allTokens.push(...data.notification_tokens);
+        }
+
+        cursor = data.next_cursor || null;
+        hasMore = data.has_more && !!cursor;
+      }
+
+      // Sort by created_at descending (newest first)
+      allTokens.sort((a, b) => {
+        const dateA = new Date(a.created_at).getTime();
+        const dateB = new Date(b.created_at).getTime();
+        return dateB - dateA;
+      });
+
+      setMiniappNotifications(allTokens);
+      const now = new Date().toISOString();
+      setMiniappNotificationsLastUpdated(now);
+      
+      // Save to localStorage
+      localStorage.setItem("miniapp_notifications", JSON.stringify(allTokens));
+      localStorage.setItem("miniapp_notifications_last_updated", now);
+    } catch (error: any) {
+      console.error("Failed to fetch miniapp notifications:", error);
+      alert(`Failed to fetch miniapp notifications: ${error.message}`);
+    } finally {
+      setIsLoadingMiniappNotifications(false);
+    }
+  };
 
   const sendTestNotification = async () => {
     if (!user?.fid) return;
@@ -1501,6 +1587,113 @@ export default function AdminStatisticsPage() {
                 </div>
               </div>
             </div>
+            )}
+          </div>
+        )}
+
+        {/* Miniapp Notifications */}
+        {isAdmin && (
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
+            <div className="flex items-center justify-between mb-4">
+              <button
+                onClick={() => setExpandedSections(prev => ({ ...prev, miniappNotifications: !prev.miniappNotifications }))}
+                className="flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-gray-100 hover:text-gray-700 dark:hover:text-gray-300"
+              >
+                <span className={`transition-transform ${expandedSections.miniappNotifications ? 'rotate-90' : ''}`}>
+                  ▶
+                </span>
+                <span>Miniapp Notifications</span>
+              </button>
+              <div className="flex items-center gap-4">
+                {miniappNotificationsLastUpdated && (
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    Last updated: {new Date(miniappNotificationsLastUpdated).toLocaleString()}
+                  </span>
+                )}
+                <button
+                  onClick={fetchAllMiniappNotifications}
+                  disabled={isLoadingMiniappNotifications}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                >
+                  {isLoadingMiniappNotifications ? "Updating..." : "Update"}
+                </button>
+              </div>
+            </div>
+            {expandedSections.miniappNotifications && (
+              <div className="space-y-4">
+                {isLoadingMiniappNotifications ? (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    Loading notification tokens...
+                  </div>
+                ) : miniappNotifications.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    <p>No notification tokens found.</p>
+                    <p className="text-sm mt-2">Click "Update" to fetch from Neynar API.</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="mb-4">
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Total notification tokens: <span className="font-semibold text-gray-900 dark:text-gray-100">{miniappNotifications.length}</span>
+                      </p>
+                    </div>
+                    <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              Token
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              FID
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              Created At
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              Updated At
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              Status
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                          {miniappNotifications.map((notification, idx) => (
+                            <tr key={`${notification.token}-${idx}`} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                <div className="text-sm font-mono text-gray-900 dark:text-gray-100 max-w-xs truncate" title={notification.token}>
+                                  {notification.token}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                <div className="text-sm text-gray-600 dark:text-gray-400">
+                                  {notification.fid}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                <div className="text-sm text-gray-600 dark:text-gray-400">
+                                  {new Date(notification.created_at).toLocaleString()}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                <div className="text-sm text-gray-600 dark:text-gray-400">
+                                  {new Date(notification.updated_at).toLocaleString()}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                <div className="text-sm text-gray-600 dark:text-gray-400">
+                                  {notification.status || "—"}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
+              </div>
             )}
           </div>
         )}
