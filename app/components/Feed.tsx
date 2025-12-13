@@ -16,6 +16,7 @@ import { analytics } from "@/lib/analytics";
 import { useActivityMonitor } from "@/lib/hooks/useActivityMonitor";
 import { hasPlusRole } from "@/lib/roles-client";
 import { getMaxMyUsers } from "@/lib/plus-features";
+import { X } from "lucide-react";
 
 interface Curator {
   fid: number;
@@ -121,6 +122,68 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   const [my37HasUsers, setMy37HasUsers] = useState<boolean>(false);
   const [myFeedLabel, setMyFeedLabel] = useState<string>("My 7"); // Default to "My 7", will be updated based on role
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  
+  // Load enabled feeds from localStorage (default: curated and my-37)
+  const loadEnabledFeeds = useCallback((): string[] => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("enabledFeeds");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          // Ensure curated and my-37 are always included
+          const feeds = Array.isArray(parsed) ? parsed : ["curated", "my-37"];
+          if (!feeds.includes("curated")) feeds.unshift("curated");
+          if (!feeds.includes("my-37")) feeds.push("my-37");
+          return feeds;
+        } catch (e) {
+          console.error("Failed to parse enabled feeds", e);
+        }
+      }
+    }
+    return ["curated", "my-37"]; // Default enabled feeds
+  }, []);
+
+  const [enabledFeeds, setEnabledFeeds] = useState<string[]>(loadEnabledFeeds);
+  const [showMoreFeeds, setShowMoreFeeds] = useState(false);
+
+  // Save enabled feeds to localStorage
+  const saveEnabledFeeds = useCallback((feeds: string[]) => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("enabledFeeds", JSON.stringify(feeds));
+    }
+  }, []);
+
+  // Add a feed to enabled feeds
+  const addFeed = useCallback((feedId: string) => {
+    setEnabledFeeds((prev) => {
+      if (!prev.includes(feedId)) {
+        const updated = [...prev, feedId];
+        saveEnabledFeeds(updated);
+        return updated;
+      }
+      return prev;
+    });
+  }, [saveEnabledFeeds]);
+
+  // Remove a feed from enabled feeds (but not curated or my-37)
+  const removeFeed = useCallback((feedId: string) => {
+    if (feedId === "curated" || feedId === "my-37") {
+      return; // Cannot remove default feeds
+    }
+    setEnabledFeeds((prev) => {
+      const updated = prev.filter((id) => id !== feedId);
+      saveEnabledFeeds(updated);
+      return updated;
+    });
+    // If the removed feed is currently active, switch to curated
+    if (feedType === feedId) {
+      const normalized = normalizeFeedType("curated");
+      setFeedType(normalized);
+      const params = new URLSearchParams(window.location.search);
+      params.set("feed", normalized);
+      router.replace(`/?${params.toString()}`, { scroll: false });
+    }
+  }, [saveEnabledFeeds, feedType, normalizeFeedType, router]);
   const [sortBy, setSortBy] = useState<"recently-curated" | "time-of-cast" | "recent-reply" | "quality">(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("curatedFeedSortBy");
@@ -186,7 +249,12 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       }
       return current;
     });
-  }, [searchParams, viewerFid, initialFeedType, normalizeFeedType]);
+    
+    // Auto-enable feed if it's in URL but not in enabled feeds
+    if (normalized && !enabledFeeds.includes(normalized)) {
+      addFeed(normalized);
+    }
+  }, [searchParams, viewerFid, initialFeedType, normalizeFeedType, enabledFeeds, addFeed]);
 
   // Normalize feedType if viewerFid changes (affects feed availability)
   // This only runs when viewerFid changes, not when feedType changes
@@ -1561,52 +1629,87 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
 
       {/* Feed type tabs */}
       <div className="sticky top-0 bg-white dark:bg-black border-b border-gray-200 dark:border-gray-800 z-40">
-        <div className="flex items-center justify-between px-2 sm:px-4 py-2 border-b border-gray-200 dark:border-gray-800">
-          <div className="flex gap-1 overflow-x-auto scrollbar-hide overscroll-x-contain flex-1">
-          {[
-            { id: "curated", label: "Curated", requiresAuth: false },
-              { id: "my-37", label: myFeedLabel, requiresAuth: true },
-              { id: "1500+", label: "1500+", requiresAuth: false },
-            { id: "trending", label: "Trending", requiresAuth: true },
-            { id: "for-you", label: "For You", requiresAuth: true },
-            { id: "following", label: "Following", requiresAuth: true },
-          ].map((tab) => {
-            const isDisabled = tab.requiresAuth && !viewerFid;
-            const isActive = feedType === tab.id;
-            
-            return (
-              <button
-                key={tab.id}
-                onClick={() => {
-                  if (isDisabled) {
-                    setShowLoginPrompt(true);
-                    return;
-                  }
-                  const newType = tab.id as "curated" | "following" | "for-you" | "trending" | "my-37" | "1500+";
-                  // Update state optimistically for immediate UI feedback
-                  const normalized = normalizeFeedType(newType);
-                  setFeedType(normalized);
-                  // Update URL - this is the source of truth and will sync via useEffect
-                  const params = new URLSearchParams(window.location.search);
-                  params.set("feed", normalized);
-                  router.replace(`/?${params.toString()}`, { scroll: false });
-                }}
-                className={`px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
-                  isDisabled
-                    ? "text-gray-400 dark:text-gray-600 cursor-pointer"
-                    : isActive
-                    ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
-                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
-                }`}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
+        <div className="flex flex-col">
+          <div className="flex items-center justify-between px-2 sm:px-4 py-2 border-b border-gray-200 dark:border-gray-800">
+            <div className="flex gap-1 overflow-x-auto scrollbar-hide overscroll-x-contain flex-1">
+              {/* All available feeds */}
+              {[
+                { id: "curated", label: "Curated", requiresAuth: false },
+                { id: "my-37", label: myFeedLabel, requiresAuth: true },
+                { id: "1500+", label: "1500+", requiresAuth: false },
+                { id: "trending", label: "Trending", requiresAuth: true },
+                { id: "for-you", label: "For You", requiresAuth: true },
+                { id: "following", label: "Following", requiresAuth: true },
+              ]
+                .filter((tab) => enabledFeeds.includes(tab.id))
+                .map((tab) => {
+                  const isDisabled = tab.requiresAuth && !viewerFid;
+                  const isActive = feedType === tab.id;
+                  const isOptional = tab.id !== "curated" && tab.id !== "my-37";
+                  
+                  return (
+                    <div key={tab.id} className="relative flex items-center group">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isDisabled) {
+                            setShowLoginPrompt(true);
+                            return;
+                          }
+                          const newType = tab.id as "curated" | "following" | "for-you" | "trending" | "my-37" | "1500+";
+                          // Update state optimistically for immediate UI feedback
+                          const normalized = normalizeFeedType(newType);
+                          setFeedType(normalized);
+                          // Update URL - this is the source of truth and will sync via useEffect
+                          const params = new URLSearchParams(window.location.search);
+                          params.set("feed", normalized);
+                          router.replace(`/?${params.toString()}`, { scroll: false });
+                        }}
+                        className={`px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap flex items-center gap-1 ${
+                          isDisabled
+                            ? "text-gray-400 dark:text-gray-600 cursor-pointer"
+                            : isActive
+                            ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
+                            : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                      {/* Remove button for optional feeds */}
+                      {isOptional && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeFeed(tab.id);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+                          aria-label={`Remove ${tab.label} feed`}
+                        >
+                          <X className="w-3 h-3 text-gray-500 dark:text-gray-400" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              
+              {/* "More" button */}
+              {[
+                { id: "1500+", label: "1500+", requiresAuth: false },
+                { id: "trending", label: "Trending", requiresAuth: true },
+                { id: "for-you", label: "For You", requiresAuth: true },
+                { id: "following", label: "Following", requiresAuth: true },
+              ].some((tab) => !enabledFeeds.includes(tab.id) && (!tab.requiresAuth || viewerFid)) && (
+                <button
+                  onClick={() => setShowMoreFeeds(!showMoreFeeds)}
+                  className="px-2 sm:px-3 py-2.5 sm:py-3 text-xs sm:text-sm font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors whitespace-nowrap"
+                >
+                  More
+                </button>
+              )}
+            </div>
           
-          {/* Compact view toggle - shown for all feeds */}
-          <div className="flex items-center gap-2 px-2 sm:px-3 flex-shrink-0">
+            {/* Compact view toggle - shown for all feeds */}
+            <div className="flex items-center gap-2 px-2 sm:px-3 flex-shrink-0">
             <span className="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">Compact</span>
             <button
               type="button"
@@ -1630,6 +1733,40 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
             </button>
           </div>
         </div>
+        
+        {/* Inline expansion for hidden feeds */}
+        {showMoreFeeds && (
+          <div className="px-2 sm:px-4 py-2 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50">
+            <div className="flex flex-wrap gap-2">
+              {[
+                { id: "1500+", label: "1500+", requiresAuth: false },
+                { id: "trending", label: "Trending", requiresAuth: true },
+                { id: "for-you", label: "For You", requiresAuth: true },
+                { id: "following", label: "Following", requiresAuth: true },
+              ]
+                .filter((tab) => !enabledFeeds.includes(tab.id) && (!tab.requiresAuth || viewerFid))
+                .map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => {
+                      addFeed(tab.id);
+                      setShowMoreFeeds(false);
+                      // Switch to the newly added feed
+                      const newType = tab.id as "curated" | "following" | "for-you" | "trending" | "my-37" | "1500+";
+                      const normalized = normalizeFeedType(newType);
+                      setFeedType(normalized);
+                      const params = new URLSearchParams(window.location.search);
+                      params.set("feed", normalized);
+                      router.replace(`/?${params.toString()}`, { scroll: false });
+                    }}
+                    className="px-3 py-1.5 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors"
+                  >
+                    + {tab.label}
+                  </button>
+                ))}
+            </div>
+          </div>
+        )}
         
         {/* 1500+ Feed Description */}
         {feedType === "1500+" && (

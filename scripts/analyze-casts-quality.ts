@@ -69,7 +69,7 @@ async function analyzeCuratedCasts() {
         
         // Notify cast author about quality score
         const castRecord = await db
-          .select({ authorFid: curatedCasts.authorFid })
+          .select({ authorFid: curatedCasts.authorFid, castData: curatedCasts.castData })
           .from(curatedCasts)
           .where(eq(curatedCasts.castHash, castHash))
           .limit(1);
@@ -89,6 +89,22 @@ async function analyzeCuratedCasts() {
           }).catch((error) => {
             console.error(`[Analyze] Error sending quality score notification to author ${castRecord[0].authorFid}:`, error);
           });
+        }
+
+        // Notify curators about quality score
+        if (castRecord[0]?.castData) {
+          try {
+            const { notifyCuratorsAboutQualityScore } = await import("@/lib/notifications");
+            notifyCuratorsAboutQualityScore(
+              castHash,
+              castRecord[0].castData,
+              analysisResult.qualityScore
+            ).catch((error) => {
+              console.error(`[Analyze] Error notifying curators about quality score for cast ${castHash}:`, error);
+            });
+          } catch (error) {
+            console.error(`[Analyze] Error importing or calling notifyCuratorsAboutQualityScore for cast ${castHash}:`, error);
+          }
         }
       },
       {

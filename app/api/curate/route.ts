@@ -388,7 +388,7 @@ export async function POST(request: NextRequest) {
             
             // Notify cast author about quality score
             const castRecord = await db
-              .select({ authorFid: curatedCasts.authorFid })
+              .select({ authorFid: curatedCasts.authorFid, castData: curatedCasts.castData })
               .from(curatedCasts)
               .where(eq(curatedCasts.castHash, hash))
               .limit(1);
@@ -408,6 +408,22 @@ export async function POST(request: NextRequest) {
               }).catch((error) => {
                 console.error(`[Curate] Error sending quality score notification to author ${castRecord[0].authorFid}:`, error);
               });
+            }
+
+            // Notify curators about quality score
+            if (castRecord[0]?.castData) {
+              try {
+                const { notifyCuratorsAboutQualityScore } = await import("@/lib/notifications");
+                notifyCuratorsAboutQualityScore(
+                  hash,
+                  castRecord[0].castData,
+                  result.qualityScore
+                ).catch((error) => {
+                  console.error(`[Curate] Error notifying curators about quality score for cast ${hash}:`, error);
+                });
+              } catch (error) {
+                console.error(`[Curate] Error importing or calling notifyCuratorsAboutQualityScore for cast ${hash}:`, error);
+              }
             }
           } catch (error: any) {
             console.error(`[Curate] Error updating quality analysis for cast ${hash}:`, error.message);
@@ -526,7 +542,7 @@ export async function POST(request: NextRequest) {
                   
                   // Notify cast author about quality score
                   const castRecord = await db
-                    .select({ authorFid: curatedCasts.authorFid })
+                    .select({ authorFid: curatedCasts.authorFid, castData: curatedCasts.castData })
                     .from(curatedCasts)
                     .where(eq(curatedCasts.castHash, hash))
                     .limit(1);
@@ -546,6 +562,22 @@ export async function POST(request: NextRequest) {
                     }).catch((error) => {
                       console.error(`[Curate] Error sending quality score notification to author ${castRecord[0].authorFid}:`, error);
                     });
+                  }
+
+                  // Notify curators about quality score
+                  if (castRecord[0]?.castData) {
+                    try {
+                      const { notifyCuratorsAboutQualityScore } = await import("@/lib/notifications");
+                      notifyCuratorsAboutQualityScore(
+                        hash,
+                        castRecord[0].castData,
+                        result.qualityScore
+                      ).catch((error) => {
+                        console.error(`[Curate] Error notifying curators about quality score for cast ${hash}:`, error);
+                      });
+                    } catch (error) {
+                      console.error(`[Curate] Error importing or calling notifyCuratorsAboutQualityScore for cast ${hash}:`, error);
+                    }
                   }
                 } catch (error: any) {
                   console.error(`[Curate] Error updating quality analysis for cast ${hash}:`, error.message);
@@ -649,7 +681,7 @@ export async function POST(request: NextRequest) {
             
             // Notify cast author about quality score
             const castRecord = await db
-              .select({ authorFid: curatedCasts.authorFid })
+              .select({ authorFid: curatedCasts.authorFid, castData: curatedCasts.castData })
               .from(curatedCasts)
               .where(eq(curatedCasts.castHash, hash))
               .limit(1);
@@ -669,6 +701,22 @@ export async function POST(request: NextRequest) {
               }).catch((error) => {
                 console.error(`[Curate] Error sending quality score notification to author ${castRecord[0].authorFid}:`, error);
               });
+            }
+
+            // Notify curators about quality score
+            if (castRecord[0]?.castData) {
+              try {
+                const { notifyCuratorsAboutQualityScore } = await import("@/lib/notifications");
+                notifyCuratorsAboutQualityScore(
+                  hash,
+                  castRecord[0].castData,
+                  result.qualityScore
+                ).catch((error) => {
+                  console.error(`[Curate] Error notifying curators about quality score for cast ${hash}:`, error);
+                });
+              } catch (error) {
+                console.error(`[Curate] Error importing or calling notifyCuratorsAboutQualityScore for cast ${hash}:`, error);
+              }
             }
           } catch (error: any) {
             console.error(`[Curate] Error updating quality analysis for cast ${hash}:`, error.message);

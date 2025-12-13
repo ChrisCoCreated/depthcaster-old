@@ -110,6 +110,12 @@ export function NotificationBell() {
         return `${firstName} posted a new cast`;
       case "curated.quality_reply":
         return `${firstName} posted a quality reply to your curated cast`;
+      case "curated.quality_score":
+        const qualityScore = (notification as any).castData?._qualityScore;
+        if (qualityScore !== undefined) {
+          return `Cast you curated received a quality score of ${qualityScore}`;
+        }
+        return "Cast you curated received a quality score";
       case "curated.curated":
         return `${firstName} also curated this cast`;
       case "curated.liked":
@@ -148,6 +154,7 @@ export function NotificationBell() {
     }
 
     if (
+      type === "curated.quality_score" ||
       type === "curated.curated" ||
       type === "curated.liked" ||
       type === "curated.recast"

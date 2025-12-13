@@ -77,7 +77,7 @@ export async function shouldNotifyCurator(
  */
 export async function createCuratorNotification(
   curatorFid: number,
-  type: "curated.quality_reply" | "curated.curated" | "curated.liked" | "curated.recast",
+  type: "curated.quality_reply" | "curated.curated" | "curated.liked" | "curated.recast" | "curated.quality_score",
   castHash: string,
   castData: any,
   authorFid: number
@@ -272,6 +272,60 @@ export async function notifyCuratorsAboutNewCuration(
       });
     } catch (error) {
       console.error(`[Notifications] Error notifying curator ${curatorFid} about new curation:`, error);
+      // Continue with other curators even if one fails
+    }
+  }
+}
+
+/**
+ * Notify curators when a cast they curated receives a quality score
+ */
+export async function notifyCuratorsAboutQualityScore(
+  castHash: string,
+  castData: any,
+  qualityScore: number
+): Promise<void> {
+  const curators = await getCuratorsForCast(castHash);
+
+  if (curators.length === 0) {
+    return;
+  }
+
+  const authorFid = castData?.author?.fid || 0;
+
+  for (const curatorFid of curators) {
+    try {
+      // Store quality score info in castData for display
+      const castDataWithQuality = {
+        ...castData,
+        _qualityScore: qualityScore,
+      };
+
+      await createCuratorNotification(
+        curatorFid,
+        "curated.quality_score",
+        castHash,
+        castDataWithQuality,
+        authorFid
+      );
+
+      // Send push notification
+      await sendPushNotificationToUser(curatorFid, {
+        title: "Quality score assigned",
+        body: `Cast you curated received a quality score of ${qualityScore}`,
+        icon: castData?.author?.pfp_url || "/icon-192x192.webp",
+        badge: "/icon-96x96.webp",
+        data: {
+          type: "curated.quality_score",
+          castHash,
+          qualityScore,
+          url: `/cast/${castHash}`,
+        },
+      }).catch((error) => {
+        console.error(`[Notifications] Error sending push notification to curator ${curatorFid}:`, error);
+      });
+    } catch (error) {
+      console.error(`[Notifications] Error notifying curator ${curatorFid} about quality score:`, error);
       // Continue with other curators even if one fails
     }
   }

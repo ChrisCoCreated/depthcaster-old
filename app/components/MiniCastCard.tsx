@@ -10,38 +10,60 @@ interface MiniCastCardProps {
   onClick?: () => void;
 }
 
-// Extract first image from embeds
+// Extract first image from embeds - matches CastCard logic
 function getFirstImageUrl(cast: Cast): string | null {
   if (!cast.embeds || cast.embeds.length === 0) return null;
 
   for (const embed of cast.embeds) {
-    // Handle different embed types - cast to any to access url property
     const embedAny = embed as any;
     const embedUrl = embedAny.url;
     
-    if (embedUrl) {
-      // Check if it's a direct image URL
-      if (embedUrl.match(/\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i)) {
+    if (!embedUrl) continue;
+    
+    const metadata = embedAny.metadata;
+    
+    // Check if it's a direct image URL (file extension)
+    if (embedUrl.match(/\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i)) {
+      return embedUrl;
+    }
+    
+    // Check metadata for image content type or image property
+    if (metadata) {
+      // If metadata has image property or content_type is image, use the embed URL
+      if (metadata.image || (metadata.content_type && metadata.content_type.startsWith('image/'))) {
+        // Filter out Twitter emoji SVGs
+        if (embedUrl.includes('twimg.com/emoji') || embedUrl.includes('/svg/')) {
+          continue;
+        }
         return embedUrl;
       }
       
-      // Check metadata for images
-      const metadata = embedAny.metadata;
-      if (metadata) {
-        // Check for og:image
-        const ogImage = metadata.ogImage;
-        if (ogImage) {
-          const imgUrl = typeof ogImage === 'string' ? ogImage : ogImage.url;
-          if (imgUrl && !imgUrl.includes('twimg.com/emoji') && !imgUrl.includes('/svg/')) {
-            return imgUrl;
-          }
+      // Check for og:image in html metadata
+      if (metadata.html?.ogImage) {
+        const ogImages = Array.isArray(metadata.html.ogImage) ? metadata.html.ogImage : [metadata.html.ogImage];
+        const nonEmojiImage = ogImages.find((img: any) => {
+          if (!img.url) return false;
+          if (img.type === 'svg') return false;
+          if (img.url.includes('twimg.com/emoji') || img.url.includes('/svg/')) return false;
+          return true;
+        });
+        if (nonEmojiImage) return nonEmojiImage.url;
+      }
+      
+      // Check for image property in metadata
+      if (metadata.image) {
+        const imgUrl = typeof metadata.image === 'string' ? metadata.image : metadata.image?.url || null;
+        if (imgUrl && !imgUrl.includes('twimg.com/emoji') && !imgUrl.includes('/svg/')) {
+          return imgUrl;
         }
-        
-        // Check for image property
-        const image = metadata.image;
-        if (image) {
-          const imgUrl = typeof image === 'string' ? image : image.url;
-          if (imgUrl) return imgUrl;
+      }
+      
+      // Check for ogImage property
+      if (metadata.ogImage) {
+        const ogImg = Array.isArray(metadata.ogImage) ? metadata.ogImage[0] : metadata.ogImage;
+        const imgUrl = typeof ogImg === 'string' ? ogImg : ogImg?.url || null;
+        if (imgUrl && !imgUrl.includes('twimg.com/emoji') && !imgUrl.includes('/svg/')) {
+          return imgUrl;
         }
       }
     }
@@ -56,6 +78,12 @@ export function MiniCastCard({ cast, onClick }: MiniCastCardProps) {
   const castText = cast.text || "";
   const previewText = castText.length > 150 ? `${castText.slice(0, 150)}...` : castText;
   const timestamp = cast.timestamp ? new Date(cast.timestamp) : null;
+  
+  // Debug: log image extraction
+  if (process.env.NODE_ENV === 'development' && cast.embeds && cast.embeds.length > 0) {
+    console.log('MiniCastCard embeds:', cast.embeds);
+    console.log('Extracted imageUrl:', imageUrl);
+  }
 
   const handleClick = () => {
     if (onClick) {
