@@ -22,6 +22,7 @@ import {
   castViewsDaily,
   pageViewsDaily,
   apiCallStats,
+  miniappInstallations,
 } from "@/lib/schema";
 import { isAdmin, getUserRoles, getAllAdminFids, getAllCuratorFids } from "@/lib/roles";
 
@@ -867,7 +868,8 @@ export async function GET(request: NextRequest) {
         const fourteenDaysAgo = new Date();
         fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
 
-        // Get last visit date for each curator from feed_view_sessions, cast_views, or page_views
+        // Get last visit date for each curator from all activity sources:
+        // feed_view_sessions, cast_views, page_views, curator_cast_curations, curated_cast_interactions, sign_in_logs
         const lastVisits = await db.execute(sql`
           WITH curator_visits AS (
             SELECT DISTINCT
@@ -879,6 +881,16 @@ export async function GET(request: NextRequest) {
               SELECT user_fid, created_at FROM cast_views WHERE user_fid IS NOT NULL
               UNION ALL
               SELECT user_fid, created_at FROM page_views WHERE user_fid IS NOT NULL
+              UNION ALL
+              SELECT curator_fid as user_fid, created_at FROM curator_cast_curations
+              UNION ALL
+              SELECT user_fid, created_at FROM curated_cast_interactions 
+                WHERE user_fid IS NOT NULL 
+                AND interaction_type IN ('like', 'recast', 'reply', 'quote')
+              UNION ALL
+              SELECT user_fid, created_at FROM sign_in_logs 
+                WHERE user_fid IS NOT NULL 
+                AND success = true
             ) AS all_visits
             WHERE user_fid = ANY(${sql.raw(`ARRAY[${curatorFids.join(',')}]`)})
             GROUP BY user_fid
@@ -945,6 +957,54 @@ export async function GET(request: NextRequest) {
         notVisited7Days.sort((a, b) => a.lastVisit.getTime() - b.lastVisit.getTime());
         notVisited14Days.sort((a, b) => a.lastVisit.getTime() - b.lastVisit.getTime());
 
+        // Get miniapp installation status for all curators
+        const miniappInstalledFids = await db
+          .select({ userFid: miniappInstallations.userFid })
+          .from(miniappInstallations)
+          .where(sql`user_fid = ANY(${sql.raw(`ARRAY[${curatorFids.join(',')}]`)})`);
+        
+        const installedFidSet = new Set(miniappInstalledFids.map(m => m.userFid));
+        
+        // Get all curator user data for miniapp status
+        const allCuratorUsers = await db
+          .select({
+            fid: users.fid,
+            username: users.username,
+            displayName: users.displayName,
+            pfpUrl: users.pfpUrl,
+          })
+          .from(users)
+          .where(sql`fid = ANY(${sql.raw(`ARRAY[${curatorFids.join(',')}]`)})`);
+        
+        const userMap = new Map(allCuratorUsers.map(u => [u.fid, u]));
+        
+        // Get curators with miniapp installed
+        const withMiniapp = Array.from(installedFidSet)
+          .map(fid => {
+            const user = userMap.get(fid);
+            return user ? {
+              fid: user.fid,
+              username: user.username,
+              displayName: user.displayName,
+              pfpUrl: user.pfpUrl,
+            } : null;
+          })
+          .filter((u): u is NonNullable<typeof u> => u !== null);
+        
+        // Get curators without miniapp installed
+        const withoutMiniapp = curatorFids
+          .filter(fid => !installedFidSet.has(fid))
+          .map(fid => {
+            const user = userMap.get(fid);
+            return user ? {
+              fid: user.fid,
+              username: user.username,
+              displayName: user.displayName,
+              pfpUrl: user.pfpUrl,
+            } : null;
+          })
+          .filter((u): u is NonNullable<typeof u> => u !== null);
+
         return {
           notVisited7Days: notVisited7Days.map(u => ({ ...u, lastVisit: u.lastVisit.toISOString() })),
           notVisited14Days: notVisited14Days.map(u => ({ ...u, lastVisit: u.lastVisit.toISOString() })),
@@ -954,6 +1014,8 @@ export async function GET(request: NextRequest) {
             displayName: u.displayName,
             pfpUrl: u.pfpUrl,
           })),
+          miniappInstalled: withMiniapp,
+          miniappNotInstalled: withoutMiniapp,
         };
       })(),
     });

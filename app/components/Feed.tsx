@@ -288,7 +288,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
           }
         }
       } catch (error) {
-        // Silently fail
+        console.error("Failed to fetch curators:", error);
       }
     };
     
@@ -318,12 +318,12 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
             });
           }
         } catch (error) {
-          // Silently fail
+          console.error(`Error fetching pack ${packId}:`, error);
         }
       }
       setSelectedPacks(packs);
     } catch (error) {
-      // Silently fail
+      console.error("Error fetching selected packs:", error);
     } finally {
       setLoadingPacks(false);
     }
@@ -339,7 +339,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
         setFavoritePacks(data.packs || []);
       }
     } catch (error) {
-      // Silently fail
+      console.error("Error fetching favorite packs:", error);
     }
   };
 
@@ -458,6 +458,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       setHasMore(!!data.next?.cursor);
     } catch (err: unknown) {
       const error = err as { message?: string };
+      console.error(`[Feed] Error:`, error.message || "Failed to load feed");
       setError(error.message || "Failed to load feed");
     } finally {
       setLoading(false);
@@ -484,6 +485,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
           setMyFeedLabel("My 7");
         }
       } catch (error) {
+        console.error("Error fetching user role:", error);
         setMyFeedLabel("My 7");
       }
     };
@@ -513,6 +515,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
         }
       }
     } catch (error) {
+      console.error("Error fetching My 37 pack:", error);
       setMy37HasUsers(false);
     }
   }, [viewerFid]);
@@ -621,7 +624,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
         
         // If state is stale, refresh in background
         if (isStateStale(feedType)) {
-          fetchFeed().catch(() => {});
+          fetchFeed().catch(console.error);
         }
       } else {
         castsRestoredRef.current = true; // Mark as checked
@@ -1078,8 +1081,9 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body,
-        }).catch(() => {
+        }).catch((error) => {
           // Silently fail - analytics shouldn't break the app
+          console.error("Failed to track feed view:", error);
         });
       }
     }
@@ -1279,6 +1283,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       }
     } catch (err) {
       // Silently fail - don't show errors for background checks
+      console.error("[Feed] Error checking for new curated casts:", err);
     }
   }, [feedType, loading, casts, viewerFid, selectedCuratorFids, sortBy, minQualityScore]);
 
@@ -1515,6 +1520,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
                     setHasMore(!!data.next?.cursor);
                   } catch (err: unknown) {
                     const error = err as { message?: string };
+                    console.error(`[Feed] Error:`, error.message || "Failed to load feed");
                     setError(error.message || "Failed to load feed");
                   } finally {
                     setLoading(false);
@@ -1744,7 +1750,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
                           const excludedFids = allCuratorFids.filter((fid: number) => !fids.includes(fid));
                           localStorage.setItem("excludedCuratorFids", JSON.stringify(excludedFids));
                         })
-                        .catch(() => {});
+                        .catch(err => console.error("Failed to update excluded curators:", err));
                       
                       analytics.trackFeedCuratorFilter(feedType, fids);
                     }}

@@ -12,8 +12,6 @@ export async function GET(request: NextRequest) {
   const baseUrl = request.nextUrl.origin;
   const blogApiUrl = `${baseUrl}/api/blog?url=${encodeURIComponent(url || '')}`;
   
-  console.log('[Paragraph API] Proxying to blog API:', blogApiUrl);
-  
   try {
     // Forward the request to the blog API
     const response = await fetch(blogApiUrl, {

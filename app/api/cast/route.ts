@@ -22,49 +22,19 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     let { signerUuid, text, parent, embeds, channelId, parentAuthorFid } = body;
 
-    // Verbose log the incoming request
-    console.log("[Cast API] Incoming request:", {
-      hasSignerUuid: !!signerUuid,
-      textLength: text?.length,
-      hasParent: !!parent,
-      hasEmbeds: !!embeds,
-      embedsCount: embeds?.length,
-      embeds: embeds ? JSON.stringify(embeds, null, 2) : null,
-      channelId,
-      parentAuthorFid,
-      fullBody: JSON.stringify(body, null, 2),
-    });
-
     // Normalize embeds format - Neynar SDK accepts both cast_id (snake_case) and castId (camelCase)
     // Convert cast_id to castId and ensure hash has 0x prefix (Neynar API requires 0x prefix for 20-byte hashes)
     if (embeds && Array.isArray(embeds)) {
       embeds = embeds.map((embed: any, index: number) => {
-        console.log(`[Cast API] Processing embed ${index}:`, JSON.stringify(embed, null, 2));
-        
         const castId = embed.castId || embed.cast_id;
         if (castId) {
           let hash = castId.hash || castId;
           const fid = castId.fid || embed.cast_id?.fid;
           
-          // Log original hash details
-          const originalHash = hash;
-          const has0xPrefix = hash.startsWith('0x') || hash.startsWith('0X');
-          const hexLength = has0xPrefix ? hash.length - 2 : hash.length;
-          
-          console.log(`[Cast API] Embed ${index} hash details (before normalization):`, {
-            original: originalHash,
-            length: originalHash.length,
-            hexLength: hexLength,
-            has0xPrefix: has0xPrefix,
-            fid: fid,
-            castIdObject: JSON.stringify(castId, null, 2),
-            embedObject: JSON.stringify(embed, null, 2),
-          });
-          
           // Ensure hash has 0x prefix - Neynar API requires this for proper byte parsing
+          const has0xPrefix = hash.startsWith('0x') || hash.startsWith('0X');
           if (typeof hash === 'string' && !has0xPrefix) {
             hash = '0x' + hash;
-            console.log(`[Cast API] Added 0x prefix to hash: "${originalHash}" -> "${hash}"`);
           }
           
           const normalizedEmbed = {
@@ -75,14 +45,10 @@ export async function POST(request: NextRequest) {
             ...(embed.url ? { url: embed.url } : {}),
           };
           
-          console.log(`[Cast API] Embed ${index} normalized:`, JSON.stringify(normalizedEmbed, null, 2));
-          
           return normalizedEmbed;
         }
         return embed;
       });
-      
-      console.log("[Cast API] All embeds after normalization:", JSON.stringify(embeds, null, 2));
     }
 
     if (!signerUuid) {
@@ -135,11 +101,6 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-
-      console.log("[Cast API] Superadmin casting with thinking URL as parent:", {
-        userFid,
-        parent,
-      });
     }
 
     const textByteLength = getUtf8ByteLength(trimmedText);
@@ -163,22 +124,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: errorMessage }, { status: 400 });
     }
 
-    // Log request details for debugging quote casts
-    if (embeds?.some((embed: any) => embed.castId || embed.cast_id)) {
-      console.log("[Cast API] Publishing quote cast:", {
-        signerUuid,
-        textLength: trimmedText.length,
-        embeds: embeds.map((e: any) => ({
-          castId: e.castId || e.cast_id,
-          url: e.url,
-        })),
-        parent,
-        channelId,
-        parentAuthorFid,
-      });
-    }
-
-    // Verbose log the exact call to Neynar publishCast
     const publishCastParams = {
       signerUuid,
       text: trimmedText,
@@ -187,19 +132,6 @@ export async function POST(request: NextRequest) {
       channelId,
       parentAuthorFid,
     };
-    
-    console.log("[Cast API] Calling neynarClient.publishCast with params:", {
-      signerUuid,
-      textLength: trimmedText.length,
-      textPreview: trimmedText.substring(0, 100),
-      hasParent: !!parent,
-      parent,
-      embeds: embeds ? JSON.stringify(embeds, null, 2) : null,
-      embedsCount: embeds?.length,
-      channelId,
-      parentAuthorFid,
-      fullParams: JSON.stringify(publishCastParams, null, 2),
-    });
 
     let castResponse;
     try {

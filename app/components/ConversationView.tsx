@@ -226,7 +226,6 @@ export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusR
     for (const reply of replies) {
       // Case-insensitive comparison
       if (reply.hash?.toLowerCase() === hash.toLowerCase()) {
-        console.log(`[ConversationView] Found cast in tree: hash=${reply.hash}, author=${reply.author?.username}`);
         return reply;
       }
       if (reply.children && reply.children.length > 0) {
@@ -258,12 +257,6 @@ export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusR
 
       const data = await response.json();
       const parentCastData = data?.conversation?.cast;
-      
-      console.log(`[ConversationView] Fetched parent cast from API for ${parentHash}:`, {
-        hash: parentCastData?.hash,
-        author: parentCastData?.author?.username,
-        text: parentCastData?.text?.substring(0, 50),
-      });
       
       if (parentCastData) {
         // Save parent cast to database
@@ -380,66 +373,25 @@ export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusR
         });
       }
       
-      console.log(`[ConversationView] Quote cast ${reply.hash}:`, {
-        parent_hash: reply._parentCastHash,
-        quotedCastHashes,
-        author: reply.author?.username,
-        text: reply.text?.substring(0, 50),
-        hasParentCastFromAPI: !!(reply as any)._parentCast,
-      });
-      
       // Only use parent_hash if it's different from the quoted cast hash
       // parent_hash = cast being replied to (what we want to show)
       // quoted cast = cast being quoted (what's in embeds, NOT what we want to show)
       const parentHash = reply._parentCastHash;
       const isParentDifferentFromQuoted = !quotedCastHashes.includes(parentHash);
       
-      console.log(`[ConversationView] Parent check for ${reply.hash}:`, {
-        parentHash,
-        isParentDifferentFromQuoted,
-        quotedCastHashes,
-      });
-      
       if (isParentDifferentFromQuoted) {
         // First, check if parent cast was already attached by the database API
         if ((reply as any)._parentCast) {
           parentCast = (reply as any)._parentCast;
-          if (parentCast) {
-            console.log(`[ConversationView] Using parent cast from API for ${reply.hash}:`, {
-              parentHash: parentCast.hash,
-              parentAuthor: parentCast.author?.username,
-              parentText: parentCast.text?.substring(0, 50),
-            });
-          }
         } else {
           // Fallback: check in replies tree (but this might find the wrong cast)
           parentCast = findCastByHash(replies, parentHash);
           
-          console.log(`[ConversationView] Looking for parent ${parentHash} in replies tree:`, {
-            foundInTree: !!parentCast,
-            foundHash: parentCast?.hash,
-            foundAuthor: parentCast?.author?.username,
-            foundText: parentCast?.text?.substring(0, 50),
-          });
-          
           // If not found in tree, check fetched parent casts
           if (!parentCast) {
             parentCast = fetchedParentCasts.get(parentHash) || null;
-            console.log(`[ConversationView] Checking fetchedParentCasts for ${parentHash}:`, {
-              found: !!parentCast,
-              foundAuthor: parentCast?.author?.username,
-            });
           }
         }
-        
-        console.log(`[ConversationView] Final parent cast for ${reply.hash}:`, {
-          found: !!parentCast,
-          parentHash: parentCast?.hash,
-          parentAuthor: parentCast?.author?.username,
-          parentText: parentCast?.text?.substring(0, 50),
-        });
-      } else {
-        console.log(`[ConversationView] Skipping parent cast for ${reply.hash} - parent_hash matches quoted cast`);
       }
     }
     
@@ -453,15 +405,6 @@ export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusR
       _isQuoteCast: true, // Keep flag for indicator
       _parentCast: parentCast ? parentCast as Cast : undefined, // Pass parent cast data
     } : reply;
-    
-    // Log what we're passing to CastCard
-    if (isQuote && parentCast) {
-      console.log(`[ConversationView] Passing parent cast to CastCard for ${reply.hash}:`, {
-        parentHash: parentCast.hash,
-        parentAuthor: parentCast.author?.username,
-        parentText: parentCast.text?.substring(0, 50),
-      });
-    }
     
     return (
       <div

@@ -24,8 +24,6 @@ export function isParagraphLink(url: string): boolean {
     const urlObj = new URL(normalizedUrl);
     const hostname = urlObj.hostname.toLowerCase();
     
-    console.log('[Paragraph] Checking URL:', url, 'hostname:', hostname);
-    
     // Check for paragraph.com or paragraph.xyz domain (with or without www)
     const isParagraphDomain = hostname === 'paragraph.com' || 
                               hostname === 'www.paragraph.com' ||
@@ -36,10 +34,8 @@ export function isParagraphLink(url: string): boolean {
       // Also check if it has a path that looks like a post (publication/post-slug)
       const pathname = urlObj.pathname;
       const pathMatch = pathname.match(/^\/(?:@)?[^/]+\/[^/]+/);
-      console.log('[Paragraph] Pathname:', pathname, 'matches pattern:', !!pathMatch);
       // Should have at least /publication/post-slug pattern
       if (pathMatch) {
-        console.log('[Paragraph] ✓ Detected Paragraph link:', url);
         return true;
       }
     }
@@ -48,10 +44,8 @@ export function isParagraphLink(url: string): boolean {
     // Note: Custom domains would need to be checked via API
     // For now, we'll check if it matches paragraph.xyz patterns
     
-    console.log('[Paragraph] ✗ Not a Paragraph link:', url);
     return false;
   } catch (error) {
-    console.log('[Paragraph] ✗ Error checking URL:', url, error);
     return false;
   }
 }

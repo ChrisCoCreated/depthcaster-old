@@ -34,17 +34,13 @@ export function ParagraphPreview({ url }: ParagraphPreviewProps) {
   useEffect(() => {
     const fetchPost = async () => {
       try {
-        console.log('[ParagraphPreview] Fetching post for URL:', url);
         setLoading(true);
         setError(null);
         const apiUrl = `/api/paragraph?url=${encodeURIComponent(url)}`;
-        console.log('[ParagraphPreview] API URL:', apiUrl);
         const response = await fetch(apiUrl);
         
-        console.log('[ParagraphPreview] Response status:', response.status);
         if (!response.ok) {
           const errorText = await response.text();
-          console.error('[ParagraphPreview] Error response:', errorText);
           if (response.status === 404) {
             setError("Article not found");
           } else {
@@ -54,10 +50,8 @@ export function ParagraphPreview({ url }: ParagraphPreviewProps) {
         }
 
         const data = await response.json();
-        console.log('[ParagraphPreview] Received post data:', data);
         setPost(data);
       } catch (err) {
-        console.error("[ParagraphPreview] Error fetching Paragraph post:", err);
         setError("Failed to load article");
       } finally {
         setLoading(false);

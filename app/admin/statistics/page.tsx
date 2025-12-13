@@ -125,6 +125,18 @@ interface Statistics {
       displayName: string | null;
       pfpUrl: string | null;
     }>;
+    miniappInstalled: Array<{
+      fid: number;
+      username: string | null;
+      displayName: string | null;
+      pfpUrl: string | null;
+    }>;
+    miniappNotInstalled: Array<{
+      fid: number;
+      username: string | null;
+      displayName: string | null;
+      pfpUrl: string | null;
+    }>;
   };
 }
 
@@ -142,6 +154,7 @@ export default function AdminStatisticsPage() {
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     activeUsers: true,
     inactiveCurators: true,
+    miniappStatus: true,
     feedAnalytics: true,
     popularPages: true,
     databaseMonitoring: true,
@@ -741,11 +754,99 @@ export default function AdminStatisticsPage() {
                       </div>
                     )}
 
-                    {(!statistics.inactiveCurators.neverVisited || statistics.inactiveCurators.neverVisited.length === 0) &&
+                      {(!statistics.inactiveCurators.neverVisited || statistics.inactiveCurators.neverVisited.length === 0) &&
                       (!statistics.inactiveCurators.notVisited14Days || statistics.inactiveCurators.notVisited14Days.length === 0) &&
                       (!statistics.inactiveCurators.notVisited7Days || statistics.inactiveCurators.notVisited7Days.length === 0) && (
                         <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                           <p>All curators have been active recently! 🎉</p>
+                        </div>
+                      )}
+
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Miniapp Installation Status - Separate Section */}
+            {statistics.inactiveCurators && (
+              <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <button
+                    onClick={() => setExpandedSections(prev => ({ ...prev, miniappStatus: !prev.miniappStatus }))}
+                    className="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-gray-100 hover:text-gray-700 dark:hover:text-gray-300"
+                  >
+                    <span className={`transition-transform ${expandedSections.miniappStatus ? 'rotate-90' : ''}`}>
+                      ▶
+                    </span>
+                    <span>Miniapp Installation Status</span>
+                  </button>
+                </div>
+                {expandedSections.miniappStatus && (
+                  <div className="space-y-6">
+                    {/* With Miniapp Installed */}
+                    {statistics.inactiveCurators.miniappInstalled && statistics.inactiveCurators.miniappInstalled.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                          Installed ({statistics.inactiveCurators.miniappInstalled.length})
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {statistics.inactiveCurators.miniappInstalled.map((curator) => {
+                            const displayName = curator.displayName || curator.username || `User ${curator.fid}`;
+                            return (
+                              <div
+                                key={curator.fid}
+                                className="flex items-center gap-2 px-3 py-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg"
+                              >
+                                <AvatarImage
+                                  src={curator.pfpUrl}
+                                  alt={displayName}
+                                  size={24}
+                                  className="w-6 h-6 rounded-full object-cover"
+                                />
+                                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                  {displayName}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Without Miniapp Installed */}
+                    {statistics.inactiveCurators.miniappNotInstalled && statistics.inactiveCurators.miniappNotInstalled.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                          Not Installed ({statistics.inactiveCurators.miniappNotInstalled.length})
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {statistics.inactiveCurators.miniappNotInstalled.map((curator) => {
+                            const displayName = curator.displayName || curator.username || `User ${curator.fid}`;
+                            return (
+                              <div
+                                key={curator.fid}
+                                className="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg"
+                              >
+                                <AvatarImage
+                                  src={curator.pfpUrl}
+                                  alt={displayName}
+                                  size={24}
+                                  className="w-6 h-6 rounded-full object-cover"
+                                />
+                                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                  {displayName}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {(!statistics.inactiveCurators.miniappInstalled || statistics.inactiveCurators.miniappInstalled.length === 0) &&
+                      (!statistics.inactiveCurators.miniappNotInstalled || statistics.inactiveCurators.miniappNotInstalled.length === 0) && (
+                        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                          <p>No curator data available</p>
                         </div>
                       )}
                   </div>

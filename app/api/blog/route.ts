@@ -12,10 +12,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const url = searchParams.get("url");
 
-    console.log('[Blog API] Received request for URL:', url);
-
     if (!url) {
-      console.log('[Blog API] Missing URL parameter');
       return NextResponse.json(
         { error: "URL parameter is required" },
         { status: 400 }
@@ -26,14 +23,11 @@ export async function GET(request: NextRequest) {
     const platform = isBlogLink(url);
     
     if (!platform) {
-      console.log('[Blog API] Not a supported blog platform:', url);
       return NextResponse.json(
         { error: "Not a supported blog platform" },
         { status: 400 }
       );
     }
-
-    console.log('[Blog API] Detected platform:', platform);
 
     try {
       if (platform === 'paragraph') {
@@ -95,7 +89,6 @@ async function handleParagraphPost(url: string): Promise<NextResponse> {
 
   // Remove @ prefix from publication slug if present
   const cleanPublicationSlug = parsed.paragraph.publicationSlug.replace(/^@/, "");
-  console.log('[Blog API] Clean publication slug:', cleanPublicationSlug, 'post slug:', parsed.paragraph.postSlug);
 
   // Initialize Paragraph API client
   const api = new ParagraphAPI();
@@ -105,7 +98,6 @@ async function handleParagraphPost(url: string): Promise<NextResponse> {
 
   // Try to fetch post directly using publication slug and post slug
   try {
-    console.log('[Blog API] Attempting to fetch Paragraph post by slugs...');
     postData = await api.getPost(
       {
         publicationSlug: cleanPublicationSlug,
@@ -113,16 +105,12 @@ async function handleParagraphPost(url: string): Promise<NextResponse> {
       },
       { includeContent: true }
     );
-    console.log('[Blog API] Successfully fetched Paragraph post:', postData.id);
   } catch (error: unknown) {
-    console.log('[Blog API] Failed to fetch by slugs, error:', error);
     // If that fails and it's a custom domain, try alternative approach
     if (parsed.paragraph.isCustomDomain && parsed.paragraph.domain) {
-      console.log('[Blog API] Trying custom domain approach for:', parsed.paragraph.domain);
       // For custom domains, first get publication by domain
       try {
         publicationData = await api.getPublicationByDomain(parsed.paragraph.domain);
-        console.log('[Blog API] Found publication by domain:', publicationData.id);
         
         // Then fetch post by publication ID and post slug
         postData = await api.getPost(
@@ -132,9 +120,7 @@ async function handleParagraphPost(url: string): Promise<NextResponse> {
           },
           { includeContent: true }
         );
-        console.log('[Blog API] Successfully fetched Paragraph post by domain:', postData.id);
       } catch (domainError) {
-        console.log('[Blog API] Custom domain approach failed:', domainError);
         // If custom domain approach fails, throw original error
         throw error;
       }
@@ -147,12 +133,9 @@ async function handleParagraphPost(url: string): Promise<NextResponse> {
   // Fetch publication data if we don't have it yet
   if (!publicationData) {
     try {
-      console.log('[Blog API] Fetching Paragraph publication by slug:', cleanPublicationSlug);
       publicationData = await api.getPublicationBySlug(cleanPublicationSlug);
-      console.log('[Blog API] Found Paragraph publication:', publicationData.id);
     } catch (pubError) {
       // Publication fetch is optional, continue without it
-      console.warn('[Blog API] Could not fetch Paragraph publication data:', pubError);
     }
   }
 
@@ -179,12 +162,8 @@ async function handleParagraphPost(url: string): Promise<NextResponse> {
  * Handle Substack post fetching
  */
 async function handleSubstackPost(url: string): Promise<NextResponse> {
-  console.log('[Blog API] Fetching Substack post:', url);
-  
   try {
     const postData = await fetchSubstackPost(url);
-    
-    console.log('[Blog API] Successfully fetched Substack post:', postData.id);
     
     // Return normalized format (same as Paragraph)
     return NextResponse.json({

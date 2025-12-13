@@ -25,11 +25,8 @@ export function isSubstackLink(url: string): boolean {
     const urlObj = new URL(normalizedUrl);
     const hostname = urlObj.hostname.toLowerCase();
     
-    console.log('[Substack] Checking URL:', url, 'normalized:', normalizedUrl, 'hostname:', hostname);
-    
     // Check if hostname ends with .substack.com (subdomain) or is exactly substack.com (main domain)
     if (hostname.endsWith('.substack.com') || hostname === 'substack.com' || hostname === 'www.substack.com') {
-      console.log('[Substack] ✓ Detected Substack link:', url);
       return true;
     }
     
@@ -39,14 +36,11 @@ export function isSubstackLink(url: string): boolean {
     if (pathname.match(/^\/p\//)) {
       // This looks like a Substack post URL pattern
       // We'll verify by trying to fetch the RSS feed when processing
-      console.log('[Substack] ✓ Detected potential Substack link (custom domain with /p/ pattern):', url);
       return true;
     }
     
-    console.log('[Substack] ✗ Not a Substack link:', url, '(hostname:', hostname, ')');
     return false;
   } catch (error) {
-    console.log('[Substack] ✗ Error checking URL:', url, error);
     return false;
   }
 }

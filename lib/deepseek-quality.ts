@@ -135,14 +135,11 @@ async function extractEmbedContent(castData: any): Promise<{
   for (const blogUrl of processedBlogUrls) {
     const fetchPromise = (async () => {
       try {
-        console.log('[DeepSeek] Fetching blog article for quality assessment:', blogUrl);
-        
         // Use the unified blog API endpoint
         const apiUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/blog?url=${encodeURIComponent(blogUrl)}`;
         const response = await fetch(apiUrl);
         
         if (!response.ok) {
-          console.warn('[DeepSeek] Failed to fetch blog article:', blogUrl, response.status, response.statusText);
           return;
         }
         
@@ -154,9 +151,8 @@ async function extractEmbedContent(castData: any): Promise<{
           content: postData.staticHtml,
           markdown: postData.markdown,
         });
-        console.log('[DeepSeek] Successfully fetched blog article:', postData.title);
       } catch (error) {
-        console.error('[DeepSeek] Error processing blog link:', blogUrl, error);
+        // Silently fail - blog article fetch is optional
       }
     })();
     blogPromises.push(fetchPromise);
@@ -658,28 +654,6 @@ export async function analyzeCastQuality(
   
   // Extract embed content (including Paragraph articles)
   const embedContent = await extractEmbedContent(castData);
-  
-  // Log embed information for debugging
-  const hasText = castText && castText.trim().length > 0;
-  const hasEmbeds = embedContent.quotedCastTexts.length > 0 || 
-                    embedContent.linkMetadata.length > 0 || 
-                    embedContent.paragraphArticles.length > 0 ||
-                    embedContent.imageAlts.length > 0 ||
-                    embedContent.hasImageEmbeds;
-  
-  if (hasEmbeds) {
-    console.log(`[DeepSeek] Extracted embed content for analysis:`, {
-      hasText,
-      quotedCasts: embedContent.quotedCastTexts.length,
-      links: embedContent.linkMetadata.length,
-      paragraphArticles: embedContent.paragraphArticles.length,
-      images: embedContent.imageAlts.length,
-      hasImageEmbeds: embedContent.hasImageEmbeds,
-      linkUrls: embedContent.linkMetadata.map(l => l.url),
-      paragraphUrls: embedContent.paragraphArticles.map(p => p.url),
-      imageAlts: embedContent.imageAlts,
-    });
-  }
   
   // Build content string with text and embeds
   const contentParts: string[] = [];
