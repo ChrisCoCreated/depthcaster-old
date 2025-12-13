@@ -713,6 +713,9 @@ export async function analyzeCastQuality(
     };
   }
 
+  // Check if cast has text content
+  const hasText = castText && castText.trim().length > 0;
+
   // Detect if this is an image-only cast (no text, only images, no quoted casts, no links, no Paragraph articles)
   const isImageOnly = !hasText && 
                      embedContent.hasImageEmbeds && 
