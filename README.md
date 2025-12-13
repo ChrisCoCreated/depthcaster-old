@@ -34,11 +34,19 @@ A Long from farcaster client focused on deep thoughts, philosophy, art, and mean
    POSTGRES_URL=your_postgres_url_here
    DEEPSEEK_API_KEY=your_deepseek_api_key_here
    ENABLE_NEYNAR_NOTIFICATIONS=true
+   
+   # NFT Collection (optional)
+   REPLICATE_API_TOKEN=your_replicate_api_token_here
+   NEXT_PUBLIC_THIRDWEB_CLIENT_ID=your_thirdweb_client_id_here
+   THIRDWEB_SECRET_KEY=your_thirdweb_secret_key_here
+   NEXT_PUBLIC_NFT_CONTRACT_ADDRESS=your_nft_contract_address_here
    ```
 
    Get your API keys from:
    - [Neynar](https://neynar.com) - for Farcaster integration
    - [DeepSeek](https://www.deepseek.com) - for quality analysis and categorization (optional, but recommended)
+   - [Replicate](https://replicate.com) - for AI image generation (required for NFT collection)
+   - [thirdweb](https://thirdweb.com) - for NFT contract deployment and management (required for NFT collection)
    
    For local development, you can use a local PostgreSQL database or a service like [Neon](https://neon.tech) or [Supabase](https://supabase.com)
    
