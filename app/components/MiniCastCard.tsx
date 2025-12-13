@@ -15,14 +15,18 @@ function getFirstImageUrl(cast: Cast): string | null {
   if (!cast.embeds || cast.embeds.length === 0) return null;
 
   for (const embed of cast.embeds) {
-    if (embed.url) {
+    // Handle different embed types - cast to any to access url property
+    const embedAny = embed as any;
+    const embedUrl = embedAny.url;
+    
+    if (embedUrl) {
       // Check if it's a direct image URL
-      if (embed.url.match(/\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i)) {
-        return embed.url;
+      if (embedUrl.match(/\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i)) {
+        return embedUrl;
       }
       
       // Check metadata for images
-      const metadata = (embed as any).metadata;
+      const metadata = embedAny.metadata;
       if (metadata) {
         // Check for og:image
         const ogImage = metadata.ogImage;
