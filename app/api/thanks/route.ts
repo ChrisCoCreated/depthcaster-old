@@ -7,6 +7,56 @@ import { getCuratorsForCast } from "@/lib/notifications";
 import { getUser } from "@/lib/users";
 import { findOriginalCuratedCast } from "@/lib/interactions";
 
+export async function GET(request: NextRequest) {
+  try {
+    const searchParams = request.nextUrl.searchParams;
+    const castHash = searchParams.get("castHash");
+    const userFidParam = searchParams.get("userFid");
+
+    if (!castHash || !userFidParam) {
+      return NextResponse.json(
+        { error: "castHash and userFid are required" },
+        { status: 400 }
+      );
+    }
+
+    const userFid = parseInt(userFidParam, 10);
+    if (isNaN(userFid)) {
+      return NextResponse.json(
+        { error: "Invalid userFid" },
+        { status: 400 }
+      );
+    }
+
+    // Find the original curated cast for this cast hash
+    const curatedCastHash = await findOriginalCuratedCast(castHash);
+    
+    if (!curatedCastHash) {
+      return NextResponse.json({ thanked: false });
+    }
+
+    // Check if user has already thanked this cast
+    const existingThanks = await db
+      .select()
+      .from(castThanks)
+      .where(
+        and(
+          eq(castThanks.castHash, curatedCastHash),
+          eq(castThanks.fromFid, userFid)
+        )
+      )
+      .limit(1);
+
+    return NextResponse.json({ thanked: existingThanks.length > 0 });
+  } catch (error: any) {
+    console.error("Thanks check API error:", error);
+    return NextResponse.json(
+      { error: error.message || "Failed to check thanks status" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -86,17 +136,11 @@ export async function POST(request: NextRequest) {
       .limit(1);
 
     if (existingThanks.length > 0) {
-      // User has already thanked, remove the thanks (toggle off)
-      await db
-        .delete(castThanks)
-        .where(
-          and(
-            eq(castThanks.castHash, curatedCastHash),
-            eq(castThanks.fromFid, userFid)
-          )
-        );
-
-      return NextResponse.json({ success: true, thanked: false });
+      // User has already thanked, don't allow removal
+      return NextResponse.json(
+        { error: "You have already thanked the curators for this cast" },
+        { status: 400 }
+      );
     }
 
     // Get user info for notifications

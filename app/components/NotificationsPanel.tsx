@@ -854,7 +854,7 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
       case "curated.recast":
         return `${firstName} recast your curated cast`;
       case "curated.thanked":
-        return `${firstName} said thank you`;
+        return `${firstName} said thank you for curating`;
       default:
         return "New notification";
     }

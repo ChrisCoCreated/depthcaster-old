@@ -453,7 +453,7 @@ export async function notifyCuratorsAboutThanks(
       // Send push notification
       await sendPushNotificationToUser(curatorFid, {
         title: "Someone said thank you",
-        body: `${userName} said thank you`,
+        body: `${userName} said thank you for curating`,
         icon: user?.pfpUrl || "/icon-192x192.webp",
         badge: "/icon-96x96.webp",
         data: {

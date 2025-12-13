@@ -1385,6 +1385,31 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
     checkRootCastCuration();
   }, [rootCastHash, user?.fid, cast.hash]);
 
+  // Check if user has already thanked this cast
+  useEffect(() => {
+    if (!user?.fid || !cast.hash) {
+      setIsThanked(false);
+      return;
+    }
+
+    const checkIfThanked = async () => {
+      try {
+        const response = await fetch(`/api/thanks?castHash=${cast.hash}&userFid=${user.fid}`);
+        if (response.ok) {
+          const data = await response.json();
+          setIsThanked(data.thanked || false);
+        } else {
+          setIsThanked(false);
+        }
+      } catch (error) {
+        // Silently fail - assume not thanked
+        setIsThanked(false);
+      }
+    };
+
+    checkIfThanked();
+  }, [cast.hash, user?.fid]);
+
   // Check if user is admin and fetch tags
   useEffect(() => {
     if (!user?.fid || !cast.hash) {
@@ -1555,16 +1580,19 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
       return;
     }
 
+    if (isThanked) {
+      return;
+    }
+
     try {
       setIsThanking(true);
-      const wasThanked = isThanked;
       
       // Trigger animation
       setShowThankAnimation(true);
       setTimeout(() => setShowThankAnimation(false), 300);
       
       // Optimistic update
-      setIsThanked(!wasThanked);
+      setIsThanked(true);
 
       const response = await fetch("/api/thanks", {
         method: "POST",
@@ -1579,7 +1607,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
 
       if (!response.ok) {
         // Revert optimistic update on error
-        setIsThanked(wasThanked);
+        setIsThanked(false);
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to say thank you");
       }
@@ -3284,7 +3312,8 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                   e.stopPropagation();
                   handleThankYou();
                 }}
-                disabled={isThanking || !user}
+                disabled={isThanking || !user || isThanked}
+                title={isThanked ? "Already thanked" : "Say thank you to curators"}
                 className={`flex items-center gap-1 sm:gap-2 text-xs sm:text-sm transition-all py-1 px-1 sm:px-0 ${
                   isThanked
                     ? "text-yellow-600 dark:text-yellow-400"

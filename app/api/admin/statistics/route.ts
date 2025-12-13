@@ -745,7 +745,9 @@ export async function GET(request: NextRequest) {
           cuCostPerCall: 2,
         },
       },
-      activeUsers: await (async () => {
+      ...(await (async () => {
+        // First, get active users to extract their FIDs for exclusion in inactive curators
+        const activeUsersResult = await (async () => {
         // Get admin FIDs to exclude
         const adminFids = await getAllAdminFids();
 
@@ -845,176 +847,230 @@ export async function GET(request: NextRequest) {
           });
         }
 
-        // Convert to array format
-        return Array.from(usersByDate.entries()).map(([date, users]) => ({
-          date,
-          users,
-        })).sort((a, b) => b.date.localeCompare(a.date)); // Sort by date descending
-      })(),
-      
-      // Curators who haven't visited recently
-      inactiveCurators: await (async () => {
-        const curatorFids = await getAllCuratorFids();
-        if (curatorFids.length === 0) {
-          return {
-            notVisited7Days: [],
-            notVisited14Days: [],
-            neverVisited: [],
-          };
+          // Convert to array format
+          return Array.from(usersByDate.entries()).map(([date, users]) => ({
+            date,
+            users,
+          })).sort((a, b) => b.date.localeCompare(a.date)); // Sort by date descending
+        })();
+
+        // Extract all unique FIDs from active users for exclusion
+        const activeUserFidsSet = new Set<number>();
+        for (const day of activeUsersResult) {
+          for (const user of day.users) {
+            activeUserFidsSet.add(user.fid);
+          }
         }
 
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        const fourteenDaysAgo = new Date();
-        fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+        // Now get inactive curators, excluding active users
+        const inactiveCuratorsResult = await (async () => {
+          const curatorFids = await getAllCuratorFids();
+          if (curatorFids.length === 0) {
+            return {
+              notVisited7Days: [],
+              notVisited14Days: [],
+              neverVisited: [],
+              miniappInstalled: [],
+              miniappNotInstalled: [],
+            };
+          }
 
-        // Get last visit date for each curator from actual activity sources:
-        // feed_view_sessions, cast_views, page_views, curator_cast_curations, curated_cast_interactions
-        // Note: sign_in_logs is excluded - we only count actual visits/interactions, not just logins
-        const lastVisits = await db.execute(sql`
-          WITH curator_visits AS (
-            SELECT DISTINCT
-              user_fid,
-              MAX(created_at) as last_visit
-            FROM (
-              SELECT user_fid, created_at FROM feed_view_sessions WHERE user_fid IS NOT NULL
-              UNION ALL
-              SELECT user_fid, created_at FROM cast_views WHERE user_fid IS NOT NULL
-              UNION ALL
-              SELECT user_fid, created_at FROM page_views WHERE user_fid IS NOT NULL
-              UNION ALL
-              SELECT curator_fid as user_fid, created_at FROM curator_cast_curations
-              UNION ALL
-              SELECT user_fid, created_at FROM curated_cast_interactions 
-                WHERE user_fid IS NOT NULL 
-                AND interaction_type IN ('like', 'recast', 'reply', 'quote')
-            ) AS all_visits
-            WHERE user_fid = ANY(${sql.raw(`ARRAY[${curatorFids.join(',')}]`)})
-            GROUP BY user_fid
-          )
-          SELECT
-            cv.user_fid as fid,
-            cv.last_visit,
-            u.username,
-            u.display_name as "displayName",
-            u.pfp_url as "pfpUrl"
-          FROM curator_visits cv
-          LEFT JOIN users u ON u.fid = cv.user_fid
-        `);
+          // Filter out active users from curator FIDs
+          const inactiveCuratorFids = curatorFids.filter(fid => !activeUserFidsSet.has(fid));
 
-        const visitsMap = new Map<number, { lastVisit: Date; username: string | null; displayName: string | null; pfpUrl: string | null }>();
-        for (const row of (lastVisits as any).rows || []) {
-          visitsMap.set(row.fid, {
-            lastVisit: new Date(row.last_visit),
-            username: row.username,
-            displayName: row.displayName,
-            pfpUrl: row.pfpUrl,
-          });
-        }
+          const sevenDaysAgo = new Date();
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+          const fourteenDaysAgo = new Date();
+          fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
 
-        // Get user info for curators who never visited
-        const neverVisitedFids = curatorFids.filter(fid => !visitsMap.has(fid));
-        const neverVisitedUsers = neverVisitedFids.length > 0
-          ? await db.select({
+          // Get last visit date for each curator from all activity sources:
+          // feed_view_sessions, cast_views, page_views, curator_cast_curations, curated_cast_interactions, sign_in_logs
+          // Exclude active users from this query
+          const activeUserFidsArray = Array.from(activeUserFidsSet);
+          const activeUserExclusion = activeUserFidsArray.length > 0
+            ? sql`AND user_fid NOT IN (${sql.join(activeUserFidsArray.map(fid => sql`${fid}`), sql`, `)})`
+            : sql``;
+
+          const lastVisits = await db.execute(sql`
+            WITH curator_visits AS (
+              SELECT DISTINCT
+                user_fid,
+                MAX(created_at) as last_visit
+              FROM (
+                SELECT user_fid, created_at FROM feed_view_sessions WHERE user_fid IS NOT NULL
+                UNION ALL
+                SELECT user_fid, created_at FROM cast_views WHERE user_fid IS NOT NULL
+                UNION ALL
+                SELECT user_fid, created_at FROM page_views WHERE user_fid IS NOT NULL
+                UNION ALL
+                SELECT curator_fid as user_fid, created_at FROM curator_cast_curations
+                UNION ALL
+                SELECT user_fid, created_at FROM curated_cast_interactions 
+                  WHERE user_fid IS NOT NULL 
+                  AND interaction_type IN ('like', 'recast', 'reply', 'quote')
+                UNION ALL
+                SELECT user_fid, created_at FROM sign_in_logs 
+                  WHERE user_fid IS NOT NULL 
+                  AND success = true
+              ) AS all_visits
+              WHERE user_fid = ANY(${sql.raw(`ARRAY[${inactiveCuratorFids.length > 0 ? inactiveCuratorFids.join(',') : 'NULL'}]`)})
+                ${activeUserExclusion}
+              GROUP BY user_fid
+            )
+            SELECT
+              cv.user_fid as fid,
+              cv.last_visit,
+              u.username,
+              u.display_name as "displayName",
+              u.pfp_url as "pfpUrl"
+            FROM curator_visits cv
+            LEFT JOIN users u ON u.fid = cv.user_fid
+          `);
+
+          const visitsMap = new Map<number, { lastVisit: Date; username: string | null; displayName: string | null; pfpUrl: string | null }>();
+          for (const row of (lastVisits as any).rows || []) {
+            visitsMap.set(row.fid, {
+              lastVisit: new Date(row.last_visit),
+              username: row.username,
+              displayName: row.displayName,
+              pfpUrl: row.pfpUrl,
+            });
+          }
+
+
+          // Get user info for curators who never visited (no activity at all, including sign-in)
+          // First, filter out any FIDs that are in visitsMap (they have some activity)
+          let neverVisitedFids = inactiveCuratorFids.filter(fid => !visitsMap.has(fid));
+          
+          // Additional safeguard: verify these users don't have sign-in logs
+          // If they have sign-in logs, they should have been in visitsMap, but double-check
+          if (neverVisitedFids.length > 0) {
+            const signInCheck = await db.execute(sql`
+              SELECT DISTINCT user_fid
+              FROM sign_in_logs
+              WHERE user_fid IS NOT NULL
+                AND success = true
+                AND user_fid = ANY(${sql.raw(`ARRAY[${neverVisitedFids.length > 0 ? neverVisitedFids.join(',') : 'NULL'}]`)})
+            `);
+            
+            const signInFids = new Set((signInCheck as any).rows?.map((r: any) => r.user_fid) || []);
+            // Remove any FIDs that have sign-in logs from neverVisitedFids
+            neverVisitedFids = neverVisitedFids.filter(fid => !signInFids.has(fid));
+          }
+          
+          const neverVisitedUsers = neverVisitedFids.length > 0
+            ? await db.select({
+                fid: users.fid,
+                username: users.username,
+                displayName: users.displayName,
+                pfpUrl: users.pfpUrl,
+              })
+              .from(users)
+              .where(sql`fid = ANY(${sql.raw(`ARRAY[${neverVisitedFids.length > 0 ? neverVisitedFids.join(',') : 'NULL'}]`)})`)
+            : [];
+
+          const now = new Date();
+          const notVisited7Days: Array<{ fid: number; username: string | null; displayName: string | null; pfpUrl: string | null; lastVisit: Date }> = [];
+          const notVisited14Days: Array<{ fid: number; username: string | null; displayName: string | null; pfpUrl: string | null; lastVisit: Date }> = [];
+
+          // Filter out active users from the visits map before categorizing
+          for (const [fid, visit] of visitsMap.entries()) {
+            // Skip if this user is in the active users list
+            if (activeUserFidsSet.has(fid)) {
+              continue;
+            }
+            
+            const daysSinceVisit = Math.floor((now.getTime() - visit.lastVisit.getTime()) / (1000 * 60 * 60 * 24));
+            if (daysSinceVisit > 14) {
+              notVisited14Days.push({
+                fid,
+                username: visit.username,
+                displayName: visit.displayName,
+                pfpUrl: visit.pfpUrl,
+                lastVisit: visit.lastVisit,
+              });
+            } else if (daysSinceVisit > 7) {
+              notVisited7Days.push({
+                fid,
+                username: visit.username,
+                displayName: visit.displayName,
+                pfpUrl: visit.pfpUrl,
+                lastVisit: visit.lastVisit,
+              });
+            }
+          }
+
+          // Sort by last visit date (oldest first)
+          notVisited7Days.sort((a, b) => a.lastVisit.getTime() - b.lastVisit.getTime());
+          notVisited14Days.sort((a, b) => a.lastVisit.getTime() - b.lastVisit.getTime());
+
+          // Get miniapp installation status for all curators (including active ones for the miniapp status section)
+          const miniappInstalledFids = await db
+            .select({ userFid: miniappInstallations.userFid })
+            .from(miniappInstallations)
+            .where(sql`user_fid = ANY(${sql.raw(`ARRAY[${curatorFids.length > 0 ? curatorFids.join(',') : 'NULL'}]`)})`);
+          
+          const installedFidSet = new Set(miniappInstalledFids.map(m => m.userFid));
+          
+          // Get all curator user data for miniapp status
+          const allCuratorUsers = await db
+            .select({
               fid: users.fid,
               username: users.username,
               displayName: users.displayName,
               pfpUrl: users.pfpUrl,
             })
             .from(users)
-            .where(sql`fid = ANY(${sql.raw(`ARRAY[${neverVisitedFids.join(',')}]`)})`)
-          : [];
+            .where(sql`fid = ANY(${sql.raw(`ARRAY[${curatorFids.length > 0 ? curatorFids.join(',') : 'NULL'}]`)})`);
+          
+          const userMap = new Map(allCuratorUsers.map(u => [u.fid, u]));
+          
+          // Get curators with miniapp installed
+          const withMiniapp = Array.from(installedFidSet)
+            .map(fid => {
+              const user = userMap.get(fid);
+              return user ? {
+                fid: user.fid,
+                username: user.username,
+                displayName: user.displayName,
+                pfpUrl: user.pfpUrl,
+              } : null;
+            })
+            .filter((u): u is NonNullable<typeof u> => u !== null);
+          
+          // Get curators without miniapp installed
+          const withoutMiniapp = curatorFids
+            .filter(fid => !installedFidSet.has(fid))
+            .map(fid => {
+              const user = userMap.get(fid);
+              return user ? {
+                fid: user.fid,
+                username: user.username,
+                displayName: user.displayName,
+                pfpUrl: user.pfpUrl,
+              } : null;
+            })
+            .filter((u): u is NonNullable<typeof u> => u !== null);
 
-        const now = new Date();
-        const notVisited7Days: Array<{ fid: number; username: string | null; displayName: string | null; pfpUrl: string | null; lastVisit: Date }> = [];
-        const notVisited14Days: Array<{ fid: number; username: string | null; displayName: string | null; pfpUrl: string | null; lastVisit: Date }> = [];
-
-        for (const [fid, visit] of visitsMap.entries()) {
-          const daysSinceVisit = Math.floor((now.getTime() - visit.lastVisit.getTime()) / (1000 * 60 * 60 * 24));
-          if (daysSinceVisit > 14) {
-            notVisited14Days.push({
-              fid,
-              username: visit.username,
-              displayName: visit.displayName,
-              pfpUrl: visit.pfpUrl,
-              lastVisit: visit.lastVisit,
-            });
-          } else if (daysSinceVisit > 7) {
-            notVisited7Days.push({
-              fid,
-              username: visit.username,
-              displayName: visit.displayName,
-              pfpUrl: visit.pfpUrl,
-              lastVisit: visit.lastVisit,
-            });
-          }
-        }
-
-        // Sort by last visit date (oldest first)
-        notVisited7Days.sort((a, b) => a.lastVisit.getTime() - b.lastVisit.getTime());
-        notVisited14Days.sort((a, b) => a.lastVisit.getTime() - b.lastVisit.getTime());
-
-        // Get miniapp installation status for all curators
-        const miniappInstalledFids = await db
-          .select({ userFid: miniappInstallations.userFid })
-          .from(miniappInstallations)
-          .where(sql`user_fid = ANY(${sql.raw(`ARRAY[${curatorFids.join(',')}]`)})`);
-        
-        const installedFidSet = new Set(miniappInstalledFids.map(m => m.userFid));
-        
-        // Get all curator user data for miniapp status
-        const allCuratorUsers = await db
-          .select({
-            fid: users.fid,
-            username: users.username,
-            displayName: users.displayName,
-            pfpUrl: users.pfpUrl,
-          })
-          .from(users)
-          .where(sql`fid = ANY(${sql.raw(`ARRAY[${curatorFids.join(',')}]`)})`);
-        
-        const userMap = new Map(allCuratorUsers.map(u => [u.fid, u]));
-        
-        // Get curators with miniapp installed
-        const withMiniapp = Array.from(installedFidSet)
-          .map(fid => {
-            const user = userMap.get(fid);
-            return user ? {
-              fid: user.fid,
-              username: user.username,
-              displayName: user.displayName,
-              pfpUrl: user.pfpUrl,
-            } : null;
-          })
-          .filter((u): u is NonNullable<typeof u> => u !== null);
-        
-        // Get curators without miniapp installed
-        const withoutMiniapp = curatorFids
-          .filter(fid => !installedFidSet.has(fid))
-          .map(fid => {
-            const user = userMap.get(fid);
-            return user ? {
-              fid: user.fid,
-              username: user.username,
-              displayName: user.displayName,
-              pfpUrl: user.pfpUrl,
-            } : null;
-          })
-          .filter((u): u is NonNullable<typeof u> => u !== null);
+          return {
+            notVisited7Days: notVisited7Days.map(u => ({ ...u, lastVisit: u.lastVisit.toISOString() })),
+            notVisited14Days: notVisited14Days.map(u => ({ ...u, lastVisit: u.lastVisit.toISOString() })),
+            neverVisited: neverVisitedUsers.map(u => ({
+              fid: u.fid,
+              username: u.username,
+              displayName: u.displayName,
+              pfpUrl: u.pfpUrl,
+            })),
+            miniappInstalled: withMiniapp,
+            miniappNotInstalled: withoutMiniapp,
+          };
+        })();
 
         return {
-          notVisited7Days: notVisited7Days.map(u => ({ ...u, lastVisit: u.lastVisit.toISOString() })),
-          notVisited14Days: notVisited14Days.map(u => ({ ...u, lastVisit: u.lastVisit.toISOString() })),
-          neverVisited: neverVisitedUsers.map(u => ({
-            fid: u.fid,
-            username: u.username,
-            displayName: u.displayName,
-            pfpUrl: u.pfpUrl,
-          })),
-          miniappInstalled: withMiniapp,
-          miniappNotInstalled: withoutMiniapp,
+          activeUsers: activeUsersResult,
+          inactiveCurators: inactiveCuratorsResult,
         };
-      })(),
+      })()),
     });
   } catch (error: unknown) {
     const err = error as { message?: string; cause?: any };
