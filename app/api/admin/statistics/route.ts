@@ -880,7 +880,7 @@ export async function GET(request: NextRequest) {
               UNION ALL
               SELECT user_fid, created_at FROM page_views WHERE user_fid IS NOT NULL
             ) AS all_visits
-            WHERE user_fid = ANY(${curatorFids})
+            WHERE user_fid = ANY(${sql.raw(`ARRAY[${curatorFids.join(',')}]`)})
             GROUP BY user_fid
           )
           SELECT
@@ -913,7 +913,7 @@ export async function GET(request: NextRequest) {
               pfpUrl: users.pfpUrl,
             })
             .from(users)
-            .where(sql`fid = ANY(${neverVisitedFids})`)
+            .where(sql`fid = ANY(${sql.raw(`ARRAY[${neverVisitedFids.join(',')}]`)})`)
           : [];
 
         const now = new Date();
