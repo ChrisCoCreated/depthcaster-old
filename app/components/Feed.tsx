@@ -1732,41 +1732,42 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
               />
             </button>
           </div>
-        </div>
-        
-        {/* Inline expansion for hidden feeds */}
-        {showMoreFeeds && (
-          <div className="px-2 sm:px-4 py-2 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50">
-            <div className="flex flex-wrap gap-2">
-              {[
-                { id: "1500+", label: "1500+", requiresAuth: false },
-                { id: "trending", label: "Trending", requiresAuth: true },
-                { id: "for-you", label: "For You", requiresAuth: true },
-                { id: "following", label: "Following", requiresAuth: true },
-              ]
-                .filter((tab) => !enabledFeeds.includes(tab.id) && (!tab.requiresAuth || viewerFid))
-                .map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => {
-                      addFeed(tab.id);
-                      setShowMoreFeeds(false);
-                      // Switch to the newly added feed
-                      const newType = tab.id as "curated" | "following" | "for-you" | "trending" | "my-37" | "1500+";
-                      const normalized = normalizeFeedType(newType);
-                      setFeedType(normalized);
-                      const params = new URLSearchParams(window.location.search);
-                      params.set("feed", normalized);
-                      router.replace(`/?${params.toString()}`, { scroll: false });
-                    }}
-                    className="px-3 py-1.5 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors"
-                  >
-                    + {tab.label}
-                  </button>
-                ))}
-            </div>
           </div>
-        )}
+          
+          {/* Inline expansion for hidden feeds */}
+          {showMoreFeeds && (
+            <div className="px-2 sm:px-4 py-2 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50">
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { id: "1500+", label: "1500+", requiresAuth: false },
+                  { id: "trending", label: "Trending", requiresAuth: true },
+                  { id: "for-you", label: "For You", requiresAuth: true },
+                  { id: "following", label: "Following", requiresAuth: true },
+                ]
+                  .filter((tab) => !enabledFeeds.includes(tab.id) && (!tab.requiresAuth || viewerFid))
+                  .map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => {
+                        addFeed(tab.id);
+                        setShowMoreFeeds(false);
+                        // Switch to the newly added feed
+                        const newType = tab.id as "curated" | "following" | "for-you" | "trending" | "my-37" | "1500+";
+                        const normalized = normalizeFeedType(newType);
+                        setFeedType(normalized);
+                        const params = new URLSearchParams(window.location.search);
+                        params.set("feed", normalized);
+                        router.replace(`/?${params.toString()}`, { scroll: false });
+                      }}
+                      className="px-3 py-1.5 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors"
+                    >
+                      + {tab.label}
+                    </button>
+                  ))}
+              </div>
+            </div>
+          )}
+        </div>
         
         {/* 1500+ Feed Description */}
         {feedType === "1500+" && (
