@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useNeynarContext } from "@neynar/react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
+import { useXmtp } from "../contexts/XmtpContext";
+import { ConsentState } from "@xmtp/browser-sdk";
 
 interface Conversation {
   conversationId: string;
@@ -25,35 +25,71 @@ interface ChatListProps {
 }
 
 export function ChatList({ walletAddress, onSelectConversation }: ChatListProps) {
-  const { user } = useNeynarContext();
+  const { client, isInitialized } = useXmtp();
   const router = useRouter();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user?.fid && walletAddress) {
+    if (client && isInitialized) {
       fetchConversations();
+    } else {
+      setLoading(false);
     }
-  }, [user?.fid, walletAddress]);
+  }, [client, isInitialized]);
 
   const fetchConversations = async () => {
-    if (!user?.fid) return;
+    if (!client) return;
 
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch(
-        `/api/xmtp/conversations?userFid=${user.fid}&walletAddress=${walletAddress}`
+      // List conversations directly from XMTP client
+      const allConversations = await client.conversations.list({
+        consentStates: [ConsentState.Allowed],
+      });
+
+      // Transform to our format
+      const transformed = await Promise.all(
+        allConversations.map(async (conv) => {
+          // Get last message
+          const messages = await conv.messages({ limit: BigInt(1) });
+          const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+
+          // Browser SDK uses inboxId instead of topic
+          const conversationId = ('inboxId' in conv ? String(conv.inboxId) : ('topic' in conv ? String(conv.topic) : ''));
+          const peerAddress = 'peerAddress' in conv ? (conv.peerAddress as string | null) : null;
+          const isGroup = !peerAddress;
+
+          return {
+            conversationId: conversationId || '',
+            peerAddress: peerAddress || null,
+            type: (isGroup ? "group" : "1:1") as "1:1" | "group",
+            lastMessage: lastMessage
+              ? {
+                  content: typeof lastMessage.content === "string" 
+                    ? lastMessage.content 
+                    : JSON.stringify(lastMessage.content),
+                  senderAddress: (lastMessage as any).senderAddress || (lastMessage as any).sender || '',
+                  sentAt: (lastMessage as any).sent || (lastMessage as any).sentAt || new Date(),
+                }
+              : null,
+            lastMessageAt: lastMessage ? ((lastMessage as any).sent?.toISOString() || (lastMessage as any).sentAt?.toISOString() || null) : null,
+            createdAt: null,
+          };
+        })
       );
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch conversations");
-      }
+      // Sort by last message time
+      transformed.sort((a, b) => {
+        const timeA = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
+        const timeB = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
+        return timeB - timeA;
+      });
 
-      const data = await response.json();
-      setConversations(data.conversations || []);
+      setConversations(transformed);
     } catch (err: any) {
       setError(err.message || "Failed to load conversations");
     } finally {

@@ -3344,22 +3344,24 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                 )}
               </div>
 
-              {/* Thank You */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleThankYou();
-                }}
-                disabled={isThanking || !user || isThanked}
-                title={isThanked ? "Already thanked" : "Say thank you to curators"}
-                className={`flex items-center gap-1 sm:gap-2 text-xs sm:text-sm transition-all py-1 px-1 sm:px-0 ${
-                  isThanked
-                    ? "text-yellow-600 dark:text-yellow-400"
-                    : "text-gray-500 dark:text-gray-400 hover:text-yellow-600 dark:hover:text-yellow-400"
-                } disabled:opacity-50 disabled:cursor-not-allowed ${showThankAnimation ? "thank-animate" : ""}`}
-              >
-                <span className="text-base sm:text-lg">🙏</span>
-              </button>
+              {/* Thank You - Only show for curated casts */}
+              {isCurated && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleThankYou();
+                  }}
+                  disabled={isThanking || !user || isThanked}
+                  title={isThanked ? "Already thanked" : "Say thank you to curators"}
+                  className={`flex items-center gap-1 sm:gap-2 text-xs sm:text-sm transition-all py-1 px-1 sm:px-0 ${
+                    isThanked
+                      ? "text-yellow-600 dark:text-yellow-400"
+                      : "text-gray-500 dark:text-gray-400 hover:text-yellow-600 dark:hover:text-yellow-400"
+                  } disabled:opacity-50 disabled:cursor-not-allowed ${showThankAnimation ? "thank-animate" : ""}`}
+                >
+                  <span className="text-base sm:text-lg">🙏</span>
+                </button>
+              )}
 
               {/* Quality score indicator and feedback button */}
               {qualityScore !== null && qualityScore !== undefined && (

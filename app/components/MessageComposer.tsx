@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useXmtp } from "../contexts/XmtpContext";
 
 interface MessageComposerProps {
   conversationId: string;
@@ -15,6 +16,7 @@ export function MessageComposer({
   userFid,
   onMessageSent,
 }: MessageComposerProps) {
+  const { client } = useXmtp();
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -30,28 +32,24 @@ export function MessageComposer({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!message.trim() || sending) return;
+    if (!message.trim() || sending || !client) return;
 
     setSending(true);
 
     try {
-      const response = await fetch(
-        `/api/xmtp/conversations/${conversationId}/messages`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userFid,
-            walletAddress,
-            content: message.trim(),
-          }),
-        }
-      );
+      // Get all conversations and find the one we want
+      const allConversations = await client.conversations.list();
+      const conversation = allConversations.find((c) => {
+        const id = 'inboxId' in c ? c.inboxId : ('topic' in c ? c.topic : '');
+        return id === conversationId;
+      });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to send message");
+      if (!conversation) {
+        throw new Error("Conversation not found");
       }
+
+      // Send message directly
+      await conversation.send(message.trim());
 
       setMessage("");
       onMessageSent?.();

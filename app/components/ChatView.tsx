@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { MessageComposer } from "./MessageComposer";
+import { useXmtp } from "../contexts/XmtpContext";
 
 interface Message {
   messageId: string;
@@ -19,39 +20,55 @@ interface ChatViewProps {
 }
 
 export function ChatView({ conversationId, walletAddress, userFid }: ChatViewProps) {
+  const { client, isInitialized } = useXmtp();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [isUserAddress, setIsUserAddress] = useState(false);
 
   useEffect(() => {
-    if (walletAddress) {
-      setIsUserAddress(true);
+    if (client && isInitialized) {
+      fetchMessages();
+      // Poll for new messages every 5 seconds
+      const interval = setInterval(fetchMessages, 5000);
+      return () => clearInterval(interval);
+    } else {
+      setLoading(false);
     }
-  }, [walletAddress]);
-
-  useEffect(() => {
-    fetchMessages();
-    // Poll for new messages every 5 seconds
-    const interval = setInterval(fetchMessages, 5000);
-    return () => clearInterval(interval);
-  }, [conversationId, walletAddress, userFid]);
+  }, [conversationId, client, isInitialized]);
 
   const fetchMessages = async () => {
-    if (!userFid || !walletAddress) return;
+    if (!client) return;
 
     try {
-      const response = await fetch(
-        `/api/xmtp/conversations/${conversationId}/messages?userFid=${userFid}&walletAddress=${walletAddress}&limit=100`
-      );
+      // Get all conversations and find the one we want
+      const allConversations = await client.conversations.list();
+      const conversation = allConversations.find((c) => {
+        const id = 'inboxId' in c ? c.inboxId : ('topic' in c ? c.topic : '');
+        return id === conversationId;
+      });
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch messages");
+      if (!conversation) {
+        setError("Conversation not found");
+        setLoading(false);
+        return;
       }
 
-      const data = await response.json();
-      setMessages(data.messages || []);
+      // Get messages from the conversation
+      const xmtpMessages = await conversation.messages({ limit: BigInt(100) });
+
+      // Transform to our format
+      const transformed = xmtpMessages.map((msg) => ({
+        messageId: msg.id,
+        conversationId,
+        senderAddress: (msg as any).senderAddress || (msg as any).sender || '',
+        content: typeof msg.content === "string" 
+          ? msg.content 
+          : JSON.stringify(msg.content),
+        sentAt: (msg as any).sent || (msg as any).sentAt || new Date(),
+      }));
+
+      setMessages(transformed);
       setError(null);
     } catch (err: any) {
       setError(err.message || "Failed to load messages");

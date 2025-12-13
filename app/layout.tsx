@@ -11,6 +11,7 @@ import { PushSubscriptionManager } from "./components/PushSubscriptionManager";
 import { SessionTracker } from "./components/SessionTracker";
 import { NavigationManager } from "./components/NavigationManager";
 import { PortalErrorHandler } from "./components/PortalErrorHandler";
+import { XmtpProvider } from "./contexts/XmtpContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -116,13 +117,15 @@ export default function RootLayout({
         <PortalErrorHandler />
         <ServiceWorkerRegistration />
         <AuthProvider>
-          <SessionTracker />
-          <PushSubscriptionManager />
-          <OnboardingFlow />
-          <UpdateNotification />
-          <NavigationManager />
-          <ConditionalHeader />
-          {children}
+          <XmtpProvider>
+            <SessionTracker />
+            <PushSubscriptionManager />
+            <OnboardingFlow />
+            <UpdateNotification />
+            <NavigationManager />
+            <ConditionalHeader />
+            {children}
+          </XmtpProvider>
         </AuthProvider>
       </body>
     </html>
