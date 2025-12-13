@@ -133,34 +133,95 @@ export async function initializeXmtpClient(
   // Try to get keys from the client's keystore
   // These keys may be newly created OR existing keys from other apps
   try {
-    // XMTP v7: Try multiple methods to export keys
+    // Helper function to extract Uint8Array from various key formats
+    const extractKeyBytes = (keyData: any): Uint8Array | null => {
+      if (!keyData) return null;
+      
+      // If already Uint8Array, return it
+      if (keyData instanceof Uint8Array) {
+        return keyData;
+      }
+      
+      // If it's an array, convert to Uint8Array
+      if (Array.isArray(keyData)) {
+        return new Uint8Array(keyData);
+      }
+      
+      // If it's an object, try to extract private key bytes
+      if (typeof keyData === 'object') {
+        // Try common property names
+        if (keyData.privateKey && keyData.privateKey instanceof Uint8Array) {
+          return keyData.privateKey;
+        }
+        if (keyData.privateKeyBytes && keyData.privateKeyBytes instanceof Uint8Array) {
+          return keyData.privateKeyBytes;
+        }
+        if (keyData.keyBytes && keyData.keyBytes instanceof Uint8Array) {
+          return keyData.keyBytes;
+        }
+        if (keyData.bytes && keyData.bytes instanceof Uint8Array) {
+          return keyData.bytes;
+        }
+        // If it's an array-like object, try to convert
+        if (keyData.length && typeof keyData.length === 'number') {
+          try {
+            return new Uint8Array(keyData);
+          } catch (e) {
+            // Ignore conversion errors
+          }
+        }
+      }
+      
+      return null;
+    };
+    
+    // XMTP v7: Try accessing keys directly from client properties
     let keys: Uint8Array | null = null;
     
-    // Method 1: Try keystore export
-    if ((client as any).keystore?.exportKeyBundle) {
-      keys = await (client as any).keystore.exportKeyBundle();
+    // Method 1: Try client.keys directly
+    if (!keys && (client as any).keys) {
+      keys = extractKeyBytes((client as any).keys);
     }
-    // Method 2: Try direct exportKeyBundle
-    else if ((client as any).exportKeyBundle) {
-      keys = await (client as any).exportKeyBundle();
+    
+    // Method 2: Try keystore.v2Keys (prefer v2 over v1)
+    if (!keys && (client as any).keystore?.v2Keys) {
+      keys = extractKeyBytes((client as any).keystore.v2Keys);
     }
-    // Method 3: Try exportKey
-    else if ((client as any).exportKey) {
-      keys = await (client as any).exportKey();
+    
+    // Method 3: Try keystore.v1Keys
+    if (!keys && (client as any).keystore?.v1Keys) {
+      keys = extractKeyBytes((client as any).keystore.v1Keys);
     }
-    // Method 4: Try accessing privateKey directly
-    else if ((client as any).privateKey) {
-      keys = (client as any).privateKey;
+    
+    // Method 4: Try legacyKeys
+    if (!keys && (client as any).legacyKeys) {
+      keys = extractKeyBytes((client as any).legacyKeys);
     }
-    // Method 5: Try keystore.getPrivateKey
-    else if ((client as any).keystore?.getPrivateKey) {
-      keys = await (client as any).keystore.getPrivateKey();
+    
+    // Method 5: Try keystore exportKeyBundle (fallback)
+    if (!keys && (client as any).keystore?.exportKeyBundle) {
+      try {
+        const exported = await (client as any).keystore.exportKeyBundle();
+        keys = extractKeyBytes(exported);
+      } catch (e) {
+        // Ignore errors
+      }
+    }
+    
+    // Method 6: Try direct exportKeyBundle (fallback)
+    if (!keys && (client as any).exportKeyBundle) {
+      try {
+        const exported = await (client as any).exportKeyBundle();
+        keys = extractKeyBytes(exported);
+      } catch (e) {
+        // Ignore errors
+      }
     }
 
-    if (keys && keys instanceof Uint8Array) {
+    if (keys && keys instanceof Uint8Array && keys.length > 0) {
       await storeClientKeys(address, keys);
     } else {
-      console.warn("Could not export keys from XMTP client - no valid export method found");
+      console.warn("Could not extract keys from XMTP client - no valid key source found");
     }
   } catch (error) {
     console.warn("Could not export keys from XMTP client:", error);
@@ -208,34 +269,95 @@ export async function getOrCreateClient(
   
   // Store keys in database for this user
   try {
-    // XMTP v7: Try multiple methods to export keys
+    // Helper function to extract Uint8Array from various key formats
+    const extractKeyBytes = (keyData: any): Uint8Array | null => {
+      if (!keyData) return null;
+      
+      // If already Uint8Array, return it
+      if (keyData instanceof Uint8Array) {
+        return keyData;
+      }
+      
+      // If it's an array, convert to Uint8Array
+      if (Array.isArray(keyData)) {
+        return new Uint8Array(keyData);
+      }
+      
+      // If it's an object, try to extract private key bytes
+      if (typeof keyData === 'object') {
+        // Try common property names
+        if (keyData.privateKey && keyData.privateKey instanceof Uint8Array) {
+          return keyData.privateKey;
+        }
+        if (keyData.privateKeyBytes && keyData.privateKeyBytes instanceof Uint8Array) {
+          return keyData.privateKeyBytes;
+        }
+        if (keyData.keyBytes && keyData.keyBytes instanceof Uint8Array) {
+          return keyData.keyBytes;
+        }
+        if (keyData.bytes && keyData.bytes instanceof Uint8Array) {
+          return keyData.bytes;
+        }
+        // If it's an array-like object, try to convert
+        if (keyData.length && typeof keyData.length === 'number') {
+          try {
+            return new Uint8Array(keyData);
+          } catch (e) {
+            // Ignore conversion errors
+          }
+        }
+      }
+      
+      return null;
+    };
+    
+    // XMTP v7: Try accessing keys directly from client properties
     let keys: Uint8Array | null = null;
     
-    // Method 1: Try keystore export
-    if ((client as any).keystore?.exportKeyBundle) {
-      keys = await (client as any).keystore.exportKeyBundle();
+    // Method 1: Try client.keys directly
+    if (!keys && (client as any).keys) {
+      keys = extractKeyBytes((client as any).keys);
     }
-    // Method 2: Try direct exportKeyBundle
-    else if ((client as any).exportKeyBundle) {
-      keys = await (client as any).exportKeyBundle();
+    
+    // Method 2: Try keystore.v2Keys (prefer v2 over v1)
+    if (!keys && (client as any).keystore?.v2Keys) {
+      keys = extractKeyBytes((client as any).keystore.v2Keys);
     }
-    // Method 3: Try exportKey
-    else if ((client as any).exportKey) {
-      keys = await (client as any).exportKey();
+    
+    // Method 3: Try keystore.v1Keys
+    if (!keys && (client as any).keystore?.v1Keys) {
+      keys = extractKeyBytes((client as any).keystore.v1Keys);
     }
-    // Method 4: Try accessing privateKey directly
-    else if ((client as any).privateKey) {
-      keys = (client as any).privateKey;
+    
+    // Method 4: Try legacyKeys
+    if (!keys && (client as any).legacyKeys) {
+      keys = extractKeyBytes((client as any).legacyKeys);
     }
-    // Method 5: Try keystore.getPrivateKey
-    else if ((client as any).keystore?.getPrivateKey) {
-      keys = await (client as any).keystore.getPrivateKey();
+    
+    // Method 5: Try keystore exportKeyBundle (fallback)
+    if (!keys && (client as any).keystore?.exportKeyBundle) {
+      try {
+        const exported = await (client as any).keystore.exportKeyBundle();
+        keys = extractKeyBytes(exported);
+      } catch (e) {
+        // Ignore errors
+      }
+    }
+    
+    // Method 6: Try direct exportKeyBundle (fallback)
+    if (!keys && (client as any).exportKeyBundle) {
+      try {
+        const exported = await (client as any).exportKeyBundle();
+        keys = extractKeyBytes(exported);
+      } catch (e) {
+        // Ignore errors
+      }
     }
 
-    if (keys && keys instanceof Uint8Array) {
+    if (keys && keys instanceof Uint8Array && keys.length > 0) {
       await storeClientKeysForUser(userFid, address, keys);
     } else {
-      console.warn("Could not export keys from XMTP client - no valid export method found");
+      console.warn("Could not extract keys from XMTP client - no valid key source found");
     }
   } catch (error) {
     console.warn("Could not export keys from XMTP client:", error);
