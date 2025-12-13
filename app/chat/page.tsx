@@ -14,13 +14,41 @@ export default function ChatPage() {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [showNewChat, setShowNewChat] = useState(false);
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for connected wallet
-    if (typeof window !== "undefined" && (window as any).ethereum) {
-      checkWalletConnection();
-    }
-  }, []);
+    const checkAdminAccess = async () => {
+      if (!user?.fid) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/admin/check?fid=${user.fid}`);
+        const data = await response.json();
+        
+        if (data.isAdmin) {
+          setIsAdmin(true);
+          // Check for connected wallet after admin check
+          if (typeof window !== "undefined" && (window as any).ethereum) {
+            checkWalletConnection();
+          }
+        } else {
+          setIsAdmin(false);
+          router.push("/");
+        }
+      } catch (error) {
+        console.error("Failed to check admin access:", error);
+        setIsAdmin(false);
+        router.push("/");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkAdminAccess();
+  }, [user, router]);
 
   const checkWalletConnection = async () => {
     try {
@@ -64,13 +92,21 @@ export default function ChatPage() {
     router.push(`/chat/${conversationId}`);
   };
 
-  if (!user) {
+  if (!user || isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-gray-500 dark:text-gray-400">Loading...</div>
+      </div>
+    );
+  }
+
+  if (isAdmin === false) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Sign In Required</h1>
+          <h1 className="text-2xl font-bold mb-4 text-red-600 dark:text-red-400">Access Denied</h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Please sign in with Farcaster to access chat.
+            This page is only accessible to administrators.
           </p>
         </div>
       </div>
