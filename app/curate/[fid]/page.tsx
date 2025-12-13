@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useState, use, useRef } from "react";
 import { useNeynarContext } from "@neynar/react";
 import { ProfileHeader } from "../../components/ProfileHeader";
 import { CastCard } from "../../components/CastCard";
 import { MiniCastCard } from "../../components/MiniCastCard";
 import { BulkCollectionSelectModal } from "../../components/BulkCollectionSelectModal";
 import { hasCollectionsOrAdminRole } from "@/lib/roles-client";
-import { ChevronDown, ChevronUp, LayoutGrid, List } from "lucide-react";
+import { ChevronDown, ChevronUp, LayoutGrid, List, Square, Minus, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 interface UserProfile {
@@ -63,6 +63,7 @@ export default function CuratePersonPage({
   // Selection state
   const [selectedCasts, setSelectedCasts] = useState<Map<string, SelectedCast>>(new Map());
   const [showBulkModal, setShowBulkModal] = useState(false);
+  const globalCheckboxRef = useRef<HTMLInputElement>(null);
 
   // Check collector role
   useEffect(() => {
@@ -232,6 +233,28 @@ export default function CuratePersonPage({
     setSelectedCasts(newSelected);
   };
 
+  const handleSelectAllGlobal = () => {
+    const allCasts = [...popularCasts, ...chronoCasts];
+    handleSelectAll(allCasts);
+  };
+
+  const allCastsSelected = () => {
+    const allCasts = [...popularCasts, ...chronoCasts];
+    return allCasts.length > 0 && allCasts.every(cast => selectedCasts.has(cast.hash));
+  };
+
+  const someCastsSelected = () => {
+    const allCasts = [...popularCasts, ...chronoCasts];
+    return allCasts.some(cast => selectedCasts.has(cast.hash));
+  };
+
+  // Update indeterminate state of global checkbox
+  useEffect(() => {
+    if (globalCheckboxRef.current) {
+      globalCheckboxRef.current.indeterminate = someCastsSelected() && !allCastsSelected();
+    }
+  }, [selectedCasts, popularCasts, chronoCasts]);
+
   const handleDeselectAll = () => {
     setSelectedCasts(new Map());
   };
@@ -310,6 +333,22 @@ export default function CuratePersonPage({
         <div className="sticky top-0 bg-white dark:bg-black border-b border-gray-200 dark:border-gray-800 z-40 p-4 mb-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
+              {/* Global Select All Checkbox */}
+              <input
+                type="checkbox"
+                ref={globalCheckboxRef}
+                checked={allCastsSelected()}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    handleSelectAllGlobal();
+                  } else {
+                    handleDeselectAll();
+                  }
+                }}
+                className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                title="Select All"
+              />
+              
               {/* View Toggle */}
               <div className="flex items-center gap-2 border border-gray-300 dark:border-gray-700 rounded-lg p-1">
                 <button
@@ -317,14 +356,14 @@ export default function CuratePersonPage({
                   className={`p-1.5 rounded ${isMiniView ? "bg-blue-600 text-white" : "text-gray-600 dark:text-gray-400"}`}
                   title="Mini View"
                 >
-                  <LayoutGrid className="w-4 h-4" />
+                  <List className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => setViewMode("standard")}
                   className={`p-1.5 rounded ${!isMiniView ? "bg-blue-600 text-white" : "text-gray-600 dark:text-gray-400"}`}
                   title="Standard View"
                 >
-                  <List className="w-4 h-4" />
+                  <LayoutGrid className="w-4 h-4" />
                 </button>
               </div>
               
@@ -362,9 +401,9 @@ export default function CuratePersonPage({
               className="flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-gray-100 hover:text-gray-700 dark:hover:text-gray-300"
             >
               {popularExpanded ? (
-                <ChevronDown className="w-5 h-5" />
+                <Minus className="w-5 h-5" />
               ) : (
-                <ChevronUp className="w-5 h-5" />
+                <Square className="w-5 h-5" />
               )}
               <span>Popular Casts</span>
               {popularCasts.length > 0 && (
@@ -373,14 +412,6 @@ export default function CuratePersonPage({
                 </span>
               )}
             </button>
-            {popularCasts.length > 0 && (
-              <button
-                onClick={() => handleSelectAll(popularCasts)}
-                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-              >
-                Select All
-              </button>
-            )}
           </div>
           
           {popularExpanded && (
@@ -446,9 +477,9 @@ export default function CuratePersonPage({
               className="flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-gray-100 hover:text-gray-700 dark:hover:text-gray-300"
             >
               {chronoExpanded ? (
-                <ChevronDown className="w-5 h-5" />
+                <Minus className="w-5 h-5" />
               ) : (
-                <ChevronUp className="w-5 h-5" />
+                <Square className="w-5 h-5" />
               )}
               <span>Chronological Casts</span>
               {chronoCasts.length > 0 && (
@@ -457,14 +488,6 @@ export default function CuratePersonPage({
                 </span>
               )}
             </button>
-            {chronoCasts.length > 0 && (
-              <button
-                onClick={() => handleSelectAll(chronoCasts)}
-                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-              >
-                Select All
-              </button>
-            )}
           </div>
           
           {chronoExpanded && (
