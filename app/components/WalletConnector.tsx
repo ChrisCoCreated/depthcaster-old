@@ -153,77 +153,124 @@ export function WalletConnector({ onConnected, onInitialized }: WalletConnectorP
         let keys: Uint8Array | null = null;
         
         // Helper function to extract Uint8Array from various key formats
-        const extractKeyBytes = (keyData: any): Uint8Array | null => {
-          if (!keyData) return null;
+        const extractKeyBytes = (keyData: any, source: string): Uint8Array | null => {
+          if (!keyData) {
+            console.log(`[${source}] keyData is null/undefined`);
+            return null;
+          }
+          
+          console.log(`[${source}] Type: ${typeof keyData}, IsArray: ${Array.isArray(keyData)}, Constructor: ${keyData.constructor?.name}`);
           
           // If already Uint8Array, return it
           if (keyData instanceof Uint8Array) {
+            console.log(`[${source}] Found Uint8Array, length: ${keyData.length}`);
             return keyData;
           }
           
           // If it's an array, convert to Uint8Array
           if (Array.isArray(keyData)) {
+            console.log(`[${source}] Found array, length: ${keyData.length}`);
             return new Uint8Array(keyData);
           }
           
           // If it's an object, try to extract private key bytes
           if (typeof keyData === 'object') {
+            console.log(`[${source}] Found object, keys: ${Object.keys(keyData).join(', ')}`);
+            
             // Try common property names
-            if (keyData.privateKey && keyData.privateKey instanceof Uint8Array) {
-              return keyData.privateKey;
+            if (keyData.privateKey) {
+              console.log(`[${source}] Found privateKey property, type: ${typeof keyData.privateKey}`);
+              if (keyData.privateKey instanceof Uint8Array) {
+                return keyData.privateKey;
+              }
+              if (Array.isArray(keyData.privateKey)) {
+                return new Uint8Array(keyData.privateKey);
+              }
             }
-            if (keyData.privateKeyBytes && keyData.privateKeyBytes instanceof Uint8Array) {
-              return keyData.privateKeyBytes;
+            if (keyData.privateKeyBytes) {
+              console.log(`[${source}] Found privateKeyBytes property`);
+              if (keyData.privateKeyBytes instanceof Uint8Array) {
+                return keyData.privateKeyBytes;
+              }
+              if (Array.isArray(keyData.privateKeyBytes)) {
+                return new Uint8Array(keyData.privateKeyBytes);
+              }
             }
-            if (keyData.keyBytes && keyData.keyBytes instanceof Uint8Array) {
-              return keyData.keyBytes;
+            if (keyData.keyBytes) {
+              console.log(`[${source}] Found keyBytes property`);
+              if (keyData.keyBytes instanceof Uint8Array) {
+                return keyData.keyBytes;
+              }
+              if (Array.isArray(keyData.keyBytes)) {
+                return new Uint8Array(keyData.keyBytes);
+              }
             }
-            if (keyData.bytes && keyData.bytes instanceof Uint8Array) {
-              return keyData.bytes;
+            if (keyData.bytes) {
+              console.log(`[${source}] Found bytes property`);
+              if (keyData.bytes instanceof Uint8Array) {
+                return keyData.bytes;
+              }
+              if (Array.isArray(keyData.bytes)) {
+                return new Uint8Array(keyData.bytes);
+              }
             }
             // If it's an array-like object, try to convert
             if (keyData.length && typeof keyData.length === 'number') {
+              console.log(`[${source}] Found array-like object, length: ${keyData.length}`);
               try {
                 return new Uint8Array(keyData);
               } catch (e) {
-                // Ignore conversion errors
+                console.warn(`[${source}] Failed to convert array-like to Uint8Array:`, e);
               }
             }
           }
           
+          console.log(`[${source}] Could not extract Uint8Array from keyData`);
           return null;
         };
         
         // Method 1: Try client.keys directly
         if (!keys && (client as any).keys) {
-          keys = extractKeyBytes((client as any).keys);
+          console.log("Attempting to extract from client.keys...");
+          keys = extractKeyBytes((client as any).keys, "client.keys");
           if (keys) {
-            console.log("Extracted keys via client.keys");
+            console.log("✓ Extracted keys via client.keys");
           }
+        } else {
+          console.log("client.keys is not available");
         }
         
         // Method 2: Try keystore.v2Keys (prefer v2 over v1)
         if (!keys && (client as any).keystore?.v2Keys) {
-          keys = extractKeyBytes((client as any).keystore.v2Keys);
+          console.log("Attempting to extract from keystore.v2Keys...");
+          keys = extractKeyBytes((client as any).keystore.v2Keys, "keystore.v2Keys");
           if (keys) {
-            console.log("Extracted keys via keystore.v2Keys");
+            console.log("✓ Extracted keys via keystore.v2Keys");
           }
+        } else {
+          console.log("keystore.v2Keys is not available");
         }
         
         // Method 3: Try keystore.v1Keys
         if (!keys && (client as any).keystore?.v1Keys) {
-          keys = extractKeyBytes((client as any).keystore.v1Keys);
+          console.log("Attempting to extract from keystore.v1Keys...");
+          keys = extractKeyBytes((client as any).keystore.v1Keys, "keystore.v1Keys");
           if (keys) {
-            console.log("Extracted keys via keystore.v1Keys");
+            console.log("✓ Extracted keys via keystore.v1Keys");
           }
+        } else {
+          console.log("keystore.v1Keys is not available");
         }
         
         // Method 4: Try legacyKeys
         if (!keys && (client as any).legacyKeys) {
-          keys = extractKeyBytes((client as any).legacyKeys);
+          console.log("Attempting to extract from legacyKeys...");
+          keys = extractKeyBytes((client as any).legacyKeys, "legacyKeys");
           if (keys) {
-            console.log("Extracted keys via legacyKeys");
+            console.log("✓ Extracted keys via legacyKeys");
           }
+        } else {
+          console.log("legacyKeys is not available");
         }
         
         // Method 5: Try keystore exportKeyBundle (fallback)
