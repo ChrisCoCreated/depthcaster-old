@@ -149,7 +149,60 @@ export async function initializeXmtpClient(
       
       // If it's an object, try to extract private key bytes
       if (typeof keyData === 'object') {
-        // Try common property names
+        // XMTP key bundle structure: has identityKey, preKeys, etc.
+        // Try to extract from identityKey first (this is the main private key)
+        if (keyData.identityKey) {
+          const identityKey = keyData.identityKey;
+          
+          // Check if identityKey has private key bytes
+          if (identityKey.privateKey) {
+            if (identityKey.privateKey instanceof Uint8Array) {
+              return identityKey.privateKey;
+            }
+            if (Array.isArray(identityKey.privateKey)) {
+              return new Uint8Array(identityKey.privateKey);
+            }
+          }
+          if (identityKey.privateKeyBytes) {
+            if (identityKey.privateKeyBytes instanceof Uint8Array) {
+              return identityKey.privateKeyBytes;
+            }
+            if (Array.isArray(identityKey.privateKeyBytes)) {
+              return new Uint8Array(identityKey.privateKeyBytes);
+            }
+          }
+          if (identityKey.keyBytes) {
+            if (identityKey.keyBytes instanceof Uint8Array) {
+              return identityKey.keyBytes;
+            }
+            if (Array.isArray(identityKey.keyBytes)) {
+              return new Uint8Array(identityKey.keyBytes);
+            }
+          }
+          // Try to serialize the identityKey if it has a serialize method
+          if (typeof identityKey.serialize === 'function') {
+            try {
+              const serialized = identityKey.serialize();
+              if (serialized instanceof Uint8Array) {
+                return serialized;
+              }
+              if (Array.isArray(serialized)) {
+                return new Uint8Array(serialized);
+              }
+            } catch (e) {
+              // Ignore errors
+            }
+          }
+          // If identityKey itself is a Uint8Array or array
+          if (identityKey instanceof Uint8Array) {
+            return identityKey;
+          }
+          if (Array.isArray(identityKey)) {
+            return new Uint8Array(identityKey);
+          }
+        }
+        
+        // Try common property names on the root object
         if (keyData.privateKey && keyData.privateKey instanceof Uint8Array) {
           return keyData.privateKey;
         }
@@ -161,6 +214,20 @@ export async function initializeXmtpClient(
         }
         if (keyData.bytes && keyData.bytes instanceof Uint8Array) {
           return keyData.bytes;
+        }
+        // Try serialize method on the root object
+        if (typeof keyData.serialize === 'function') {
+          try {
+            const serialized = keyData.serialize();
+            if (serialized instanceof Uint8Array) {
+              return serialized;
+            }
+            if (Array.isArray(serialized)) {
+              return new Uint8Array(serialized);
+            }
+          } catch (e) {
+            // Ignore errors
+          }
         }
         // If it's an array-like object, try to convert
         if (keyData.length && typeof keyData.length === 'number') {
@@ -285,7 +352,60 @@ export async function getOrCreateClient(
       
       // If it's an object, try to extract private key bytes
       if (typeof keyData === 'object') {
-        // Try common property names
+        // XMTP key bundle structure: has identityKey, preKeys, etc.
+        // Try to extract from identityKey first (this is the main private key)
+        if (keyData.identityKey) {
+          const identityKey = keyData.identityKey;
+          
+          // Check if identityKey has private key bytes
+          if (identityKey.privateKey) {
+            if (identityKey.privateKey instanceof Uint8Array) {
+              return identityKey.privateKey;
+            }
+            if (Array.isArray(identityKey.privateKey)) {
+              return new Uint8Array(identityKey.privateKey);
+            }
+          }
+          if (identityKey.privateKeyBytes) {
+            if (identityKey.privateKeyBytes instanceof Uint8Array) {
+              return identityKey.privateKeyBytes;
+            }
+            if (Array.isArray(identityKey.privateKeyBytes)) {
+              return new Uint8Array(identityKey.privateKeyBytes);
+            }
+          }
+          if (identityKey.keyBytes) {
+            if (identityKey.keyBytes instanceof Uint8Array) {
+              return identityKey.keyBytes;
+            }
+            if (Array.isArray(identityKey.keyBytes)) {
+              return new Uint8Array(identityKey.keyBytes);
+            }
+          }
+          // Try to serialize the identityKey if it has a serialize method
+          if (typeof identityKey.serialize === 'function') {
+            try {
+              const serialized = identityKey.serialize();
+              if (serialized instanceof Uint8Array) {
+                return serialized;
+              }
+              if (Array.isArray(serialized)) {
+                return new Uint8Array(serialized);
+              }
+            } catch (e) {
+              // Ignore errors
+            }
+          }
+          // If identityKey itself is a Uint8Array or array
+          if (identityKey instanceof Uint8Array) {
+            return identityKey;
+          }
+          if (Array.isArray(identityKey)) {
+            return new Uint8Array(identityKey);
+          }
+        }
+        
+        // Try common property names on the root object
         if (keyData.privateKey && keyData.privateKey instanceof Uint8Array) {
           return keyData.privateKey;
         }
@@ -297,6 +417,20 @@ export async function getOrCreateClient(
         }
         if (keyData.bytes && keyData.bytes instanceof Uint8Array) {
           return keyData.bytes;
+        }
+        // Try serialize method on the root object
+        if (typeof keyData.serialize === 'function') {
+          try {
+            const serialized = keyData.serialize();
+            if (serialized instanceof Uint8Array) {
+              return serialized;
+            }
+            if (Array.isArray(serialized)) {
+              return new Uint8Array(serialized);
+            }
+          } catch (e) {
+            // Ignore errors
+          }
         }
         // If it's an array-like object, try to convert
         if (keyData.length && typeof keyData.length === 'number') {
