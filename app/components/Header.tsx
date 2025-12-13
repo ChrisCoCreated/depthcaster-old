@@ -549,7 +549,13 @@ export function Header() {
             // Auto-like if enabled and not curated by deepbot
             if (autoLikeEnabled && !isCuratedByDeepbot) {
               try {
-                await fetch("/api/reaction", {
+                console.log("[Like Frontend] Auto-liking cast:", {
+                  castHash,
+                  userFid: user?.fid,
+                  signerUuid: user.signer_uuid,
+                  targetAuthorFid: pendingCastData.author?.fid,
+                });
+                const response = await fetch("/api/reaction", {
                   method: "POST",
                   headers: {
                     "Content-Type": "application/json",
@@ -561,8 +567,17 @@ export function Header() {
                     targetAuthorFid: pendingCastData.author?.fid,
                   }),
                 });
-              } catch (error) {
-                console.error("Failed to auto-like cast:", error);
+                console.log("[Like Frontend] Auto-like response:", {
+                  castHash,
+                  status: response.status,
+                  ok: response.ok,
+                });
+              } catch (error: any) {
+                console.error("[Like Frontend] Failed to auto-like cast:", {
+                  castHash,
+                  error: error.message,
+                  stack: error.stack,
+                });
               }
             }
 

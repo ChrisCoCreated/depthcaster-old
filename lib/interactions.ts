@@ -96,30 +96,71 @@ export async function enrichCastsWithViewerContext(
   casts: any[],
   viewerFid: number | undefined
 ): Promise<any[]> {
+  console.log("[Like Fetch] enrichCastsWithViewerContext called:", {
+    viewerFid,
+    castsCount: casts.length,
+    hasViewerFid: !!viewerFid,
+  });
+
   if (!viewerFid || casts.length === 0) {
+    console.log("[Like Fetch] Skipping enrichment:", {
+      reason: !viewerFid ? "no viewerFid" : "no casts",
+      viewerFid,
+      castsCount: casts.length,
+    });
     return casts;
   }
 
   // Extract all cast hashes
   const castHashes = casts.map(cast => cast.hash).filter(Boolean);
+  console.log("[Like Fetch] Extracted cast hashes:", {
+    viewerFid,
+    totalCasts: casts.length,
+    validHashes: castHashes.length,
+    sampleHashes: castHashes.slice(0, 5),
+  });
+
   if (castHashes.length === 0) {
+    console.log("[Like Fetch] No valid cast hashes to query");
     return casts;
   }
 
   // Query database for viewer's interactions with these casts
-  const interactions = await db
-    .select({
-      targetCastHash: curatedCastInteractions.targetCastHash,
-      interactionType: curatedCastInteractions.interactionType,
-    })
-    .from(curatedCastInteractions)
-    .where(
-      and(
-        inArray(curatedCastInteractions.targetCastHash, castHashes),
-        eq(curatedCastInteractions.userFid, viewerFid),
-        inArray(curatedCastInteractions.interactionType, ["like", "recast"])
-      )
-    );
+  console.log("[Like Fetch] Querying database for interactions:", {
+    viewerFid,
+    castHashesCount: castHashes.length,
+  });
+
+  let interactions;
+  try {
+    interactions = await db
+      .select({
+        targetCastHash: curatedCastInteractions.targetCastHash,
+        interactionType: curatedCastInteractions.interactionType,
+      })
+      .from(curatedCastInteractions)
+      .where(
+        and(
+          inArray(curatedCastInteractions.targetCastHash, castHashes),
+          eq(curatedCastInteractions.userFid, viewerFid),
+          inArray(curatedCastInteractions.interactionType, ["like", "recast"])
+        )
+      );
+
+    console.log("[Like Fetch] Database query completed:", {
+      viewerFid,
+      interactionsFound: interactions.length,
+      interactions: interactions.slice(0, 10), // Log first 10 for debugging
+    });
+  } catch (error: any) {
+    console.error("[Like Fetch] Database query error:", {
+      viewerFid,
+      error: error.message,
+      stack: error.stack,
+    });
+    // Return casts without enrichment on error
+    return casts;
+  }
 
   // Build maps for efficient lookup
   const likedHashes = new Set<string>();
@@ -133,8 +174,16 @@ export async function enrichCastsWithViewerContext(
     }
   });
 
+  console.log("[Like Fetch] Built interaction maps:", {
+    viewerFid,
+    likedCount: likedHashes.size,
+    recastedCount: recastedHashes.size,
+    likedHashes: Array.from(likedHashes).slice(0, 10),
+    recastedHashes: Array.from(recastedHashes).slice(0, 10),
+  });
+
   // Enrich casts with viewer context
-  return casts.map(cast => {
+  const enrichedCasts = casts.map(cast => {
     if (!cast.hash) return cast;
     
     const liked = likedHashes.has(cast.hash);
@@ -150,5 +199,20 @@ export async function enrichCastsWithViewerContext(
       },
     };
   });
+
+  // Count how many casts were enriched
+  const enrichedCount = enrichedCasts.filter(cast => 
+    cast.viewer_context?.liked || cast.viewer_context?.recasted
+  ).length;
+
+  console.log("[Like Fetch] Enrichment completed:", {
+    viewerFid,
+    totalCasts: enrichedCasts.length,
+    enrichedCount,
+    likedCount: likedHashes.size,
+    recastedCount: recastedHashes.size,
+  });
+
+  return enrichedCasts;
 }
 

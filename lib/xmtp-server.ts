@@ -35,7 +35,7 @@ function decryptKeys(encryptedData: string): Uint8Array {
 /**
  * Store client keys for a user
  */
-async function storeClientKeysForUser(
+export async function storeClientKeysForUser(
   userFid: number,
   walletAddress: Address,
   keys: Uint8Array

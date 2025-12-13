@@ -1124,8 +1124,24 @@ export async function GET(request: NextRequest) {
     let finalCasts = sortedCasts.slice(0, limit);
     
     // Enrich casts with viewer context from database (for all feed types)
+    console.log("[Like Fetch] Feed API - Before enrichment:", {
+      feedType,
+      viewerFid,
+      finalCastsCount: finalCasts.length,
+      hasViewerFid: !!viewerFid,
+    });
+    
     if (viewerFid) {
       finalCasts = await enrichCastsWithViewerContext(finalCasts, viewerFid);
+      
+      console.log("[Like Fetch] Feed API - After enrichment:", {
+        feedType,
+        viewerFid,
+        finalCastsCount: finalCasts.length,
+        enrichedCasts: finalCasts.filter(c => c.viewer_context?.liked || c.viewer_context?.recasted).length,
+      });
+    } else {
+      console.log("[Like Fetch] Feed API - Skipping enrichment (no viewerFid)");
     }
     
     let nextCursor: string | null = null;
