@@ -533,8 +533,73 @@ export type QualityFeedback = typeof qualityFeedback.$inferSelect;
 export type NewQualityFeedback = typeof qualityFeedback.$inferInsert;
 export type SignInLog = typeof signInLogs.$inferSelect;
 export type NewSignInLog = typeof signInLogs.$inferInsert;
+export const xmtpClients = pgTable("xmtp_clients", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userFid: bigint("user_fid", { mode: "number" }).notNull().references(() => users.fid, { onDelete: "cascade" }),
+  walletAddress: text("wallet_address").notNull(),
+  keys: text("keys").notNull(), // Encrypted XMTP keys
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  userFidWalletUnique: uniqueIndex("xmtp_clients_user_fid_wallet_unique").on(table.userFid, table.walletAddress),
+  userFidIdx: index("xmtp_clients_user_fid_idx").on(table.userFid),
+  walletAddressIdx: index("xmtp_clients_wallet_address_idx").on(table.walletAddress),
+}));
+
+export const xmtpConversations = pgTable("xmtp_conversations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  conversationId: text("conversation_id").notNull().unique(), // XMTP topic ID
+  userFid: bigint("user_fid", { mode: "number" }).notNull().references(() => users.fid, { onDelete: "cascade" }),
+  peerAddress: text("peer_address"), // For 1:1 chats
+  groupId: text("group_id"), // For group chats
+  type: text("type").notNull(), // '1:1' or 'group'
+  lastMessageAt: timestamp("last_message_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  conversationIdIdx: index("xmtp_conversations_conversation_id_idx").on(table.conversationId),
+  userFidIdx: index("xmtp_conversations_user_fid_idx").on(table.userFid),
+  userFidLastMessageAtIdx: index("xmtp_conversations_user_fid_last_message_at_idx").on(table.userFid, table.lastMessageAt),
+  peerAddressIdx: index("xmtp_conversations_peer_address_idx").on(table.peerAddress),
+  groupIdIdx: index("xmtp_conversations_group_id_idx").on(table.groupId),
+}));
+
+export const xmtpMessages = pgTable("xmtp_messages", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  conversationId: text("conversation_id").notNull(), // XMTP topic ID - references xmtpConversations.conversationId
+  messageId: text("message_id").notNull().unique(), // XMTP message ID
+  senderAddress: text("sender_address").notNull(),
+  content: text("content").notNull(),
+  sentAt: timestamp("sent_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  conversationIdIdx: index("xmtp_messages_conversation_id_idx").on(table.conversationId),
+  conversationIdSentAtIdx: index("xmtp_messages_conversation_id_sent_at_idx").on(table.conversationId, table.sentAt),
+  senderAddressIdx: index("xmtp_messages_sender_address_idx").on(table.senderAddress),
+  messageIdIdx: index("xmtp_messages_message_id_idx").on(table.messageId),
+}));
+
+export const xmtpGroupMembers = pgTable("xmtp_group_members", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  conversationId: text("conversation_id").notNull(), // XMTP topic ID - references xmtpConversations.conversationId
+  memberAddress: text("member_address").notNull(),
+  addedAt: timestamp("added_at").defaultNow().notNull(),
+}, (table) => ({
+  conversationMemberUnique: uniqueIndex("xmtp_group_members_conversation_member_unique").on(table.conversationId, table.memberAddress),
+  conversationIdIdx: index("xmtp_group_members_conversation_id_idx").on(table.conversationId),
+  memberAddressIdx: index("xmtp_group_members_member_address_idx").on(table.memberAddress),
+}));
+
 export type Collection = typeof collections.$inferSelect;
 export type NewCollection = typeof collections.$inferInsert;
 export type CollectionCast = typeof collectionCasts.$inferSelect;
 export type NewCollectionCast = typeof collectionCasts.$inferInsert;
+export type XmtpClient = typeof xmtpClients.$inferSelect;
+export type NewXmtpClient = typeof xmtpClients.$inferInsert;
+export type XmtpConversation = typeof xmtpConversations.$inferSelect;
+export type NewXmtpConversation = typeof xmtpConversations.$inferInsert;
+export type XmtpMessage = typeof xmtpMessages.$inferSelect;
+export type NewXmtpMessage = typeof xmtpMessages.$inferInsert;
+export type XmtpGroupMember = typeof xmtpGroupMembers.$inferSelect;
+export type NewXmtpGroupMember = typeof xmtpGroupMembers.$inferInsert;
 
