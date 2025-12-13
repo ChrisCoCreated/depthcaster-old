@@ -276,10 +276,11 @@ export function WalletConnector({ onConnected, onInitialized }: WalletConnectorP
         // Method 5: Try keystore exportKeyBundle (fallback)
         if (!keys && (client as any).keystore?.exportKeyBundle) {
           try {
+            console.log("Attempting to extract from keystore.exportKeyBundle...");
             const exported = await (client as any).keystore.exportKeyBundle();
-            keys = extractKeyBytes(exported);
+            keys = extractKeyBytes(exported, "keystore.exportKeyBundle");
             if (keys) {
-              console.log("Extracted keys via keystore.exportKeyBundle");
+              console.log("✓ Extracted keys via keystore.exportKeyBundle");
             }
           } catch (e) {
             console.warn("keystore.exportKeyBundle failed:", e);
@@ -289,10 +290,11 @@ export function WalletConnector({ onConnected, onInitialized }: WalletConnectorP
         // Method 6: Try direct exportKeyBundle (fallback)
         if (!keys && (client as any).exportKeyBundle) {
           try {
+            console.log("Attempting to extract from exportKeyBundle...");
             const exported = await (client as any).exportKeyBundle();
-            keys = extractKeyBytes(exported);
+            keys = extractKeyBytes(exported, "exportKeyBundle");
             if (keys) {
-              console.log("Extracted keys via exportKeyBundle");
+              console.log("✓ Extracted keys via exportKeyBundle");
             }
           } catch (e) {
             console.warn("exportKeyBundle failed:", e);
