@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { users, userRoles } from "@/lib/schema";
-import { eq, inArray } from "drizzle-orm";
+import { users, userRoles, signInLogs } from "@/lib/schema";
+import { eq, inArray, and } from "drizzle-orm";
 import { isAdmin, getUserRoles } from "@/lib/roles";
 import { sendAppUpdateNotificationToUsers } from "@/lib/notifications";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { title, body: messageBody, url, targetType, targetFids, targetRole, adminFid } = body;
+    const { title, body: messageBody, url, targetType, targetFids, targetRoles, adminFid } = body;
 
     // Validate required fields
     if (!title || !messageBody || !targetType) {
@@ -54,23 +54,64 @@ export async function POST(request: NextRequest) {
     let targetUserFids: number[] = [];
 
     if (targetType === "all") {
-      // Get all user FIDs
-      const allUsers = await db.select({ fid: users.fid }).from(users);
-      targetUserFids = allUsers.map((u) => u.fid);
+      // Get all users who have signed in (have successful sign-in logs)
+      const signedInUsers = await db
+        .selectDistinct({ userFid: signInLogs.userFid })
+        .from(signInLogs)
+        .where(eq(signInLogs.success, true));
+      targetUserFids = signedInUsers
+        .map((u) => u.userFid)
+        .filter((fid): fid is number => fid !== null);
     } else if (targetType === "targeted") {
       if (targetFids && Array.isArray(targetFids) && targetFids.length > 0) {
-        // Use provided FIDs
-        targetUserFids = targetFids.filter((fid: any) => typeof fid === "number" && !isNaN(fid));
-      } else if (targetRole && typeof targetRole === "string") {
-        // Get users by role
-        const usersWithRole = await db
-          .select({ fid: userRoles.userFid })
-          .from(userRoles)
-          .where(eq(userRoles.role, targetRole));
-        targetUserFids = usersWithRole.map((u) => u.fid);
+        // Use provided FIDs, but filter to only those who have signed in
+        const validFids = targetFids.filter((fid: any) => typeof fid === "number" && !isNaN(fid));
+        if (validFids.length > 0) {
+          const signedInFids = await db
+            .selectDistinct({ userFid: signInLogs.userFid })
+            .from(signInLogs)
+            .where(
+              and(
+                inArray(signInLogs.userFid, validFids),
+                eq(signInLogs.success, true)
+              )
+            );
+          targetUserFids = signedInFids
+            .map((u) => u.userFid)
+            .filter((fid): fid is number => fid !== null);
+        }
+      } else if (targetRoles && Array.isArray(targetRoles) && targetRoles.length > 0) {
+        // Get users by roles (multiple roles supported)
+        // Filter to only users who have signed in AND have one of the selected roles
+        const validRoles = targetRoles.filter((role: any) => typeof role === "string" && role.trim().length > 0);
+        if (validRoles.length > 0) {
+          // Get all users with the selected roles
+          const usersWithRoles = await db
+            .selectDistinct({ userFid: userRoles.userFid })
+            .from(userRoles)
+            .where(inArray(userRoles.role, validRoles));
+          
+          const roleUserFids = usersWithRoles.map((u) => u.userFid);
+          
+          if (roleUserFids.length > 0) {
+            // Filter to only those who have signed in
+            const signedInUsers = await db
+              .selectDistinct({ userFid: signInLogs.userFid })
+              .from(signInLogs)
+              .where(
+                and(
+                  inArray(signInLogs.userFid, roleUserFids),
+                  eq(signInLogs.success, true)
+                )
+              );
+            targetUserFids = signedInUsers
+              .map((u) => u.userFid)
+              .filter((fid): fid is number => fid !== null);
+          }
+        }
       } else {
         return NextResponse.json(
-          { error: "For targeted notifications, provide targetFids array or targetRole" },
+          { error: "For targeted notifications, provide targetFids array or targetRoles array" },
           { status: 400 }
         );
       }
@@ -83,7 +124,7 @@ export async function POST(request: NextRequest) {
 
     if (targetUserFids.length === 0) {
       return NextResponse.json(
-        { error: "No target users found" },
+        { error: "No target users found (only users who have signed in are included)" },
         { status: 400 }
       );
     }

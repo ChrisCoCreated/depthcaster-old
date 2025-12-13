@@ -25,7 +25,7 @@ export default function AdminNotificationsPage() {
   const [url, setUrl] = useState("");
   const [targetType, setTargetType] = useState<"all" | "targeted">("all");
   const [targetFids, setTargetFids] = useState("");
-  const [targetRole, setTargetRole] = useState("");
+  const [targetRoles, setTargetRoles] = useState<string[]>([]);
 
   useEffect(() => {
     const checkAdminAccess = async () => {
@@ -69,8 +69,8 @@ export default function AdminNotificationsPage() {
       return;
     }
 
-    if (targetType === "targeted" && !targetFids.trim() && !targetRole.trim()) {
-      setMessage({ type: "error", text: "Please provide target FIDs or select a role" });
+    if (targetType === "targeted" && !targetFids.trim() && targetRoles.length === 0) {
+      setMessage({ type: "error", text: "Please provide target FIDs or select at least one role" });
       return;
     }
 
@@ -99,8 +99,8 @@ export default function AdminNotificationsPage() {
             payload.targetFids = fids;
           }
         }
-        if (targetRole.trim()) {
-          payload.targetRole = targetRole.trim();
+        if (targetRoles.length > 0) {
+          payload.targetRoles = targetRoles;
         }
       }
 
@@ -129,7 +129,7 @@ export default function AdminNotificationsPage() {
       setUrl("");
       setTargetType("all");
       setTargetFids("");
-      setTargetRole("");
+      setTargetRoles([]);
     } catch (error: any) {
       console.error("Failed to send notifications:", error);
       setMessage({ type: "error", text: error.message || "Failed to send notifications" });
@@ -465,7 +465,7 @@ export default function AdminNotificationsPage() {
                     onChange={(e) => setTargetType(e.target.value as "all" | "targeted")}
                     className="mr-2"
                   />
-                  <span className="text-gray-900 dark:text-gray-100">All users</span>
+                  <span className="text-gray-900 dark:text-gray-100">All users (who have signed in)</span>
                 </label>
                 <label className="flex items-center">
                   <input
@@ -492,22 +492,38 @@ export default function AdminNotificationsPage() {
                       placeholder="e.g., 123, 456, 789"
                       className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      Only users who have signed in will receive notifications
+                    </p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Or select by role
+                      Or select by role(s)
                     </label>
-                    <select
-                      value={targetRole}
-                      onChange={(e) => setTargetRole(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">Select a role...</option>
-                      <option value="curator">Curators</option>
-                      <option value="admin">Admins</option>
-                      <option value="superadmin">Super Admins</option>
-                      <option value="tester">Testers</option>
-                    </select>
+                    <div className="space-y-2">
+                      {["curator", "admin", "superadmin", "tester"].map((role) => (
+                        <label key={role} className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={targetRoles.includes(role)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setTargetRoles([...targetRoles, role]);
+                              } else {
+                                setTargetRoles(targetRoles.filter((r) => r !== role));
+                              }
+                            }}
+                            className="mr-2"
+                          />
+                          <span className="text-gray-900 dark:text-gray-100 capitalize">
+                            {role === "superadmin" ? "Super Admins" : role === "admin" ? "Admins" : `${role}s`}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      You can select multiple roles. Only users who have signed in will receive notifications.
+                    </p>
                   </div>
                 </div>
               )}
@@ -529,7 +545,7 @@ export default function AdminNotificationsPage() {
                   setUrl("");
                   setTargetType("all");
                   setTargetFids("");
-                  setTargetRole("");
+                  setTargetRoles([]);
                   setMessage(null);
                 }}
                 className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
