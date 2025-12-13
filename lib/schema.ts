@@ -603,6 +603,42 @@ export const castThanks = pgTable("cast_thanks", {
   toFidIdx: index("cast_thanks_to_fid_idx").on(table.toFid),
 }));
 
+export const polls = pgTable("polls", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  castHash: text("cast_hash").notNull().unique().references(() => curatedCasts.castHash, { onDelete: "cascade" }),
+  question: text("question").notNull(),
+  createdBy: bigint("created_by", { mode: "number" }).notNull().references(() => users.fid),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  castHashIdx: index("polls_cast_hash_idx").on(table.castHash),
+  createdByIdx: index("polls_created_by_idx").on(table.createdBy),
+}));
+
+export const pollOptions = pgTable("poll_options", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  pollId: uuid("poll_id").notNull().references(() => polls.id, { onDelete: "cascade" }),
+  optionText: text("option_text").notNull(),
+  order: integer("order").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  pollIdIdx: index("poll_options_poll_id_idx").on(table.pollId),
+  pollIdOrderIdx: index("poll_options_poll_id_order_idx").on(table.pollId, table.order),
+}));
+
+export const pollResponses = pgTable("poll_responses", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  pollId: uuid("poll_id").notNull().references(() => polls.id, { onDelete: "cascade" }),
+  userFid: bigint("user_fid", { mode: "number" }).notNull().references(() => users.fid, { onDelete: "cascade" }),
+  rankings: jsonb("rankings").notNull(), // Array of option IDs in ranked order
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  pollUserUnique: uniqueIndex("poll_responses_poll_user_unique").on(table.pollId, table.userFid),
+  pollIdIdx: index("poll_responses_poll_id_idx").on(table.pollId),
+  userFidIdx: index("poll_responses_user_fid_idx").on(table.userFid),
+}));
+
 export type Collection = typeof collections.$inferSelect;
 export type NewCollection = typeof collections.$inferInsert;
 export type CollectionCast = typeof collectionCasts.$inferSelect;
@@ -617,4 +653,10 @@ export type XmtpGroupMember = typeof xmtpGroupMembers.$inferSelect;
 export type NewXmtpGroupMember = typeof xmtpGroupMembers.$inferInsert;
 export type CastThanks = typeof castThanks.$inferSelect;
 export type NewCastThanks = typeof castThanks.$inferInsert;
+export type Poll = typeof polls.$inferSelect;
+export type NewPoll = typeof polls.$inferInsert;
+export type PollOption = typeof pollOptions.$inferSelect;
+export type NewPollOption = typeof pollOptions.$inferInsert;
+export type PollResponse = typeof pollResponses.$inferSelect;
+export type NewPollResponse = typeof pollResponses.$inferInsert;
 
