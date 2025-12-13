@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getClientForUser } from "@/lib/xmtp";
+import { getClientForUser } from "@/lib/xmtp-server";
 import { getAddress, type Address } from "viem";
 
 export async function POST(request: NextRequest) {

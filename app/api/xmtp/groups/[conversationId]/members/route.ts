@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getClientForUser } from "@/lib/xmtp";
+import { getClientForUser } from "@/lib/xmtp-server";
 import { db } from "@/lib/db";
 import { xmtpConversations, xmtpGroupMembers } from "@/lib/schema";
 import { eq, and } from "drizzle-orm";

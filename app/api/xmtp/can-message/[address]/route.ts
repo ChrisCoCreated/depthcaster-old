@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { canMessage } from "@/lib/xmtp";
+import { canMessage } from "@/lib/xmtp-server";
 import { getAddress, type Address } from "viem";
 
 export async function GET(

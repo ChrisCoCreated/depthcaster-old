@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getClientForUser } from "@/lib/xmtp";
+import { getClientForUser } from "@/lib/xmtp-server";
 import { db } from "@/lib/db";
 import { xmtpConversations, xmtpMessages } from "@/lib/schema";
 import { eq, and, desc } from "drizzle-orm";
@@ -65,7 +65,7 @@ export async function GET(
       conversationId,
       senderAddress: msg.senderAddress,
       content: msg.content,
-      sentAt: msg.sentAt,
+      sentAt: msg.sent || new Date(), // XMTP v7 uses 'sent' instead of 'sentAt'
     }));
 
     return NextResponse.json({ messages: result });
@@ -128,14 +128,15 @@ export async function POST(
       content: typeof sentMessage.content === "string" 
         ? sentMessage.content 
         : JSON.stringify(sentMessage.content),
-      sentAt: sentMessage.sentAt,
+      sentAt: sentMessage.sent || new Date(), // XMTP v7 uses 'sent' instead of 'sentAt'
     }).onConflictDoNothing();
 
     // Update conversation last message time
+    const sentAt = sentMessage.sent || new Date();
     await db
       .update(xmtpConversations)
       .set({
-        lastMessageAt: sentMessage.sentAt,
+        lastMessageAt: sentAt,
         updatedAt: new Date(),
       })
       .where(eq(xmtpConversations.conversationId, conversationId));
@@ -145,7 +146,7 @@ export async function POST(
       conversationId,
       senderAddress: sentMessage.senderAddress,
       content: sentMessage.content,
-      sentAt: sentMessage.sentAt,
+      sentAt: sentAt,
     });
   } catch (error: any) {
     console.error("Error sending message:", error);

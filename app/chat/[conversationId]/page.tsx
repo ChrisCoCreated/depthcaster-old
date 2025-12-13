@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import { useNeynarContext } from "@neynar/react";
-import { use, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { WalletConnector } from "../../components/WalletConnector";
 import { ChatList } from "../../components/ChatList";
 import { ChatView } from "../../components/ChatView";

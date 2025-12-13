@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getClientForUser } from "@/lib/xmtp";
+import { getClientForUser } from "@/lib/xmtp-server";
 import { db } from "@/lib/db";
 import { xmtpConversations, xmtpMessages } from "@/lib/schema";
 import { eq, and, desc } from "drizzle-orm";
@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
             ? {
                 content: lastMessage.content,
                 senderAddress: lastMessage.senderAddress,
-                sentAt: lastMessage.sentAt,
+                sentAt: lastMessage.sent || new Date(), // XMTP v7 uses 'sent' instead of 'sentAt'
               }
             : null,
           lastMessageAt: local?.lastMessageAt || null,
