@@ -145,22 +145,36 @@ export function ImageModal({
 
       {/* Image container */}
       <div
-        className="relative w-screen h-screen flex items-center justify-center cursor-pointer px-6 py-6"
+        className="relative w-screen h-screen flex flex-col items-center justify-center cursor-pointer px-6 py-6"
         onClick={onClose}
       >
-        <img
-          src={imageUrl}
-          alt="Full screen"
-          className="w-full h-full max-w-full max-h-full object-contain transition-opacity duration-300"
-          key={imageUrl}
-          style={{ opacity: 0 }}
-          onLoad={(e) => {
-            (e.target as HTMLImageElement).style.opacity = "1";
-          }}
-        />
+        <div className="flex-1 flex items-center justify-center w-full">
+          <img
+            src={imageUrl}
+            alt="Full screen"
+            className="w-full h-full max-w-full max-h-[calc(100vh-12rem)] object-contain transition-opacity duration-300"
+            key={imageUrl}
+            style={{ opacity: 0 }}
+            onLoad={(e) => {
+              (e.target as HTMLImageElement).style.opacity = "1";
+            }}
+          />
+        </div>
+        
+        {/* Caption */}
+        {caption && (
+          <div 
+            className="mt-6 w-full max-w-4xl px-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-black/60 backdrop-blur-sm rounded-2xl px-6 py-4 border border-white/10">
+              <p className="text-white text-base leading-relaxed break-words">
+                {caption}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
-
-      {/* Caption removed to reduce distraction */}
     </div>
   );
 }

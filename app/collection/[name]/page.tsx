@@ -447,7 +447,7 @@ export default function CollectionPage({
             onNext={currentIndex < images.length - 1 ? handleNextImage : undefined}
             disablePrevious={currentIndex === 0}
             disableNext={currentIndex === images.length - 1}
-            caption={images[currentIndex]?.castText || undefined}
+            caption={displayType === "image-text" ? (images[currentIndex]?.castText || undefined) : undefined}
           />
         )}
       </main>

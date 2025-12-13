@@ -174,6 +174,22 @@ export default function AdminStatisticsPage() {
     status?: string;
     [key: string]: any;
   }>>([]);
+  const [miniappNotificationsByUser, setMiniappNotificationsByUser] = useState<Map<number, {
+    fid: number;
+    username: string | null;
+    displayName: string | null;
+    pfpUrl: string | null;
+    notifications: Array<{
+      token: string;
+      created_at: string;
+      updated_at: string;
+      status?: string;
+    }>;
+    currentStatus: string;
+    firstEnabled: string | null;
+    lastEnabled: string | null;
+    lastDisabled: string | null;
+  }>>(new Map());
   const [isLoadingMiniappNotifications, setIsLoadingMiniappNotifications] = useState(false);
   const [miniappNotificationsLastUpdated, setMiniappNotificationsLastUpdated] = useState<string | null>(null);
 
@@ -240,12 +256,116 @@ export default function AdminStatisticsPage() {
     }
   }, [period, isAdmin, user?.fid]);
 
-  const loadMiniappNotificationsFromStorage = () => {
+  const processNotificationsData = async (allTokens: Array<{
+    token: string;
+    fid: number;
+    created_at: string;
+    updated_at: string;
+    status?: string;
+    [key: string]: any;
+  }>) => {
+    // Group by user FID and fetch user data
+    const uniqueFids = Array.from(new Set(allTokens.map(t => t.fid)));
+    const userMap = new Map<number, {
+      fid: number;
+      username: string | null;
+      displayName: string | null;
+      pfpUrl: string | null;
+      notifications: Array<{
+        token: string;
+        created_at: string;
+        updated_at: string;
+        status?: string;
+      }>;
+      currentStatus: string;
+      firstEnabled: string | null;
+      lastEnabled: string | null;
+      lastDisabled: string | null;
+    }>();
+
+    // Fetch user data for all unique FIDs
+    try {
+      const userPromises = uniqueFids.map(async (fid) => {
+        try {
+          const response = await fetch(`/api/user/${fid}`);
+          if (response.ok) {
+            const userData = await response.json();
+            return { fid, userData };
+          }
+        } catch (error) {
+          console.error(`Failed to fetch user ${fid}:`, error);
+        }
+        return { fid, userData: null };
+      });
+
+      const userResults = await Promise.all(userPromises);
+
+      // Group notifications by FID
+      for (const fid of uniqueFids) {
+        const userNotifications = allTokens.filter(t => t.fid === fid);
+        const userResult = userResults.find(r => r.fid === fid);
+        const userData = userResult?.userData;
+
+        // Sort notifications by created_at (oldest first for timeline)
+        userNotifications.sort((a, b) => {
+          const dateA = new Date(a.created_at).getTime();
+          const dateB = new Date(b.created_at).getTime();
+          return dateA - dateB;
+        });
+
+        // Determine current status (most recent status, or "enabled" if no status field)
+        const mostRecent = userNotifications[userNotifications.length - 1];
+        const currentStatus = mostRecent?.status || "enabled";
+
+        // Find first enabled, last enabled, last disabled
+        let firstEnabled: string | null = null;
+        let lastEnabled: string | null = null;
+        let lastDisabled: string | null = null;
+
+        for (const notif of userNotifications) {
+          const status = notif.status || "enabled";
+          if (status === "enabled" || !notif.status) {
+            if (!firstEnabled) {
+              firstEnabled = notif.created_at;
+            }
+            lastEnabled = notif.created_at;
+          } else if (status === "disabled") {
+            lastDisabled = notif.created_at;
+          }
+        }
+
+        userMap.set(fid, {
+          fid,
+          username: userData?.username || null,
+          displayName: userData?.display_name || null,
+          pfpUrl: userData?.pfp_url || null,
+          notifications: userNotifications.map(n => ({
+            token: n.token,
+            created_at: n.created_at,
+            updated_at: n.updated_at,
+            status: n.status,
+          })),
+          currentStatus,
+          firstEnabled,
+          lastEnabled,
+          lastDisabled,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to fetch user data:", error);
+    }
+
+    setMiniappNotificationsByUser(userMap);
+  };
+
+  const loadMiniappNotificationsFromStorage = async () => {
     try {
       const stored = localStorage.getItem("miniapp_notifications");
       const lastUpdated = localStorage.getItem("miniapp_notifications_last_updated");
       if (stored) {
-        setMiniappNotifications(JSON.parse(stored));
+        const allTokens = JSON.parse(stored);
+        setMiniappNotifications(allTokens);
+        await processNotificationsData(allTokens);
       }
       if (lastUpdated) {
         setMiniappNotificationsLastUpdated(lastUpdated);
@@ -300,6 +420,7 @@ export default function AdminStatisticsPage() {
       });
 
       setMiniappNotifications(allTokens);
+      await processNotificationsData(allTokens);
       const now = new Date().toISOString();
       setMiniappNotificationsLastUpdated(now);
       
@@ -1619,64 +1740,116 @@ export default function AdminStatisticsPage() {
                   </div>
                 ) : (
                   <>
-                    <div className="mb-4">
+                    <div className="mb-4 flex items-center justify-between">
                       <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Total notification tokens: <span className="font-semibold text-gray-900 dark:text-gray-100">{miniappNotifications.length}</span>
+                        Total users: <span className="font-semibold text-gray-900 dark:text-gray-100">{miniappNotificationsByUser.size}</span>
+                        {" • "}
+                        Total tokens: <span className="font-semibold text-gray-900 dark:text-gray-100">{miniappNotifications.length}</span>
                       </p>
                     </div>
-                    <div className="overflow-x-auto max-h-96 overflow-y-auto">
-                      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                              Token
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                              FID
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                              Created At
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                              Updated At
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                              Status
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-                          {miniappNotifications.map((notification, idx) => (
-                            <tr key={`${notification.token}-${idx}`} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                              <td className="px-4 py-3 whitespace-nowrap">
-                                <div className="text-sm font-mono text-gray-900 dark:text-gray-100 max-w-xs truncate" title={notification.token}>
-                                  {notification.token}
+                    <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+                      <div className="space-y-4">
+                        {Array.from(miniappNotificationsByUser.values())
+                          .sort((a, b) => {
+                            // Sort by most recent notification first
+                            const aLatest = a.notifications[a.notifications.length - 1]?.created_at || "";
+                            const bLatest = b.notifications[b.notifications.length - 1]?.created_at || "";
+                            return bLatest.localeCompare(aLatest);
+                          })
+                          .map((userData) => {
+                            const displayName = userData.displayName || userData.username || `User ${userData.fid}`;
+                            const isEnabled = userData.currentStatus === "enabled" || !userData.currentStatus;
+                            
+                            return (
+                              <div
+                                key={userData.fid}
+                                className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4"
+                              >
+                                <div className="flex items-start gap-3 mb-3">
+                                  <AvatarImage
+                                    src={userData.pfpUrl}
+                                    alt={displayName}
+                                    size={40}
+                                    className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+                                        {displayName}
+                                      </h4>
+                                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                                        isEnabled
+                                          ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                                          : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+                                      }`}>
+                                        {isEnabled ? "Enabled" : "Disabled"}
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                      FID: {userData.fid}
+                                      {userData.username && ` • @${userData.username}`}
+                                    </p>
+                                  </div>
                                 </div>
-                              </td>
-                              <td className="px-4 py-3 whitespace-nowrap">
-                                <div className="text-sm text-gray-600 dark:text-gray-400">
-                                  {notification.fid}
+
+                                {/* Timeline */}
+                                <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                                  <div className="space-y-2">
+                                    {userData.firstEnabled && (
+                                      <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                                        <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                                        <span>First enabled: {new Date(userData.firstEnabled).toLocaleString()}</span>
+                                      </div>
+                                    )}
+                                    {userData.lastEnabled && userData.lastEnabled !== userData.firstEnabled && (
+                                      <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                                        <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                                        <span>Last enabled: {new Date(userData.lastEnabled).toLocaleString()}</span>
+                                      </div>
+                                    )}
+                                    {userData.lastDisabled && (
+                                      <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                                        <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                                        <span>Last disabled: {new Date(userData.lastDisabled).toLocaleString()}</span>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Notification tokens timeline */}
+                                  {userData.notifications.length > 1 && (
+                                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                                      <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Notification History ({userData.notifications.length} tokens)
+                                      </p>
+                                      <div className="space-y-1 max-h-32 overflow-y-auto">
+                                        {userData.notifications.map((notif, idx) => {
+                                          const notifStatus = notif.status || "enabled";
+                                          const isNotifEnabled = notifStatus === "enabled";
+                                          return (
+                                            <div
+                                              key={`${notif.token}-${idx}`}
+                                              className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400"
+                                            >
+                                              <span className={`w-1.5 h-1.5 rounded-full ${
+                                                isNotifEnabled ? "bg-green-500" : "bg-red-500"
+                                              }`}></span>
+                                              <span className="font-mono text-[10px] truncate flex-1" title={notif.token}>
+                                                {notif.token.substring(0, 20)}...
+                                              </span>
+                                              <span className="text-gray-500 dark:text-gray-500">
+                                                {new Date(notif.created_at).toLocaleDateString()}
+                                              </span>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
-                              </td>
-                              <td className="px-4 py-3 whitespace-nowrap">
-                                <div className="text-sm text-gray-600 dark:text-gray-400">
-                                  {new Date(notification.created_at).toLocaleString()}
-                                </div>
-                              </td>
-                              <td className="px-4 py-3 whitespace-nowrap">
-                                <div className="text-sm text-gray-600 dark:text-gray-400">
-                                  {new Date(notification.updated_at).toLocaleString()}
-                                </div>
-                              </td>
-                              <td className="px-4 py-3 whitespace-nowrap">
-                                <div className="text-sm text-gray-600 dark:text-gray-400">
-                                  {notification.status || "—"}
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                              </div>
+                            );
+                          })}
+                      </div>
                     </div>
                   </>
                 )}
