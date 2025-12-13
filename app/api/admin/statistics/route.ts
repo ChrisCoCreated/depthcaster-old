@@ -852,7 +852,7 @@ export async function GET(request: NextRequest) {
       })(),
       
       // Curators who haven't visited recently
-      inactiveCurators: (async () => {
+      inactiveCurators: await (async () => {
         const curatorFids = await getAllCuratorFids();
         if (curatorFids.length === 0) {
           return {
