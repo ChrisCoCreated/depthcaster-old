@@ -46,6 +46,11 @@ const curatorRoleUsersCache = new LRUCache<string, any>({
   ttl: 5 * 60 * 1000, // 5 minutes
 });
 
+const blogCache = new LRUCache<string, any>({
+  max: 200, // Max 200 articles (covers popular articles)
+  ttl: 24 * 60 * 60 * 1000, // 24 hours (articles don't change often)
+});
+
 /**
  * Generate a cache key from request parameters
  */
@@ -145,6 +150,16 @@ export const cacheCuratorRoleUsers = {
 };
 
 /**
+ * Cache for blog articles (Paragraph, Substack, generic articles)
+ */
+export const cacheBlog = {
+  get: (key: string) => blogCache.get(key),
+  set: (key: string, value: any) => blogCache.set(key, value),
+  generateKey: (url: string) => `blog:${url}`,
+  clear: () => blogCache.clear(),
+};
+
+/**
  * Clear all caches (useful for testing or cache invalidation)
  */
 export function clearAllCaches() {
@@ -155,6 +170,7 @@ export function clearAllCaches() {
   notificationCountCache.clear();
   searchCache.clear();
   curatorRoleUsersCache.clear();
+  blogCache.clear();
 }
 
 /**

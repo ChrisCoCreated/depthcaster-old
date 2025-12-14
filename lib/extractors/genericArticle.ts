@@ -247,14 +247,11 @@ function extractFromParagraphs(dom: Document): string | null {
 /**
  * Extract article content using Readability with fallbacks
  */
-function extractArticleContent(html: string, url: string): {
+function extractArticleContent(html: string, url: string, document: Document): {
   content: string;
   title: string;
   excerpt?: string;
 } {
-  const dom = new JSDOM(html, { url });
-  const document = dom.window.document;
-  
   let content: string | null = null;
   let title = extractTitle(html, document);
   let excerpt: string | undefined;
@@ -311,71 +308,95 @@ export async function fetchGenericArticle(url: string): Promise<GenericArticle> 
     
     const html = await response.text();
     console.log('[Generic Article] Fetched HTML, length:', html.length);
-  
-  // Parse domain from URL
-  const urlObj = new URL(url);
-  const domain = urlObj.hostname.replace('www.', '');
-  
-  // Create DOM for analysis
-  const dom = new JSDOM(html, { url });
-  const document = dom.window.document;
-  
-  // Attempt extraction (we try for all URLs)
-  let rawContent: string;
-  let title: string;
-  let excerpt: string | undefined;
-  
-  try {
-    const extracted = extractArticleContent(html, url);
-    rawContent = extracted.content;
-    title = extracted.title;
-    excerpt = extracted.excerpt;
-  } catch (error) {
-    // If extraction fails, provide a helpful error message
-    // Check if it's because it's not an article page
-    if (!detectArticlePage(html, document)) {
-      throw new Error('URL does not appear to be an article page');
+    
+    // Parse domain from URL
+    const urlObj = new URL(url);
+    const domain = urlObj.hostname.replace('www.', '');
+    
+    // Create DOM for analysis
+    let dom: JSDOM;
+    let document: Document;
+    
+    try {
+      dom = new JSDOM(html, { url });
+      document = dom.window.document;
+      console.log('[Generic Article] Created DOM successfully');
+    } catch (error) {
+      console.error('[Generic Article] Failed to create DOM:', error);
+      throw new Error('Failed to parse HTML');
     }
-    // Otherwise, re-throw the extraction error
-    throw error;
+    
+    // Attempt extraction (we try for all URLs)
+    let rawContent: string;
+    let title: string;
+    let excerpt: string | undefined;
+    
+    try {
+      console.log('[Generic Article] Attempting content extraction...');
+      const extracted = extractArticleContent(html, url, document);
+      rawContent = extracted.content;
+      title = extracted.title;
+      excerpt = extracted.excerpt;
+      console.log('[Generic Article] Extraction successful, content length:', rawContent.length);
+    } catch (error) {
+      console.error('[Generic Article] Extraction failed:', error);
+      // If extraction fails, provide a helpful error message
+      // Check if it's because it's not an article page
+      if (!detectArticlePage(html, document)) {
+        throw new Error('URL does not appear to be an article page');
+      }
+      // Otherwise, re-throw the extraction error
+      throw error;
+    }
+    
+    // Sanitize HTML
+    console.log('[Generic Article] Sanitizing HTML...');
+    const sanitizedHtml = sanitizeHtml(rawContent);
+    
+    // Convert to markdown
+    console.log('[Generic Article] Converting to markdown...');
+    const markdown = htmlToMarkdown(sanitizedHtml);
+    
+    // Check content length
+    const textContent = markdown.replace(/[#*\[\]()]/g, '').trim();
+    if (textContent.length < 200) {
+      console.warn('[Generic Article] Content too short:', textContent.length);
+      throw new Error('Extracted content is too short (< 200 characters)');
+    }
+    
+    // Extract metadata
+    const coverImage = extractCoverImage(html, document);
+    const publicationName = extractPublicationName(html, domain, document);
+    
+    // Extract published date if available
+    const publishedDateMatch = html.match(/<meta\s+property=["']article:published_time["']\s+content=["']([^"']+)["']/i) ||
+                                 html.match(/<time[^>]+datetime=["']([^"']+)["']/i);
+    const publishedAt = publishedDateMatch ? publishedDateMatch[1] : undefined;
+    
+    console.log('[Generic Article] Successfully processed article:', title);
+    
+    return {
+      id: url,
+      title,
+      subtitle: excerpt,
+      markdown,
+      staticHtml: sanitizedHtml,
+      coverImage: coverImage ? removeTrackingParams(coverImage) : undefined,
+      publication: {
+        id: domain,
+        slug: domain,
+        name: publicationName,
+      },
+      publishedAt,
+      createdAt: publishedAt,
+      url: removeTrackingParams(url),
+    };
+  } catch (error) {
+    console.error('[Generic Article] Error in fetchGenericArticle:', error);
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error(String(error));
   }
-  
-  // Sanitize HTML
-  const sanitizedHtml = sanitizeHtml(rawContent);
-  
-  // Convert to markdown
-  const markdown = htmlToMarkdown(sanitizedHtml);
-  
-  // Check content length
-  const textContent = markdown.replace(/[#*\[\]()]/g, '').trim();
-  if (textContent.length < 200) {
-    throw new Error('Extracted content is too short (< 200 characters)');
-  }
-  
-  // Extract metadata
-  const coverImage = extractCoverImage(html, document);
-  const publicationName = extractPublicationName(html, domain, document);
-  
-  // Extract published date if available
-  const publishedDateMatch = html.match(/<meta\s+property=["']article:published_time["']\s+content=["']([^"']+)["']/i) ||
-                               html.match(/<time[^>]+datetime=["']([^"']+)["']/i);
-  const publishedAt = publishedDateMatch ? publishedDateMatch[1] : undefined;
-  
-  return {
-    id: url,
-    title,
-    subtitle: excerpt,
-    markdown,
-    staticHtml: sanitizedHtml,
-    coverImage: coverImage ? removeTrackingParams(coverImage) : undefined,
-    publication: {
-      id: domain,
-      slug: domain,
-      name: publicationName,
-    },
-    publishedAt,
-    createdAt: publishedAt,
-    url: removeTrackingParams(url),
-  };
 }
 
