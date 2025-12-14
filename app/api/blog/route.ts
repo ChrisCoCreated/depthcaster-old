@@ -234,7 +234,9 @@ async function handleSubstackPost(url: string): Promise<NextResponse> {
  */
 async function handleGenericArticle(url: string): Promise<NextResponse> {
   try {
+    console.log('[Blog API] Fetching generic article:', url);
     const articleData = await fetchGenericArticle(url);
+    console.log('[Blog API] Successfully extracted article:', articleData.title);
     
     // Return normalized format (same as Paragraph/Substack)
     return NextResponse.json({
@@ -255,6 +257,8 @@ async function handleGenericArticle(url: string): Promise<NextResponse> {
     });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('[Blog API] Error fetching generic article:', errorMessage);
+    console.error('[Blog API] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     
     // Re-throw to let main handler deal with it
     throw error;

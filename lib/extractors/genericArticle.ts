@@ -296,18 +296,21 @@ function extractArticleContent(html: string, url: string): {
 export async function fetchGenericArticle(url: string): Promise<GenericArticle> {
   console.log('[Generic Article] Fetching:', url);
   
-  // Fetch HTML
-  const response = await fetch(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (compatible; Depthcaster/1.0)',
-    },
-  });
-  
-  if (!response.ok) {
-    throw new Error(`Failed to fetch article: ${response.status} ${response.statusText}`);
-  }
-  
-  const html = await response.text();
+  try {
+    // Fetch HTML
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; Depthcaster/1.0)',
+      },
+    });
+    
+    if (!response.ok) {
+      console.error('[Generic Article] Fetch failed:', response.status, response.statusText);
+      throw new Error(`Failed to fetch article: ${response.status} ${response.statusText}`);
+    }
+    
+    const html = await response.text();
+    console.log('[Generic Article] Fetched HTML, length:', html.length);
   
   // Parse domain from URL
   const urlObj = new URL(url);
