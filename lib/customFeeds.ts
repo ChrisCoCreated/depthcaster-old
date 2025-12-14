@@ -41,6 +41,8 @@ export interface DisplayMode {
   buttonBackgroundColor?: string;
   buttonTextColor?: string;
   expandMentionedProfiles?: boolean;
+  mentionedProfilesStyle?: "full" | "minicard"; // Default: "full"
+  mentionedProfilesPosition?: "above" | "below"; // Default: "below"
   hideCuratedButton?: boolean;
   hideShareButton?: boolean;
 }

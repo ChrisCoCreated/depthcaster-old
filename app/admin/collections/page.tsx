@@ -432,6 +432,12 @@ function CollectionModal({
   const [expandMentionedProfiles, setExpandMentionedProfiles] = useState(
     (collection?.displayMode as any)?.expandMentionedProfiles || false
   );
+  const [mentionedProfilesStyle, setMentionedProfilesStyle] = useState<"full" | "minicard">(
+    (collection?.displayMode as any)?.mentionedProfilesStyle || "full"
+  );
+  const [mentionedProfilesPosition, setMentionedProfilesPosition] = useState<"above" | "below">(
+    (collection?.displayMode as any)?.mentionedProfilesPosition || "below"
+  );
   const [hiddenEmbedUrlsText, setHiddenEmbedUrlsText] = useState(
     collection?.hiddenEmbedUrls ? (collection.hiddenEmbedUrls as string[]).join('\n') : ""
   );
@@ -566,6 +572,8 @@ function CollectionModal({
         buttonBackgroundColor: replaceEmbeds ? buttonBackgroundColor : undefined,
         buttonTextColor: replaceEmbeds ? buttonTextColor : undefined,
         expandMentionedProfiles,
+        mentionedProfilesStyle: expandMentionedProfiles ? mentionedProfilesStyle : undefined,
+        mentionedProfilesPosition: expandMentionedProfiles ? mentionedProfilesPosition : undefined,
         hideCuratedButton,
         hideShareButton,
       } : null;
@@ -890,20 +898,54 @@ function CollectionModal({
               </label>
             </div>
 
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="expandMentionedProfiles"
-                checked={expandMentionedProfiles}
-                onChange={(e) => setExpandMentionedProfiles(e.target.checked)}
-                className="mr-2"
-              />
-              <label htmlFor="expandMentionedProfiles" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Expand Mentioned Profiles
-              </label>
-              <p className="ml-2 text-xs text-gray-500 dark:text-gray-400">
-                Show full profile cards (pfp, banner, bio, stats, URL) for mentioned profiles in casts
-              </p>
+            <div className="space-y-3">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="expandMentionedProfiles"
+                  checked={expandMentionedProfiles}
+                  onChange={(e) => setExpandMentionedProfiles(e.target.checked)}
+                  className="mr-2"
+                />
+                <label htmlFor="expandMentionedProfiles" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Expand Mentioned Profiles
+                </label>
+                <p className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                  Show profile cards for mentioned profiles in casts
+                </p>
+              </div>
+              
+              {expandMentionedProfiles && (
+                <div className="pl-6 space-y-3 border-l-2 border-gray-300 dark:border-gray-600">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Profile Card Style
+                    </label>
+                    <select
+                      value={mentionedProfilesStyle}
+                      onChange={(e) => setMentionedProfilesStyle(e.target.value as "full" | "minicard")}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm"
+                    >
+                      <option value="full">Full Width (banner, bio, stats)</option>
+                      <option value="minicard">Minicard (compact, 2 columns)</option>
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Position Relative to Embeds
+                    </label>
+                    <select
+                      value={mentionedProfilesPosition}
+                      onChange={(e) => setMentionedProfilesPosition(e.target.value as "above" | "below")}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm"
+                    >
+                      <option value="below">Below Embeds (default)</option>
+                      <option value="above">Above Embeds</option>
+                    </select>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Display Mode Settings */}

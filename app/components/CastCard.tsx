@@ -23,6 +23,7 @@ import { CuratorBadge } from "./CuratorBadge";
 import { DisplayMode } from "@/lib/customFeeds";
 import { CollectionSelectModal } from "./CollectionSelectModal";
 import { MentionedProfileCard } from "./MentionedProfileCard";
+import { MentionedProfileMinicard } from "./MentionedProfileMinicard";
 import { BlogPreview } from "./BlogPreview";
 import { isBlogLink } from "@/lib/blog";
 import { useTouchSafeClick } from "@/lib/hooks/useTouchSafeClick";
@@ -1418,10 +1419,14 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
       return;
     }
 
+    const abortController = new AbortController();
+
     const checkAdminAndFetchTags = async () => {
       try {
         // Check admin status
-        const adminResponse = await fetch(`/api/admin/check?fid=${user.fid}`);
+        const adminResponse = await fetch(`/api/admin/check?fid=${user.fid}`, {
+          signal: abortController.signal,
+        });
         if (adminResponse.ok) {
           const adminData = await adminResponse.json();
           setIsAdmin(adminData.isAdmin || false);
@@ -1429,17 +1434,33 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
         }
 
         // Fetch tags
-        const tagsResponse = await fetch(`/api/tags?castHash=${cast.hash}`);
+        const tagsResponse = await fetch(`/api/tags?castHash=${cast.hash}`, {
+          signal: abortController.signal,
+        });
         if (tagsResponse.ok) {
           const tagsData = await tagsResponse.json();
           setTags(tagsData.tags?.map((t: any) => t.tag) || []);
         }
-      } catch (error) {
+      } catch (error: any) {
+        // Ignore network cancellation errors (ERR_NETWORK_CHANGED, AbortError, etc.)
+        if (
+          error?.name === 'AbortError' ||
+          error?.message?.includes('ERR_NETWORK_CHANGED') ||
+          error?.message?.includes('Failed to fetch') ||
+          error?.message?.includes('network')
+        ) {
+          // Silently ignore - component likely unmounted or navigation occurred
+          return;
+        }
         console.error("Failed to check admin status or fetch tags:", error);
       }
     };
 
     checkAdminAndFetchTags();
+
+    return () => {
+      abortController.abort();
+    };
   }, [user?.fid, cast.hash]);
 
   // Prevent body scroll when confirmation modal is open
@@ -2577,8 +2598,11 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
               </button>
             )}
 
-            {/* Expanded Mentioned Profiles */}
-            {displayMode?.expandMentionedProfiles && cast.mentioned_profiles && cast.mentioned_profiles.length > 0 && (() => {
+            {/* Expanded Mentioned Profiles - Above Embeds */}
+            {displayMode?.expandMentionedProfiles && 
+             displayMode?.mentionedProfilesPosition === "above" &&
+             cast.mentioned_profiles && 
+             cast.mentioned_profiles.length > 0 && (() => {
               // Deduplicate profiles by FID - only show one card per unique profile
               const seenFids = new Set<number>();
               const uniqueProfiles = cast.mentioned_profiles.filter((profile: any) => {
@@ -2590,13 +2614,22 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                 return true;
               });
               
-              return uniqueProfiles.length > 0 ? (
-                <div className="my-3 space-y-3">
-                  {uniqueProfiles.map((profile: any) => (
-                    <MentionedProfileCard key={profile.fid} profile={profile} viewerFid={user?.fid} />
-                  ))}
+              if (uniqueProfiles.length === 0) return null;
+              
+              const style = displayMode?.mentionedProfilesStyle || "full";
+              const isMinicard = style === "minicard";
+              
+              return (
+                <div className={`my-3 ${isMinicard ? "grid grid-cols-1 sm:grid-cols-2 gap-2" : "space-y-3"}`}>
+                  {uniqueProfiles.map((profile: any) => 
+                    isMinicard ? (
+                      <MentionedProfileMinicard key={profile.fid} profile={profile} />
+                    ) : (
+                      <MentionedProfileCard key={profile.fid} profile={profile} viewerFid={user?.fid} />
+                    )
+                  )}
                 </div>
-              ) : null;
+              );
             })()}
 
             {/* Check for blog links in cast text (that might not be embeds yet) */}
@@ -3253,6 +3286,40 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                       );
                     }
                   })}
+                </div>
+              );
+            })()}
+
+            {/* Expanded Mentioned Profiles - Below Embeds */}
+            {displayMode?.expandMentionedProfiles && 
+             (displayMode?.mentionedProfilesPosition === "below" || !displayMode?.mentionedProfilesPosition) &&
+             cast.mentioned_profiles && 
+             cast.mentioned_profiles.length > 0 && (() => {
+              // Deduplicate profiles by FID - only show one card per unique profile
+              const seenFids = new Set<number>();
+              const uniqueProfiles = cast.mentioned_profiles.filter((profile: any) => {
+                if (!profile.fid) return false;
+                if (seenFids.has(profile.fid)) {
+                  return false;
+                }
+                seenFids.add(profile.fid);
+                return true;
+              });
+              
+              if (uniqueProfiles.length === 0) return null;
+              
+              const style = displayMode?.mentionedProfilesStyle || "full";
+              const isMinicard = style === "minicard";
+              
+              return (
+                <div className={`my-3 ${isMinicard ? "grid grid-cols-1 sm:grid-cols-2 gap-2" : "space-y-3"}`}>
+                  {uniqueProfiles.map((profile: any) => 
+                    isMinicard ? (
+                      <MentionedProfileMinicard key={profile.fid} profile={profile} />
+                    ) : (
+                      <MentionedProfileCard key={profile.fid} profile={profile} viewerFid={user?.fid} />
+                    )
+                  )}
                 </div>
               );
             })()}

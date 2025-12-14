@@ -53,7 +53,15 @@ export function Header() {
         setHasPreviewAccess(false);
         setIsAdminUser(false);
       }
-    } catch (error) {
+    } catch (error: any) {
+      // Ignore network cancellation errors
+      if (
+        error?.name === 'AbortError' ||
+        error?.message?.includes('ERR_NETWORK_CHANGED') ||
+        error?.message?.includes('Failed to fetch')
+      ) {
+        return;
+      }
       console.error("Failed to check preview access:", error);
       setHasPreviewAccess(false);
       setIsAdminUser(false);
@@ -71,7 +79,15 @@ export function Header() {
         setIsAdminUser(false);
         setIsSuperAdminUser(false);
       }
-    } catch (error) {
+    } catch (error: any) {
+      // Ignore network cancellation errors
+      if (
+        error?.name === 'AbortError' ||
+        error?.message?.includes('ERR_NETWORK_CHANGED') ||
+        error?.message?.includes('Failed to fetch')
+      ) {
+        return;
+      }
       console.error("Failed to check admin status:", error);
       setIsAdminUser(false);
       setIsSuperAdminUser(false);
