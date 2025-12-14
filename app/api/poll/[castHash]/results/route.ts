@@ -210,6 +210,47 @@ export async function GET(
 
       // Create a map of existing options
       const existingOptionsMap = new Map(options.map(opt => [opt.id, opt]));
+      
+      // Identify deleted option IDs
+      const deletedOptionIds = Array.from(allOptionIds).filter(id => !existingOptionsMap.has(id));
+      
+      // Infer order for deleted options from earliest responses
+      const deletedOptionOrder = new Map<string, number>();
+      if (deletedOptionIds.length > 0 && responses.length > 0) {
+        // Sort responses by createdAt (earliest first)
+        const sortedResponses = [...responses].sort((a, b) => 
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
+        
+        // Use first response that has all deleted option IDs to infer order
+        for (const response of sortedResponses) {
+          let choicesObj: Record<string, string> | null = null;
+          if (response.choices) {
+            if (typeof response.choices === 'string') {
+              try {
+                choicesObj = JSON.parse(response.choices);
+              } catch (e) {
+                continue;
+              }
+            } else if (typeof response.choices === 'object' && response.choices !== null && !Array.isArray(response.choices)) {
+              choicesObj = response.choices as Record<string, string>;
+            }
+          }
+          
+          if (choicesObj && typeof choicesObj === 'object' && !Array.isArray(choicesObj) && choicesObj !== null) {
+            const keys = Object.keys(choicesObj);
+            const deletedKeysInOrder = keys.filter(k => deletedOptionIds.includes(k));
+            
+            // If this response has all deleted options, use it to infer order
+            if (deletedKeysInOrder.length === deletedOptionIds.length) {
+              deletedKeysInOrder.forEach((optionId, index) => {
+                deletedOptionOrder.set(optionId, index + 1);
+              });
+              break;
+            }
+          }
+        }
+      }
 
       // Calculate collated results for all options (existing + deleted)
       collatedResults = Array.from(allOptionIds).map((optionId) => {
@@ -249,7 +290,34 @@ export async function GET(
           choiceCounts,
           totalVotes,
           isDeleted: !option,
+          inferredOrder: !option ? (deletedOptionOrder.get(optionId) || 999) : undefined,
         };
+      });
+      
+      // Sort collated results: existing options first (by database order), then deleted options (by inferred order)
+      collatedResults.sort((a, b) => {
+        const aIsDeleted = a.isDeleted;
+        const bIsDeleted = b.isDeleted;
+        
+        if (!aIsDeleted && !bIsDeleted) {
+          // Both existing - maintain database order (options are already sorted by order field)
+          const aOption = existingOptionsMap.get(a.optionId);
+          const bOption = existingOptionsMap.get(b.optionId);
+          const aOrder = aOption?.order || 999;
+          const bOrder = bOption?.order || 999;
+          return aOrder - bOrder;
+        } else if (!aIsDeleted && bIsDeleted) {
+          // Existing before deleted
+          return -1;
+        } else if (aIsDeleted && !bIsDeleted) {
+          // Deleted after existing
+          return 1;
+        } else {
+          // Both deleted - use inferred order
+          const aOrder = a.inferredOrder || 999;
+          const bOrder = b.inferredOrder || 999;
+          return aOrder - bOrder;
+        }
       });
 
       // Format individual responses for choice type
