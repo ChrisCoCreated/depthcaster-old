@@ -2,7 +2,31 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   // Ensure XMTP browser SDK only runs on client side
-  serverExternalPackages: ['@xmtp/browser-sdk'],
+  serverExternalPackages: [
+    '@xmtp/browser-sdk',
+    'thread-stream',
+    'pino',
+    'pino-pretty',
+    '@walletconnect/logger',
+  ],
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      // Externalize Node-only packages from client bundle
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        "thread-stream": false,
+        "pino": false,
+        "pino-pretty": false,
+        "@walletconnect/logger": false,
+      };
+      // Also mark as externals to prevent bundling
+      config.externals = config.externals || [];
+      if (Array.isArray(config.externals)) {
+        config.externals.push('thread-stream', 'pino', 'pino-pretty', '@walletconnect/logger');
+      }
+    }
+    return config;
+  },
   images: {
     localPatterns: [
       {

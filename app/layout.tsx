@@ -12,7 +12,12 @@ import { SessionTracker } from "./components/SessionTracker";
 import { NavigationManager } from "./components/NavigationManager";
 import { PortalErrorHandler } from "./components/PortalErrorHandler";
 import { XmtpProvider } from "./contexts/XmtpContext";
-import { ThirdwebProviderWrapper } from "./components/ThirdwebProviderWrapper";
+import dynamicImport from "next/dynamic";
+
+const ThirdwebProviderWrapper = dynamicImport(
+  () => import("./components/ThirdwebProviderWrapper").then((mod) => ({ default: mod.ThirdwebProviderWrapper })),
+  { ssr: false }
+);
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

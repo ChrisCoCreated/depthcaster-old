@@ -6,7 +6,12 @@ import { getContract, createThirdwebClient, readContract } from "thirdweb";
 import { base } from "thirdweb/chains";
 import { lazyMint } from "thirdweb/extensions/erc721";
 import { upload } from "thirdweb/storage";
-import { ConnectButton } from "thirdweb/react";
+import dynamic from "next/dynamic";
+
+const WalletClient = dynamic(
+  () => import("@/app/components/WalletClient").then((mod) => ({ default: mod.WalletClient })),
+  { ssr: false }
+);
 import { prepareContractCall } from "thirdweb";
 import { sendTransaction } from "thirdweb";
 import Image from "next/image";
@@ -366,11 +371,7 @@ export default function PfpCollectionPage() {
             <p className="text-gray-700 dark:text-gray-300 mb-4">
               Connect your wallet to mint an NFT
             </p>
-            <ConnectButton
-              client={client}
-              chain={base}
-              connectModal={{ size: "compact" }}
-            />
+            <WalletClient />
           </div>
         )}
 
