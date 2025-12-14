@@ -4,6 +4,14 @@ import { sql, eq } from "drizzle-orm";
 
 /**
  * Activity event types that qualify for 14-Day Active Users metric
+ * 
+ * IMPORTANT: Only app-specific activities count. Protocol-level activities
+ * (e.g., casts created via webhooks from other clients) do NOT count.
+ * 
+ * - post_reply: Casts/replies created via the app's /api/cast endpoint
+ * - save_curate: Casts curated via the app's /api/curate endpoint
+ * - follow_add: Users followed/subscribed via app APIs
+ * - session_depth: Feed viewing sessions in the app (≥60s)
  */
 export type ActivityEventType = "post_reply" | "save_curate" | "follow_add" | "session_depth";
 
