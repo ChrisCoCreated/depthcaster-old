@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { polls, pollOptions, pollResponses } from "@/lib/schema";
 import { eq, and } from "drizzle-orm";
+import { hasCuratorOrAdminRole, getUserRoles } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,15 @@ export async function POST(
       return NextResponse.json(
         { error: "Invalid FID" },
         { status: 400 }
+      );
+    }
+
+    // Check if user has curator role
+    const roles = await getUserRoles(fid);
+    if (!hasCuratorOrAdminRole(roles)) {
+      return NextResponse.json(
+        { error: "Unauthorized: Curator role required to participate in polls" },
+        { status: 403 }
       );
     }
 

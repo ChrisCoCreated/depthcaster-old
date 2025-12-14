@@ -5,6 +5,7 @@ import { use } from "react";
 import { useNeynarContext } from "@neynar/react";
 import { ConversationView } from "../../components/ConversationView";
 import { ArrowUp, ArrowDown, GripVertical } from "lucide-react";
+import { hasCuratorOrAdminRole } from "@/lib/roles-client";
 
 interface PollOption {
   id: string;
@@ -37,6 +38,8 @@ export default function PollPage({
   const [error, setError] = useState<string | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [isCurator, setIsCurator] = useState<boolean | null>(null);
+  const [checkingCurator, setCheckingCurator] = useState(false);
 
   const fetchPoll = useCallback(async () => {
     try {
@@ -70,6 +73,34 @@ export default function PollPage({
   useEffect(() => {
     fetchPoll();
   }, [fetchPoll]);
+
+  useEffect(() => {
+    const checkCuratorStatus = async () => {
+      if (!user?.fid) {
+        setIsCurator(false);
+        return;
+      }
+
+      try {
+        setCheckingCurator(true);
+        const response = await fetch(`/api/admin/check?fid=${user.fid}`);
+        if (response.ok) {
+          const data = await response.json();
+          const roles = data.roles || [];
+          setIsCurator(hasCuratorOrAdminRole(roles));
+        } else {
+          setIsCurator(false);
+        }
+      } catch (error) {
+        console.error("Failed to check curator status:", error);
+        setIsCurator(false);
+      } finally {
+        setCheckingCurator(false);
+      }
+    };
+
+    checkCuratorStatus();
+  }, [user?.fid]);
 
   const moveOption = (fromIndex: number, toIndex: number) => {
     if (fromIndex === toIndex) return;
@@ -162,11 +193,20 @@ export default function PollPage({
       );
     }
 
+    const isDisabled = checkingCurator || isCurator === false;
+    const showCuratorMessage = !checkingCurator && isCurator === false;
+
     return (
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
+      <div className={`bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 ${isDisabled ? "opacity-60" : ""}`}>
         <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-gray-100">
           {poll.question}
         </h2>
+
+        {showCuratorMessage && (
+          <div className="mb-4 px-4 py-3 border border-yellow-200 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900/40 text-sm text-yellow-800 dark:text-yellow-100 rounded-md">
+            Polls are only available to users with curator role. Please contact an admin to request curator access.
+          </div>
+        )}
 
         {submitted ? (
           <div className="px-4 py-3 border border-green-200 dark:border-green-700 bg-green-50 dark:bg-green-900/40 text-sm text-green-800 dark:text-green-100 rounded-md">
@@ -186,17 +226,17 @@ export default function PollPage({
                 return (
                   <div
                     key={option.id}
-                    draggable
-                    onDragStart={() => handleDragStart(index)}
-                    onDragOver={(e) => handleDragOver(e, index)}
-                    onDragLeave={handleDragLeave}
-                    onDrop={(e) => handleDrop(e, index)}
+                    draggable={!isDisabled}
+                    onDragStart={!isDisabled ? () => handleDragStart(index) : undefined}
+                    onDragOver={!isDisabled ? (e) => handleDragOver(e, index) : undefined}
+                    onDragLeave={!isDisabled ? handleDragLeave : undefined}
+                    onDrop={!isDisabled ? (e) => handleDrop(e, index) : undefined}
                     className={`
                       flex items-center gap-3 p-4 border rounded-lg
                       ${draggedIndex === index ? "opacity-50" : ""}
                       ${dragOverIndex === index ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" : "border-gray-200 dark:border-gray-700"}
                       bg-white dark:bg-gray-800
-                      cursor-move
+                      ${isDisabled ? "cursor-not-allowed" : "cursor-move"}
                       transition-colors
                     `}
                   >
@@ -213,7 +253,7 @@ export default function PollPage({
                       <button
                         type="button"
                         onClick={() => moveUp(index)}
-                        disabled={index === 0}
+                        disabled={isDisabled || index === 0}
                         className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                         aria-label="Move up"
                       >
@@ -222,7 +262,7 @@ export default function PollPage({
                       <button
                         type="button"
                         onClick={() => moveDown(index)}
-                        disabled={index === rankings.length - 1}
+                        disabled={isDisabled || index === rankings.length - 1}
                         className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                         aria-label="Move down"
                       >
@@ -244,7 +284,7 @@ export default function PollPage({
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={submitting}
+                disabled={isDisabled || submitting}
                 className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
               >
                 {submitting ? "Submitting..." : "Submit Ranking"}
