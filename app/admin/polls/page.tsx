@@ -31,10 +31,7 @@ export default function AdminPollsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [viewingResults, setViewingResults] = useState<Poll | null>(null);
   const [resultsData, setResultsData] = useState<any>(null);
-  const [originalResultsData, setOriginalResultsData] = useState<any>(null);
   const [loadingResults, setLoadingResults] = useState(false);
-  const [savingMerge, setSavingMerge] = useState<string | null>(null);
-  const [optionMerges, setOptionMerges] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -144,71 +141,6 @@ export default function AdminPollsPage() {
     }
   };
 
-  const applyMergesToResults = (merges: Record<string, string>, originalData: any) => {
-    if (!originalData) return;
-    
-    // Create a map to track which existing options have merged data
-    const mergedDataMap = new Map<string, any>();
-    
-    // First pass: collect all merged data
-    originalData.collatedResults.forEach((result: any) => {
-      const mergedIntoId = merges[result.optionId];
-      if (result.isDeleted && mergedIntoId) {
-        if (!mergedDataMap.has(mergedIntoId)) {
-          const targetResult = originalData.collatedResults.find((r: any) => r.optionId === mergedIntoId && !r.isDeleted);
-          if (targetResult) {
-            mergedDataMap.set(mergedIntoId, {
-              ...targetResult,
-              mergedFrom: [],
-            });
-          }
-        }
-        const merged = mergedDataMap.get(mergedIntoId);
-        if (merged) {
-          // Combine choice counts
-          Object.entries(result.choiceCounts || {}).forEach(([choice, count]: [string, any]) => {
-            merged.choiceCounts[choice] = (merged.choiceCounts[choice] || 0) + count;
-          });
-          merged.totalVotes = (merged.totalVotes || 0) + (result.totalVotes || 0);
-          merged.mergedFrom.push(result.optionId);
-        }
-      }
-    });
-    
-    // Second pass: build final results
-    const mergedResults = originalData.collatedResults
-      .map((result: any) => {
-        const mergedIntoId = merges[result.optionId];
-        if (result.isDeleted && mergedIntoId) {
-          // This deleted option is merged - return the merged version
-          return mergedDataMap.get(mergedIntoId);
-        } else if (!result.isDeleted && mergedDataMap.has(result.optionId)) {
-          // This existing option has merged data - return the merged version
-          return mergedDataMap.get(result.optionId);
-        } else if (!result.isDeleted) {
-          // Regular existing option
-          return result;
-        } else {
-          // Deleted option that's not merged
-          return result;
-        }
-      })
-      .filter((result: any) => {
-        // Remove duplicates and deleted options that are merged
-        const mergedIntoId = merges[result?.optionId];
-        return result && !(result.isDeleted && mergedIntoId);
-      })
-      .filter((result: any, index: number, self: any[]) => {
-        // Remove duplicates (keep first occurrence)
-        return index === self.findIndex((r: any) => r.optionId === result.optionId);
-      });
-    
-    setResultsData({
-      ...originalData,
-      collatedResults: mergedResults,
-    });
-  };
-
   const handleViewResults = async (poll: Poll) => {
     if (!user?.fid) return;
 
@@ -227,22 +159,7 @@ export default function AdminPollsPage() {
       }
 
       console.log("Poll results data:", data); // Debug log
-      setOriginalResultsData(data);
       setResultsData(data);
-      
-      // Load option merges from localStorage
-      const pollId = poll.slug || poll.castHash;
-      const storedMerges = localStorage.getItem(`poll_merges_${pollId}`);
-      if (storedMerges) {
-        try {
-          const merges = JSON.parse(storedMerges);
-          setOptionMerges(merges);
-          // Apply merges to results
-          applyMergesToResults(merges, data);
-        } catch (e) {
-          console.error("Error parsing stored merges:", e);
-        }
-      }
     } catch (err: any) {
       console.error("Error loading results:", err);
       setError(err.message || "Failed to load results");
@@ -726,8 +643,6 @@ export default function AdminPollsPage() {
                   onClick={() => {
                     setViewingResults(null);
                     setResultsData(null);
-                    setOriginalResultsData(null);
-                    setOptionMerges({});
                   }}
                   className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                 >
@@ -801,69 +716,9 @@ export default function AdminPollsPage() {
                                     {index + 1}
                                   </div>
                                 )}
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className={`font-semibold text-lg ${result.isDeleted ? 'text-gray-500 dark:text-gray-500 italic' : 'text-gray-900 dark:text-gray-100'}`}>
-                                    {result.optionText}
-                                  </span>
-                                  {result.isDeleted && !optionMerges[result.optionId] && (
-                                    <select
-                                      value=""
-                                      onChange={(e) => {
-                                        const existingOptionId = e.target.value || null;
-                                        setSavingMerge(result.optionId);
-                                        try {
-                                          const pollId = viewingResults?.castHash || viewingResults?.slug || "";
-                                          const newMerges = { ...optionMerges };
-                                          if (existingOptionId) {
-                                            newMerges[result.optionId] = existingOptionId;
-                                          } else {
-                                            delete newMerges[result.optionId];
-                                          }
-                                          setOptionMerges(newMerges);
-                                          // Save to localStorage
-                                          localStorage.setItem(`poll_merges_${pollId}`, JSON.stringify(newMerges));
-                                          // Recalculate results with merges
-                                          applyMergesToResults(newMerges, originalResultsData || resultsData);
-                                        } catch (err) {
-                                          console.error("Error saving merge:", err);
-                                        } finally {
-                                          setSavingMerge(null);
-                                        }
-                                      }}
-                                      disabled={savingMerge === result.optionId}
-                                      className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                                    >
-                                      <option value="">Assign to...</option>
-                                      {resultsData.collatedResults
-                                        .filter((r: any) => !r.isDeleted)
-                                        .map((existingOption: any) => (
-                                          <option key={existingOption.optionId} value={existingOption.optionId}>
-                                            {existingOption.optionText}
-                                          </option>
-                                        ))}
-                                    </select>
-                                  )}
-                                  {result.isDeleted && optionMerges[result.optionId] && (
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-xs text-gray-500 dark:text-gray-400 italic">
-                                        (merged into {resultsData.collatedResults.find((r: any) => r.optionId === optionMerges[result.optionId])?.optionText || "option"})
-                                      </span>
-                                      <button
-                                        onClick={() => {
-                                          const pollId = viewingResults?.castHash || viewingResults?.slug || "";
-                                          const newMerges = { ...optionMerges };
-                                          delete newMerges[result.optionId];
-                                          setOptionMerges(newMerges);
-                                          localStorage.setItem(`poll_merges_${pollId}`, JSON.stringify(newMerges));
-                                          applyMergesToResults(newMerges, originalResultsData || resultsData);
-                                        }}
-                                        className="text-xs text-red-600 dark:text-red-400 hover:underline"
-                                      >
-                                        Remove
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
+                                <span className={`font-semibold text-lg ${result.isDeleted ? 'text-gray-500 dark:text-gray-500 italic' : 'text-gray-900 dark:text-gray-100'}`}>
+                                  {result.optionText}
+                                </span>
                               </div>
                               {resultsData.poll.pollType === "ranking" && (
                                 <div className="text-right">
@@ -917,6 +772,54 @@ export default function AdminPollsPage() {
                               </div>
                             ) : (
                               <div className="mt-3">
+                                {/* Positive vs Negative Sentiment */}
+                                {result.positiveVotes !== undefined && result.negativeVotes !== undefined && (result.positiveVotes > 0 || result.negativeVotes > 0) && (
+                                  <div className="mb-4 p-3 bg-gray-100 dark:bg-gray-700/50 rounded-lg">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Sentiment</span>
+                                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                                        {result.positiveVotes + result.negativeVotes} votes
+                                      </span>
+                                    </div>
+                                    <div className="flex gap-2 mb-2">
+                                      <div className="flex-1">
+                                        <div className="flex items-center justify-between mb-1">
+                                          <span className="text-xs font-semibold text-green-700 dark:text-green-300">Positive</span>
+                                          <span className="text-xs font-bold text-green-700 dark:text-green-300">
+                                            {result.positivePercentage.toFixed(1)}%
+                                          </span>
+                                        </div>
+                                        <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2 overflow-hidden">
+                                          <div
+                                            className="h-full bg-green-500 rounded-full transition-all"
+                                            style={{ width: `${result.positivePercentage}%` }}
+                                          />
+                                        </div>
+                                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                          {result.positiveVotes} vote{result.positiveVotes !== 1 ? 's' : ''} (like + love)
+                                        </div>
+                                      </div>
+                                      <div className="flex-1">
+                                        <div className="flex items-center justify-between mb-1">
+                                          <span className="text-xs font-semibold text-red-700 dark:text-red-300">Negative</span>
+                                          <span className="text-xs font-bold text-red-700 dark:text-red-300">
+                                            {result.negativePercentage.toFixed(1)}%
+                                          </span>
+                                        </div>
+                                        <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2 overflow-hidden">
+                                          <div
+                                            className="h-full bg-red-500 rounded-full transition-all"
+                                            style={{ width: `${result.negativePercentage}%` }}
+                                          />
+                                        </div>
+                                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                          {result.negativeVotes} vote{result.negativeVotes !== 1 ? 's' : ''} (meh + hate)
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                                
                                 {result.choiceCounts && Object.keys(result.choiceCounts).length > 0 ? (
                                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                     {Object.entries(result.choiceCounts || {}).map(([choice, count]: [string, any]) => {

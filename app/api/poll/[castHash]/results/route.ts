@@ -92,10 +92,6 @@ export async function GET(
 
     const pollType = pollData.pollType || "ranking";
     const pollChoices = pollData.choices as string[] | null;
-    // Option merges are stored locally in the browser, not in the database
-    // The client will pass them in the request if needed, but for now we'll return all data
-    // and let the client handle merging
-    const optionMerges: Record<string, string> = {};
 
     let collatedResults: any[] = [];
     let individualResponses: any[] = [];
@@ -214,27 +210,23 @@ export async function GET(
 
       // Create a map of existing options
       const existingOptionsMap = new Map(options.map(opt => [opt.id, opt]));
-      
-      // Identify deleted option IDs
-      const deletedOptionIds = Array.from(allOptionIds).filter(id => !existingOptionsMap.has(id));
-      
-      // Infer order for deleted options from earliest responses
-      const deletedOptionOrder = new Map<string, number>();
-      if (deletedOptionIds.length > 0 && responses.length > 0) {
-        // Sort responses by createdAt (earliest first)
-        const sortedResponses = [...responses].sort((a, b) => 
-          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-        );
-        
-        // Use first response that has all deleted option IDs to infer order
-        for (const response of sortedResponses) {
+
+      // Calculate collated results for all options (existing + deleted)
+      collatedResults = Array.from(allOptionIds).map((optionId) => {
+        const option = existingOptionsMap.get(optionId);
+        const choiceCounts: Record<string, number> = {};
+        let totalVotes = 0;
+
+        responses.forEach((response) => {
+          // Drizzle should automatically parse JSONB, but handle both cases
           let choicesObj: Record<string, string> | null = null;
           if (response.choices) {
             if (typeof response.choices === 'string') {
               try {
                 choicesObj = JSON.parse(response.choices);
               } catch (e) {
-                continue;
+                console.error("Failed to parse choices JSON:", e, response.choices);
+                return; // Skip this response if parsing fails
               }
             } else if (typeof response.choices === 'object' && response.choices !== null && !Array.isArray(response.choices)) {
               choicesObj = response.choices as Record<string, string>;
@@ -242,112 +234,45 @@ export async function GET(
           }
           
           if (choicesObj && typeof choicesObj === 'object' && !Array.isArray(choicesObj) && choicesObj !== null) {
-            const keys = Object.keys(choicesObj);
-            const deletedKeysInOrder = keys.filter(k => deletedOptionIds.includes(k));
-            
-            // If this response has all deleted options, use it to infer order
-            if (deletedKeysInOrder.length === deletedOptionIds.length) {
-              deletedKeysInOrder.forEach((optionId, index) => {
-                deletedOptionOrder.set(optionId, index + 1);
-              });
-              break;
+            const choice = choicesObj[optionId];
+            if (choice && typeof choice === 'string' && choice.trim() !== '') {
+              choiceCounts[choice] = (choiceCounts[choice] || 0) + 1;
+              totalVotes++;
             }
           }
-        }
-      }
+        });
 
-      // Calculate collated results for all options (existing + deleted, excluding merged deleted)
-      collatedResults = Array.from(allOptionIds)
-        .map((optionId) => {
-      const option = existingOptionsMap.get(optionId);
-      
-      // Check if this deleted option is merged into an existing option
-      const mergedIntoOptionId = optionMerges[optionId];
-      const isMerged = !!mergedIntoOptionId;
-      
-      // Skip deleted options that are merged (they'll be counted in the target option)
-      if (!option && isMerged) {
-        return null;
-      }
-      const choiceCounts: Record<string, number> = {};
-      let totalVotes = 0;
-
-      responses.forEach((response) => {
-        // Drizzle should automatically parse JSONB, but handle both cases
-        let choicesObj: Record<string, string> | null = null;
-        if (response.choices) {
-          if (typeof response.choices === 'string') {
-            try {
-              choicesObj = JSON.parse(response.choices);
-            } catch (e) {
-              console.error("Failed to parse choices JSON:", e, response.choices);
-              return; // Skip this response if parsing fails
-            }
-          } else if (typeof response.choices === 'object' && response.choices !== null && !Array.isArray(response.choices)) {
-            choicesObj = response.choices as Record<string, string>;
-          }
-        }
+        // Calculate positive vs negative proportions
+        const positiveChoices = ['love', 'like'];
+        const negativeChoices = ['meh', 'hate'];
+        let positiveVotes = 0;
+        let negativeVotes = 0;
         
-        if (choicesObj && typeof choicesObj === 'object' && !Array.isArray(choicesObj) && choicesObj !== null) {
-          // Count votes for this option
-          const choice = choicesObj[optionId];
-          if (choice && typeof choice === 'string' && choice.trim() !== '') {
-            choiceCounts[choice] = (choiceCounts[choice] || 0) + 1;
-            totalVotes++;
+        Object.entries(choiceCounts).forEach(([choice, count]) => {
+          const normalizedChoice = choice.toLowerCase();
+          if (positiveChoices.includes(normalizedChoice)) {
+            positiveVotes += count;
+          } else if (negativeChoices.includes(normalizedChoice)) {
+            negativeVotes += count;
           }
-          
-          // If this is an existing option, also count votes from deleted options merged into it
-          if (option) {
-            Object.entries(optionMerges).forEach(([deletedId, existingId]) => {
-              if (existingId === optionId && deletedId !== optionId) {
-                const mergedChoice = choicesObj[deletedId];
-                if (mergedChoice && typeof mergedChoice === 'string' && mergedChoice.trim() !== '') {
-                  choiceCounts[mergedChoice] = (choiceCounts[mergedChoice] || 0) + 1;
-                  totalVotes++;
-                }
-              }
-            });
-          }
-        }
-      });
-
-      return {
-        optionId: optionId,
-        optionText: option?.optionText || "[Deleted Option]",
-        markdown: option?.markdown || null,
-        choiceCounts,
-        totalVotes,
-        isDeleted: !option,
-        mergedIntoOptionId: isMerged ? mergedIntoOptionId : undefined,
-        inferredOrder: !option ? (deletedOptionOrder.get(optionId) || 999) : undefined,
-      };
-      })
-      .filter((result): result is NonNullable<typeof result> => result !== null);
-      
-      // Sort collated results: existing options first (by database order), then deleted options (by inferred order)
-      collatedResults.sort((a, b) => {
-        const aIsDeleted = a.isDeleted;
-        const bIsDeleted = b.isDeleted;
+        });
         
-        if (!aIsDeleted && !bIsDeleted) {
-          // Both existing - maintain database order (options are already sorted by order field)
-          const aOption = existingOptionsMap.get(a.optionId);
-          const bOption = existingOptionsMap.get(b.optionId);
-          const aOrder = aOption?.order || 999;
-          const bOrder = bOption?.order || 999;
-          return aOrder - bOrder;
-        } else if (!aIsDeleted && bIsDeleted) {
-          // Existing before deleted
-          return -1;
-        } else if (aIsDeleted && !bIsDeleted) {
-          // Deleted after existing
-          return 1;
-        } else {
-          // Both deleted - use inferred order
-          const aOrder = a.inferredOrder || 999;
-          const bOrder = b.inferredOrder || 999;
-          return aOrder - bOrder;
-        }
+        const totalSentimentVotes = positiveVotes + negativeVotes;
+        const positivePercentage = totalSentimentVotes > 0 ? (positiveVotes / totalSentimentVotes) * 100 : 0;
+        const negativePercentage = totalSentimentVotes > 0 ? (negativeVotes / totalSentimentVotes) * 100 : 0;
+
+        return {
+          optionId: optionId,
+          optionText: option?.optionText || "[Deleted Option]",
+          markdown: option?.markdown || null,
+          choiceCounts,
+          totalVotes,
+          isDeleted: !option,
+          positiveVotes,
+          negativeVotes,
+          positivePercentage,
+          negativePercentage,
+        };
       });
 
       // Format individual responses for choice type
