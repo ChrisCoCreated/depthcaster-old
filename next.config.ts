@@ -9,6 +9,8 @@ const nextConfig: NextConfig = {
     'pino-pretty',
     '@walletconnect/logger',
   ],
+  // Turbopack config (empty to silence warning, serverExternalPackages handles externalization)
+  turbopack: {},
   webpack: (config, { isServer }) => {
     if (!isServer) {
       // Externalize Node-only packages from client bundle

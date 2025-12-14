@@ -12,12 +12,7 @@ import { SessionTracker } from "./components/SessionTracker";
 import { NavigationManager } from "./components/NavigationManager";
 import { PortalErrorHandler } from "./components/PortalErrorHandler";
 import { XmtpProvider } from "./contexts/XmtpContext";
-import dynamicImport from "next/dynamic";
-
-const ThirdwebProviderWrapper = dynamicImport(
-  () => import("./components/ThirdwebProviderWrapper").then((mod) => ({ default: mod.ThirdwebProviderWrapper })),
-  { ssr: false }
-);
+import { ThirdwebProviderClient } from "./components/ThirdwebProviderClient";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -124,7 +119,7 @@ export default function RootLayout({
         <PortalErrorHandler />
         <ServiceWorkerRegistration />
         <AuthProvider>
-          <ThirdwebProviderWrapper>
+          <ThirdwebProviderClient>
             <XmtpProvider>
               <SessionTracker />
               <PushSubscriptionManager />
@@ -134,7 +129,7 @@ export default function RootLayout({
               <ConditionalHeader />
               {children}
             </XmtpProvider>
-          </ThirdwebProviderWrapper>
+          </ThirdwebProviderClient>
         </AuthProvider>
       </body>
     </html>
