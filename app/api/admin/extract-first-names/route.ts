@@ -70,10 +70,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fallback function: capitalize first letter of username
+    // Helper function to strip .eth from username
+    const stripEth = (username: string | null): string | null => {
+      if (!username) return null;
+      return username.endsWith(".eth") ? username.slice(0, -4) : username;
+    };
+
+    // Fallback function: capitalize first letter of username (after stripping .eth)
     const fallbackFirstName = (username: string | null): string => {
-      if (!username || username.length === 0) return "User";
-      return username.charAt(0).toUpperCase() + username.slice(1);
+      const cleanedUsername = stripEth(username);
+      if (!cleanedUsername || cleanedUsername.length === 0) return "User";
+      return cleanedUsername.charAt(0).toUpperCase() + cleanedUsername.slice(1);
     };
 
     // If DeepSeek API is not configured, use fallback
@@ -83,11 +90,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ firstNames });
     }
 
-    // Prepare batch request for DeepSeek
+    // Prepare batch request for DeepSeek (strip .eth from usernames)
     const userList = validatedUsers.map((u, index) => {
-      const username = u.username || `user_${u.fid}`;
+      const cleanedUsername = stripEth(u.username) || `user_${u.fid}`;
       const displayName = u.displayName || "";
-      return `${index + 1}. Username: "${username}"${displayName ? `, Display Name: "${displayName}"` : ""}`;
+      return `${index + 1}. Username: "${cleanedUsername}"${displayName ? `, Display Name: "${displayName}"` : ""}`;
     }).join("\n");
 
     const prompt = `Extract the first name from each user's username and/or display name. Return ONLY a JSON array of first names, one per user, in the same order. If you cannot determine a first name, return an empty string for that user.

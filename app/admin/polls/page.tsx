@@ -149,15 +149,19 @@ export default function AdminPollsPage() {
     setError(null);
 
     try {
-      const response = await fetch(`/api/poll/${poll.castHash}/results?userFid=${user.fid}`);
+      // Use slug if available, otherwise use castHash
+      const identifier = poll.slug || poll.castHash;
+      const response = await fetch(`/api/poll/${identifier}/results?userFid=${user.fid}`);
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(data.error || "Failed to load results");
       }
 
+      console.log("Poll results data:", data); // Debug log
       setResultsData(data);
     } catch (err: any) {
+      console.error("Error loading results:", err);
       setError(err.message || "Failed to load results");
     } finally {
       setLoadingResults(false);
@@ -672,12 +676,13 @@ export default function AdminPollsPage() {
                         : "Collated Results (Ranked by Average Position)"}
                     </h3>
                     <div className="space-y-3">
-                      {resultsData.collatedResults.map((result: any, index: number) => {
-                        const maxVotes = resultsData.poll.pollType === "ranking" 
-                          ? Math.max(...resultsData.collatedResults.map((r: any) => r.voteCount || 0))
-                          : Math.max(...resultsData.collatedResults.map((r: any) => r.totalVotes || 0));
-                        const voteCount = resultsData.poll.pollType === "ranking" ? result.voteCount : result.totalVotes;
-                        const votePercentage = maxVotes > 0 ? (voteCount / maxVotes) * 100 : 0;
+                      {resultsData.collatedResults && resultsData.collatedResults.length > 0 ? (
+                        resultsData.collatedResults.map((result: any, index: number) => {
+                          const maxVotes = resultsData.poll.pollType === "ranking" 
+                            ? Math.max(...resultsData.collatedResults.map((r: any) => r.voteCount || 0), 1)
+                            : Math.max(...resultsData.collatedResults.map((r: any) => r.totalVotes || 0), 1);
+                          const voteCount = resultsData.poll.pollType === "ranking" ? (result.voteCount || 0) : (result.totalVotes || 0);
+                          const votePercentage = maxVotes > 0 ? (voteCount / maxVotes) * 100 : 0;
 
                         return (
                           <div
@@ -708,36 +713,48 @@ export default function AdminPollsPage() {
                             </div>
                             
                             {/* Progress Bar */}
-                            <div className="mb-3">
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                                  {voteCount} vote{voteCount !== 1 ? "s" : ""} ({votePercentage.toFixed(0)}%)
-                                </span>
+                            {voteCount > 0 && (
+                              <div className="mb-3">
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                                    {voteCount} vote{voteCount !== 1 ? "s" : ""} {maxVotes > 1 ? `(${votePercentage.toFixed(0)}%)` : ""}
+                                  </span>
+                                </div>
+                                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+                                  <div
+                                    className="h-full bg-blue-500 rounded-full transition-all duration-500 shadow-sm"
+                                    style={{ width: `${votePercentage}%` }}
+                                  />
+                                </div>
                               </div>
-                              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
-                                <div
-                                  className="h-full bg-blue-500 rounded-full transition-all duration-500 shadow-sm"
-                                  style={{ width: `${votePercentage}%` }}
-                                />
+                            )}
+                            {voteCount === 0 && (
+                              <div className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+                                No votes yet
                               </div>
-                            </div>
+                            )}
 
                             {resultsData.poll.pollType === "ranking" ? (
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-xs text-gray-500 dark:text-gray-400">Rankings:</span>
-                                {result.rankings.map((rank: number, rankIndex: number) => (
-                                  <span
-                                    key={rankIndex}
-                                    className="px-2 py-1 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
-                                  >
-                                    #{rank}
-                                  </span>
-                                ))}
+                                {result.rankings && result.rankings.length > 0 ? (
+                                  result.rankings.map((rank: number, rankIndex: number) => (
+                                    <span
+                                      key={rankIndex}
+                                      className="px-2 py-1 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                                    >
+                                      #{rank}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="text-xs text-gray-400 dark:text-gray-500">No rankings yet</span>
+                                )}
                               </div>
                             ) : (
                               <div className="mt-3">
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                  {Object.entries(result.choiceCounts || {}).map(([choice, count]: [string, any]) => {
+                                {result.choiceCounts && Object.keys(result.choiceCounts).length > 0 ? (
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                    {Object.entries(result.choiceCounts || {}).map(([choice, count]: [string, any]) => {
                                     const total = result.totalVotes || 1;
                                     const percentage = (count / total) * 100;
                                     const choiceColors: Record<string, any> = {
@@ -773,12 +790,20 @@ export default function AdminPollsPage() {
                                       </div>
                                     );
                                   })}
-                                </div>
+                                  </div>
+                                ) : (
+                                  <div className="text-xs text-gray-400 dark:text-gray-500">No choices recorded yet</div>
+                                )}
                               </div>
                             )}
                           </div>
                         );
-                      })}
+                      })
+                      ) : (
+                        <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                          No results available
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -821,45 +846,55 @@ export default function AdminPollsPage() {
                             </div>
                             <div className="space-y-2">
                               {resultsData.poll.pollType === "ranking" ? (
-                                response.rankings.map((ranked: any, rankIndex: number) => {
-                                  return (
-                                    <div
-                                      key={ranked.optionId}
-                                      className="flex items-center gap-3 p-2 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
-                                    >
-                                      <span className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-xs font-bold text-white shadow-sm">
-                                        {ranked.rank}
-                                      </span>
-                                      <span className="flex-1 font-medium text-gray-900 dark:text-gray-100">
-                                        {ranked.optionText}
-                                      </span>
-                                    </div>
-                                  );
-                                })
+                                response.rankings && response.rankings.length > 0 ? (
+                                  response.rankings.map((ranked: any, rankIndex: number) => {
+                                    return (
+                                      <div
+                                        key={ranked.optionId}
+                                        className="flex items-center gap-3 p-2 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
+                                      >
+                                        <span className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-xs font-bold text-white shadow-sm">
+                                          {ranked.rank}
+                                        </span>
+                                        <span className="flex-1 font-medium text-gray-900 dark:text-gray-100">
+                                          {ranked.optionText}
+                                        </span>
+                                      </div>
+                                    );
+                                  })
+                                ) : (
+                                  <div className="text-sm text-gray-400 dark:text-gray-500">No rankings submitted</div>
+                                )
                               ) : (
-                                response.choices.map((optionChoice: any) => {
-                                  const choiceColors: Record<string, any> = {
-                                    love: { bg: "bg-pink-500", text: "text-pink-700", textDark: "text-pink-300", bgLight: "bg-pink-100", bgDark: "bg-pink-900/40" },
-                                    like: { bg: "bg-green-500", text: "text-green-700", textDark: "text-green-300", bgLight: "bg-green-100", bgDark: "bg-green-900/40" },
-                                    meh: { bg: "bg-yellow-500", text: "text-yellow-700", textDark: "text-yellow-300", bgLight: "bg-yellow-100", bgDark: "bg-yellow-900/40" },
-                                    hate: { bg: "bg-red-500", text: "text-red-700", textDark: "text-red-300", bgLight: "bg-red-100", bgDark: "bg-red-900/40" },
-                                  };
-                                  const choiceColor = choiceColors[optionChoice.choice.toLowerCase()] || { bg: "bg-blue-500", text: "text-blue-700", textDark: "text-blue-300", bgLight: "bg-blue-100", bgDark: "bg-blue-900/40" };
-                                  
-                                  return (
-                                    <div
-                                      key={optionChoice.optionId}
-                                      className="flex items-center gap-3 p-2 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
-                                    >
-                                      <span className="flex-1 font-medium text-gray-900 dark:text-gray-100">
-                                        {optionChoice.optionText}
-                                      </span>
-                                      <span className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${choiceColor.bgLight} dark:${choiceColor.bgDark} ${choiceColor.text} dark:${choiceColor.textDark} border-2 ${choiceColor.bg} border-opacity-30`}>
-                                        {optionChoice.choice}
-                                      </span>
-                                    </div>
-                                  );
-                                })
+                                response.choices && response.choices.length > 0 ? (
+                                  response.choices
+                                    .filter((optionChoice: any) => optionChoice.choice && optionChoice.choice.trim() !== "")
+                                    .map((optionChoice: any) => {
+                                    const choiceColors: Record<string, any> = {
+                                      love: { bg: "bg-pink-500", text: "text-pink-700", textDark: "text-pink-300", bgLight: "bg-pink-100", bgDark: "bg-pink-900/40" },
+                                      like: { bg: "bg-green-500", text: "text-green-700", textDark: "text-green-300", bgLight: "bg-green-100", bgDark: "bg-green-900/40" },
+                                      meh: { bg: "bg-yellow-500", text: "text-yellow-700", textDark: "text-yellow-300", bgLight: "bg-yellow-100", bgDark: "bg-yellow-900/40" },
+                                      hate: { bg: "bg-red-500", text: "text-red-700", textDark: "text-red-300", bgLight: "bg-red-100", bgDark: "bg-red-900/40" },
+                                    };
+                                    const choiceColor = choiceColors[optionChoice.choice.toLowerCase()] || { bg: "bg-blue-500", text: "text-blue-700", textDark: "text-blue-300", bgLight: "bg-blue-100", bgDark: "bg-blue-900/40" };
+                                    
+                                    return (
+                                      <div
+                                        key={optionChoice.optionId}
+                                        className="flex items-center gap-3 p-2 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
+                                      >
+                                        <span className="flex-1 font-medium text-gray-900 dark:text-gray-100">
+                                          {optionChoice.optionText}
+                                        </span>
+                                        <span className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${choiceColor.bgLight} dark:${choiceColor.bgDark} ${choiceColor.text} dark:${choiceColor.textDark} border-2 ${choiceColor.bg} border-opacity-30`}>
+                                          {optionChoice.choice}
+                                        </span>
+                                      </div>
+                                    );
+                                  })
+                                ) : (
+                                  <div className="text-sm text-gray-400 dark:text-gray-500">No choices submitted</div>
+                                )
                               )}
                             </div>
                           </div>

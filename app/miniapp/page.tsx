@@ -691,7 +691,8 @@ function MiniappContent() {
                  "📱 Depthcaster"}
               </button>
               {/* Notification frequency toggle: All / Daily / Weekly */}
-              {(() => {
+              {/* Temporarily hidden */}
+              {false && (() => {
                 const isAppInstalled = installed || added;
                 const areNotificationsEnabled = !!notificationDetails;
                 const getButtonState = () => {
