@@ -75,6 +75,7 @@ export async function GET(
         id: pollResponses.id,
         userFid: pollResponses.userFid,
         rankings: pollResponses.rankings,
+        choices: pollResponses.choices,
         createdAt: pollResponses.createdAt,
         username: users.username,
         displayName: users.displayName,
@@ -84,80 +85,138 @@ export async function GET(
       .innerJoin(users, eq(pollResponses.userFid, users.fid))
       .where(eq(pollResponses.pollId, pollData.id));
 
-    // Calculate collated results
-    // For each option, calculate average rank and total votes
-    const optionStats = options.map((option) => {
-      let totalRank = 0;
-      let voteCount = 0;
-      const rankings: number[] = [];
+    const pollType = pollData.pollType || "ranking";
+    const pollChoices = pollData.choices as string[] | null;
 
-      responses.forEach((response) => {
-        const rankingsArray = response.rankings as string[];
-        const rank = rankingsArray.indexOf(option.id);
-        if (rank !== -1) {
-          // Rank is 0-indexed, so add 1 for display
-          const displayRank = rank + 1;
-          totalRank += displayRank;
-          voteCount++;
-          rankings.push(displayRank);
-        }
-      });
+    let collatedResults: any[] = [];
+    let individualResponses: any[] = [];
 
-      const averageRank = voteCount > 0 ? totalRank / voteCount : 0;
+    if (pollType === "ranking") {
+      // Calculate collated results for ranking type
+      // For each option, calculate average rank and total votes
+      collatedResults = options.map((option) => {
+        let totalRank = 0;
+        let voteCount = 0;
+        const rankings: number[] = [];
 
-      return {
-        optionId: option.id,
-        optionText: option.optionText,
-        averageRank,
-        voteCount,
-        totalRank,
-        rankings, // Individual ranks for this option
-      };
-    });
+        responses.forEach((response) => {
+          const rankingsArray = response.rankings as string[] | null;
+          if (rankingsArray) {
+            const rank = rankingsArray.indexOf(option.id);
+            if (rank !== -1) {
+              // Rank is 0-indexed, so add 1 for display
+              const displayRank = rank + 1;
+              totalRank += displayRank;
+              voteCount++;
+              rankings.push(displayRank);
+            }
+          }
+        });
 
-    // Sort by average rank (lower is better)
-    optionStats.sort((a, b) => {
-      if (a.voteCount === 0 && b.voteCount === 0) return 0;
-      if (a.voteCount === 0) return 1;
-      if (b.voteCount === 0) return -1;
-      return a.averageRank - b.averageRank;
-    });
+        const averageRank = voteCount > 0 ? totalRank / voteCount : 0;
 
-    // Format individual responses
-    const individualResponses = responses.map((response) => {
-      const rankingsArray = response.rankings as string[];
-      const rankedOptions = rankingsArray.map((optionId, index) => {
-        const option = options.find((opt) => opt.id === optionId);
         return {
-          rank: index + 1,
-          optionId,
-          optionText: option?.optionText || "Unknown",
+          optionId: option.id,
+          optionText: option.optionText,
+          averageRank,
+          voteCount,
+          totalRank,
+          rankings, // Individual ranks for this option
         };
       });
 
-      return {
-        id: response.id,
-        userFid: response.userFid,
-        username: response.username,
-        displayName: response.displayName,
-        pfpUrl: response.pfpUrl,
-        rankings: rankedOptions,
-        createdAt: response.createdAt,
-      };
-    });
+      // Sort by average rank (lower is better)
+      collatedResults.sort((a, b) => {
+        if (a.voteCount === 0 && b.voteCount === 0) return 0;
+        if (a.voteCount === 0) return 1;
+        if (b.voteCount === 0) return -1;
+        return a.averageRank - b.averageRank;
+      });
+
+      // Format individual responses for ranking type
+      individualResponses = responses.map((response) => {
+        const rankingsArray = response.rankings as string[] | null;
+        const rankedOptions = rankingsArray?.map((optionId, index) => {
+          const option = options.find((opt) => opt.id === optionId);
+          return {
+            rank: index + 1,
+            optionId,
+            optionText: option?.optionText || "Unknown",
+          };
+        }) || [];
+
+        return {
+          id: response.id,
+          userFid: response.userFid,
+          username: response.username,
+          displayName: response.displayName,
+          pfpUrl: response.pfpUrl,
+          rankings: rankedOptions,
+          createdAt: response.createdAt,
+        };
+      });
+    } else if (pollType === "choice") {
+      // Calculate collated results for choice type
+      // For each option, count choices
+      collatedResults = options.map((option) => {
+        const choiceCounts: Record<string, number> = {};
+        let totalVotes = 0;
+
+        responses.forEach((response) => {
+          const choicesObj = response.choices as Record<string, string> | null;
+          if (choicesObj && choicesObj[option.id]) {
+            const choice = choicesObj[option.id];
+            choiceCounts[choice] = (choiceCounts[choice] || 0) + 1;
+            totalVotes++;
+          }
+        });
+
+        return {
+          optionId: option.id,
+          optionText: option.optionText,
+          choiceCounts,
+          totalVotes,
+        };
+      });
+
+      // Format individual responses for choice type
+      individualResponses = responses.map((response) => {
+        const choicesObj = response.choices as Record<string, string> | null;
+        const optionChoices = options.map((option) => {
+          const choice = choicesObj?.[option.id] || "";
+          return {
+            optionId: option.id,
+            optionText: option.optionText,
+            choice,
+          };
+        });
+
+        return {
+          id: response.id,
+          userFid: response.userFid,
+          username: response.username,
+          displayName: response.displayName,
+          pfpUrl: response.pfpUrl,
+          choices: optionChoices,
+          createdAt: response.createdAt,
+        };
+      });
+    }
 
     return NextResponse.json({
       poll: {
         id: pollData.id,
         castHash: pollData.castHash,
         question: pollData.question,
+        pollType: pollData.pollType || "ranking",
+        choices: pollData.choices,
       },
       options: options.map((opt) => ({
         id: opt.id,
         optionText: opt.optionText,
         order: opt.order,
       })),
-      collatedResults: optionStats,
+      collatedResults,
       individualResponses,
       totalResponses: responses.length,
     });

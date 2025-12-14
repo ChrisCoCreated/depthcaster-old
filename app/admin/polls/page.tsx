@@ -37,6 +37,8 @@ export default function AdminPollsPage() {
   // Form state
   const [castHash, setCastHash] = useState("");
   const [question, setQuestion] = useState("");
+  const [pollType, setPollType] = useState<"ranking" | "choice">("ranking");
+  const [choices, setChoices] = useState<string[]>([]);
   const [options, setOptions] = useState<string[]>([""]);
   const [saving, setSaving] = useState(false);
 
@@ -93,6 +95,8 @@ export default function AdminPollsPage() {
   const handleCreate = () => {
     setCastHash("");
     setQuestion("");
+    setPollType("ranking");
+    setChoices([]);
     setOptions([""]);
     setEditingPoll(null);
     setShowCreateModal(true);
@@ -100,15 +104,25 @@ export default function AdminPollsPage() {
     setSuccess(null);
   };
 
-  const handleEdit = (poll: Poll) => {
+  const handleEdit = async (poll: Poll) => {
     setCastHash(poll.castHash);
     setQuestion(poll.question);
     setEditingPoll(poll);
     setShowCreateModal(true);
     setError(null);
     setSuccess(null);
-    // Load options for this poll
-    loadPollOptions(poll.castHash);
+    // Load poll data including type and choices
+    try {
+      const response = await fetch(`/api/poll/${poll.castHash}`);
+      const data = await response.json();
+      if (response.ok && data.poll) {
+        setPollType(data.poll.pollType || "ranking");
+        setChoices(data.poll.choices || []);
+        setOptions(data.poll.options.map((opt: any) => opt.optionText));
+      }
+    } catch (err) {
+      console.error("Failed to load poll data:", err);
+    }
   };
 
   const loadPollOptions = async (castHash: string) => {
@@ -177,6 +191,20 @@ export default function AdminPollsPage() {
     setOptions([...options, ""]);
   };
 
+  const handleAddChoice = () => {
+    setChoices([...choices, ""]);
+  };
+
+  const handleRemoveChoice = (index: number) => {
+    setChoices(choices.filter((_, i) => i !== index));
+  };
+
+  const handleChoiceChange = (index: number, value: string) => {
+    const newChoices = [...choices];
+    newChoices[index] = value;
+    setChoices(newChoices);
+  };
+
   const handleRemoveOption = (index: number) => {
     if (options.length > 1) {
       setOptions(options.filter((_, i) => i !== index));
@@ -216,6 +244,15 @@ export default function AdminPollsPage() {
       return;
     }
 
+    // Validate choices for choice type
+    if (pollType === "choice") {
+      const validChoices = choices.filter((c) => c.trim().length > 0);
+      if (validChoices.length < 2) {
+        setError("At least 2 choices are required for choice-type polls");
+        return;
+      }
+    }
+
     setSaving(true);
     setError(null);
     setSuccess(null);
@@ -226,6 +263,8 @@ export default function AdminPollsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           question: question.trim(),
+          pollType,
+          choices: pollType === "choice" ? choices.filter((c) => c.trim().length > 0) : undefined,
           options: validOptions,
           userFid: user.fid,
         }),
@@ -425,6 +464,63 @@ export default function AdminPollsPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Poll Type
+                  </label>
+                  <select
+                    value={pollType}
+                    onChange={(e) => {
+                      setPollType(e.target.value as "ranking" | "choice");
+                      if (e.target.value === "choice" && choices.length === 0) {
+                        setChoices(["love", "like", "meh", "hate"]);
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  >
+                    <option value="ranking">Ranking (rank all options)</option>
+                    <option value="choice">Choice (rate each option)</option>
+                  </select>
+                </div>
+
+                {pollType === "choice" && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Choices (at least 2 required)
+                    </label>
+                    <div className="space-y-2">
+                      {choices.map((choice, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={choice}
+                            onChange={(e) => handleChoiceChange(index, e.target.value)}
+                            placeholder={`Choice ${index + 1}`}
+                            className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                            required
+                          />
+                          {choices.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveChoice(index)}
+                              className="px-3 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddChoice}
+                      className="mt-2 px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg"
+                    >
+                      + Add Choice
+                    </button>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Options (at least 2 required)
                   </label>
                   <div className="space-y-2">
@@ -518,7 +614,9 @@ export default function AdminPollsPage() {
                   {/* Collated Results */}
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                      Collated Results (Ranked by Average Position)
+                      {resultsData.poll.pollType === "choice" 
+                        ? "Results by Option" 
+                        : "Collated Results (Ranked by Average Position)"}
                     </h3>
                     <div className="space-y-3">
                       {resultsData.collatedResults.map((result: any, index: number) => (
@@ -528,21 +626,43 @@ export default function AdminPollsPage() {
                         >
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-sm font-semibold text-blue-700 dark:text-blue-300">
-                                {index + 1}
-                              </div>
+                              {resultsData.poll.pollType === "ranking" && (
+                                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-sm font-semibold text-blue-700 dark:text-blue-300">
+                                  {index + 1}
+                                </div>
+                              )}
                               <span className="font-medium text-gray-900 dark:text-gray-100">
                                 {result.optionText}
                               </span>
                             </div>
-                            <div className="text-sm text-gray-600 dark:text-gray-400">
-                              Avg Rank: {result.averageRank.toFixed(2)}
+                            {resultsData.poll.pollType === "ranking" && (
+                              <div className="text-sm text-gray-600 dark:text-gray-400">
+                                Avg Rank: {result.averageRank.toFixed(2)}
+                              </div>
+                            )}
+                          </div>
+                          {resultsData.poll.pollType === "ranking" ? (
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              {result.voteCount} vote{result.voteCount !== 1 ? "s" : ""} • 
+                              Ranks: {result.rankings.join(", ")}
                             </div>
-                          </div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            {result.voteCount} vote{result.voteCount !== 1 ? "s" : ""} • 
-                            Ranks: {result.rankings.join(", ")}
-                          </div>
+                          ) : (
+                            <div className="mt-2">
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                                {result.totalVotes} vote{result.totalVotes !== 1 ? "s" : ""}
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {Object.entries(result.choiceCounts || {}).map(([choice, count]: [string, any]) => (
+                                  <div
+                                    key={choice}
+                                    className="px-3 py-1 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded-lg text-sm"
+                                  >
+                                    {choice}: {count}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -583,19 +703,35 @@ export default function AdminPollsPage() {
                               </div>
                             </div>
                             <div className="space-y-1">
-                              {response.rankings.map((ranked: any) => (
-                                <div
-                                  key={ranked.optionId}
-                                  className="flex items-center gap-2 text-sm"
-                                >
-                                  <span className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-xs font-semibold text-blue-700 dark:text-blue-300">
-                                    {ranked.rank}
-                                  </span>
-                                  <span className="text-gray-700 dark:text-gray-300">
-                                    {ranked.optionText}
-                                  </span>
-                                </div>
-                              ))}
+                              {resultsData.poll.pollType === "ranking" ? (
+                                response.rankings.map((ranked: any) => (
+                                  <div
+                                    key={ranked.optionId}
+                                    className="flex items-center gap-2 text-sm"
+                                  >
+                                    <span className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-xs font-semibold text-blue-700 dark:text-blue-300">
+                                      {ranked.rank}
+                                    </span>
+                                    <span className="text-gray-700 dark:text-gray-300">
+                                      {ranked.optionText}
+                                    </span>
+                                  </div>
+                                ))
+                              ) : (
+                                response.choices.map((optionChoice: any) => (
+                                  <div
+                                    key={optionChoice.optionId}
+                                    className="flex items-center gap-2 text-sm"
+                                  >
+                                    <span className="text-gray-700 dark:text-gray-300 font-medium">
+                                      {optionChoice.optionText}:
+                                    </span>
+                                    <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded text-xs font-medium">
+                                      {optionChoice.choice}
+                                    </span>
+                                  </div>
+                                ))
+                              )}
                             </div>
                           </div>
                         ))

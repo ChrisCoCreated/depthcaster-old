@@ -57,7 +57,11 @@ export async function GET(
         .limit(1);
 
       if (response.length > 0) {
-        userResponse = response[0].rankings as string[];
+        if (pollData.pollType === "ranking") {
+          userResponse = response[0].rankings as string[];
+        } else if (pollData.pollType === "choice") {
+          userResponse = response[0].choices as Record<string, string>;
+        }
       }
     }
 
@@ -66,6 +70,8 @@ export async function GET(
         id: pollData.id,
         castHash: pollData.castHash,
         question: pollData.question,
+        pollType: pollData.pollType || "ranking",
+        choices: pollData.choices as string[] | null,
         createdBy: pollData.createdBy,
         createdAt: pollData.createdAt,
         updatedAt: pollData.updatedAt,
@@ -94,7 +100,7 @@ export async function POST(
   try {
     const { castHash } = await params;
     const body = await request.json();
-    const { question, options, userFid } = body;
+    const { question, options, userFid, pollType, choices } = body;
 
     if (!castHash) {
       return NextResponse.json(
@@ -122,6 +128,18 @@ export async function POST(
         { error: "At least 2 options are required" },
         { status: 400 }
       );
+    }
+
+    const validPollType = pollType === "choice" ? "choice" : "ranking";
+    
+    // Validate choices for choice type
+    if (validPollType === "choice") {
+      if (!Array.isArray(choices) || choices.length < 2) {
+        return NextResponse.json(
+          { error: "At least 2 choices are required for choice-type polls" },
+          { status: 400 }
+        );
+      }
     }
 
     // Check if user is admin
@@ -157,6 +175,8 @@ export async function POST(
         .update(polls)
         .set({
           question: question.trim(),
+          pollType: validPollType,
+          choices: validPollType === "choice" ? choices : null,
           updatedAt: new Date(),
         })
         .where(eq(polls.id, pollId));
@@ -170,6 +190,8 @@ export async function POST(
         .values({
           castHash,
           question: question.trim(),
+          pollType: validPollType,
+          choices: validPollType === "choice" ? choices : null,
           createdBy: fid,
         })
         .returning();

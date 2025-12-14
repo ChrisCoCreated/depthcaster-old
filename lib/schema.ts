@@ -642,6 +642,8 @@ export const polls = pgTable("polls", {
   id: uuid("id").defaultRandom().primaryKey(),
   castHash: text("cast_hash").notNull().unique().references(() => curatedCasts.castHash, { onDelete: "cascade" }),
   question: text("question").notNull(),
+  pollType: text("poll_type").notNull().default("ranking"), // 'ranking' or 'choice'
+  choices: jsonb("choices"), // For choice type: array of choice labels like ["love", "like", "meh", "hate"]
   createdBy: bigint("created_by", { mode: "number" }).notNull().references(() => users.fid),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -665,7 +667,8 @@ export const pollResponses = pgTable("poll_responses", {
   id: uuid("id").defaultRandom().primaryKey(),
   pollId: uuid("poll_id").notNull().references(() => polls.id, { onDelete: "cascade" }),
   userFid: bigint("user_fid", { mode: "number" }).notNull().references(() => users.fid, { onDelete: "cascade" }),
-  rankings: jsonb("rankings").notNull(), // Array of option IDs in ranked order
+  rankings: jsonb("rankings"), // For ranking type: Array of option IDs in ranked order
+  choices: jsonb("choices"), // For choice type: Object mapping optionId -> choice (e.g., { "option-id-1": "love", "option-id-2": "like" })
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({

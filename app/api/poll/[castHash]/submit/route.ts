@@ -13,7 +13,7 @@ export async function POST(
   try {
     const { castHash } = await params;
     const body = await request.json();
-    const { rankings, userFid } = body;
+    const { rankings, choices, userFid } = body;
 
     if (!castHash) {
       return NextResponse.json(
@@ -25,13 +25,6 @@ export async function POST(
     if (!userFid) {
       return NextResponse.json(
         { error: "User FID is required" },
-        { status: 400 }
-      );
-    }
-
-    if (!Array.isArray(rankings) || rankings.length === 0) {
-      return NextResponse.json(
-        { error: "Rankings array is required" },
         { status: 400 }
       );
     }
@@ -68,6 +61,7 @@ export async function POST(
     }
 
     const pollData = poll[0];
+    const pollType = pollData.pollType || "ranking";
 
     // Get all poll options
     const options = await db
@@ -75,30 +69,79 @@ export async function POST(
       .from(pollOptions)
       .where(eq(pollOptions.pollId, pollData.id));
 
-    // Validate rankings - must include all option IDs exactly once
     const optionIds = options.map((opt) => opt.id);
-    if (rankings.length !== optionIds.length) {
-      return NextResponse.json(
-        { error: "Rankings must include all options" },
-        { status: 400 }
-      );
-    }
+    const pollChoices = pollData.choices as string[] | null;
 
-    const rankingsSet = new Set(rankings);
-    if (rankingsSet.size !== rankings.length) {
-      return NextResponse.json(
-        { error: "Rankings must not contain duplicates" },
-        { status: 400 }
-      );
-    }
-
-    for (const rankingId of rankings) {
-      if (!optionIds.includes(rankingId)) {
+    if (pollType === "ranking") {
+      // Validate rankings - must include all option IDs exactly once
+      if (!Array.isArray(rankings) || rankings.length === 0) {
         return NextResponse.json(
-          { error: "Invalid option ID in rankings" },
+          { error: "Rankings array is required for ranking-type polls" },
           { status: 400 }
         );
       }
+
+      if (rankings.length !== optionIds.length) {
+        return NextResponse.json(
+          { error: "Rankings must include all options" },
+          { status: 400 }
+        );
+      }
+
+      const rankingsSet = new Set(rankings);
+      if (rankingsSet.size !== rankings.length) {
+        return NextResponse.json(
+          { error: "Rankings must not contain duplicates" },
+          { status: 400 }
+        );
+      }
+
+      for (const rankingId of rankings) {
+        if (!optionIds.includes(rankingId)) {
+          return NextResponse.json(
+            { error: "Invalid option ID in rankings" },
+            { status: 400 }
+          );
+        }
+      }
+    } else if (pollType === "choice") {
+      // Validate choices - must have a choice for each option
+      if (!choices || typeof choices !== "object") {
+        return NextResponse.json(
+          { error: "Choices object is required for choice-type polls" },
+          { status: 400 }
+        );
+      }
+
+      if (!pollChoices || !Array.isArray(pollChoices)) {
+        return NextResponse.json(
+          { error: "Poll choices configuration is invalid" },
+          { status: 400 }
+        );
+      }
+
+      // Check that all options have a choice
+      for (const optionId of optionIds) {
+        if (!(optionId in choices)) {
+          return NextResponse.json(
+            { error: `Missing choice for option ${optionId}` },
+            { status: 400 }
+          );
+        }
+
+        const choice = choices[optionId];
+        if (!pollChoices.includes(choice)) {
+          return NextResponse.json(
+            { error: `Invalid choice "${choice}" for option ${optionId}. Must be one of: ${pollChoices.join(", ")}` },
+            { status: 400 }
+          );
+        }
+      }
+    } else {
+      return NextResponse.json(
+        { error: "Invalid poll type" },
+        { status: 400 }
+      );
     }
 
     // Check if response already exists
@@ -118,7 +161,8 @@ export async function POST(
       await db
         .update(pollResponses)
         .set({
-          rankings: rankings,
+          rankings: pollType === "ranking" ? rankings : null,
+          choices: pollType === "choice" ? choices : null,
           updatedAt: new Date(),
         })
         .where(eq(pollResponses.id, existingResponse[0].id));
@@ -127,7 +171,8 @@ export async function POST(
       await db.insert(pollResponses).values({
         pollId: pollData.id,
         userFid: fid,
-        rankings: rankings,
+        rankings: pollType === "ranking" ? rankings : null,
+        choices: pollType === "choice" ? choices : null,
       });
     }
 
