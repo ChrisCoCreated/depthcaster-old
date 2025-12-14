@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { curatorPacks, userPackSubscriptions } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import { upsertUser } from "@/lib/users";
+import { recordActivityEvent } from "@/lib/activityTracking";
 
 export async function POST(
   request: NextRequest,
@@ -38,15 +39,29 @@ export async function POST(
     await upsertUser(userFid);
 
     // Create subscription (ignore if already exists)
+    let isNewSubscription = false;
     try {
       await db.insert(userPackSubscriptions).values({
         userFid,
         packId,
       });
+      isNewSubscription = true;
     } catch (error: any) {
       // Ignore unique constraint violations (already subscribed)
       if (!error.message?.includes("unique") && !error.message?.includes("duplicate")) {
         throw error;
+      }
+    }
+
+    // Record activity event for follow_add (only if new subscription)
+    if (isNewSubscription) {
+      try {
+        await recordActivityEvent(userFid, "follow_add", {
+          pack_id: packId,
+        });
+      } catch (error) {
+        // Log but don't fail - activity tracking shouldn't break subscription
+        console.error("Failed to record follow_add activity:", error);
       }
     }
 

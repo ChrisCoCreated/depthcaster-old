@@ -9,11 +9,14 @@ export const users = pgTable("users", {
   signerUuid: text("signer_uuid"),
   preferences: jsonb("preferences"),
   usageStats: jsonb("usage_stats"),
+  firstSignInAt: timestamp("first_sign_in_at"), // MIN of successful sign-ins from sign_in_logs
+  lastQualifyingActivityAt: timestamp("last_qualifying_activity_at"), // MAX of created_at from activity_events
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   usernameIdx: index("username_idx").on(table.username),
   signerUuidIdx: index("signer_uuid_idx").on(table.signerUuid),
+  lastQualifyingActivityAtIdx: index("users_last_qualifying_activity_at_idx").on(table.lastQualifyingActivityAt),
 }));
 
 export const userRoles = pgTable("user_roles", {
@@ -442,6 +445,18 @@ export const signInLogs = pgTable("sign_in_logs", {
   userFidCreatedAtIdx: index("sign_in_logs_user_fid_created_at_idx").on(table.userFid, table.createdAt),
 }));
 
+export const activityEvents = pgTable("activity_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userFid: bigint("user_fid", { mode: "number" }).notNull().references(() => users.fid, { onDelete: "cascade" }),
+  type: text("type").notNull(), // enum: 'post_reply', 'save_curate', 'follow_add', 'session_depth'
+  metadata: jsonb("metadata"), // Optional: cast_hash, duration_seconds, etc.
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  userFidTypeCreatedAtIdx: index("activity_events_user_fid_type_created_at_idx").on(table.userFid, table.type, table.createdAt),
+  userFidCreatedAtIdx: index("activity_events_user_fid_created_at_idx").on(table.userFid, table.createdAt),
+  createdAtIdx: index("activity_events_created_at_idx").on(table.createdAt),
+}));
+
 export const collections = pgTable("collections", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull().unique(),
@@ -551,6 +566,8 @@ export type QualityFeedback = typeof qualityFeedback.$inferSelect;
 export type NewQualityFeedback = typeof qualityFeedback.$inferInsert;
 export type SignInLog = typeof signInLogs.$inferSelect;
 export type NewSignInLog = typeof signInLogs.$inferInsert;
+export type ActivityEvent = typeof activityEvents.$inferSelect;
+export type NewActivityEvent = typeof activityEvents.$inferInsert;
 export const xmtpClients = pgTable("xmtp_clients", {
   id: uuid("id").defaultRandom().primaryKey(),
   userFid: bigint("user_fid", { mode: "number" }).notNull().references(() => users.fid, { onDelete: "cascade" }),

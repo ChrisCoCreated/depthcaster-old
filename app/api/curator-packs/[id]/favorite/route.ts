@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { packFavorites } from "@/lib/schema";
 import { eq, and } from "drizzle-orm";
+import { recordActivityEvent } from "@/lib/activityTracking";
 
 export async function POST(
   request: NextRequest,
@@ -40,6 +41,16 @@ export async function POST(
       packId,
       userFid,
     });
+
+    // Record activity event for follow_add
+    try {
+      await recordActivityEvent(userFid, "follow_add", {
+        pack_id: packId,
+      });
+    } catch (error) {
+      // Log but don't fail - activity tracking shouldn't break favorite
+      console.error("Failed to record follow_add activity:", error);
+    }
 
     return NextResponse.json({ favorited: true });
   } catch (error: any) {

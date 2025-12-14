@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { feedViewSessions } from "@/lib/schema";
+import { recordActivityEvent } from "@/lib/activityTracking";
 
 export async function POST(request: NextRequest) {
   try {
@@ -51,6 +52,19 @@ export async function POST(request: NextRequest) {
         curatorFids: curatorFids && curatorFids.length > 0 ? curatorFids : null,
         packIds: packIds && packIds.length > 0 ? packIds : null,
       } as any);
+
+      // Record activity event if session duration >= 60 seconds (qualifying activity)
+      if (userFid && validatedDuration >= 60) {
+        try {
+          await recordActivityEvent(Number(userFid), "session_depth", {
+            duration_seconds: validatedDuration,
+            feed_type: feedType,
+          });
+        } catch (error) {
+          // Log but don't fail - activity tracking shouldn't break the app
+          console.error("Failed to record session_depth activity:", error);
+        }
+      }
     } catch (error) {
       // Log but don't fail - analytics shouldn't break the app
       console.error("Failed to track feed view session:", error);

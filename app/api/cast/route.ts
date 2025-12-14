@@ -16,6 +16,7 @@ import {
 } from "@/lib/castLimits";
 import { analyzeCastQualityAsync } from "@/lib/deepseek-quality";
 import { isSuperAdmin, getUserRoles } from "@/lib/roles";
+import { recordActivityEvent } from "@/lib/activityTracking";
 
 export async function POST(request: NextRequest) {
   try {
@@ -264,6 +265,20 @@ export async function POST(request: NextRequest) {
 
                 console.log(`[Cast API] Stored quote cast ${replyCastHash} for curated cast ${quotedCastHash}`);
 
+                // Record activity event for post_reply (only if author_fid is not null)
+                if (metadata.authorFid) {
+                  try {
+                    await recordActivityEvent(metadata.authorFid, "post_reply", {
+                      cast_hash: replyCastHash,
+                      curated_cast_hash: quotedCastHash,
+                      is_quote_cast: true,
+                    });
+                  } catch (error) {
+                    // Log but don't fail - activity tracking shouldn't break cast creation
+                    console.error("Failed to record post_reply activity:", error);
+                  }
+                }
+
                 // Trigger async quality analysis (non-blocking)
                 analyzeCastQualityAsync(replyCastHash, fullCastData, async (hash, result) => {
                   try {
@@ -402,6 +417,19 @@ export async function POST(request: NextRequest) {
                   });
 
                 console.log(`[Cast API] Stored reply ${replyCastHash} for curated cast ${rootHash} at depth ${replyDepth}`);
+
+                // Record activity event for post_reply (only if author_fid is not null)
+                if (metadata.authorFid) {
+                  try {
+                    await recordActivityEvent(metadata.authorFid, "post_reply", {
+                      cast_hash: replyCastHash,
+                      curated_cast_hash: rootHash,
+                    });
+                  } catch (error) {
+                    // Log but don't fail - activity tracking shouldn't break cast creation
+                    console.error("Failed to record post_reply activity:", error);
+                  }
+                }
 
                 // Trigger async quality analysis (non-blocking)
                 analyzeCastQualityAsync(replyCastHash, fullCastData, async (hash, result) => {

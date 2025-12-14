@@ -13,6 +13,7 @@ interface Statistics {
     new: number;
     withRoles: number;
     uniqueActiveUsers: number;
+    miniappOnlyUsers?: number;
   };
   activeUsers: Array<{
     date: string;
@@ -419,7 +420,7 @@ export default function UserStatisticsPage() {
             {/* Overview Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Authenticated Users</h3>
+                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Signed-In Users (All Time)</h3>
                 <p className="text-3xl font-bold text-gray-900 dark:text-gray-100 mt-2">
                   {formatNumber(statistics.users.total)}
                 </p>
@@ -428,8 +429,8 @@ export default function UserStatisticsPage() {
                     +{formatNumber(statistics.users.new)} new
                   </p>
                 )}
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {formatNumber(statistics.users.uniqueActiveUsers)} active
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1" title="Users who have taken at least one meaningful action in the past 14 days">
+                  {formatNumber(statistics.users.uniqueActiveUsers)} D14 Active
                 </p>
               </div>
 
@@ -441,9 +442,12 @@ export default function UserStatisticsPage() {
               </div>
 
               <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Active Users (14 days)</h3>
+                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">14-Day Active Users (D14 Active)</h3>
                 <p className="text-3xl font-bold text-gray-900 dark:text-gray-100 mt-2">
                   {formatNumber(statistics.users.uniqueActiveUsers)}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1" title="Users who have taken at least one meaningful action in the past 14 days">
+                  Core retention metric
                 </p>
               </div>
 
@@ -471,7 +475,11 @@ export default function UserStatisticsPage() {
                     </span>
                     <span>Active Users (Past 30 Days)</span>
                   </button>
-                  <div className="flex items-center gap-2">
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                  Based on qualifying activity events: post/reply, save/curate, follow/add, session depth (≥60s)
+                </p>
+                <div className="flex items-center gap-2 mb-4">
                     <label className="text-sm text-gray-600 dark:text-gray-400">Miniview</label>
                     <button
                       onClick={() => setMiniview(!miniview)}

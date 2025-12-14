@@ -12,6 +12,7 @@ import { refreshUnifiedCuratedWebhooks } from "@/lib/webhooks-unified";
 import { sendPushNotificationToUser } from "@/lib/pushNotifications";
 import { upsertUser } from "@/lib/users";
 import { analyzeCastQualityAsync } from "@/lib/deepseek-quality";
+import { recordActivityEvent } from "@/lib/activityTracking";
 
 // Disable body parsing to read raw body for signature verification
 export const runtime = "nodejs";
@@ -757,6 +758,16 @@ export async function POST(request: NextRequest) {
         castHash,
         curatorFid,
       }).returning();
+
+      // Record activity event for save_curate
+      try {
+        await recordActivityEvent(curatorFid, "save_curate", {
+          cast_hash: castHash,
+        });
+      } catch (error) {
+        // Log but don't fail - activity tracking shouldn't break curation
+        console.error("Failed to record save_curate activity:", error);
+      }
 
       // Check AFTER insert to avoid race conditions - if only 1 curator exists, this is the first curation
       const allCurators = await db

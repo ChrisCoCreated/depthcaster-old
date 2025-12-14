@@ -24,8 +24,10 @@ import {
   apiCallStats,
   miniappInstallations,
   signInLogs,
+  activityEvents,
 } from "@/lib/schema";
 import { isAdmin, getUserRoles, getAllAdminFids, getAllCuratorFids } from "@/lib/roles";
+import { get14DayActiveUsers, getSignedInEver, getMiniappOnlyUsers } from "@/lib/canonicalMetrics";
 
 function getTimeRangeFilter(period: string) {
   const now = new Date();
@@ -74,11 +76,10 @@ export async function GET(request: NextRequest) {
       ? sql`AND created_at >= ${timeFilter.toISOString()}`
       : sql``;
 
-    // User Statistics - Authenticated users are those who have successfully logged in
-    const totalUsers = await db
-      .select({ count: sql<number>`count(distinct user_fid)::int` })
-      .from(signInLogs)
-      .where(sql`success = true AND user_fid IS NOT NULL`);
+    // Canonical User Statistics
+    const signedInEver = await getSignedInEver();
+    const d14ActiveUsers = await get14DayActiveUsers();
+    const miniappOnlyUsers = await getMiniappOnlyUsers();
     
     const newUsers = timeFilter
       ? await db
@@ -90,23 +91,6 @@ export async function GET(request: NextRequest) {
     const usersWithRoles = await db
       .select({ count: sql<number>`count(distinct user_fid)::int` })
       .from(userRoles);
-
-    // Active users are those with activity in the past 14 days
-    const fourteenDaysAgo = new Date();
-    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
-    const uniqueActiveUsers = await db.execute(sql`
-      SELECT COUNT(DISTINCT user_fid)::int as count
-      FROM (
-        SELECT user_fid FROM feed_view_sessions 
-        WHERE user_fid IS NOT NULL AND created_at >= ${fourteenDaysAgo.toISOString()}
-        UNION
-        SELECT user_fid FROM cast_views 
-        WHERE user_fid IS NOT NULL AND created_at >= ${fourteenDaysAgo.toISOString()}
-        UNION
-        SELECT user_fid FROM page_views 
-        WHERE user_fid IS NOT NULL AND created_at >= ${fourteenDaysAgo.toISOString()}
-      ) active_users
-    `);
 
     // Anonymous vs Authenticated analytics
     const authenticatedPageViewsQuery = timeFilter
@@ -596,10 +580,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       period,
       users: {
-        total: totalUsers[0]?.count || 0, // All authenticated users (users who have successfully logged in)
+        total: signedInEver, // All-Time Signed-In Users (canonical metric)
         new: newUsers[0]?.count || 0,
         withRoles: usersWithRoles[0]?.count || 0,
-        uniqueActiveUsers: ((uniqueActiveUsers as any).rows?.[0]?.count || 0) as number, // Users with activity in past 14 days
+        uniqueActiveUsers: d14ActiveUsers, // 14-Day Active Users (canonical metric)
+        miniappOnlyUsers: miniappOnlyUsers, // Users with miniapp but no qualifying activity
       },
       analytics: {
         pageViews: {
@@ -707,60 +692,40 @@ export async function GET(request: NextRequest) {
         // Get admin FIDs to exclude
         const adminFids = await getAllAdminFids();
 
-        // Get date range for past 30 days
+        // Get date range for past 30 days (for UI display, but using canonical activity_events)
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         const startDate = thirtyDaysAgo.toISOString().split('T')[0];
 
         // Build admin exclusion clause
         const adminExclusion = adminFids.length > 0 
-          ? sql`AND ua.user_fid NOT IN (${sql.join(adminFids.map(fid => sql`${fid}`), sql`, `)})`
+          ? sql`AND ae.user_fid NOT IN (${sql.join(adminFids.map(fid => sql`${fid}`), sql`, `)})`
           : sql``;
 
-        // Query active users for past 30 days
-        // Combine data from feedViewSessions, castViews, and pageViews
+        // Query active users for past 30 days using canonical activity_events
         const activeUsersQuery = await db.execute(sql`
           WITH user_activity AS (
             SELECT DISTINCT
               user_fid,
               DATE(created_at) as activity_date
-            FROM feed_view_sessions
-            WHERE user_fid IS NOT NULL
-              AND created_at >= ${startDate}
-            
-            UNION
-            
-            SELECT DISTINCT
-              user_fid,
-              DATE(created_at) as activity_date
-            FROM cast_views
-            WHERE user_fid IS NOT NULL
-              AND created_at >= ${startDate}
-            
-            UNION
-            
-            SELECT DISTINCT
-              user_fid,
-              DATE(created_at) as activity_date
-            FROM page_views
-            WHERE user_fid IS NOT NULL
-              AND created_at >= ${startDate}
+            FROM activity_events
+            WHERE created_at >= ${startDate}
           ),
           curation_activity AS (
             SELECT DISTINCT
-              curator_fid as user_fid,
+              user_fid,
               DATE(created_at) as activity_date
-            FROM curator_cast_curations
-            WHERE created_at >= ${startDate}
+            FROM activity_events
+            WHERE type = 'save_curate'
+              AND created_at >= ${startDate}
           ),
           onchain_activity AS (
             SELECT DISTINCT
               user_fid,
               DATE(created_at) as activity_date
-            FROM curated_cast_interactions
-            WHERE user_fid IS NOT NULL
+            FROM activity_events
+            WHERE type = 'post_reply'
               AND created_at >= ${startDate}
-              AND interaction_type IN ('like', 'recast', 'reply', 'quote')
           )
           SELECT
             ua.activity_date::text as date,
@@ -823,24 +788,15 @@ export async function GET(request: NextRequest) {
             };
           }
 
-          // Get last activity date for ALL curators from all activity sources
+          // Get last activity date for ALL curators from canonical activity_events
+          // Also include sign_in_logs for "never signed in" detection
           const lastVisits = await db.execute(sql`
             WITH curator_visits AS (
               SELECT DISTINCT
                 user_fid,
                 MAX(created_at) as last_visit
               FROM (
-                SELECT user_fid, created_at FROM feed_view_sessions WHERE user_fid IS NOT NULL
-                UNION ALL
-                SELECT user_fid, created_at FROM cast_views WHERE user_fid IS NOT NULL
-                UNION ALL
-                SELECT user_fid, created_at FROM page_views WHERE user_fid IS NOT NULL
-                UNION ALL
-                SELECT curator_fid as user_fid, created_at FROM curator_cast_curations
-                UNION ALL
-                SELECT user_fid, created_at FROM curated_cast_interactions 
-                  WHERE user_fid IS NOT NULL 
-                  AND interaction_type IN ('like', 'recast', 'reply', 'quote')
+                SELECT user_fid, created_at FROM activity_events
                 UNION ALL
                 SELECT user_fid, created_at FROM sign_in_logs 
                   WHERE user_fid IS NOT NULL 

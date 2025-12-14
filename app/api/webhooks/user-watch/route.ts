@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { userWatches } from "@/lib/schema";
+import { recordActivityEvent } from "@/lib/activityTracking";
 import { eq, and } from "drizzle-orm";
 import { getWatchedFids } from "@/lib/webhooks";
 import { refreshUnifiedUserWatchWebhook } from "@/lib/webhooks-unified-watches";
@@ -47,6 +48,16 @@ export async function POST(request: NextRequest) {
         watchedFid,
       })
       .returning();
+
+    // Record activity event for follow_add
+    try {
+      await recordActivityEvent(watcherFid, "follow_add", {
+        watched_fid: watchedFid,
+      });
+    } catch (error) {
+      // Log but don't fail - activity tracking shouldn't break watch
+      console.error("Failed to record follow_add activity:", error);
+    }
 
     // Refresh unified webhook to include new watched user
     await refreshUnifiedUserWatchWebhook();

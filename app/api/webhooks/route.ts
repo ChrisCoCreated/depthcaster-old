@@ -13,6 +13,7 @@ import { analyzeCastQualityAsync } from "@/lib/deepseek-quality";
 import { findOriginalCuratedCast } from "@/lib/interactions";
 import { getUserRoles } from "@/lib/roles";
 import { upsertUser } from "@/lib/users";
+import { recordActivityEvent } from "@/lib/activityTracking";
 
 // Disable body parsing to read raw body for signature verification
 export const runtime = "nodejs";
@@ -374,6 +375,20 @@ export async function POST(request: NextRequest) {
                 engagementScore: metadata.engagementScore,
               }).onConflictDoNothing({ target: castReplies.replyCastHash });
 
+              // Record activity event for post_reply (only if author_fid is not null)
+              if (finalAuthorFid) {
+                try {
+                  await recordActivityEvent(finalAuthorFid, "post_reply", {
+                    cast_hash: castHash,
+                    curated_cast_hash: quotedCastHash,
+                    is_quote_cast: true,
+                  });
+                } catch (error) {
+                  // Log but don't fail - activity tracking shouldn't break webhook processing
+                  console.error("Failed to record post_reply activity:", error);
+                }
+              }
+
               console.log(`[Webhook] Stored cast via curated-quote webhook: castHash=${castHash} curatedCastHash=${quotedCastHash}`);
 
               // Trigger async quality analysis (non-blocking)
@@ -551,6 +566,19 @@ export async function POST(request: NextRequest) {
                 repliesCount: metadata.repliesCount,
                 engagementScore: metadata.engagementScore,
               }).onConflictDoNothing({ target: castReplies.replyCastHash });
+
+            // Record activity event for post_reply (only if author_fid is not null)
+            if (finalAuthorFid) {
+              try {
+                await recordActivityEvent(finalAuthorFid, "post_reply", {
+                  cast_hash: castHash,
+                  curated_cast_hash: curatedCastHash,
+                });
+              } catch (error) {
+                // Log but don't fail - activity tracking shouldn't break webhook processing
+                console.error("Failed to record post_reply activity:", error);
+              }
+            }
 
             console.log(`[Webhook] Stored cast via curated-reply webhook: castHash=${castHash} curatedCastHash=${curatedCastHash} depth=${replyDepth}`);
             

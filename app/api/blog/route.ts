@@ -3,6 +3,7 @@ import { isBlogLink, parseBlogUrl } from "@/lib/blog";
 import { ParagraphAPI } from "@paragraph_xyz/sdk";
 import { fetchSubstackPost } from "@/lib/rss-fetcher";
 import { fetchGenericArticle } from "@/lib/extractors/genericArticle";
+import { cacheBlog } from "@/lib/cache";
 
 /**
  * Unified blog API route that handles both Paragraph and Substack posts
@@ -18,6 +19,14 @@ export async function GET(request: NextRequest) {
         { error: "URL parameter is required" },
         { status: 400 }
       );
+    }
+
+    // Check cache first
+    const cacheKey = cacheBlog.generateKey(url);
+    const cached = cacheBlog.get(cacheKey);
+    if (cached) {
+      console.log('[Blog API] Cache hit for:', url);
+      return NextResponse.json(cached);
     }
 
     // Detect blog platform
@@ -166,7 +175,7 @@ async function handleParagraphPost(url: string): Promise<NextResponse> {
   }
 
   // Return formatted post data (normalized format)
-  return NextResponse.json({
+  const responseData = {
     id: postData.id,
     title: postData.title,
     subtitle: postData.subtitle,
@@ -181,7 +190,12 @@ async function handleParagraphPost(url: string): Promise<NextResponse> {
     publishedAt: postData.publishedAt,
     createdAt: postData.updatedAt || postData.publishedAt,
     url: url,
-  });
+  };
+  
+  // Cache the response
+  cacheBlog.set(cacheBlog.generateKey(url), responseData);
+  
+  return NextResponse.json(responseData);
 }
 
 /**
@@ -192,13 +206,18 @@ async function handleSubstackPost(url: string): Promise<NextResponse> {
     const postData = await fetchSubstackPost(url);
     
     // Return normalized format (same as Paragraph)
-    return NextResponse.json({
+    const responseData = {
       ...postData,
       publication: {
         ...postData.publication,
         platform: 'substack',
       },
-    });
+    };
+    
+    // Cache the response
+    cacheBlog.set(cacheBlog.generateKey(url), responseData);
+    
+    return NextResponse.json(responseData);
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     
@@ -239,7 +258,7 @@ async function handleGenericArticle(url: string): Promise<NextResponse> {
     console.log('[Blog API] Successfully extracted article:', articleData.title);
     
     // Return normalized format (same as Paragraph/Substack)
-    return NextResponse.json({
+    const responseData = {
       id: articleData.id,
       title: articleData.title,
       subtitle: articleData.subtitle,
@@ -254,7 +273,12 @@ async function handleGenericArticle(url: string): Promise<NextResponse> {
       publishedAt: articleData.publishedAt,
       createdAt: articleData.createdAt,
       url: articleData.url,
-    });
+    };
+    
+    // Cache the response
+    cacheBlog.set(cacheBlog.generateKey(url), responseData);
+    
+    return NextResponse.json(responseData);
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error('[Blog API] Error fetching generic article:', errorMessage);
