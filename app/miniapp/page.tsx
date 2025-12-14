@@ -610,8 +610,15 @@ function MiniappContent() {
             <Link href="/" className="text-lg font-bold text-gray-900 dark:text-gray-100">
               Depthcaster <span className="text-xs font-normal text-gray-500 dark:text-gray-400">Beta</span>
             </Link>
-          {context?.user?.fid && (
-            <div className="relative flex items-center gap-1">
+            <div className="flex items-center gap-3">
+              <Link
+                href="/pfp-collection"
+                className="text-sm text-blue-600 dark:text-blue-400 hover:underline font-medium"
+              >
+                Mint PFP
+              </Link>
+              {context?.user?.fid && (
+                <div className="relative flex items-center gap-1">
               {/* Toggle for opening links: Auto Open Depthcaster, Farcaster, or Depthcaster */}
               <button
                 onClick={() => {
@@ -717,9 +724,10 @@ function MiniappContent() {
                     </button>
                   </div>
                 </div>
+                )}
+              </div>
               )}
             </div>
-          )}
           </div>
         </div>
       </div>

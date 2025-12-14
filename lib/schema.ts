@@ -660,3 +660,21 @@ export type NewPollOption = typeof pollOptions.$inferInsert;
 export type PollResponse = typeof pollResponses.$inferSelect;
 export type NewPollResponse = typeof pollResponses.$inferInsert;
 
+export const pfpNfts = pgTable("pfp_nfts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tokenId: bigint("token_id", { mode: "number" }).notNull(),
+  ownerAddress: text("owner_address").notNull(),
+  imageUrl: text("image_url").notNull(),
+  metadata: jsonb("metadata"),
+  mintedAt: timestamp("minted_at").defaultNow().notNull(),
+  transactionHash: text("transaction_hash"),
+  replicateJobId: text("replicate_job_id"),
+}, (table) => ({
+  tokenIdIdx: index("pfp_nfts_token_id_idx").on(table.tokenId),
+  ownerAddressIdx: index("pfp_nfts_owner_address_idx").on(table.ownerAddress),
+  transactionHashIdx: index("pfp_nfts_transaction_hash_idx").on(table.transactionHash),
+}));
+
+export type PfpNft = typeof pfpNfts.$inferSelect;
+export type NewPfpNft = typeof pfpNfts.$inferInsert;
+
