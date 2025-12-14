@@ -3000,6 +3000,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                             </div>
                           </a>
                         </div>
+                      </div>
                       );
                     }
                     
