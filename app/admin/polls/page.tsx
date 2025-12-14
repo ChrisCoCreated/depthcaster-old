@@ -31,6 +31,7 @@ export default function AdminPollsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [viewingResults, setViewingResults] = useState<Poll | null>(null);
   const [resultsData, setResultsData] = useState<any>(null);
+  const [originalResultsData, setOriginalResultsData] = useState<any>(null);
   const [loadingResults, setLoadingResults] = useState(false);
   const [savingMerge, setSavingMerge] = useState<string | null>(null);
   const [optionMerges, setOptionMerges] = useState<Record<string, string>>({});
@@ -143,6 +144,71 @@ export default function AdminPollsPage() {
     }
   };
 
+  const applyMergesToResults = (merges: Record<string, string>, originalData: any) => {
+    if (!originalData) return;
+    
+    // Create a map to track which existing options have merged data
+    const mergedDataMap = new Map<string, any>();
+    
+    // First pass: collect all merged data
+    originalData.collatedResults.forEach((result: any) => {
+      const mergedIntoId = merges[result.optionId];
+      if (result.isDeleted && mergedIntoId) {
+        if (!mergedDataMap.has(mergedIntoId)) {
+          const targetResult = originalData.collatedResults.find((r: any) => r.optionId === mergedIntoId && !r.isDeleted);
+          if (targetResult) {
+            mergedDataMap.set(mergedIntoId, {
+              ...targetResult,
+              mergedFrom: [],
+            });
+          }
+        }
+        const merged = mergedDataMap.get(mergedIntoId);
+        if (merged) {
+          // Combine choice counts
+          Object.entries(result.choiceCounts || {}).forEach(([choice, count]: [string, any]) => {
+            merged.choiceCounts[choice] = (merged.choiceCounts[choice] || 0) + count;
+          });
+          merged.totalVotes = (merged.totalVotes || 0) + (result.totalVotes || 0);
+          merged.mergedFrom.push(result.optionId);
+        }
+      }
+    });
+    
+    // Second pass: build final results
+    const mergedResults = originalData.collatedResults
+      .map((result: any) => {
+        const mergedIntoId = merges[result.optionId];
+        if (result.isDeleted && mergedIntoId) {
+          // This deleted option is merged - return the merged version
+          return mergedDataMap.get(mergedIntoId);
+        } else if (!result.isDeleted && mergedDataMap.has(result.optionId)) {
+          // This existing option has merged data - return the merged version
+          return mergedDataMap.get(result.optionId);
+        } else if (!result.isDeleted) {
+          // Regular existing option
+          return result;
+        } else {
+          // Deleted option that's not merged
+          return result;
+        }
+      })
+      .filter((result: any) => {
+        // Remove duplicates and deleted options that are merged
+        const mergedIntoId = merges[result?.optionId];
+        return result && !(result.isDeleted && mergedIntoId);
+      })
+      .filter((result: any, index: number, self: any[]) => {
+        // Remove duplicates (keep first occurrence)
+        return index === self.findIndex((r: any) => r.optionId === result.optionId);
+      });
+    
+    setResultsData({
+      ...originalData,
+      collatedResults: mergedResults,
+    });
+  };
+
   const handleViewResults = async (poll: Poll) => {
     if (!user?.fid) return;
 
@@ -161,7 +227,22 @@ export default function AdminPollsPage() {
       }
 
       console.log("Poll results data:", data); // Debug log
+      setOriginalResultsData(data);
       setResultsData(data);
+      
+      // Load option merges from localStorage
+      const pollId = poll.slug || poll.castHash;
+      const storedMerges = localStorage.getItem(`poll_merges_${pollId}`);
+      if (storedMerges) {
+        try {
+          const merges = JSON.parse(storedMerges);
+          setOptionMerges(merges);
+          // Apply merges to results
+          applyMergesToResults(merges, data);
+        } catch (e) {
+          console.error("Error parsing stored merges:", e);
+        }
+      }
     } catch (err: any) {
       console.error("Error loading results:", err);
       setError(err.message || "Failed to load results");
@@ -645,6 +726,8 @@ export default function AdminPollsPage() {
                   onClick={() => {
                     setViewingResults(null);
                     setResultsData(null);
+                    setOriginalResultsData(null);
+                    setOptionMerges({});
                   }}
                   className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                 >
@@ -740,7 +823,7 @@ export default function AdminPollsPage() {
                                           // Save to localStorage
                                           localStorage.setItem(`poll_merges_${pollId}`, JSON.stringify(newMerges));
                                           // Recalculate results with merges
-                                          applyMergesToResults(newMerges);
+                                          applyMergesToResults(newMerges, originalResultsData || resultsData);
                                         } catch (err) {
                                           console.error("Error saving merge:", err);
                                         } finally {
