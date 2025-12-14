@@ -1,6 +1,6 @@
 export type FeedType = "channel" | "user" | "fids" | "custom";
 
-export type FilterType = "authorFid" | "excludeRecasts" | "minLength" | "custom";
+export type FilterType = "authorFid" | "excludeRecasts" | "minLength" | "hasParagraphPost" | "custom";
 
 export interface FeedFilter {
   type: FilterType;

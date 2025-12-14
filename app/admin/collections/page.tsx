@@ -1408,7 +1408,7 @@ function CollectionModal({
                               const newFilters = [...autoCurationFilters];
                               newFilters[index] = {
                                 type: e.target.value,
-                                value: e.target.value === "excludeRecasts" ? true : "",
+                                value: e.target.value === "excludeRecasts" || e.target.value === "hasParagraphPost" ? true : "",
                               };
                               setAutoCurationFilters(newFilters);
                             }}
@@ -1417,10 +1417,15 @@ function CollectionModal({
                             <option value="authorFid">Author FID</option>
                             <option value="excludeRecasts">Exclude Recasts</option>
                             <option value="minLength">Min Length</option>
+                            <option value="hasParagraphPost">Has Paragraph Post</option>
                           </select>
                           {filter.type === "excludeRecasts" ? (
                             <div className="flex-1 flex items-center text-sm text-gray-600 dark:text-gray-400">
                               Excludes all recasts (casts with parent_hash)
+                            </div>
+                          ) : filter.type === "hasParagraphPost" ? (
+                            <div className="flex-1 flex items-center text-sm text-gray-600 dark:text-gray-400">
+                              Only includes casts with Paragraph post links (in embeds or text)
                             </div>
                           ) : filter.type === "authorFid" ? (
                             <input

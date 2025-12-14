@@ -10,6 +10,7 @@ import { extractCastTimestamp } from "@/lib/cast-timestamp";
 import { extractCastMetadata } from "@/lib/cast-metadata";
 import { upsertUser } from "@/lib/users";
 import type { CustomFeed } from "@/lib/customFeeds";
+import { isParagraphLink } from "@/lib/paragraph";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,6 +26,37 @@ function verifyCronRequest(request: NextRequest): boolean {
     console.warn("[Auto-Curate Collections Cron] CRON_SECRET not set - allowing request (development mode)");
     return true;
   }
+  return false;
+}
+
+/**
+ * Check if a cast has a Paragraph post link in embeds or text
+ */
+function castHasParagraphPost(cast: any): boolean {
+  // Check embeds for Paragraph URLs
+  if (cast.embeds && Array.isArray(cast.embeds)) {
+    for (const embed of cast.embeds) {
+      if (embed.url && isParagraphLink(embed.url)) {
+        return true;
+      }
+    }
+  }
+
+  // Check cast text for Paragraph URLs
+  if (cast.text) {
+    const urlRegex = /(https?:\/\/[^\s<>"']+)|(www\.[^\s<>"']+)/g;
+    let match;
+    while ((match = urlRegex.exec(cast.text)) !== null) {
+      let url = match[1] || match[2];
+      if (url && !url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'https://' + url;
+      }
+      if (url && isParagraphLink(url)) {
+        return true;
+      }
+    }
+  }
+
   return false;
 }
 
@@ -69,6 +101,15 @@ function applyFilters(casts: any[], filters: any[]): any[] {
           }
         }
         if (minLength !== null && (!cast.text || cast.text.length < minLength)) {
+          return false;
+        }
+      } else if (filter.type === "hasParagraphPost") {
+        const hasParagraph = castHasParagraphPost(cast);
+        // If filter value is true, only include casts with Paragraph posts
+        // If filter value is false or not set, exclude casts with Paragraph posts
+        if (filter.value === true && !hasParagraph) {
+          return false;
+        } else if (filter.value === false && hasParagraph) {
           return false;
         }
       }
