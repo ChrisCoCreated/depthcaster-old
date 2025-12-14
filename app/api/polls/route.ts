@@ -64,6 +64,7 @@ export async function GET(request: NextRequest) {
         return {
           id: poll.id,
           castHash: poll.castHash,
+          slug: poll.slug,
           question: poll.question,
           createdBy: poll.createdBy,
           createdAt: poll.createdAt,

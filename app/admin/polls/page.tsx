@@ -11,6 +11,7 @@ import { AvatarImage } from "@/app/components/AvatarImage";
 interface Poll {
   id: string;
   castHash: string;
+  slug?: string | null;
   question: string;
   createdBy: number;
   createdAt: string;
@@ -370,10 +371,10 @@ export default function AdminPollsPage() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-2">
                       <code className="text-sm text-gray-900 dark:text-gray-100 font-mono">
-                        {poll.castHash.slice(0, 10)}...
+                        {poll.slug || `${poll.castHash.slice(0, 10)}...`}
                       </code>
                       <Link
-                        href={`/poll/${poll.castHash}`}
+                        href={`/polls/${poll.slug || poll.castHash}`}
                         target="_blank"
                         className="text-blue-600 dark:text-blue-400 hover:underline"
                       >
