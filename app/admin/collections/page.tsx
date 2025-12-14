@@ -40,6 +40,7 @@ export default function AdminCollectionsPage() {
   const [managingCollection, setManagingCollection] = useState<Collection | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [autoCuratingCollection, setAutoCuratingCollection] = useState<string | null>(null);
 
   useEffect(() => {
     const checkAdminAccess = async () => {
@@ -142,6 +143,39 @@ export default function AdminCollectionsPage() {
     } catch (error: any) {
       setError(error.message || "Failed to delete collection");
       setTimeout(() => setError(null), 5000);
+    }
+  };
+
+  const handleAutoCurate = async (collection: Collection) => {
+    if (!user?.fid) return;
+    if (!collection.autoCurationEnabled) {
+      setError("Auto-curation is not enabled for this collection");
+      setTimeout(() => setError(null), 5000);
+      return;
+    }
+
+    setAutoCuratingCollection(collection.name);
+    try {
+      const response = await fetch(`/api/collections/${encodeURIComponent(collection.name)}/auto-curate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminFid: user.fid }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to run auto-curation");
+      }
+
+      const data = await response.json();
+      setSuccess(data.message || `Auto-curation completed: ${data.added} cast(s) added`);
+      loadCollections();
+      setTimeout(() => setSuccess(null), 5000);
+    } catch (error: any) {
+      setError(error.message || "Failed to run auto-curation");
+      setTimeout(() => setError(null), 5000);
+    } finally {
+      setAutoCuratingCollection(null);
     }
   };
 
@@ -317,7 +351,7 @@ export default function AdminCollectionsPage() {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <Link
                           href={`/collection/${collection.name}`}
                           target="_blank"
@@ -331,6 +365,15 @@ export default function AdminCollectionsPage() {
                         >
                           Manage Casts
                         </button>
+                        {collection.autoCurationEnabled && (
+                          <button
+                            onClick={() => handleAutoCurate(collection)}
+                            disabled={autoCuratingCollection === collection.name}
+                            className="text-purple-600 dark:text-purple-400 hover:text-purple-900 dark:hover:text-purple-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {autoCuratingCollection === collection.name ? "Curating..." : "Auto Curate Now"}
+                          </button>
+                        )}
                         <button
                           onClick={() => setEditingCollection(collection)}
                           className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300"
