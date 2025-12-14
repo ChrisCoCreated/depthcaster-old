@@ -84,6 +84,7 @@ export async function GET(
         options: options.map((opt) => ({
           id: opt.id,
           optionText: opt.optionText,
+          markdown: opt.markdown,
           order: opt.order,
         })),
       },
@@ -132,6 +133,27 @@ export async function POST(
     if (!Array.isArray(options) || options.length < 2) {
       return NextResponse.json(
         { error: "At least 2 options are required" },
+        { status: 400 }
+      );
+    }
+
+    // Validate options structure - can be strings (backward compat) or objects with text and markdown
+    const normalizedOptions = options.map((opt: any, index: number) => {
+      if (typeof opt === 'string') {
+        return { text: opt.trim(), markdown: null };
+      } else if (typeof opt === 'object' && opt !== null) {
+        return {
+          text: (opt.text || '').trim(),
+          markdown: (opt.markdown || '').trim() || null,
+        };
+      } else {
+        throw new Error(`Invalid option format at index ${index}`);
+      }
+    });
+
+    if (normalizedOptions.some(opt => !opt.text || opt.text.length === 0)) {
+      return NextResponse.json(
+        { error: "All options must have text" },
         { status: 400 }
       );
     }
@@ -233,9 +255,10 @@ export async function POST(
     }
 
     // Insert new options
-    const optionValues = options.map((opt: string, index: number) => ({
+    const optionValues = normalizedOptions.map((opt: any, index: number) => ({
       pollId,
-      optionText: opt.trim(),
+      optionText: opt.text,
+      markdown: opt.markdown || null,
       order: index + 1,
     }));
 

@@ -41,7 +41,7 @@ export default function AdminPollsPage() {
   const [question, setQuestion] = useState("");
   const [pollType, setPollType] = useState<"ranking" | "choice">("ranking");
   const [choices, setChoices] = useState<string[]>([]);
-  const [options, setOptions] = useState<string[]>([""]);
+  const [options, setOptions] = useState<Array<{ text: string; markdown: string }>>([{ text: "", markdown: "" }]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -100,7 +100,7 @@ export default function AdminPollsPage() {
     setQuestion("");
     setPollType("ranking");
     setChoices([]);
-    setOptions([""]);
+    setOptions([{ text: "", markdown: "" }]);
     setEditingPoll(null);
     setShowCreateModal(true);
     setError(null);
@@ -122,7 +122,7 @@ export default function AdminPollsPage() {
         setPollType(data.poll.pollType || "ranking");
         setChoices(data.poll.choices || []);
         setSlug(data.poll.slug || "");
-        setOptions(data.poll.options.map((opt: any) => opt.optionText));
+        setOptions(data.poll.options.map((opt: any) => ({ text: opt.optionText, markdown: opt.markdown || "" })));
       }
     } catch (err) {
       console.error("Failed to load poll data:", err);
@@ -134,7 +134,7 @@ export default function AdminPollsPage() {
       const response = await fetch(`/api/poll/${castHash}`);
       const data = await response.json();
       if (response.ok && data.poll) {
-        setOptions(data.poll.options.map((opt: any) => opt.optionText));
+        setOptions(data.poll.options.map((opt: any) => ({ text: opt.optionText, markdown: opt.markdown || "" })));
       }
     } catch (err) {
       console.error("Failed to load poll options:", err);
@@ -196,7 +196,7 @@ export default function AdminPollsPage() {
   };
 
   const handleAddOption = () => {
-    setOptions([...options, ""]);
+    setOptions([...options, { text: "", markdown: "" }]);
   };
 
   const handleAddChoice = () => {
@@ -219,9 +219,15 @@ export default function AdminPollsPage() {
     }
   };
 
-  const handleOptionChange = (index: number, value: string) => {
+  const handleOptionTextChange = (index: number, value: string) => {
     const newOptions = [...options];
-    newOptions[index] = value;
+    newOptions[index] = { ...newOptions[index], text: value };
+    setOptions(newOptions);
+  };
+
+  const handleOptionMarkdownChange = (index: number, value: string) => {
+    const newOptions = [...options];
+    newOptions[index] = { ...newOptions[index], markdown: value };
     setOptions(newOptions);
   };
 
@@ -246,7 +252,7 @@ export default function AdminPollsPage() {
       return;
     }
 
-    const validOptions = options.filter((opt) => opt.trim().length > 0);
+    const validOptions = options.filter((opt) => opt.text.trim().length > 0);
     if (validOptions.length < 2) {
       setError("At least 2 options are required");
       return;
@@ -274,7 +280,7 @@ export default function AdminPollsPage() {
           pollType,
           choices: pollType === "choice" ? choices.filter((c) => c.trim().length > 0) : undefined,
           slug: slug.trim() || undefined,
-          options: validOptions,
+          options: validOptions.map(opt => ({ text: opt.text.trim(), markdown: opt.markdown.trim() || undefined })),
           userFid: user.fid,
         }),
       });
@@ -556,26 +562,40 @@ export default function AdminPollsPage() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Options (at least 2 required)
                   </label>
-                  <div className="space-y-2">
+                  <div className="space-y-4">
                     {options.map((option, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={option}
-                          onChange={(e) => handleOptionChange(index, e.target.value)}
-                          placeholder={`Option ${index + 1}`}
-                          className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                          required
-                        />
-                        {options.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveOption(index)}
-                            className="px-3 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
-                          >
-                            Remove
-                          </button>
-                        )}
+                      <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={option.text}
+                            onChange={(e) => handleOptionTextChange(index, e.target.value)}
+                            placeholder={`Option ${index + 1}`}
+                            className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                            required
+                          />
+                          {options.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveOption(index)}
+                              className="px-3 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                            Markdown (optional)
+                          </label>
+                          <textarea
+                            value={option.markdown}
+                            onChange={(e) => handleOptionMarkdownChange(index, e.target.value)}
+                            placeholder="Optional markdown text to display below this option"
+                            rows={2}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm"
+                          />
+                        </div>
                       </div>
                     ))}
                   </div>

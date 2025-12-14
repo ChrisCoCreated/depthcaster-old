@@ -658,6 +658,7 @@ export const pollOptions = pgTable("poll_options", {
   id: uuid("id").defaultRandom().primaryKey(),
   pollId: uuid("poll_id").notNull().references(() => polls.id, { onDelete: "cascade" }),
   optionText: text("option_text").notNull(),
+  markdown: text("markdown"), // Optional markdown text to display below the option
   order: integer("order").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({

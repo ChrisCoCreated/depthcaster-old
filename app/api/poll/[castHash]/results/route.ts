@@ -105,8 +105,21 @@ export async function GET(
         const rankings: number[] = [];
 
         responses.forEach((response) => {
-          const rankingsArray = response.rankings as string[] | null;
-          if (rankingsArray) {
+          // Handle JSONB - it might be a string that needs parsing
+          let rankingsArray: string[] | null = null;
+          if (response.rankings) {
+            if (typeof response.rankings === 'string') {
+              try {
+                rankingsArray = JSON.parse(response.rankings);
+              } catch (e) {
+                console.error("Failed to parse rankings JSON:", e);
+              }
+            } else if (Array.isArray(response.rankings)) {
+              rankingsArray = response.rankings;
+            }
+          }
+          
+          if (rankingsArray && Array.isArray(rankingsArray)) {
             const rank = rankingsArray.indexOf(option.id);
             if (rank !== -1) {
               // Rank is 0-indexed, so add 1 for display
@@ -123,6 +136,7 @@ export async function GET(
         return {
           optionId: option.id,
           optionText: option.optionText,
+          markdown: option.markdown,
           averageRank,
           voteCount,
           totalRank,
@@ -140,7 +154,20 @@ export async function GET(
 
       // Format individual responses for ranking type
       individualResponses = responses.map((response) => {
-        const rankingsArray = response.rankings as string[] | null;
+        // Handle JSONB - it might be a string that needs parsing
+        let rankingsArray: string[] | null = null;
+        if (response.rankings) {
+          if (typeof response.rankings === 'string') {
+            try {
+              rankingsArray = JSON.parse(response.rankings);
+            } catch (e) {
+              console.error("Failed to parse rankings JSON:", e);
+            }
+          } else if (Array.isArray(response.rankings)) {
+            rankingsArray = response.rankings;
+          }
+        }
+        
         const rankedOptions = rankingsArray?.map((optionId, index) => {
           const option = options.find((opt) => opt.id === optionId);
           return {
@@ -168,17 +195,34 @@ export async function GET(
         let totalVotes = 0;
 
         responses.forEach((response) => {
-          const choicesObj = response.choices as Record<string, string> | null;
-          if (choicesObj && choicesObj[option.id]) {
+          // Drizzle should automatically parse JSONB, but handle both cases
+          let choicesObj: Record<string, string> | null = null;
+          if (response.choices) {
+            if (typeof response.choices === 'string') {
+              try {
+                choicesObj = JSON.parse(response.choices);
+              } catch (e) {
+                console.error("Failed to parse choices JSON:", e, response.choices);
+                return; // Skip this response if parsing fails
+              }
+            } else if (typeof response.choices === 'object' && response.choices !== null) {
+              choicesObj = response.choices as Record<string, string>;
+            }
+          }
+          
+          if (choicesObj && typeof choicesObj === 'object' && !Array.isArray(choicesObj)) {
             const choice = choicesObj[option.id];
-            choiceCounts[choice] = (choiceCounts[choice] || 0) + 1;
-            totalVotes++;
+            if (choice && typeof choice === 'string' && choice.trim() !== '') {
+              choiceCounts[choice] = (choiceCounts[choice] || 0) + 1;
+              totalVotes++;
+            }
           }
         });
 
         return {
           optionId: option.id,
           optionText: option.optionText,
+          markdown: option.markdown,
           choiceCounts,
           totalVotes,
         };
@@ -186,13 +230,27 @@ export async function GET(
 
       // Format individual responses for choice type
       individualResponses = responses.map((response) => {
-        const choicesObj = response.choices as Record<string, string> | null;
+        // Handle JSONB - Drizzle should parse it automatically, but handle both cases
+        let choicesObj: Record<string, string> | null = null;
+        if (response.choices) {
+          if (typeof response.choices === 'string') {
+            try {
+              choicesObj = JSON.parse(response.choices);
+            } catch (e) {
+              console.error("Failed to parse choices JSON:", e, response.choices);
+              choicesObj = null;
+            }
+          } else if (typeof response.choices === 'object' && response.choices !== null && !Array.isArray(response.choices)) {
+            choicesObj = response.choices as Record<string, string>;
+          }
+        }
+        
         const optionChoices = options.map((option) => {
           const choice = choicesObj?.[option.id] || "";
           return {
             optionId: option.id,
             optionText: option.optionText,
-            choice,
+            choice: choice && typeof choice === 'string' ? choice : "",
           };
         });
 
@@ -207,6 +265,24 @@ export async function GET(
         };
       });
     }
+    
+    // Debug logging
+    console.log("Poll results calculation:", {
+      pollType,
+      optionsCount: options.length,
+      options: options.map(opt => ({ id: opt.id, text: opt.optionText })),
+      responsesCount: responses.length,
+      collatedResultsCount: collatedResults.length,
+      individualResponsesCount: individualResponses.length,
+      sampleResponse: responses[0] ? {
+        id: responses[0].id,
+        choices: responses[0].choices,
+        choicesType: typeof responses[0].choices,
+        choicesIsArray: Array.isArray(responses[0].choices),
+        choicesKeys: typeof responses[0].choices === 'object' && responses[0].choices !== null ? Object.keys(responses[0].choices) : null,
+      } : null,
+      sampleCollatedResult: collatedResults[0] || null,
+    });
 
     return NextResponse.json({
       poll: {

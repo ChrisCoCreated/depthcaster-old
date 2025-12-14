@@ -53,6 +53,7 @@ export default function AdminRolesPage() {
   const [selectedRole, setSelectedRole] = useState<ValidRole | "">("");
   const [salutation, setSalutation] = useState<string>("");
   const [bulkDmMessage, setBulkDmMessage] = useState<string>("");
+  const [addCommaAfterName, setAddCommaAfterName] = useState<boolean>(false);
   const [filteredUsers, setFilteredUsers] = useState<FilteredUser[]>([]);
   const [selectedUserFids, setSelectedUserFids] = useState<Set<number>>(new Set());
   const [sendingBulkDm, setSendingBulkDm] = useState<boolean>(false);
@@ -432,6 +433,7 @@ thanks and looking forward to what you curate!`;
     setSelectedRole("");
     setSalutation("");
     setBulkDmMessage("");
+    setAddCommaAfterName(false);
     setFilteredUsers([]);
     setSelectedUserFids(new Set());
   };
@@ -441,6 +443,7 @@ thanks and looking forward to what you curate!`;
     setSelectedRole("");
     setSalutation("");
     setBulkDmMessage("");
+    setAddCommaAfterName(false);
     setFilteredUsers([]);
     setSelectedUserFids(new Set());
     setExtractingNames(false);
@@ -553,11 +556,18 @@ thanks and looking forward to what you curate!`;
     if (salutation.trim()) {
       parts.push(salutation.trim());
     }
-    parts.push(firstName);
+    // Add firstName with optional comma
+    const nameWithComma = addCommaAfterName ? `${firstName},` : firstName;
+    parts.push(nameWithComma);
+    
+    // Add message body (preserve line breaks)
     if (bulkDmMessage.trim()) {
-      parts.push(bulkDmMessage.trim());
+      // Join salutation and name with space, then add message with line breaks preserved
+      const header = parts.join(" ");
+      return `${header}\n${bulkDmMessage.trim()}`;
     }
-    // Join with spaces for one-line format
+    
+    // If no message, just return salutation and name
     return parts.join(" ");
   };
 
@@ -1142,9 +1152,22 @@ thanks and looking forward to what you curate!`;
                     value={salutation}
                     onChange={(e) => setSalutation(e.target.value)}
                     disabled={sendingBulkDm}
-                    placeholder="e.g., Hi everyone,"
+                    placeholder="e.g., Hi"
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   />
+                  <div className="mt-2 flex items-center">
+                    <input
+                      type="checkbox"
+                      id="addCommaAfterName"
+                      checked={addCommaAfterName}
+                      onChange={(e) => setAddCommaAfterName(e.target.checked)}
+                      disabled={sendingBulkDm}
+                      className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 disabled:opacity-50"
+                    />
+                    <label htmlFor="addCommaAfterName" className="ml-2 text-sm text-gray-700 dark:text-gray-300">
+                      Add comma after name
+                    </label>
+                  </div>
                 </div>
 
                 {/* Recipient Names - Informational Only */}
@@ -1186,13 +1209,13 @@ thanks and looking forward to what you curate!`;
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Message Preview (example for one recipient)
                     </label>
-                    <div className="p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+                    <div className="p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
                       {selectedUserFids.size > 0 && filteredUsers.length > 0
                         ? assembleMessage(filteredUsers.find((u) => selectedUserFids.has(u.fid))?.extractedFirstName || "Name")
                         : assembleMessage("Name")}
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Each recipient will receive a personalized DM with their first name.
+                      Each recipient will receive a personalized DM with their first name. Line breaks in the message will be preserved.
                     </p>
                   </div>
                 ) : null}

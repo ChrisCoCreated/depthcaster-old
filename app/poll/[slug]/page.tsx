@@ -4,12 +4,14 @@ import { useState, useEffect, useCallback } from "react";
 import { use } from "react";
 import { useNeynarContext } from "@neynar/react";
 import { ConversationView } from "../../components/ConversationView";
+import { MarkdownRenderer } from "../../components/MarkdownRenderer";
 import { ArrowUp, ArrowDown, GripVertical } from "lucide-react";
 import { hasCuratorOrAdminRole } from "@/lib/roles-client";
 
 interface PollOption {
   id: string;
   optionText: string;
+  markdown?: string | null;
   order: number;
 }
 
@@ -271,6 +273,11 @@ export default function PollPage({
                         <div className="mb-3 font-medium text-gray-900 dark:text-gray-100">
                           {option.optionText}
                         </div>
+                        {option.markdown && (
+                          <div className="mb-3 text-sm text-gray-600 dark:text-gray-400">
+                            <MarkdownRenderer content={option.markdown} />
+                          </div>
+                        )}
                         <div className="flex flex-wrap gap-2">
                           {pollChoices.map((choice) => (
                             <button
@@ -331,8 +338,15 @@ export default function PollPage({
                         <div className="shrink-0 w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-sm font-semibold text-blue-700 dark:text-blue-300">
                           {index + 1}
                         </div>
-                        <div className="flex-1 text-gray-900 dark:text-gray-100">
-                          {option.optionText}
+                        <div className="flex-1">
+                          <div className="text-gray-900 dark:text-gray-100">
+                            {option.optionText}
+                          </div>
+                          {option.markdown && (
+                            <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                              <MarkdownRenderer content={option.markdown} />
+                            </div>
+                          )}
                         </div>
                         <div className="shrink-0 flex gap-1">
                           <button
