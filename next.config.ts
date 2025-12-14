@@ -13,6 +13,8 @@ const nextConfig: NextConfig = {
     'pino',
     'pino-pretty',
     '@walletconnect/logger',
+    'jsdom',
+    '@mozilla/readability',
   ],
   webpack: (config, { isServer }) => {
     if (!isServer) {

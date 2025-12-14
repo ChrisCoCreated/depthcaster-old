@@ -3,8 +3,6 @@
  * Uses Mozilla Readability with fallbacks for content extraction
  */
 
-import { Readability } from '@mozilla/readability';
-import { JSDOM } from 'jsdom';
 import { htmlToMarkdown } from '../html-to-markdown';
 
 export interface GenericArticle {
@@ -213,17 +211,18 @@ function extractFromParagraphs(dom: Document): string | null {
 /**
  * Extract article content using Readability with fallbacks
  */
-function extractArticleContent(html: string, url: string, document: Document): {
+async function extractArticleContent(html: string, url: string, document: Document): Promise<{
   content: string;
   title: string;
   excerpt?: string;
-} {
+}> {
   let content: string | null = null;
   let title = extractTitle(html, document);
   let excerpt: string | undefined;
   
-  // Try Readability first
+  // Try Readability first (dynamic import for serverless compatibility)
   try {
+    const { Readability } = await import('@mozilla/readability');
     const reader = new Readability(document);
     const article = reader.parse();
     
@@ -279,12 +278,13 @@ export async function fetchGenericArticle(url: string): Promise<GenericArticle> 
     const urlObj = new URL(url);
     const domain = urlObj.hostname.replace('www.', '');
     
-    // Create DOM for analysis
-    let dom: JSDOM;
+    // Create DOM for analysis using dynamic imports for serverless compatibility
     let document: Document;
     
     try {
-      dom = new JSDOM(html, { url });
+      // Dynamic import for jsdom to avoid ESM/CommonJS issues in serverless
+      const { JSDOM } = await import('jsdom');
+      const dom = new JSDOM(html, { url });
       document = dom.window.document;
       console.log('[Generic Article] Created DOM successfully');
     } catch (error) {
@@ -299,7 +299,7 @@ export async function fetchGenericArticle(url: string): Promise<GenericArticle> 
     
     try {
       console.log('[Generic Article] Attempting content extraction...');
-      const extracted = extractArticleContent(html, url, document);
+      const extracted = await extractArticleContent(html, url, document);
       rawContent = extracted.content;
       title = extracted.title;
       excerpt = extracted.excerpt;

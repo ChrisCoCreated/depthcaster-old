@@ -248,116 +248,118 @@ export default function PollPage({
           <div className="px-4 py-3 border border-green-200 dark:border-green-700 bg-green-50 dark:bg-green-900/40 text-sm text-green-800 dark:text-green-100 rounded-md">
             Your response has been submitted successfully!
           </div>
-        ) : poll.pollType === "choice" ? (
-          <>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-              Select a choice for each option.
-            </p>
-
-            <div className="space-y-4 mb-6">
-              {poll.options.map((option) => {
-                const pollChoices = poll.choices || [];
-                const selectedChoice = choices[option.id] || "";
-
-                return (
-                  <div
-                    key={option.id}
-                    className={`p-4 border rounded-lg bg-white dark:bg-gray-800 ${
-                      isDisabled ? "opacity-60 cursor-not-allowed" : ""
-                    } border-gray-200 dark:border-gray-700`}
-                  >
-                    <div className="mb-3 font-medium text-gray-900 dark:text-gray-100">
-                      {option.optionText}
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {pollChoices.map((choice) => (
-                        <button
-                          key={choice}
-                          type="button"
-                          onClick={() => !isDisabled && handleChoiceChange(option.id, choice)}
-                          disabled={isDisabled}
-                          className={`
-                            px-4 py-2 rounded-lg text-sm font-medium transition-colors
-                            ${
-                              selectedChoice === choice
-                                ? "bg-blue-600 text-white"
-                                : "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600"
-                            }
-                            ${isDisabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}
-                          `}
-                        >
-                          {choice}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </>
         ) : (
           <>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-              Rank the options from best to worst by dragging them or using the arrow buttons.
-            </p>
+            {poll.pollType === "choice" ? (
+              <>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+                  Select a choice for each option.
+                </p>
 
-            <div className="space-y-2 mb-6">
-              {rankings.map((optionId, index) => {
-                const option = poll.options.find((opt) => opt.id === optionId);
-                if (!option) return null;
+                <div className="space-y-4 mb-6">
+                  {poll.options.map((option) => {
+                    const pollChoices = poll.choices || [];
+                    const selectedChoice = choices[option.id] || "";
 
-                return (
-                  <div
-                    key={option.id}
-                    draggable={!isDisabled}
-                    onDragStart={!isDisabled ? () => handleDragStart(index) : undefined}
-                    onDragOver={!isDisabled ? (e) => handleDragOver(e, index) : undefined}
-                    onDragLeave={!isDisabled ? handleDragLeave : undefined}
-                    onDrop={!isDisabled ? (e) => handleDrop(e, index) : undefined}
-                    className={`
-                      flex items-center gap-3 p-4 border rounded-lg
-                      ${draggedIndex === index ? "opacity-50" : ""}
-                      ${dragOverIndex === index ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" : "border-gray-200 dark:border-gray-700"}
-                      bg-white dark:bg-gray-800
-                      ${isDisabled ? "cursor-not-allowed" : "cursor-move"}
-                      transition-colors
-                    `}
-                  >
-                    <div className="shrink-0 text-gray-400 dark:text-gray-500">
-                      <GripVertical className="w-5 h-5" />
-                    </div>
-                    <div className="shrink-0 w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-sm font-semibold text-blue-700 dark:text-blue-300">
-                      {index + 1}
-                    </div>
-                    <div className="flex-1 text-gray-900 dark:text-gray-100">
-                      {option.optionText}
-                    </div>
-                    <div className="shrink-0 flex gap-1">
-                      <button
-                        type="button"
-                        onClick={() => moveUp(index)}
-                        disabled={isDisabled || index === 0}
-                        className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                        aria-label="Move up"
+                    return (
+                      <div
+                        key={option.id}
+                        className={`p-4 border rounded-lg bg-white dark:bg-gray-800 ${
+                          isDisabled ? "opacity-60 cursor-not-allowed" : ""
+                        } border-gray-200 dark:border-gray-700`}
                       >
-                        <ArrowUp className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => moveDown(index)}
-                        disabled={isDisabled || index === rankings.length - 1}
-                        className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                        aria-label="Move down"
+                        <div className="mb-3 font-medium text-gray-900 dark:text-gray-100">
+                          {option.optionText}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {pollChoices.map((choice) => (
+                            <button
+                              key={choice}
+                              type="button"
+                              onClick={() => !isDisabled && handleChoiceChange(option.id, choice)}
+                              disabled={isDisabled}
+                              className={`
+                                px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                                ${
+                                  selectedChoice === choice
+                                    ? "bg-blue-600 text-white"
+                                    : "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600"
+                                }
+                                ${isDisabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}
+                              `}
+                            >
+                              {choice}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+                  Rank the options from best to worst by dragging them or using the arrow buttons.
+                </p>
+
+                <div className="space-y-2 mb-6">
+                  {rankings.map((optionId, index) => {
+                    const option = poll.options.find((opt) => opt.id === optionId);
+                    if (!option) return null;
+
+                    return (
+                      <div
+                        key={option.id}
+                        draggable={!isDisabled}
+                        onDragStart={!isDisabled ? () => handleDragStart(index) : undefined}
+                        onDragOver={!isDisabled ? (e) => handleDragOver(e, index) : undefined}
+                        onDragLeave={!isDisabled ? handleDragLeave : undefined}
+                        onDrop={!isDisabled ? (e) => handleDrop(e, index) : undefined}
+                        className={`
+                          flex items-center gap-3 p-4 border rounded-lg
+                          ${draggedIndex === index ? "opacity-50" : ""}
+                          ${dragOverIndex === index ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" : "border-gray-200 dark:border-gray-700"}
+                          bg-white dark:bg-gray-800
+                          ${isDisabled ? "cursor-not-allowed" : "cursor-move"}
+                          transition-colors
+                        `}
                       >
-                        <ArrowDown className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
+                        <div className="shrink-0 text-gray-400 dark:text-gray-500">
+                          <GripVertical className="w-5 h-5" />
+                        </div>
+                        <div className="shrink-0 w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-sm font-semibold text-blue-700 dark:text-blue-300">
+                          {index + 1}
+                        </div>
+                        <div className="flex-1 text-gray-900 dark:text-gray-100">
+                          {option.optionText}
+                        </div>
+                        <div className="shrink-0 flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() => moveUp(index)}
+                            disabled={isDisabled || index === 0}
+                            className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            aria-label="Move up"
+                          >
+                            <ArrowUp className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => moveDown(index)}
+                            disabled={isDisabled || index === rankings.length - 1}
+                            className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            aria-label="Move down"
+                          >
+                            <ArrowDown className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
 
             {error && (
               <div className="mb-4 px-4 py-3 border border-red-200 dark:border-red-700 bg-red-50 dark:bg-red-900/40 text-sm text-red-800 dark:text-red-100 rounded-md">
@@ -365,20 +367,20 @@ export default function PollPage({
               </div>
             )}
 
-                {user ? (
-                  <button
-                    type="button"
-                    onClick={handleSubmit}
-                    disabled={isDisabled || submitting}
-                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
-                  >
-                    {submitting ? "Submitting..." : "Submit Response"}
-                  </button>
-                ) : (
-                  <div className="px-4 py-3 border border-yellow-200 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900/40 text-sm text-yellow-800 dark:text-yellow-100 rounded-md">
-                    Please sign in to submit your response.
-                  </div>
-                )}
+            {user ? (
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={isDisabled || submitting}
+                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+              >
+                {submitting ? "Submitting..." : "Submit Response"}
+              </button>
+            ) : (
+              <div className="px-4 py-3 border border-yellow-200 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900/40 text-sm text-yellow-800 dark:text-yellow-100 rounded-md">
+                Please sign in to submit your response.
+              </div>
+            )}
           </>
         )}
       </div>
