@@ -1,3 +1,9 @@
+// ⚠️ IMPORTANT:
+// This component must remain client-only.
+// Do not import into Server Components.
+// Thirdweb → WalletConnect pulls in Node-only deps (pino/thread-stream).
+// Always use dynamic import with ssr: false when importing this component.
+
 "use client";
 
 import { ConnectButton } from "thirdweb/react";

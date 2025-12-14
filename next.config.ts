@@ -1,7 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Ensure XMTP browser SDK only runs on client side
+  // Prevent Node-only logging packages from being bundled
+  // serverExternalPackages is the proper Next.js way to exclude packages from bundling
+  // This works with both Turbopack and Webpack
+  // Empty turbopack config to silence warning (serverExternalPackages handles externalization)
+  turbopack: {},
+  // Ensure XMTP browser SDK and Node-only logging packages only run on server side
   serverExternalPackages: [
     '@xmtp/browser-sdk',
     'thread-stream',
@@ -9,8 +14,6 @@ const nextConfig: NextConfig = {
     'pino-pretty',
     '@walletconnect/logger',
   ],
-  // Turbopack config (empty to silence warning, serverExternalPackages handles externalization)
-  turbopack: {},
   webpack: (config, { isServer }) => {
     if (!isServer) {
       // Externalize Node-only packages from client bundle

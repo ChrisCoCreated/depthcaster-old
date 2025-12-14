@@ -14,6 +14,7 @@ const WalletClient = dynamic(
 );
 import { prepareContractCall } from "thirdweb";
 import { sendTransaction } from "thirdweb";
+import confetti from "canvas-confetti";
 import Image from "next/image";
 
 const client = createThirdwebClient({
@@ -92,6 +93,7 @@ export default function PfpCollectionPage() {
       setUploadProgress("NFT minted successfully! Setting price...");
       handleSetPrice();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mintReceipt]);
 
   // Handle price transaction confirmation
@@ -102,6 +104,11 @@ export default function PfpCollectionPage() {
       setIsSettingPrice(false);
       setIsMinting(false);
       setSuccess(true);
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+      });
       // Refresh stats
       fetchStats();
     }
