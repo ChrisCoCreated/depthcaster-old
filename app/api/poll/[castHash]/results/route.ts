@@ -205,12 +205,12 @@ export async function GET(
                 console.error("Failed to parse choices JSON:", e, response.choices);
                 return; // Skip this response if parsing fails
               }
-            } else if (typeof response.choices === 'object' && response.choices !== null) {
+            } else if (typeof response.choices === 'object' && response.choices !== null && !Array.isArray(response.choices)) {
               choicesObj = response.choices as Record<string, string>;
             }
           }
           
-          if (choicesObj && typeof choicesObj === 'object' && !Array.isArray(choicesObj)) {
+          if (choicesObj && typeof choicesObj === 'object' && !Array.isArray(choicesObj) && choicesObj !== null) {
             const choice = choicesObj[option.id];
             if (choice && typeof choice === 'string' && choice.trim() !== '') {
               choiceCounts[choice] = (choiceCounts[choice] || 0) + 1;
@@ -246,11 +246,17 @@ export async function GET(
         }
         
         const optionChoices = options.map((option) => {
-          const choice = choicesObj?.[option.id] || "";
+          let choice = "";
+          if (choicesObj && typeof choicesObj === 'object' && !Array.isArray(choicesObj) && choicesObj !== null) {
+            const choiceValue = choicesObj[option.id];
+            if (choiceValue && typeof choiceValue === 'string' && choiceValue.trim() !== '') {
+              choice = choiceValue;
+            }
+          }
           return {
             optionId: option.id,
             optionText: option.optionText,
-            choice: choice && typeof choice === 'string' ? choice : "",
+            choice,
           };
         });
 
@@ -267,22 +273,40 @@ export async function GET(
     }
     
     // Debug logging
-    console.log("Poll results calculation:", {
-      pollType,
-      optionsCount: options.length,
-      options: options.map(opt => ({ id: opt.id, text: opt.optionText })),
-      responsesCount: responses.length,
-      collatedResultsCount: collatedResults.length,
-      individualResponsesCount: individualResponses.length,
-      sampleResponse: responses[0] ? {
-        id: responses[0].id,
-        choices: responses[0].choices,
-        choicesType: typeof responses[0].choices,
-        choicesIsArray: Array.isArray(responses[0].choices),
-        choicesKeys: typeof responses[0].choices === 'object' && responses[0].choices !== null ? Object.keys(responses[0].choices) : null,
-      } : null,
-      sampleCollatedResult: collatedResults[0] || null,
-    });
+    if (responses.length > 0 && pollType === "choice") {
+      const sampleResponse = responses[0];
+      let sampleChoicesObj: any = null;
+      if (sampleResponse.choices) {
+        if (typeof sampleResponse.choices === 'string') {
+          try {
+            sampleChoicesObj = JSON.parse(sampleResponse.choices);
+          } catch (e) {
+            sampleChoicesObj = sampleResponse.choices;
+          }
+        } else {
+          sampleChoicesObj = sampleResponse.choices;
+        }
+      }
+      
+      const optionIds = options.map(opt => opt.id);
+      const choicesKeys = sampleChoicesObj && typeof sampleChoicesObj === 'object' && !Array.isArray(sampleChoicesObj) ? Object.keys(sampleChoicesObj) : [];
+      
+      console.log("Poll results calculation (choice type):", {
+        pollType,
+        optionsCount: options.length,
+        optionIds,
+        choicesKeys,
+        optionIdsMatch: optionIds.every(id => choicesKeys.includes(id)),
+        responsesCount: responses.length,
+        collatedResultsCount: collatedResults.length,
+        sampleCollatedResult: collatedResults[0] ? {
+          optionId: collatedResults[0].optionId,
+          optionText: collatedResults[0].optionText,
+          choiceCounts: collatedResults[0].choiceCounts,
+          totalVotes: collatedResults[0].totalVotes,
+        } : null,
+      });
+    }
 
     return NextResponse.json({
       poll: {
