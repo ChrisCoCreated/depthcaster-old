@@ -92,6 +92,10 @@ export async function GET(
 
     const pollType = pollData.pollType || "ranking";
     const pollChoices = pollData.choices as string[] | null;
+    // Option merges are stored locally in the browser, not in the database
+    // The client will pass them in the request if needed, but for now we'll return all data
+    // and let the client handle merging
+    const optionMerges: Record<string, string> = {};
 
     let collatedResults: any[] = [];
     let individualResponses: any[] = [];
@@ -252,47 +256,73 @@ export async function GET(
         }
       }
 
-      // Calculate collated results for all options (existing + deleted)
-      collatedResults = Array.from(allOptionIds).map((optionId) => {
-        const option = existingOptionsMap.get(optionId);
-        const choiceCounts: Record<string, number> = {};
-        let totalVotes = 0;
+      // Calculate collated results for all options (existing + deleted, excluding merged deleted)
+      collatedResults = Array.from(allOptionIds)
+        .map((optionId) => {
+      const option = existingOptionsMap.get(optionId);
+      
+      // Check if this deleted option is merged into an existing option
+      const mergedIntoOptionId = optionMerges[optionId];
+      const isMerged = !!mergedIntoOptionId;
+      
+      // Skip deleted options that are merged (they'll be counted in the target option)
+      if (!option && isMerged) {
+        return null;
+      }
+      const choiceCounts: Record<string, number> = {};
+      let totalVotes = 0;
 
-        responses.forEach((response) => {
-          // Drizzle should automatically parse JSONB, but handle both cases
-          let choicesObj: Record<string, string> | null = null;
-          if (response.choices) {
-            if (typeof response.choices === 'string') {
-              try {
-                choicesObj = JSON.parse(response.choices);
-              } catch (e) {
-                console.error("Failed to parse choices JSON:", e, response.choices);
-                return; // Skip this response if parsing fails
-              }
-            } else if (typeof response.choices === 'object' && response.choices !== null && !Array.isArray(response.choices)) {
-              choicesObj = response.choices as Record<string, string>;
+      responses.forEach((response) => {
+        // Drizzle should automatically parse JSONB, but handle both cases
+        let choicesObj: Record<string, string> | null = null;
+        if (response.choices) {
+          if (typeof response.choices === 'string') {
+            try {
+              choicesObj = JSON.parse(response.choices);
+            } catch (e) {
+              console.error("Failed to parse choices JSON:", e, response.choices);
+              return; // Skip this response if parsing fails
             }
+          } else if (typeof response.choices === 'object' && response.choices !== null && !Array.isArray(response.choices)) {
+            choicesObj = response.choices as Record<string, string>;
+          }
+        }
+        
+        if (choicesObj && typeof choicesObj === 'object' && !Array.isArray(choicesObj) && choicesObj !== null) {
+          // Count votes for this option
+          const choice = choicesObj[optionId];
+          if (choice && typeof choice === 'string' && choice.trim() !== '') {
+            choiceCounts[choice] = (choiceCounts[choice] || 0) + 1;
+            totalVotes++;
           }
           
-          if (choicesObj && typeof choicesObj === 'object' && !Array.isArray(choicesObj) && choicesObj !== null) {
-            const choice = choicesObj[optionId];
-            if (choice && typeof choice === 'string' && choice.trim() !== '') {
-              choiceCounts[choice] = (choiceCounts[choice] || 0) + 1;
-              totalVotes++;
-            }
+          // If this is an existing option, also count votes from deleted options merged into it
+          if (option) {
+            Object.entries(optionMerges).forEach(([deletedId, existingId]) => {
+              if (existingId === optionId && deletedId !== optionId) {
+                const mergedChoice = choicesObj[deletedId];
+                if (mergedChoice && typeof mergedChoice === 'string' && mergedChoice.trim() !== '') {
+                  choiceCounts[mergedChoice] = (choiceCounts[mergedChoice] || 0) + 1;
+                  totalVotes++;
+                }
+              }
+            });
           }
-        });
-
-        return {
-          optionId: optionId,
-          optionText: option?.optionText || "[Deleted Option]",
-          markdown: option?.markdown || null,
-          choiceCounts,
-          totalVotes,
-          isDeleted: !option,
-          inferredOrder: !option ? (deletedOptionOrder.get(optionId) || 999) : undefined,
-        };
+        }
       });
+
+      return {
+        optionId: optionId,
+        optionText: option?.optionText || "[Deleted Option]",
+        markdown: option?.markdown || null,
+        choiceCounts,
+        totalVotes,
+        isDeleted: !option,
+        mergedIntoOptionId: isMerged ? mergedIntoOptionId : undefined,
+        inferredOrder: !option ? (deletedOptionOrder.get(optionId) || 999) : undefined,
+      };
+      })
+      .filter((result): result is NonNullable<typeof result> => result !== null);
       
       // Sort collated results: existing options first (by database order), then deleted options (by inferred order)
       collatedResults.sort((a, b) => {

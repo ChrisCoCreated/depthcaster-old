@@ -32,6 +32,8 @@ export default function AdminPollsPage() {
   const [viewingResults, setViewingResults] = useState<Poll | null>(null);
   const [resultsData, setResultsData] = useState<any>(null);
   const [loadingResults, setLoadingResults] = useState(false);
+  const [savingMerge, setSavingMerge] = useState<string | null>(null);
+  const [optionMerges, setOptionMerges] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -716,9 +718,69 @@ export default function AdminPollsPage() {
                                     {index + 1}
                                   </div>
                                 )}
-                                <span className={`font-semibold text-lg ${result.isDeleted ? 'text-gray-500 dark:text-gray-500 italic' : 'text-gray-900 dark:text-gray-100'}`}>
-                                  {result.optionText}
-                                </span>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className={`font-semibold text-lg ${result.isDeleted ? 'text-gray-500 dark:text-gray-500 italic' : 'text-gray-900 dark:text-gray-100'}`}>
+                                    {result.optionText}
+                                  </span>
+                                  {result.isDeleted && !optionMerges[result.optionId] && (
+                                    <select
+                                      value=""
+                                      onChange={(e) => {
+                                        const existingOptionId = e.target.value || null;
+                                        setSavingMerge(result.optionId);
+                                        try {
+                                          const pollId = viewingResults?.castHash || viewingResults?.slug || "";
+                                          const newMerges = { ...optionMerges };
+                                          if (existingOptionId) {
+                                            newMerges[result.optionId] = existingOptionId;
+                                          } else {
+                                            delete newMerges[result.optionId];
+                                          }
+                                          setOptionMerges(newMerges);
+                                          // Save to localStorage
+                                          localStorage.setItem(`poll_merges_${pollId}`, JSON.stringify(newMerges));
+                                          // Recalculate results with merges
+                                          applyMergesToResults(newMerges);
+                                        } catch (err) {
+                                          console.error("Error saving merge:", err);
+                                        } finally {
+                                          setSavingMerge(null);
+                                        }
+                                      }}
+                                      disabled={savingMerge === result.optionId}
+                                      className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                                    >
+                                      <option value="">Assign to...</option>
+                                      {resultsData.collatedResults
+                                        .filter((r: any) => !r.isDeleted)
+                                        .map((existingOption: any) => (
+                                          <option key={existingOption.optionId} value={existingOption.optionId}>
+                                            {existingOption.optionText}
+                                          </option>
+                                        ))}
+                                    </select>
+                                  )}
+                                  {result.isDeleted && optionMerges[result.optionId] && (
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs text-gray-500 dark:text-gray-400 italic">
+                                        (merged into {resultsData.collatedResults.find((r: any) => r.optionId === optionMerges[result.optionId])?.optionText || "option"})
+                                      </span>
+                                      <button
+                                        onClick={() => {
+                                          const pollId = viewingResults?.castHash || viewingResults?.slug || "";
+                                          const newMerges = { ...optionMerges };
+                                          delete newMerges[result.optionId];
+                                          setOptionMerges(newMerges);
+                                          localStorage.setItem(`poll_merges_${pollId}`, JSON.stringify(newMerges));
+                                          applyMergesToResults(newMerges);
+                                        }}
+                                        className="text-xs text-red-600 dark:text-red-400 hover:underline"
+                                      >
+                                        Remove
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                               {resultsData.poll.pollType === "ranking" && (
                                 <div className="text-right">
