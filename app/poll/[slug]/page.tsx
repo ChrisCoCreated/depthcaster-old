@@ -16,7 +16,6 @@ interface PollOption {
 interface Poll {
   id: string;
   castHash: string;
-  slug?: string | null;
   question: string;
   pollType: "ranking" | "choice";
   choices?: string[] | null;
@@ -31,7 +30,7 @@ export default function PollPage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  const { slug } = use(params);
+  const { slug: slugOrHash } = use(params);
   const { user } = useNeynarContext();
   const [poll, setPoll] = useState<Poll | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,8 +48,8 @@ export default function PollPage({
     try {
       setLoading(true);
       const url = user?.fid 
-        ? `/api/poll/${slug}?userFid=${user.fid}`
-        : `/api/poll/${slug}`;
+        ? `/api/poll/${slugOrHash}?userFid=${user.fid}`
+        : `/api/poll/${slugOrHash}`;
       const response = await fetch(url);
       const data = await response.json();
 
@@ -88,7 +87,7 @@ export default function PollPage({
     } finally {
       setLoading(false);
     }
-  }, [slug, user?.fid]);
+  }, [slugOrHash, user?.fid]);
 
   useEffect(() => {
     fetchPoll();
@@ -132,15 +131,13 @@ export default function PollPage({
   };
 
   const moveUp = (index: number) => {
-    if (index > 0) {
-      moveOption(index, index - 1);
-    }
+    if (index === 0) return;
+    moveOption(index, index - 1);
   };
 
   const moveDown = (index: number) => {
-    if (index < rankings.length - 1) {
-      moveOption(index, index + 1);
-    }
+    if (index === rankings.length - 1) return;
+    moveOption(index, index + 1);
   };
 
   const handleDragStart = (index: number) => {
@@ -156,10 +153,10 @@ export default function PollPage({
     setDragOverIndex(null);
   };
 
-  const handleDrop = (e: React.DragEvent, index: number) => {
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
     e.preventDefault();
-    if (draggedIndex !== null && draggedIndex !== index) {
-      moveOption(draggedIndex, index);
+    if (draggedIndex !== null && draggedIndex !== dropIndex) {
+      moveOption(draggedIndex, dropIndex);
     }
     setDraggedIndex(null);
     setDragOverIndex(null);
@@ -181,7 +178,7 @@ export default function PollPage({
     setError(null);
 
     try {
-      const response = await fetch(`/api/poll/${slug}/submit`, {
+      const response = await fetch(`/api/poll/${slugOrHash}/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -390,23 +387,16 @@ export default function PollPage({
     );
   };
 
-  if (!poll) {
-    return (
-      <div className="min-h-screen">
-        <main className="max-w-7xl mx-auto px-4 py-8">
-          <div className="text-center text-gray-500">Poll not found</div>
-        </main>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen">
       <main className="max-w-7xl mx-auto px-4 py-8">
-        <ConversationView
-          castHash={poll.castHash}
-          customContentAfterRoot={renderPollComponent()}
-        />
+        <div className="max-w-3xl mx-auto">
+          <ConversationView 
+            castHash={castHash} 
+            viewerFid={user?.fid}
+            customContentAfterRoot={renderPollComponent()}
+          />
+        </div>
       </main>
     </div>
   );

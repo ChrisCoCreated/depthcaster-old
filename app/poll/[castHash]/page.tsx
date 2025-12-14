@@ -30,7 +30,7 @@ export default function PollPage({
 }: {
   params: Promise<{ castHash: string }>;
 }) {
-  const { castHash } = use(params);
+  const { castHash: slugOrHash } = use(params);
   const { user } = useNeynarContext();
   const [poll, setPoll] = useState<Poll | null>(null);
   const [loading, setLoading] = useState(true);
@@ -48,8 +48,8 @@ export default function PollPage({
     try {
       setLoading(true);
       const url = user?.fid 
-        ? `/api/poll/${castHash}?userFid=${user.fid}`
-        : `/api/poll/${castHash}`;
+        ? `/api/poll/${slugOrHash}?userFid=${user.fid}`
+        : `/api/poll/${slugOrHash}`;
       const response = await fetch(url);
       const data = await response.json();
 
@@ -87,7 +87,7 @@ export default function PollPage({
     } finally {
       setLoading(false);
     }
-  }, [castHash, user?.fid]);
+  }, [slugOrHash, user?.fid]);
 
   useEffect(() => {
     fetchPoll();
@@ -178,7 +178,7 @@ export default function PollPage({
     setError(null);
 
     try {
-      const response = await fetch(`/api/poll/${castHash}/submit`, {
+      const response = await fetch(`/api/poll/${slugOrHash}/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
