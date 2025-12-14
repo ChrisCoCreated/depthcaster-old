@@ -264,10 +264,10 @@ function extractArticleContent(html: string, url: string): {
     const reader = new Readability(document);
     const article = reader.parse();
     
-    if (article && article.textContent && article.textContent.length > 200) {
+    if (article && article.textContent && article.textContent.length > 200 && article.content) {
       content = article.content;
       title = article.title || title;
-      excerpt = article.excerpt;
+      excerpt = article.excerpt || undefined;
     }
   } catch (error) {
     console.log('[Generic Article] Readability failed, trying fallbacks:', error);
