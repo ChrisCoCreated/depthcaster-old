@@ -24,24 +24,21 @@ interface BlogPost {
 
 interface BlogPreviewProps {
   url: string;
+  onSuccess?: () => void; // Callback when preview successfully loads
 }
 
-export function BlogPreview({ url }: BlogPreviewProps) {
+export function BlogPreview({ url, onSuccess }: BlogPreviewProps) {
   const [post, setPost] = useState<BlogPost | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   
-  // Expose error state via data attribute so parent can check
+  // Signal success when post loads
   useEffect(() => {
-    if (error || (!loading && !post)) {
-      // Signal that BlogPreview has failed
-      const element = document.querySelector(`[data-blog-preview-url="${url}"]`);
-      if (element) {
-        element.setAttribute('data-blog-preview-failed', 'true');
-      }
+    if (!loading && post && !error && onSuccess) {
+      onSuccess();
     }
-  }, [error, loading, post, url]);
+  }, [loading, post, error, onSuccess]);
 
   useEffect(() => {
     const fetchPost = async () => {

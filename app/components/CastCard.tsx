@@ -931,6 +931,8 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
   const [showRecastMenu, setShowRecastMenu] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [showQuoteModal, setShowQuoteModal] = useState(false);
+  // Track which blog previews have successfully loaded to hide OG preview
+  const [blogPreviewLoaded, setBlogPreviewLoaded] = useState<Set<string>>(new Set());
   const [showReplyBox, setShowReplyBox] = useState(false);
   const [isLiked, setIsLiked] = useState(cast.viewer_context?.liked || false);
   const [isRecasted, setIsRecasted] = useState(cast.viewer_context?.recasted || false);
@@ -2908,15 +2910,23 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                       // Unified card layout for all link embeds with metadata
                       // If this is a blog link, try BlogPreview first
                       // BlogPreview will return null on error, allowing normal embed to show
+                      const blogPreviewSucceeded = blogPreviewLoaded.has(embed.url);
+                      
                       return (
                         <div key={index}>
                           {/* Try BlogPreview for blog links - returns null on error */}
                           {renderBlogPlatform && (
                             <div onClick={(e) => e.stopPropagation()}>
-                              <BlogPreview url={embed.url} />
+                              <BlogPreview 
+                                url={embed.url} 
+                                onSuccess={() => {
+                                  setBlogPreviewLoaded(prev => new Set(prev).add(embed.url));
+                                }}
+                              />
                             </div>
                           )}
-                          {/* Normal embed card - shows if BlogPreview returns null or if not a blog link */}
+                          {/* Normal embed card - only show if BlogPreview hasn't succeeded or if not a blog link */}
+                          {(!renderBlogPlatform || !blogPreviewSucceeded) && (
                           <div 
                             className="rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-gray-300 dark:hover:border-gray-700 transition-colors"
                             onClick={(e) => e.stopPropagation()}
@@ -3000,7 +3010,8 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                             </div>
                           </a>
                         </div>
-                      </div>
+                          )}
+                        </div>
                       );
                     }
                     
