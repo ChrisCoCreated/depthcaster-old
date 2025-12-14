@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { isBlogLink, parseBlogUrl } from "@/lib/blog";
 import { ParagraphAPI } from "@paragraph_xyz/sdk";
 import { fetchSubstackPost } from "@/lib/rss-fetcher";
-import { fetchGenericArticle } from "@/lib/extractors/genericArticle";
 import { cacheBlog } from "@/lib/cache";
 
 /**
@@ -47,8 +46,9 @@ export async function GET(request: NextRequest) {
         // Handle Substack posts using RSS
         return await handleSubstackPost(url);
       } else if (platform === 'generic_article') {
-        // Handle generic article extraction
-        return await handleGenericArticle(url);
+        // Handle generic article extraction (lazy import to avoid loading jsdom/readability unless needed)
+        const { fetchGenericArticle } = await import("@/lib/extractors/genericArticle");
+        return await handleGenericArticle(url, fetchGenericArticle);
       }
     } catch (error: unknown) {
       console.error(`[Blog API] Error fetching ${platform} post:`, error);
@@ -241,7 +241,22 @@ async function handleSubstackPost(url: string): Promise<NextResponse> {
 /**
  * Handle generic article extraction
  */
-async function handleGenericArticle(url: string): Promise<NextResponse> {
+async function handleGenericArticle(url: string, fetchGenericArticle: (url: string) => Promise<{
+  id: string;
+  title: string;
+  subtitle?: string;
+  markdown?: string;
+  staticHtml?: string;
+  coverImage?: string;
+  publication: {
+    id: string;
+    slug: string;
+    name?: string;
+  };
+  publishedAt?: string;
+  createdAt?: string;
+  url: string;
+}>): Promise<NextResponse> {
   try {
     console.log('[Blog API] Fetching generic article:', url);
     const articleData = await fetchGenericArticle(url);
