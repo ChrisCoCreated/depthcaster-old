@@ -387,12 +387,22 @@ export default function PollPage({
     );
   };
 
+  if (!poll) {
+    return (
+      <div className="min-h-screen">
+        <main className="max-w-7xl mx-auto px-4 py-8">
+          <div className="text-center text-gray-500">Poll not found</div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen">
       <main className="max-w-7xl mx-auto px-4 py-8">
         <div className="max-w-3xl mx-auto">
           <ConversationView 
-            castHash={castHash} 
+            castHash={poll.castHash} 
             viewerFid={user?.fid}
             customContentAfterRoot={renderPollComponent()}
           />
