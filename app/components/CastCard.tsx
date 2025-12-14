@@ -2776,23 +2776,10 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                         
                         // URL embed (images, videos, links)
                         if (embed.url) {
-                          // Check if this is a blog link - try to render special preview
+                          // Check if this is a blog link - try BlogPreview first
                           const renderBlogPlatform = isBlogLink(embed.url);
-                          if (renderBlogPlatform) {
-                            // Render BlogPreview - if it fails and returns null, 
-                            // we'll also render the normal embed below as fallback
-                            const blogPreview = <BlogPreview url={embed.url} />;
-                            // If BlogPreview returns null (error), it won't render anything
-                            // and we'll continue to render the normal embed metadata card
-                            if (blogPreview) {
-                              return (
-                                <div key={index} onClick={(e) => e.stopPropagation()}>
-                                  {blogPreview}
-                                </div>
-                              );
-                            }
-                            // If blogPreview is null, fall through to normal embed rendering
-                          }
+                          // Don't return early - let normal embed render as fallback if BlogPreview fails
+                          // BlogPreview will return null on error, and normal embed will show
 
                           const metadata = embed.metadata;
                           const urlObj = new URL(embed.url);
@@ -2919,12 +2906,21 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                     if (metadata?.html || title || description || imageUrl || isXEmbed || isYouTube) {
                       
                       // Unified card layout for all link embeds with metadata
+                      // If this is a blog link, try BlogPreview first
+                      // BlogPreview will return null on error, allowing normal embed to show
                       return (
-                        <div 
-                          key={index} 
-                          className="rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-gray-300 dark:hover:border-gray-700 transition-colors"
-                          onClick={(e) => e.stopPropagation()}
-                        >
+                        <div key={index}>
+                          {/* Try BlogPreview for blog links - returns null on error */}
+                          {renderBlogPlatform && (
+                            <div onClick={(e) => e.stopPropagation()}>
+                              <BlogPreview url={embed.url} />
+                            </div>
+                          )}
+                          {/* Normal embed card - shows if BlogPreview returns null or if not a blog link */}
+                          <div 
+                            className="rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-gray-300 dark:hover:border-gray-700 transition-colors"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                           <a
                             href={embed.url}
                             target="_blank"

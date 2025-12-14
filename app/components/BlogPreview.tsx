@@ -31,6 +31,17 @@ export function BlogPreview({ url }: BlogPreviewProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
+  
+  // Expose error state via data attribute so parent can check
+  useEffect(() => {
+    if (error || (!loading && !post)) {
+      // Signal that BlogPreview has failed
+      const element = document.querySelector(`[data-blog-preview-url="${url}"]`);
+      if (element) {
+        element.setAttribute('data-blog-preview-failed', 'true');
+      }
+    }
+  }, [error, loading, post, url]);
 
   useEffect(() => {
     const fetchPost = async () => {
