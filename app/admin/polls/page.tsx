@@ -822,7 +822,20 @@ export default function AdminPollsPage() {
                                 
                                 {result.choiceCounts && Object.keys(result.choiceCounts).length > 0 ? (
                                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                    {Object.entries(result.choiceCounts || {}).map(([choice, count]: [string, any]) => {
+                                    {Object.entries(result.choiceCounts || {})
+                                      .sort(([choiceA], [choiceB]) => {
+                                        // Order: Love, Like, Meh, Hate
+                                        const order: Record<string, number> = {
+                                          love: 0,
+                                          like: 1,
+                                          meh: 2,
+                                          hate: 3,
+                                        };
+                                        const orderA = order[choiceA.toLowerCase()] ?? 999;
+                                        const orderB = order[choiceB.toLowerCase()] ?? 999;
+                                        return orderA - orderB;
+                                      })
+                                      .map(([choice, count]: [string, any]) => {
                                     const total = result.totalVotes || 1;
                                     const percentage = (count / total) * 100;
                                     const choiceColors: Record<string, any> = {
@@ -937,6 +950,18 @@ export default function AdminPollsPage() {
                                 response.choices && response.choices.length > 0 ? (
                                   response.choices
                                     .filter((optionChoice: any) => optionChoice.choice && optionChoice.choice.trim() !== "")
+                                    .sort((a: any, b: any) => {
+                                      // Order: Love, Like, Meh, Hate
+                                      const order: Record<string, number> = {
+                                        love: 0,
+                                        like: 1,
+                                        meh: 2,
+                                        hate: 3,
+                                      };
+                                      const orderA = order[a.choice.toLowerCase()] ?? 999;
+                                      const orderB = order[b.choice.toLowerCase()] ?? 999;
+                                      return orderA - orderB;
+                                    })
                                     .map((optionChoice: any) => {
                                     const choiceColors: Record<string, any> = {
                                       love: { bg: "bg-pink-500", text: "text-pink-700", textDark: "text-pink-300", bgLight: "bg-pink-100", bgDark: "bg-pink-900/40" },
