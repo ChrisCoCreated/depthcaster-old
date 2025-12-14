@@ -253,9 +253,7 @@ export async function GET(
       });
 
       // Format individual responses for choice type
-      // Create a map of existing options for quick lookup
-      const existingOptionsMap = new Map(options.map(opt => [opt.id, opt]));
-      
+      // Use the existingOptionsMap already created above
       individualResponses = responses.map((response) => {
         // Handle JSONB - Drizzle should parse it automatically, but handle both cases
         let choicesObj: Record<string, string> | null = null;
