@@ -475,11 +475,7 @@ export default function UserStatisticsPage() {
                     </span>
                     <span>Active Users (Past 30 Days)</span>
                   </button>
-                </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-                  Based on qualifying activity events: post/reply, save/curate, follow/add, session depth (≥60s)
-                </p>
-                <div className="flex items-center gap-2 mb-4">
+                  <div className="flex items-center gap-2">
                     <label className="text-sm text-gray-600 dark:text-gray-400">Miniview</label>
                     <button
                       onClick={() => setMiniview(!miniview)}
@@ -495,6 +491,9 @@ export default function UserStatisticsPage() {
                     </button>
                   </div>
                 </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                  Based on qualifying activity events: post/reply, save/curate, follow/add, session depth (≥60s)
+                </p>
                 {expandedSections.activeUsers && (
                   <div className="mb-4 flex items-center gap-3">
                     <div className="flex-1">
