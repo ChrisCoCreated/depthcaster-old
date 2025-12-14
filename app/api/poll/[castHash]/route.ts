@@ -231,7 +231,7 @@ export async function POST(
           question: question.trim(),
           pollType: validPollType,
           choices: validPollType === "choice" ? choices : null,
-          slug: normalizedSlug,
+          slug: normalizedSlug || undefined,
           updatedAt: new Date(),
         })
         .where(eq(polls.id, pollId));
@@ -244,7 +244,7 @@ export async function POST(
         .insert(polls)
         .values({
           castHash,
-          slug: normalizedSlug,
+          slug: normalizedSlug || undefined,
           question: question.trim(),
           pollType: validPollType,
           choices: validPollType === "choice" ? choices : null,
