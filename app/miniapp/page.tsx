@@ -117,16 +117,32 @@ function MiniappContent() {
   useEffect(() => {
     // Load notification frequency preference from database
     const loadNotificationFrequency = async () => {
-      if (context?.user?.fid && context?.user?.signer_uuid) {
+      if (context?.user?.fid) {
         try {
-          const response = await fetch(
-            `/api/user/preferences?fid=${context.user.fid}&signerUuid=${context.user.signer_uuid}`
-          );
-          if (response.ok) {
-            const data = await response.json();
-            if (data.notificationFrequency && (data.notificationFrequency === "all" || data.notificationFrequency === "daily" || data.notificationFrequency === "weekly")) {
-              setNotificationFrequency(data.notificationFrequency);
-              localStorage.setItem("miniappNotificationFrequency", data.notificationFrequency);
+          // First, ensure user exists and get signer_uuid
+          const ensureResponse = await fetch("/api/user/ensure", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fid: context.user.fid }),
+          });
+
+          let signerUuid: string | null = null;
+          if (ensureResponse.ok) {
+            const ensureData = await ensureResponse.json();
+            signerUuid = ensureData.signer_uuid || null;
+          }
+
+          // If we have signer_uuid, fetch preferences
+          if (signerUuid) {
+            const response = await fetch(
+              `/api/user/preferences?fid=${context.user.fid}&signerUuid=${signerUuid}`
+            );
+            if (response.ok) {
+              const data = await response.json();
+              if (data.notificationFrequency && (data.notificationFrequency === "all" || data.notificationFrequency === "daily" || data.notificationFrequency === "weekly")) {
+                setNotificationFrequency(data.notificationFrequency);
+                localStorage.setItem("miniappNotificationFrequency", data.notificationFrequency);
+              }
             }
           }
         } catch (error) {
@@ -135,10 +151,10 @@ function MiniappContent() {
       }
     };
 
-    if (isSDKLoaded && context?.user?.fid && context?.user?.signer_uuid) {
+    if (isSDKLoaded && context?.user?.fid) {
       loadNotificationFrequency();
     }
-  }, [isSDKLoaded, context?.user?.fid, context?.user?.signer_uuid]);
+  }, [isSDKLoaded, context?.user?.fid]);
 
   useEffect(() => {
     // Call ready() when SDK is loaded to signal miniapp is ready
@@ -719,17 +735,33 @@ function MiniappContent() {
                   localStorage.setItem("miniappNotificationFrequency", nextFrequency);
                   
                   // Save to database if user is logged in
-                  if (context?.user?.fid && context?.user?.signer_uuid) {
+                  if (context?.user?.fid) {
                     try {
-                      await fetch("/api/user/preferences", {
-                        method: "PUT",
+                      // First, ensure user exists and get signer_uuid
+                      const ensureResponse = await fetch("/api/user/ensure", {
+                        method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          fid: context.user.fid,
-                          signerUuid: context.user.signer_uuid,
-                          notificationFrequency: nextFrequency,
-                        }),
+                        body: JSON.stringify({ fid: context.user.fid }),
                       });
+
+                      let signerUuid: string | null = null;
+                      if (ensureResponse.ok) {
+                        const ensureData = await ensureResponse.json();
+                        signerUuid = ensureData.signer_uuid || null;
+                      }
+
+                      // If we have signer_uuid, save preferences
+                      if (signerUuid) {
+                        await fetch("/api/user/preferences", {
+                          method: "PUT",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            fid: context.user.fid,
+                            signerUuid: signerUuid,
+                            notificationFrequency: nextFrequency,
+                          }),
+                        });
+                      }
                     } catch (error) {
                       console.error("Error saving notification frequency preference:", error);
                     }
