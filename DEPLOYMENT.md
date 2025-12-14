@@ -133,11 +133,31 @@ When deploying updates that include database schema changes:
 
 **Note**: Migrations are idempotent - safe to run multiple times. They use `IF NOT EXISTS` checks where possible.
 
+## Build Configuration
+
+### Thirdweb Wallet UI Build Fix
+
+We fixed build failures caused by Node-only dependencies (pino, thread-stream) being bundled into client components via Thirdweb/WalletConnect.
+
+**Solution:**
+- Enforced strict client-only boundaries around Thirdweb wallet UI components
+- Node-only dependencies (pino, thread-stream) are externalized via `serverExternalPackages` in `next.config.ts`
+- Turbopack is left unconfigured because no Node-only modules are reachable from the client graph
+
+**Key Components:**
+- `app/components/WalletClient.tsx` - Client-only wrapper for ConnectButton (must remain client-only)
+- `app/components/ThirdwebProviderClient.tsx` - Client-only wrapper for ThirdwebProvider
+- All Thirdweb wallet UI components use dynamic imports with `ssr: false` when needed
+
+**Important:** Do not import Thirdweb wallet UI components into Server Components. Always use the client-only wrappers.
+
 ## Troubleshooting
 
 - **Database connection errors**: Ensure `POSTGRES_URL` is set in Vercel environment variables
 - **API errors**: Verify your Neynar API keys are correct
 - **Build failures**: Check the build logs in Vercel dashboard
+  - If you see thread-stream/pino errors, verify `serverExternalPackages` includes all Node-only logging packages
+  - Ensure all Thirdweb wallet UI components are client-only and not imported into Server Components
 - **Environment variables not working**: Make sure to redeploy after adding new variables
 - **Migration errors**: Check that all previous migrations have been run. Foreign key constraints may fail if referenced data doesn't exist
 

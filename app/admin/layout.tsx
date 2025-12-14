@@ -37,6 +37,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, section: "main" },
   { href: "/admin/statistics", label: "Statistics", icon: BarChart3, section: "analytics" },
+  { href: "/admin/statistics/users", label: "User Statistics", icon: Users, section: "analytics" },
   { href: "/admin/roles", label: "User Roles", icon: Users, section: "users" },
   { href: "/admin/users-without-roles", label: "Users Without Roles", icon: UserX, section: "users" },
   { href: "/admin/curator-recommendations", label: "Curator Recommendations", icon: UserPlus, section: "users" },
