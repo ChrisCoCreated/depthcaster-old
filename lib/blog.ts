@@ -5,7 +5,7 @@
 import { isParagraphLink, parseParagraphUrl, ParsedParagraphUrl } from './paragraph';
 import { isSubstackLink, parseSubstackUrl, ParsedSubstackUrl } from './substack';
 
-export type BlogPlatform = 'paragraph' | 'substack';
+export type BlogPlatform = 'paragraph' | 'substack' | 'generic_article';
 
 export interface ParsedBlogUrl {
   platform: BlogPlatform;
@@ -24,7 +24,9 @@ export function isBlogLink(url: string): BlogPlatform | null {
   if (isSubstackLink(url)) {
     return 'substack';
   }
-  return null;
+  // Attempt generic article extraction for all other URLs
+  // The extraction logic will determine if it's actually an article
+  return 'generic_article';
 }
 
 /**
@@ -47,8 +49,17 @@ export function parseBlogUrl(url: string): ParsedBlogUrl | null {
   } else if (platform === 'substack') {
     result.substack = parseSubstackUrl(url);
   }
+  // generic_article doesn't need additional parsing
   
   return result;
+}
+
+/**
+ * Check if URL is a generic article link
+ * (Always returns true for non-Paragraph/Substack URLs)
+ */
+export function isGenericArticleLink(url: string): boolean {
+  return !isParagraphLink(url) && !isSubstackLink(url);
 }
 
 // Re-export platform-specific utilities for convenience

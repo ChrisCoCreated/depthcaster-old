@@ -378,6 +378,22 @@ export const miniappInstallations = pgTable("miniapp_installations", {
   installedAtIdx: index("miniapp_installations_installed_at_idx").on(table.installedAt),
 }));
 
+export const miniappNotificationQueue = pgTable("miniapp_notification_queue", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userFid: bigint("user_fid", { mode: "number" }).notNull().references(() => users.fid, { onDelete: "cascade" }),
+  castHash: text("cast_hash").notNull(),
+  castData: jsonb("cast_data").notNull(),
+  notificationType: text("notification_type").notNull().default("new_curated_cast"), // e.g., "new_curated_cast"
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  scheduledFor: timestamp("scheduled_for").notNull(), // When to send (calculated based on frequency)
+  sentAt: timestamp("sent_at"), // When notification was actually sent (nullable)
+}, (table) => ({
+  userFidIdx: index("miniapp_notification_queue_user_fid_idx").on(table.userFid),
+  scheduledForIdx: index("miniapp_notification_queue_scheduled_for_idx").on(table.scheduledFor),
+  sentAtIdx: index("miniapp_notification_queue_sent_at_idx").on(table.sentAt),
+  userFidScheduledForIdx: index("miniapp_notification_queue_user_fid_scheduled_for_idx").on(table.userFid, table.scheduledFor),
+}));
+
 export const curatorRecommendations = pgTable("curator_recommendations", {
   id: uuid("id").defaultRandom().primaryKey(),
   recommendedUserFid: bigint("recommended_user_fid", { mode: "number" }).notNull().references(() => users.fid, { onDelete: "cascade" }),
@@ -529,6 +545,8 @@ export type ApiCallStat = typeof apiCallStats.$inferSelect;
 export type NewApiCallStat = typeof apiCallStats.$inferInsert;
 export type MiniappInstallation = typeof miniappInstallations.$inferSelect;
 export type NewMiniappInstallation = typeof miniappInstallations.$inferInsert;
+export type MiniappNotificationQueue = typeof miniappNotificationQueue.$inferSelect;
+export type NewMiniappNotificationQueue = typeof miniappNotificationQueue.$inferInsert;
 export type QualityFeedback = typeof qualityFeedback.$inferSelect;
 export type NewQualityFeedback = typeof qualityFeedback.$inferInsert;
 export type SignInLog = typeof signInLogs.$inferSelect;

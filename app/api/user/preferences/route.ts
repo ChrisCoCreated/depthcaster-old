@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
       notifyOnLiked?: boolean;
       notifyOnRecast?: boolean;
       notifyOnDailyStats?: boolean;
+      notificationFrequency?: "all" | "daily" | "weekly";
     };
     
     // Ensure hiddenBots exists with defaults
@@ -53,6 +54,7 @@ export async function GET(request: NextRequest) {
     const notifyOnLiked = preferences.notifyOnLiked !== undefined ? preferences.notifyOnLiked : true;
     const notifyOnRecast = preferences.notifyOnRecast !== undefined ? preferences.notifyOnRecast : false;
     const notifyOnDailyStats = preferences.notifyOnDailyStats !== undefined ? preferences.notifyOnDailyStats : true;
+    const notificationFrequency = preferences.notificationFrequency || "all";
 
     return NextResponse.json({
       hideBots,
@@ -66,6 +68,7 @@ export async function GET(request: NextRequest) {
       notifyOnLiked,
       notifyOnRecast,
       notifyOnDailyStats,
+      notificationFrequency,
     });
   } catch (error: any) {
     console.error("Error fetching user preferences:", error);
@@ -79,7 +82,7 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { fid, signerUuid, hideBots, hiddenBots, autoLikeOnCurate, hasSeenAutoLikeNotification, notifyOnDeepbotCurate, notifyOnQualityReply, qualityReplyThreshold, notifyOnCurated, notifyOnLiked, notifyOnRecast, notifyOnDailyStats } = body;
+    const { fid, signerUuid, hideBots, hiddenBots, autoLikeOnCurate, hasSeenAutoLikeNotification, notifyOnDeepbotCurate, notifyOnQualityReply, qualityReplyThreshold, notifyOnCurated, notifyOnLiked, notifyOnRecast, notifyOnDailyStats, notificationFrequency } = body;
 
     if (!fid || !signerUuid) {
       return NextResponse.json(
@@ -111,6 +114,7 @@ export async function PUT(request: NextRequest) {
       notifyOnLiked?: boolean;
       notifyOnRecast?: boolean;
       notifyOnDailyStats?: boolean;
+      notificationFrequency?: "all" | "daily" | "weekly";
     };
     
     // Update preferences
@@ -127,6 +131,7 @@ export async function PUT(request: NextRequest) {
       notifyOnLiked: notifyOnLiked !== undefined ? notifyOnLiked : existingPreferences.notifyOnLiked !== undefined ? existingPreferences.notifyOnLiked : true,
       notifyOnRecast: notifyOnRecast !== undefined ? notifyOnRecast : existingPreferences.notifyOnRecast !== undefined ? existingPreferences.notifyOnRecast : false,
       notifyOnDailyStats: notifyOnDailyStats !== undefined ? notifyOnDailyStats : existingPreferences.notifyOnDailyStats !== undefined ? existingPreferences.notifyOnDailyStats : true,
+      notificationFrequency: notificationFrequency !== undefined ? notificationFrequency : existingPreferences.notificationFrequency || "all",
     };
 
     await updateUserPreferences(fid, updatedPreferences);
@@ -143,6 +148,7 @@ export async function PUT(request: NextRequest) {
       notifyOnLiked: updatedPreferences.notifyOnLiked,
       notifyOnRecast: updatedPreferences.notifyOnRecast,
       notifyOnDailyStats: updatedPreferences.notifyOnDailyStats,
+      notificationFrequency: updatedPreferences.notificationFrequency,
     });
   } catch (error: any) {
     console.error("Error updating user preferences:", error);

@@ -63,6 +63,15 @@ function MiniappContent() {
     }
     return "depthcaster"; // Default to Depthcaster
   });
+  const [notificationFrequency, setNotificationFrequency] = useState<"all" | "daily" | "weekly">(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("miniappNotificationFrequency");
+      if (saved === "all" || saved === "daily" || saved === "weekly") {
+        return saved;
+      }
+    }
+    return "all"; // Default to All
+  });
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://depthcaster.vercel.app";
   
@@ -104,6 +113,32 @@ function MiniappContent() {
       checkInstallation();
     }
   }, [isSDKLoaded, context?.user?.fid]);
+
+  useEffect(() => {
+    // Load notification frequency preference from database
+    const loadNotificationFrequency = async () => {
+      if (context?.user?.fid && context?.user?.signer_uuid) {
+        try {
+          const response = await fetch(
+            `/api/user/preferences?fid=${context.user.fid}&signerUuid=${context.user.signer_uuid}`
+          );
+          if (response.ok) {
+            const data = await response.json();
+            if (data.notificationFrequency && (data.notificationFrequency === "all" || data.notificationFrequency === "daily" || data.notificationFrequency === "weekly")) {
+              setNotificationFrequency(data.notificationFrequency);
+              localStorage.setItem("miniappNotificationFrequency", data.notificationFrequency);
+            }
+          }
+        } catch (error) {
+          console.error("Error loading notification frequency preference:", error);
+        }
+      }
+    };
+
+    if (isSDKLoaded && context?.user?.fid && context?.user?.signer_uuid) {
+      loadNotificationFrequency();
+    }
+  }, [isSDKLoaded, context?.user?.fid, context?.user?.signer_uuid]);
 
   useEffect(() => {
     // Call ready() when SDK is loaded to signal miniapp is ready
@@ -644,6 +679,81 @@ function MiniappContent() {
                 {openLinkPreference === "auto" ? "⚡ Auto" :
                  openLinkPreference === "farcaster" ? "🔗 Farcaster" :
                  "📱 Depthcaster"}
+              </button>
+              {/* Notification frequency toggle: All / Daily / Weekly */}
+              <button
+                onClick={async () => {
+                  // Check if app is installed and notifications are enabled
+                  const isAppInstalled = installed || added;
+                  const areNotificationsEnabled = !!notificationDetails;
+
+                  // If app not installed, request to add it (which also requests notifications)
+                  if (!isAppInstalled) {
+                    if (!isSDKLoaded || !actions) {
+                      showToast("Please wait for the app to load", "error");
+                      return;
+                    }
+                    try {
+                      await handleInstall();
+                      showToast("App added! Notifications enabled.", "success");
+                      return;
+                    } catch (error) {
+                      console.error("Error adding app:", error);
+                      showToast("Failed to add app", "error");
+                      return;
+                    }
+                  }
+
+                  // If app is installed but notifications are not enabled, show message
+                  if (isAppInstalled && !areNotificationsEnabled) {
+                    showToast("Please enable notifications in your Farcaster settings", "error");
+                    return;
+                  }
+
+                  // If everything is set up, cycle through frequency options
+                  // Cycle through: all -> daily -> weekly -> all
+                  const nextFrequency = 
+                    notificationFrequency === "all" ? "daily" :
+                    notificationFrequency === "daily" ? "weekly" : "all";
+                  setNotificationFrequency(nextFrequency);
+                  localStorage.setItem("miniappNotificationFrequency", nextFrequency);
+                  
+                  // Save to database if user is logged in
+                  if (context?.user?.fid && context?.user?.signer_uuid) {
+                    try {
+                      await fetch("/api/user/preferences", {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          fid: context.user.fid,
+                          signerUuid: context.user.signer_uuid,
+                          notificationFrequency: nextFrequency,
+                        }),
+                      });
+                    } catch (error) {
+                      console.error("Error saving notification frequency preference:", error);
+                    }
+                  }
+                }}
+                className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                aria-label={
+                  notificationFrequency === "all" ? "All notifications" :
+                  notificationFrequency === "daily" ? "Daily notifications" :
+                  "Weekly notifications"
+                }
+                title={
+                  !installed && !added ? "Add app to enable notifications (click to add)" :
+                  !notificationDetails ? "Enable notifications in Farcaster settings" :
+                  notificationFrequency === "all" ? "All notifications (click to change)" :
+                  notificationFrequency === "daily" ? "Daily notifications (click to change)" :
+                  "Weekly notifications (click to change)"
+                }
+              >
+                {!installed && !added ? "➕ Add" :
+                 !notificationDetails ? "🔕 Off" :
+                 notificationFrequency === "all" ? "🔔 All" :
+                 notificationFrequency === "daily" ? "📅 Daily" :
+                 "📆 Weekly"}
               </button>
               <button
                 onClick={handlePasteToCurate}

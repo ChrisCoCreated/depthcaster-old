@@ -1,7 +1,8 @@
 import { neynarClient } from "./neynar";
 import { db } from "./db";
-import { miniappInstallations } from "./schema";
-import { eq } from "drizzle-orm";
+import { miniappInstallations, miniappNotificationQueue, users } from "./schema";
+import { eq, and, isNull, lte, inArray } from "drizzle-orm";
+import { getUser } from "./users";
 
 /**
  * Check if a user has the miniapp installed
@@ -169,13 +170,63 @@ export async function sendMiniappNotificationToUser(
 }
 
 /**
+ * Get user's notification frequency preference
+ */
+export async function getUserNotificationFrequency(userFid: number): Promise<"all" | "daily" | "weekly"> {
+  const user = await getUser(userFid);
+  const preferences = (user?.preferences || {}) as {
+    notificationFrequency?: "all" | "daily" | "weekly";
+  };
+  return preferences.notificationFrequency || "all";
+}
+
+/**
+ * Queue a notification for later sending (daily/weekly batching)
+ */
+export async function queueMiniappNotification(
+  userFid: number,
+  castHash: string,
+  castData: any,
+  notificationType: string = "new_curated_cast",
+  frequency: "daily" | "weekly"
+): Promise<void> {
+  const now = new Date();
+  let scheduledFor: Date;
+  
+  if (frequency === "daily") {
+    // Schedule for next day at 9 AM UTC
+    scheduledFor = new Date(now);
+    scheduledFor.setUTCDate(scheduledFor.getUTCDate() + 1);
+    scheduledFor.setUTCHours(9, 0, 0, 0);
+  } else {
+    // Schedule for next week (Monday) at 9 AM UTC
+    scheduledFor = new Date(now);
+    const daysUntilMonday = (8 - scheduledFor.getUTCDay()) % 7 || 7;
+    scheduledFor.setUTCDate(scheduledFor.getUTCDate() + daysUntilMonday);
+    scheduledFor.setUTCHours(9, 0, 0, 0);
+  }
+
+  await db.insert(miniappNotificationQueue).values({
+    userFid,
+    castHash,
+    castData,
+    notificationType,
+    scheduledFor,
+  });
+  
+  console.log(`[Miniapp] Queued ${frequency} notification for user ${userFid}, cast ${castHash}, scheduled for ${scheduledFor.toISOString()}`);
+}
+
+/**
  * Notify all miniapp users about a new curated cast
- * Passes empty array for targetFids to send to all users with notifications enabled
+ * Checks each user's notification frequency preference:
+ * - "all": sends immediately
+ * - "daily"/"weekly": queues for batch sending
  */
 export async function notifyAllMiniappUsersAboutNewCuratedCast(
   castHash: string,
   castData: any
-): Promise<{ sent: number; errors: number }> {
+): Promise<{ sent: number; errors: number; queued: number }> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://depthcaster.vercel.app";
   // Use miniapp URL with castHash query parameter to auto-open the cast
   const targetUrl = `${appUrl}/miniapp?castHash=${castHash}`;
@@ -191,7 +242,137 @@ export async function notifyAllMiniappUsersAboutNewCuratedCast(
   // buildMiniappNotificationPayload will handle truncation to 128 chars
   const body = castText || `${authorName} curated a cast`;
 
-  // Pass empty array to send to all users with notifications enabled for the app
-  // Neynar will automatically filter to only users who have the miniapp installed
-  return await sendMiniappNotification([], title, body, targetUrl);
+  // Get all users with miniapp installed
+  const installedFids = await getMiniappInstalledFids();
+  
+  if (installedFids.length === 0) {
+    console.log("[Miniapp] No users with miniapp installed");
+    return { sent: 0, errors: 0, queued: 0 };
+  }
+
+  // Group users by notification frequency
+  const usersToNotifyImmediately: number[] = [];
+  const usersToQueueDaily: number[] = [];
+  const usersToQueueWeekly: number[] = [];
+
+  for (const fid of installedFids) {
+    const frequency = await getUserNotificationFrequency(fid);
+    if (frequency === "all") {
+      usersToNotifyImmediately.push(fid);
+    } else if (frequency === "daily") {
+      usersToQueueDaily.push(fid);
+    } else if (frequency === "weekly") {
+      usersToQueueWeekly.push(fid);
+    }
+  }
+
+  // Send immediate notifications to users with "all" frequency
+  let sent = 0;
+  let errors = 0;
+  if (usersToNotifyImmediately.length > 0) {
+    try {
+      const result = await sendMiniappNotification(usersToNotifyImmediately, title, body, targetUrl);
+      sent = result.sent;
+      errors = result.errors;
+    } catch (error) {
+      console.error("[Miniapp] Error sending immediate notifications:", error);
+      errors = usersToNotifyImmediately.length;
+    }
+  }
+
+  // Queue notifications for daily/weekly users
+  let queued = 0;
+  for (const fid of usersToQueueDaily) {
+    try {
+      await queueMiniappNotification(fid, castHash, castData, "new_curated_cast", "daily");
+      queued++;
+    } catch (error) {
+      console.error(`[Miniapp] Error queueing daily notification for user ${fid}:`, error);
+    }
+  }
+
+  for (const fid of usersToQueueWeekly) {
+    try {
+      await queueMiniappNotification(fid, castHash, castData, "new_curated_cast", "weekly");
+      queued++;
+    } catch (error) {
+      console.error(`[Miniapp] Error queueing weekly notification for user ${fid}:`, error);
+    }
+  }
+
+  console.log(`[Miniapp] Notification summary: ${sent} sent immediately, ${queued} queued (${usersToQueueDaily.length} daily, ${usersToQueueWeekly.length} weekly)`);
+
+  return { sent, errors, queued };
+}
+
+/**
+ * Send batched notifications for a user (daily/weekly summaries)
+ */
+export async function sendBatchedMiniappNotification(
+  userFid: number,
+  queuedNotifications: Array<{ castHash: string; castData: any }>,
+  frequency: "daily" | "weekly"
+): Promise<boolean> {
+  if (queuedNotifications.length === 0) {
+    return false;
+  }
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://depthcaster.vercel.app";
+  const targetUrl = `${appUrl}/miniapp`;
+
+  const count = queuedNotifications.length;
+  const timePeriod = frequency === "daily" ? "today" : "this week";
+  
+  const title = frequency === "daily" ? "Daily curated casts" : "Weekly curated casts";
+  const body = `${count} new curated cast${count === 1 ? "" : "s"} ${timePeriod}`;
+
+  try {
+    const result = await sendMiniappNotification([userFid], title, body, targetUrl);
+    return result.sent > 0;
+  } catch (error) {
+    console.error(`[Miniapp] Error sending batched notification to user ${userFid}:`, error);
+    return false;
+  }
+}
+
+/**
+ * Get queued notifications for a user that are ready to send
+ */
+export async function getQueuedNotificationsForUser(
+  userFid: number,
+  frequency: "daily" | "weekly"
+): Promise<Array<{ id: string; castHash: string; castData: any }>> {
+  const now = new Date();
+  
+  const queued = await db
+    .select({
+      id: miniappNotificationQueue.id,
+      castHash: miniappNotificationQueue.castHash,
+      castData: miniappNotificationQueue.castData,
+    })
+    .from(miniappNotificationQueue)
+    .where(
+      and(
+        eq(miniappNotificationQueue.userFid, userFid),
+        lte(miniappNotificationQueue.scheduledFor, now),
+        isNull(miniappNotificationQueue.sentAt)
+      )
+    );
+
+  return queued;
+}
+
+/**
+ * Mark queued notifications as sent
+ */
+export async function markQueuedNotificationsAsSent(
+  notificationIds: string[]
+): Promise<void> {
+  if (notificationIds.length === 0) return;
+
+  // Batch update all notifications at once
+  await db
+    .update(miniappNotificationQueue)
+    .set({ sentAt: new Date() })
+    .where(inArray(miniappNotificationQueue.id, notificationIds));
 }

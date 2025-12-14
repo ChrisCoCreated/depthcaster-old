@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isBlogLink, parseBlogUrl } from "@/lib/blog";
 import { ParagraphAPI } from "@paragraph_xyz/sdk";
 import { fetchSubstackPost } from "@/lib/rss-fetcher";
+import { fetchGenericArticle } from "@/lib/extractors/genericArticle";
 
 /**
  * Unified blog API route that handles both Paragraph and Substack posts
@@ -36,6 +37,9 @@ export async function GET(request: NextRequest) {
       } else if (platform === 'substack') {
         // Handle Substack posts using RSS
         return await handleSubstackPost(url);
+      } else if (platform === 'generic_article') {
+        // Handle generic article extraction
+        return await handleGenericArticle(url);
       }
     } catch (error: unknown) {
       console.error(`[Blog API] Error fetching ${platform} post:`, error);
@@ -50,6 +54,28 @@ export async function GET(request: NextRequest) {
           errorMessage.includes('Cannot determine publication')) {
         // Re-throw to let handleSubstackPost handle it
         throw error;
+      }
+      
+      // Handle generic article specific errors
+      if (platform === 'generic_article') {
+        if (errorMessage.includes('does not appear to be an article page') ||
+            errorMessage.includes('Extracted content is too short') ||
+            errorMessage.includes('Could not extract article content')) {
+          return NextResponse.json(
+            { 
+              error: "Full text unavailable – open externally?",
+              details: errorMessage
+            },
+            { status: 400 }
+          );
+        }
+        
+        if (errorMessage.includes("Failed to fetch article") || errorStatus === 404) {
+          return NextResponse.json(
+            { error: "Article not found" },
+            { status: 404 }
+          );
+        }
       }
       
       if (errorMessage.includes("not found") || errorStatus === 404 || errorMessage.includes("Post not found")) {
@@ -199,6 +225,38 @@ async function handleSubstackPost(url: string): Promise<NextResponse> {
       );
     }
     
+    throw error;
+  }
+}
+
+/**
+ * Handle generic article extraction
+ */
+async function handleGenericArticle(url: string): Promise<NextResponse> {
+  try {
+    const articleData = await fetchGenericArticle(url);
+    
+    // Return normalized format (same as Paragraph/Substack)
+    return NextResponse.json({
+      id: articleData.id,
+      title: articleData.title,
+      subtitle: articleData.subtitle,
+      markdown: articleData.markdown,
+      staticHtml: articleData.staticHtml,
+      coverImage: articleData.coverImage,
+      publication: {
+        id: articleData.publication.id,
+        slug: articleData.publication.slug,
+        name: articleData.publication.name,
+      },
+      publishedAt: articleData.publishedAt,
+      createdAt: articleData.createdAt,
+      url: articleData.url,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    // Re-throw to let main handler deal with it
     throw error;
   }
 }
