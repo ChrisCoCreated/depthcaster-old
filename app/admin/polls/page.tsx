@@ -855,7 +855,7 @@ export default function AdminPollsPage() {
                                           delete newMerges[result.optionId];
                                           setOptionMerges(newMerges);
                                           localStorage.setItem(`poll_merges_${pollId}`, JSON.stringify(newMerges));
-                                          applyMergesToResults(newMerges);
+                                          applyMergesToResults(newMerges, originalResultsData || resultsData);
                                         }}
                                         className="text-xs text-red-600 dark:text-red-400 hover:underline"
                                       >
