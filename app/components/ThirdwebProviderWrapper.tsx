@@ -6,3 +6,4 @@ export function ThirdwebProviderWrapper({ children }: { children: React.ReactNod
   return <ThirdwebProvider>{children}</ThirdwebProvider>;
 }
 
+
