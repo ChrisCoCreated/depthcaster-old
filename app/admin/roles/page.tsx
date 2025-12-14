@@ -489,7 +489,6 @@ thanks and looking forward to what you curate!`;
     setExtractingNames(true);
     setFilteredUsers([]);
     setSelectedUserFids(new Set());
-    setRecipientNames("");
 
     if (!role) {
       setExtractingNames(false);
