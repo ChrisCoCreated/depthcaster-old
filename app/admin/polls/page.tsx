@@ -716,7 +716,7 @@ export default function AdminPollsPage() {
                                     {index + 1}
                                   </div>
                                 )}
-                                <span className="font-semibold text-lg text-gray-900 dark:text-gray-100">
+                                <span className={`font-semibold text-lg ${result.isDeleted ? 'text-gray-500 dark:text-gray-500 italic' : 'text-gray-900 dark:text-gray-100'}`}>
                                   {result.optionText}
                                 </span>
                               </div>
@@ -903,7 +903,7 @@ export default function AdminPollsPage() {
                                         key={optionChoice.optionId}
                                         className="flex items-center gap-3 p-2 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
                                       >
-                                        <span className="flex-1 font-medium text-gray-900 dark:text-gray-100">
+                                        <span className={`flex-1 font-medium ${optionChoice.isDeleted ? 'text-gray-500 dark:text-gray-500 italic' : 'text-gray-900 dark:text-gray-100'}`}>
                                           {optionChoice.optionText}
                                         </span>
                                         <span className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${choiceColor.bgLight} dark:${choiceColor.bgDark} ${choiceColor.text} dark:${choiceColor.textDark} border-2 ${choiceColor.bg} border-opacity-30`}>

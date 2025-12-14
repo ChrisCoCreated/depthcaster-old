@@ -188,9 +188,32 @@ export async function GET(
         };
       });
     } else if (pollType === "choice") {
-      // Calculate collated results for choice type
-      // For each option, count choices
-      collatedResults = options.map((option) => {
+      // Collect all option IDs from responses (including deleted options)
+      const allOptionIds = new Set<string>();
+      responses.forEach((response) => {
+        let choicesObj: Record<string, string> | null = null;
+        if (response.choices) {
+          if (typeof response.choices === 'string') {
+            try {
+              choicesObj = JSON.parse(response.choices);
+            } catch (e) {
+              // Skip if parsing fails
+            }
+          } else if (typeof response.choices === 'object' && response.choices !== null && !Array.isArray(response.choices)) {
+            choicesObj = response.choices as Record<string, string>;
+          }
+        }
+        if (choicesObj && typeof choicesObj === 'object' && !Array.isArray(choicesObj) && choicesObj !== null) {
+          Object.keys(choicesObj).forEach(optionId => allOptionIds.add(optionId));
+        }
+      });
+
+      // Create a map of existing options
+      const existingOptionsMap = new Map(options.map(opt => [opt.id, opt]));
+
+      // Calculate collated results for all options (existing + deleted)
+      collatedResults = Array.from(allOptionIds).map((optionId) => {
+        const option = existingOptionsMap.get(optionId);
         const choiceCounts: Record<string, number> = {};
         let totalVotes = 0;
 
@@ -211,7 +234,7 @@ export async function GET(
           }
           
           if (choicesObj && typeof choicesObj === 'object' && !Array.isArray(choicesObj) && choicesObj !== null) {
-            const choice = choicesObj[option.id];
+            const choice = choicesObj[optionId];
             if (choice && typeof choice === 'string' && choice.trim() !== '') {
               choiceCounts[choice] = (choiceCounts[choice] || 0) + 1;
               totalVotes++;
@@ -220,15 +243,19 @@ export async function GET(
         });
 
         return {
-          optionId: option.id,
-          optionText: option.optionText,
-          markdown: option.markdown,
+          optionId: optionId,
+          optionText: option?.optionText || "[Deleted Option]",
+          markdown: option?.markdown || null,
           choiceCounts,
           totalVotes,
+          isDeleted: !option,
         };
       });
 
       // Format individual responses for choice type
+      // Create a map of existing options for quick lookup
+      const existingOptionsMap = new Map(options.map(opt => [opt.id, opt]));
+      
       individualResponses = responses.map((response) => {
         // Handle JSONB - Drizzle should parse it automatically, but handle both cases
         let choicesObj: Record<string, string> | null = null;
@@ -245,20 +272,23 @@ export async function GET(
           }
         }
         
-        const optionChoices = options.map((option) => {
-          let choice = "";
-          if (choicesObj && typeof choicesObj === 'object' && !Array.isArray(choicesObj) && choicesObj !== null) {
-            const choiceValue = choicesObj[option.id];
-            if (choiceValue && typeof choiceValue === 'string' && choiceValue.trim() !== '') {
-              choice = choiceValue;
+        // Include all choices from the response, even for deleted options
+        const optionChoices: Array<{ optionId: string; optionText: string; choice: string; isDeleted?: boolean }> = [];
+        
+        if (choicesObj && typeof choicesObj === 'object' && !Array.isArray(choicesObj) && choicesObj !== null) {
+          // Process all choices in the response (including deleted options)
+          Object.entries(choicesObj).forEach(([optionId, choice]) => {
+            if (choice && typeof choice === 'string' && choice.trim() !== '') {
+              const option = existingOptionsMap.get(optionId);
+              optionChoices.push({
+                optionId,
+                optionText: option?.optionText || "[Deleted Option]",
+                choice,
+                isDeleted: !option,
+              });
             }
-          }
-          return {
-            optionId: option.id,
-            optionText: option.optionText,
-            choice,
-          };
-        });
+          });
+        }
 
         return {
           id: response.id,
