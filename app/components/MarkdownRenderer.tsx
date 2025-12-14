@@ -18,10 +18,10 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
 
     const flushParagraph = () => {
       if (currentParagraph.length > 0) {
-        const paragraphText = currentParagraph.join(" ");
+        const paragraphText = currentParagraph.join("\n");
         if (paragraphText.trim()) {
           elements.push(
-            <p key={`p-${elements.length}`} className="mb-4 text-gray-700 dark:text-gray-300 leading-relaxed">
+            <p key={`p-${elements.length}`} className="mb-4 text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
               {parseInlineMarkdown(paragraphText)}
             </p>
           );

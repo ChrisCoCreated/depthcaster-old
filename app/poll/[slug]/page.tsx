@@ -270,11 +270,11 @@ export default function PollPage({
                           isDisabled ? "opacity-60 cursor-not-allowed" : ""
                         } border-gray-200 dark:border-gray-700`}
                       >
-                        <div className="mb-3 font-medium text-gray-900 dark:text-gray-100">
+                        <div className="mb-3 text-lg font-bold text-gray-900 dark:text-gray-100">
                           {option.optionText}
                         </div>
                         {option.markdown && (
-                          <div className="mb-3 text-sm text-gray-600 dark:text-gray-400">
+                          <div className="mb-3 text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap">
                             <MarkdownRenderer content={option.markdown} />
                           </div>
                         )}
@@ -339,11 +339,11 @@ export default function PollPage({
                           {index + 1}
                         </div>
                         <div className="flex-1">
-                          <div className="text-gray-900 dark:text-gray-100">
+                          <div className="text-lg font-bold text-gray-900 dark:text-gray-100">
                             {option.optionText}
                           </div>
                           {option.markdown && (
-                            <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                            <div className="mt-1 text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap">
                               <MarkdownRenderer content={option.markdown} />
                             </div>
                           )}
