@@ -53,7 +53,6 @@ export default function AdminRolesPage() {
   const [selectedRole, setSelectedRole] = useState<ValidRole | "">("");
   const [salutation, setSalutation] = useState<string>("");
   const [bulkDmMessage, setBulkDmMessage] = useState<string>("");
-  const [recipientNames, setRecipientNames] = useState<string>("");
   const [filteredUsers, setFilteredUsers] = useState<FilteredUser[]>([]);
   const [selectedUserFids, setSelectedUserFids] = useState<Set<number>>(new Set());
   const [sendingBulkDm, setSendingBulkDm] = useState<boolean>(false);
@@ -433,7 +432,6 @@ thanks and looking forward to what you curate!`;
     setSelectedRole("");
     setSalutation("");
     setBulkDmMessage("");
-    setRecipientNames("");
     setFilteredUsers([]);
     setSelectedUserFids(new Set());
   };
@@ -443,7 +441,6 @@ thanks and looking forward to what you curate!`;
     setSelectedRole("");
     setSalutation("");
     setBulkDmMessage("");
-    setRecipientNames("");
     setFilteredUsers([]);
     setSelectedUserFids(new Set());
     setExtractingNames(false);
@@ -485,12 +482,6 @@ thanks and looking forward to what you curate!`;
         return username.charAt(0).toUpperCase() + username.slice(1);
       });
     }
-  };
-
-  const updateRecipientNames = (selectedFids: Set<number>, users: FilteredUser[]) => {
-    const selectedUsers = users.filter((u) => selectedFids.has(u.fid));
-    const names = selectedUsers.map((u) => u.extractedFirstName).join(", ");
-    setRecipientNames(names);
   };
 
   const handleRoleChange = async (role: ValidRole | "") => {
@@ -536,7 +527,6 @@ thanks and looking forward to what you curate!`;
     // Select all users by default
     const allFids = new Set(filtered.map((u) => u.fid));
     setSelectedUserFids(allFids);
-    updateRecipientNames(allFids, filtered);
     setExtractingNames(false);
   };
 
@@ -548,33 +538,28 @@ thanks and looking forward to what you curate!`;
       newSelected.add(fid);
     }
     setSelectedUserFids(newSelected);
-    updateRecipientNames(newSelected, filteredUsers);
   };
 
   const handleSelectAll = () => {
     const allFids = new Set(filteredUsers.map((u) => u.fid));
     setSelectedUserFids(allFids);
-    updateRecipientNames(allFids, filteredUsers);
   };
 
   const handleDeselectAll = () => {
     setSelectedUserFids(new Set());
-    setRecipientNames("");
   };
 
-  const assembleMessage = (): string => {
+  const assembleMessage = (firstName: string): string => {
     const parts: string[] = [];
     if (salutation.trim()) {
       parts.push(salutation.trim());
     }
-    if (recipientNames.trim()) {
-      parts.push(recipientNames.trim());
-    }
+    parts.push(firstName);
     if (bulkDmMessage.trim()) {
       parts.push(bulkDmMessage.trim());
     }
-    // Join with double newlines as specified in the plan
-    return parts.join("\n\n");
+    // Join with spaces for one-line format
+    return parts.join(" ");
   };
 
   const handleSendBulkDm = async () => {
@@ -584,36 +569,52 @@ thanks and looking forward to what you curate!`;
     setMessage(null);
 
     try {
-      const recipientFids = Array.from(selectedUserFids);
-      const finalMessage = assembleMessage();
+      const selectedUsers = filteredUsers.filter((u) => selectedUserFids.has(u.fid));
+      let successCount = 0;
+      let failureCount = 0;
 
-      const response = await fetch("/api/admin/send-dm", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          adminFid: user.fid,
-          recipientFids,
-          message: finalMessage,
-        }),
-      });
+      // Send individual DMs to each recipient with personalized message
+      for (const selectedUser of selectedUsers) {
+        try {
+          const personalizedMessage = assembleMessage(selectedUser.extractedFirstName);
 
-      const data = await response.json();
+          const response = await fetch("/api/admin/send-dm", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              adminFid: user.fid,
+              recipientFid: selectedUser.fid,
+              message: personalizedMessage,
+            }),
+          });
 
-      if (response.ok) {
-        const successCount = data.results?.success || (data.success ? recipientFids.length : 0);
-        const failureCount = data.results?.failed || 0;
-        
-        if (failureCount === 0) {
-          setMessage({ type: "success", text: `Successfully sent ${successCount} DM(s)!` });
-        } else {
-          setMessage({ type: "success", text: `Sent ${successCount} DM(s), ${failureCount} failed` });
+          const data = await response.json();
+
+          if (response.ok) {
+            successCount++;
+          } else {
+            failureCount++;
+            console.error(`Failed to send DM to FID ${selectedUser.fid}:`, data.error);
+          }
+
+          // Small delay between requests to avoid rate limiting
+          if (selectedUsers.length > 1) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          }
+        } catch (error: any) {
+          failureCount++;
+          console.error(`Error sending DM to FID ${selectedUser.fid}:`, error);
         }
-        handleCloseBulkDmModal();
-      } else {
-        setMessage({ type: "error", text: data.error || "Failed to send bulk DM" });
       }
+
+      if (failureCount === 0) {
+        setMessage({ type: "success", text: `Successfully sent ${successCount} DM(s)!` });
+      } else {
+        setMessage({ type: "success", text: `Sent ${successCount} DM(s), ${failureCount} failed` });
+      }
+      handleCloseBulkDmModal();
     } catch (error: any) {
       console.error("Failed to send bulk DM:", error);
       setMessage({ type: "error", text: error.message || "Failed to send bulk DM" });
@@ -1147,20 +1148,23 @@ thanks and looking forward to what you curate!`;
                   />
                 </div>
 
-                {/* Recipient Names */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Recipient Names (editable)
-                  </label>
-                  <textarea
-                    value={recipientNames}
-                    onChange={(e) => setRecipientNames(e.target.value)}
-                    disabled={sendingBulkDm}
-                    placeholder="Names will be auto-populated from selected users"
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none disabled:opacity-50 disabled:cursor-not-allowed"
-                    rows={2}
-                  />
-                </div>
+                {/* Recipient Names - Informational Only */}
+                {selectedUserFids.size > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Recipients ({selectedUserFids.size} selected)
+                    </label>
+                    <div className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm">
+                      {filteredUsers
+                        .filter((u) => selectedUserFids.has(u.fid))
+                        .map((u) => u.extractedFirstName)
+                        .join(", ")}
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Each recipient will receive a personalized DM with their first name.
+                    </p>
+                  </div>
+                )}
 
                 {/* Message */}
                 <div>
@@ -1178,14 +1182,19 @@ thanks and looking forward to what you curate!`;
                 </div>
 
                 {/* Preview */}
-                {salutation || recipientNames || bulkDmMessage ? (
+                {salutation || bulkDmMessage ? (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Message Preview
+                      Message Preview (example for one recipient)
                     </label>
-                    <div className="p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
-                      {assembleMessage()}
+                    <div className="p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+                      {selectedUserFids.size > 0 && filteredUsers.length > 0
+                        ? assembleMessage(filteredUsers.find((u) => selectedUserFids.has(u.fid))?.extractedFirstName || "Name")
+                        : assembleMessage("Name")}
                     </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Each recipient will receive a personalized DM with their first name.
+                    </p>
                   </div>
                 ) : null}
               </div>
