@@ -662,12 +662,6 @@ function MiniappContent() {
               Depthcaster <span className="text-xs font-normal text-gray-500 dark:text-gray-400">Beta</span>
             </Link>
             <div className="flex items-center gap-3">
-              <Link
-                href="/pfp-collection"
-                className="text-sm text-blue-600 dark:text-blue-400 hover:underline font-medium"
-              >
-                Mint PFP
-              </Link>
               {context?.user?.fid && (
                 <div className="relative flex items-center gap-1">
               {/* Toggle for opening links: Auto Open Depthcaster, Farcaster, or Depthcaster */}
@@ -697,96 +691,92 @@ function MiniappContent() {
                  "📱 Depthcaster"}
               </button>
               {/* Notification frequency toggle: All / Daily / Weekly */}
-              <button
-                onClick={async () => {
-                  // Check if app is installed and notifications are enabled
-                  const isAppInstalled = installed || added;
-                  const areNotificationsEnabled = !!notificationDetails;
-
-                  // If app not installed, request to add it (which also requests notifications)
-                  if (!isAppInstalled) {
-                    if (!isSDKLoaded || !actions) {
-                      showToast("Please wait for the app to load", "error");
-                      return;
-                    }
-                    try {
-                      await handleInstall();
-                      showToast("App added! Notifications enabled.", "success");
-                      return;
-                    } catch (error) {
-                      console.error("Error adding app:", error);
-                      showToast("Failed to add app", "error");
-                      return;
-                    }
-                  }
-
-                  // If app is installed but notifications are not enabled, show message
-                  if (isAppInstalled && !areNotificationsEnabled) {
-                    showToast("Please enable notifications in your Farcaster settings", "error");
-                    return;
-                  }
-
-                  // If everything is set up, cycle through frequency options
-                  // Cycle through: all -> daily -> weekly -> all
-                  const nextFrequency = 
-                    notificationFrequency === "all" ? "daily" :
-                    notificationFrequency === "daily" ? "weekly" : "all";
-                  setNotificationFrequency(nextFrequency);
-                  localStorage.setItem("miniappNotificationFrequency", nextFrequency);
-                  
-                  // Save to database if user is logged in
-                  if (context?.user?.fid) {
-                    try {
-                      // First, ensure user exists and get signer_uuid
-                      const ensureResponse = await fetch("/api/user/ensure", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ fid: context.user.fid }),
-                      });
-
-                      let signerUuid: string | null = null;
-                      if (ensureResponse.ok) {
-                        const ensureData = await ensureResponse.json();
-                        signerUuid = ensureData.signer_uuid || null;
+              {(() => {
+                const isAppInstalled = installed || added;
+                const areNotificationsEnabled = !!notificationDetails;
+                const getButtonState = () => {
+                  if (!isAppInstalled) return { text: "➕ Add", label: "Add app to enable notifications", className: "bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300" };
+                  if (!areNotificationsEnabled) return { text: "🔕 Off", label: "Notifications disabled - enable in Farcaster settings", className: "bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400" };
+                  if (notificationFrequency === "all") return { text: "🔔 All", label: "All notifications enabled", className: "bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700 text-green-700 dark:text-green-300" };
+                  if (notificationFrequency === "daily") return { text: "📅 Daily", label: "Daily notifications enabled", className: "bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300" };
+                  return { text: "📆 Weekly", label: "Weekly notifications enabled", className: "bg-purple-50 dark:bg-purple-900/20 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300" };
+                };
+                const state = getButtonState();
+                return (
+                  <button
+                    onClick={async () => {
+                      // If app not installed, request to add it (which also requests notifications)
+                      if (!isAppInstalled) {
+                        if (!isSDKLoaded || !actions) {
+                          showToast("Please wait for the app to load", "error");
+                          return;
+                        }
+                        try {
+                          await handleInstall();
+                          showToast("App added! Notifications enabled.", "success");
+                          return;
+                        } catch (error) {
+                          console.error("Error adding app:", error);
+                          showToast("Failed to add app", "error");
+                          return;
+                        }
                       }
 
-                      // If we have signer_uuid, save preferences
-                      if (signerUuid) {
-                        await fetch("/api/user/preferences", {
-                          method: "PUT",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            fid: context.user.fid,
-                            signerUuid: signerUuid,
-                            notificationFrequency: nextFrequency,
-                          }),
-                        });
+                      // If app is installed but notifications are not enabled, show message
+                      if (isAppInstalled && !areNotificationsEnabled) {
+                        showToast("Please enable notifications in your Farcaster settings", "error");
+                        return;
                       }
-                    } catch (error) {
-                      console.error("Error saving notification frequency preference:", error);
-                    }
-                  }
-                }}
-                className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                aria-label={
-                  notificationFrequency === "all" ? "All notifications" :
-                  notificationFrequency === "daily" ? "Daily notifications" :
-                  "Weekly notifications"
-                }
-                title={
-                  !installed && !added ? "Add app to enable notifications (click to add)" :
-                  !notificationDetails ? "Enable notifications in Farcaster settings" :
-                  notificationFrequency === "all" ? "All notifications (click to change)" :
-                  notificationFrequency === "daily" ? "Daily notifications (click to change)" :
-                  "Weekly notifications (click to change)"
-                }
-              >
-                {!installed && !added ? "➕ Add" :
-                 !notificationDetails ? "🔕 Off" :
-                 notificationFrequency === "all" ? "🔔 All" :
-                 notificationFrequency === "daily" ? "📅 Daily" :
-                 "📆 Weekly"}
-              </button>
+
+                      // If everything is set up, cycle through frequency options
+                      // Cycle through: all -> daily -> weekly -> all
+                      const nextFrequency = 
+                        notificationFrequency === "all" ? "daily" :
+                        notificationFrequency === "daily" ? "weekly" : "all";
+                      setNotificationFrequency(nextFrequency);
+                      localStorage.setItem("miniappNotificationFrequency", nextFrequency);
+                      
+                      // Save to database if user is logged in
+                      if (context?.user?.fid) {
+                        try {
+                          // First, ensure user exists and get signer_uuid
+                          const ensureResponse = await fetch("/api/user/ensure", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ fid: context.user.fid }),
+                          });
+
+                          let signerUuid: string | null = null;
+                          if (ensureResponse.ok) {
+                            const ensureData = await ensureResponse.json();
+                            signerUuid = ensureData.signer_uuid || null;
+                          }
+
+                          // If we have signer_uuid, save preferences
+                          if (signerUuid) {
+                            await fetch("/api/user/preferences", {
+                              method: "PUT",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                fid: context.user.fid,
+                                signerUuid: signerUuid,
+                                notificationFrequency: nextFrequency,
+                              }),
+                            });
+                          }
+                        } catch (error) {
+                          console.error("Error saving notification frequency preference:", error);
+                        }
+                      }
+                    }}
+                    className={`px-2 py-1 text-xs rounded border font-medium ${state.className} hover:opacity-80 transition-all`}
+                    aria-label={state.label}
+                    title={`${state.label} (click to ${isAppInstalled && areNotificationsEnabled ? "change" : isAppInstalled ? "enable" : "add"})`}
+                  >
+                    {state.text}
+                  </button>
+                );
+              })()}
               <button
                 onClick={handlePasteToCurate}
                 disabled={isPasting}
