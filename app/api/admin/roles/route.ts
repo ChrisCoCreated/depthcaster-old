@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { users, userRoles } from "@/lib/schema";
-import { eq, and, ilike, isNotNull } from "drizzle-orm";
+import { users, userRoles, signInLogs } from "@/lib/schema";
+import { eq, and, ilike, isNotNull, inArray } from "drizzle-orm";
 import { isAdmin, getUserRoles } from "@/lib/roles";
 import { upsertUser } from "@/lib/users";
 
@@ -69,6 +69,24 @@ export async function GET(request: NextRequest) {
 
     const results = await query;
 
+    // Get all unique FIDs from results
+    const allFids = Array.from(new Set(results.map(r => r.fid)));
+    
+    // Get sign-in status for all users
+    const signedInUsers = allFids.length > 0 ? await db
+      .selectDistinct({
+        userFid: signInLogs.userFid,
+      })
+      .from(signInLogs)
+      .where(
+        and(
+          inArray(signInLogs.userFid, allFids),
+          eq(signInLogs.success, true)
+        )
+      ) : [];
+    
+    const signedInFidsSet = new Set(signedInUsers.map(u => u.userFid));
+
     // Group by user and collect roles
     const userMap = new Map<number, {
       fid: number;
@@ -77,6 +95,7 @@ export async function GET(request: NextRequest) {
       pfpUrl: string | null;
       roles: string[];
       lastActivity: Date | null;
+      hasSignedIn: boolean;
     }>();
 
     for (const row of results) {
@@ -102,6 +121,7 @@ export async function GET(request: NextRequest) {
           pfpUrl: row.pfpUrl,
           roles: [],
           lastActivity,
+          hasSignedIn: signedInFidsSet.has(row.fid),
         });
       }
       if (row.role) {

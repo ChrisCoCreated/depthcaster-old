@@ -13,6 +13,7 @@ interface UserWithRoles {
   pfpUrl: string | null;
   roles: string[];
   lastActivity: string | null;
+  hasSignedIn?: boolean;
 }
 
 interface FilteredUser {
@@ -51,11 +52,15 @@ export default function AdminRolesPage() {
   // Bulk DM state
   const [bulkDmModalOpen, setBulkDmModalOpen] = useState<boolean>(false);
   const [selectedRole, setSelectedRole] = useState<ValidRole | "">("");
+  const [filterSignedIn, setFilterSignedIn] = useState<"all" | "signed-in" | "not-signed-in">("all");
+  const [filter14dActive, setFilter14dActive] = useState<"all" | "active" | "inactive">("all");
   const [salutation, setSalutation] = useState<string>("");
   const [bulkDmMessage, setBulkDmMessage] = useState<string>("");
   const [addCommaAfterName, setAddCommaAfterName] = useState<boolean>(false);
   const [filteredUsers, setFilteredUsers] = useState<FilteredUser[]>([]);
   const [selectedUserFids, setSelectedUserFids] = useState<Set<number>>(new Set());
+  const [editedNames, setEditedNames] = useState<Map<number, string>>(new Map());
+  const [recipientNamesText, setRecipientNamesText] = useState<string>("");
   const [sendingBulkDm, setSendingBulkDm] = useState<boolean>(false);
   const [extractingNames, setExtractingNames] = useState<boolean>(false);
 
@@ -431,21 +436,29 @@ thanks and looking forward to what you curate!`;
   const handleOpenBulkDmModal = () => {
     setBulkDmModalOpen(true);
     setSelectedRole("");
+    setFilterSignedIn("all");
+    setFilter14dActive("all");
     setSalutation("");
     setBulkDmMessage("");
     setAddCommaAfterName(false);
     setFilteredUsers([]);
     setSelectedUserFids(new Set());
+    setEditedNames(new Map());
+    setRecipientNamesText("");
   };
 
   const handleCloseBulkDmModal = () => {
     setBulkDmModalOpen(false);
     setSelectedRole("");
+    setFilterSignedIn("all");
+    setFilter14dActive("all");
     setSalutation("");
     setBulkDmMessage("");
     setAddCommaAfterName(false);
     setFilteredUsers([]);
     setSelectedUserFids(new Set());
+    setEditedNames(new Map());
+    setRecipientNamesText("");
     setExtractingNames(false);
     setSendingBulkDm(false);
   };
@@ -487,8 +500,11 @@ thanks and looking forward to what you curate!`;
     }
   };
 
-  const handleRoleChange = async (role: ValidRole | "") => {
-    setSelectedRole(role);
+  const applyFiltersAndExtractNames = async (
+    role: ValidRole | "",
+    signedInFilter: typeof filterSignedIn,
+    activeFilter: typeof filter14dActive
+  ) => {
     setExtractingNames(true);
     setFilteredUsers([]);
     setSelectedUserFids(new Set());
@@ -499,7 +515,29 @@ thanks and looking forward to what you curate!`;
     }
 
     // Filter users by role
-    const usersWithRole = users.filter((u) => u.roles.includes(role));
+    let usersWithRole = users.filter((u) => u.roles.includes(role));
+
+    // Apply sign-in filter
+    if (signedInFilter === "signed-in") {
+      usersWithRole = usersWithRole.filter((u) => u.hasSignedIn === true);
+    } else if (signedInFilter === "not-signed-in") {
+      usersWithRole = usersWithRole.filter((u) => !u.hasSignedIn);
+    }
+
+    // Apply 14-day activity filter
+    if (activeFilter === "active" || activeFilter === "inactive") {
+      const now = new Date();
+      const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+      
+      usersWithRole = usersWithRole.filter((u) => {
+        if (!u.lastActivity) {
+          return activeFilter === "inactive";
+        }
+        const lastActivityDate = new Date(u.lastActivity);
+        const isActive14d = lastActivityDate >= fourteenDaysAgo;
+        return activeFilter === "active" ? isActive14d : !isActive14d;
+      });
+    }
 
     if (usersWithRole.length === 0) {
       setExtractingNames(false);
@@ -529,7 +567,32 @@ thanks and looking forward to what you curate!`;
     // Select all users by default
     const allFids = new Set(filtered.map((u) => u.fid));
     setSelectedUserFids(allFids);
+    
+    // Initialize edited names with extracted first names
+    const initialEditedNames = new Map<number, string>();
+    filtered.forEach((u) => {
+      initialEditedNames.set(u.fid, u.extractedFirstName);
+    });
+    setEditedNames(initialEditedNames);
+    
+    // Update recipient names text
+    const namesText = filtered.map((u) => u.extractedFirstName).join(", ");
+    setRecipientNamesText(namesText);
+    
     setExtractingNames(false);
+  };
+
+  const handleRoleChange = async (role: ValidRole | "") => {
+    setSelectedRole(role);
+    await applyFiltersAndExtractNames(role, filterSignedIn, filter14dActive);
+  };
+
+  const updateRecipientNamesText = (selectedFids: Set<number>) => {
+    const selectedUsers = filteredUsers.filter((u) => selectedFids.has(u.fid));
+    const names = selectedUsers.map((u) => {
+      return editedNames.get(u.fid) || u.extractedFirstName;
+    });
+    setRecipientNamesText(names.join(", "));
   };
 
   const handleUserToggle = (fid: number) => {
@@ -540,22 +603,47 @@ thanks and looking forward to what you curate!`;
       newSelected.add(fid);
     }
     setSelectedUserFids(newSelected);
+    updateRecipientNamesText(newSelected);
   };
 
   const handleSelectAll = () => {
     const allFids = new Set(filteredUsers.map((u) => u.fid));
     setSelectedUserFids(allFids);
+    updateRecipientNamesText(allFids);
   };
 
   const handleDeselectAll = () => {
     setSelectedUserFids(new Set());
+    setRecipientNamesText("");
   };
 
-  const assembleMessage = (firstName: string): string => {
+  const handleRecipientNamesChange = (text: string) => {
+    setRecipientNamesText(text);
+    
+    // Parse the text and update edited names map
+    // Split by comma and map to users in order
+    const names = text.split(",").map((n) => n.trim()).filter((n) => n.length > 0);
+    const selectedUsers = filteredUsers.filter((u) => selectedUserFids.has(u.fid));
+    
+    const newEditedNames = new Map(editedNames);
+    selectedUsers.forEach((user, index) => {
+      if (index < names.length) {
+        newEditedNames.set(user.fid, names[index]);
+      } else {
+        // If fewer names than users, keep original
+        newEditedNames.set(user.fid, editedNames.get(user.fid) || user.extractedFirstName);
+      }
+    });
+    setEditedNames(newEditedNames);
+  };
+
+  const assembleMessage = (fid: number, defaultFirstName: string): string => {
     const parts: string[] = [];
     if (salutation.trim()) {
       parts.push(salutation.trim());
     }
+    // Use edited name if available, otherwise use default
+    const firstName = editedNames.get(fid) || defaultFirstName;
     // Add firstName with optional comma
     const nameWithComma = addCommaAfterName ? `${firstName},` : firstName;
     parts.push(nameWithComma);
@@ -585,7 +673,7 @@ thanks and looking forward to what you curate!`;
       // Send individual DMs to each recipient with personalized message
       for (const selectedUser of selectedUsers) {
         try {
-          const personalizedMessage = assembleMessage(selectedUser.extractedFirstName);
+          const personalizedMessage = assembleMessage(selectedUser.fid, selectedUser.extractedFirstName);
 
           const response = await fetch("/api/admin/send-dm", {
             method: "POST",
@@ -1072,6 +1160,59 @@ thanks and looking forward to what you curate!`;
                   </select>
                 </div>
 
+                {/* Filters */}
+                {selectedRole && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Sign-in Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Sign-in Status
+                      </label>
+                      <select
+                        value={filterSignedIn}
+                        onChange={async (e) => {
+                          const newFilter = e.target.value as "all" | "signed-in" | "not-signed-in";
+                          setFilterSignedIn(newFilter);
+                          // Re-apply filters when filter changes
+                          if (selectedRole) {
+                            await applyFiltersAndExtractNames(selectedRole, newFilter, filter14dActive);
+                          }
+                        }}
+                        disabled={extractingNames || sendingBulkDm}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <option value="all">All users</option>
+                        <option value="signed-in">Signed in</option>
+                        <option value="not-signed-in">Not signed in</option>
+                      </select>
+                    </div>
+
+                    {/* 14-day Activity Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        14-Day Activity
+                      </label>
+                      <select
+                        value={filter14dActive}
+                        onChange={async (e) => {
+                          const newFilter = e.target.value as "all" | "active" | "inactive";
+                          setFilter14dActive(newFilter);
+                          // Re-apply filters when filter changes
+                          if (selectedRole) {
+                            await applyFiltersAndExtractNames(selectedRole, filterSignedIn, newFilter);
+                          }
+                        }}
+                        disabled={extractingNames || sendingBulkDm}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <option value="all">All users</option>
+                        <option value="active">Active (14d)</option>
+                        <option value="inactive">Inactive (14d)</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+
                 {/* User Selection List */}
                 {selectedRole && (
                   <div>
@@ -1170,20 +1311,22 @@ thanks and looking forward to what you curate!`;
                   </div>
                 </div>
 
-                {/* Recipient Names - Informational Only */}
+                {/* Recipient Names - Editable */}
                 {selectedUserFids.size > 0 && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Recipients ({selectedUserFids.size} selected)
+                      Recipient Names ({selectedUserFids.size} selected) - Editable
                     </label>
-                    <div className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm">
-                      {filteredUsers
-                        .filter((u) => selectedUserFids.has(u.fid))
-                        .map((u) => u.extractedFirstName)
-                        .join(", ")}
-                    </div>
+                    <textarea
+                      value={recipientNamesText}
+                      onChange={(e) => handleRecipientNamesChange(e.target.value)}
+                      disabled={sendingBulkDm}
+                      placeholder="Names will be auto-populated from selected users"
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none disabled:opacity-50 disabled:cursor-not-allowed"
+                      rows={2}
+                    />
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Each recipient will receive a personalized DM with their first name.
+                      Edit names as needed (comma-separated). Each recipient will receive a personalized DM with their name from this list.
                     </p>
                   </div>
                 )}
@@ -1211,8 +1354,14 @@ thanks and looking forward to what you curate!`;
                     </label>
                     <div className="p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
                       {selectedUserFids.size > 0 && filteredUsers.length > 0
-                        ? assembleMessage(filteredUsers.find((u) => selectedUserFids.has(u.fid))?.extractedFirstName || "Name")
-                        : assembleMessage("Name")}
+                        ? (() => {
+                            const firstSelectedUser = filteredUsers.find((u) => selectedUserFids.has(u.fid));
+                            if (firstSelectedUser) {
+                              return assembleMessage(firstSelectedUser.fid, firstSelectedUser.extractedFirstName);
+                            }
+                            return assembleMessage(0, "Name");
+                          })()
+                        : assembleMessage(0, "Name")}
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                       Each recipient will receive a personalized DM with their first name. Line breaks in the message will be preserved.
