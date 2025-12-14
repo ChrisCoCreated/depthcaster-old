@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { sql, eq } from "drizzle-orm";
+import { sql, eq, and } from "drizzle-orm";
 import {
   users,
   userRoles,
@@ -825,16 +825,19 @@ export async function GET(request: NextRequest) {
             });
           }
 
-          // Get curators who have never signed in (no successful sign-in records)
-          const curatorsWithSignIn = await db.execute(sql`
-            SELECT DISTINCT user_fid
-            FROM sign_in_logs
-            WHERE user_fid IS NOT NULL
-              AND success = true
-              AND user_fid = ANY(${sql.raw(`ARRAY[${curatorFids.length > 0 ? curatorFids.join(',') : 'NULL'}]`)})
-          `);
+          // Get curators who have never signed in (using first_sign_in_at to match "Signed-In Users" metric)
+          // This should be consistent with getSignedInEver() which uses users.first_sign_in_at
+          const curatorsWithSignIn = await db
+            .select({ fid: users.fid })
+            .from(users)
+            .where(
+              and(
+                sql`${users.fid} = ANY(${sql.raw(`ARRAY[${curatorFids.length > 0 ? curatorFids.join(',') : 'NULL'}]`)})`,
+                sql`${users.firstSignInAt} IS NOT NULL`
+              )
+            );
           
-          const signInFidsSet = new Set((curatorsWithSignIn as any).rows?.map((r: any) => r.user_fid) || []);
+          const signInFidsSet = new Set(curatorsWithSignIn.map(u => u.fid));
           
           // Find curators who have never signed in
           const neverSignedInFids = curatorFids.filter(fid => !signInFidsSet.has(fid));
