@@ -66,19 +66,9 @@ export async function GET(request: NextRequest) {
       }
       
       // Handle generic article specific errors
+      // Note: Most extraction errors now fall back to OG preview automatically
       if (platform === 'generic_article') {
-        if (errorMessage.includes('does not appear to be an article page') ||
-            errorMessage.includes('Extracted content is too short') ||
-            errorMessage.includes('Could not extract article content')) {
-          return NextResponse.json(
-            { 
-              error: "Full text unavailable – open externally?",
-              details: errorMessage
-            },
-            { status: 400 }
-          );
-        }
-        
+        // Only return errors for network/404 issues - extraction failures now use OG preview
         if (errorMessage.includes("Failed to fetch article") || errorStatus === 404) {
           return NextResponse.json(
             { error: "Article not found" },
@@ -155,7 +145,7 @@ async function handleParagraphPost(url: string): Promise<NextResponse> {
           },
           { includeContent: true }
         );
-      } catch (domainError) {
+      } catch {
         // If custom domain approach fails, throw original error
         throw error;
       }
@@ -169,7 +159,7 @@ async function handleParagraphPost(url: string): Promise<NextResponse> {
   if (!publicationData) {
     try {
       publicationData = await api.getPublicationBySlug(cleanPublicationSlug);
-    } catch (pubError) {
+    } catch {
       // Publication fetch is optional, continue without it
     }
   }
