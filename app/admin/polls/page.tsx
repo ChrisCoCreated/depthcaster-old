@@ -374,7 +374,7 @@ export default function AdminPollsPage() {
                         {poll.slug || `${poll.castHash.slice(0, 10)}...`}
                       </code>
                       <Link
-                        href={`/polls/${poll.slug || poll.castHash}`}
+                        href={`/poll/${poll.slug || poll.castHash}`}
                         target="_blank"
                         className="text-blue-600 dark:text-blue-400 hover:underline"
                       >

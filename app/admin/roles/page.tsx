@@ -15,6 +15,14 @@ interface UserWithRoles {
   lastActivity: string | null;
 }
 
+interface FilteredUser {
+  fid: number;
+  username: string | null;
+  displayName: string | null;
+  pfpUrl: string | null;
+  extractedFirstName: string;
+}
+
 const VALID_ROLES = ["tester", "curator", "admin", "superadmin", "plus", "collector"] as const;
 type ValidRole = typeof VALID_ROLES[number];
 
@@ -39,6 +47,17 @@ export default function AdminRolesPage() {
   const [dmModalOpen, setDmModalOpen] = useState<boolean>(false);
   const [dmRecipientFid, setDmRecipientFid] = useState<number | null>(null);
   const [dmMessage, setDmMessage] = useState<string>("");
+  
+  // Bulk DM state
+  const [bulkDmModalOpen, setBulkDmModalOpen] = useState<boolean>(false);
+  const [selectedRole, setSelectedRole] = useState<ValidRole | "">("");
+  const [salutation, setSalutation] = useState<string>("");
+  const [bulkDmMessage, setBulkDmMessage] = useState<string>("");
+  const [recipientNames, setRecipientNames] = useState<string>("");
+  const [filteredUsers, setFilteredUsers] = useState<FilteredUser[]>([]);
+  const [selectedUserFids, setSelectedUserFids] = useState<Set<number>>(new Set());
+  const [sendingBulkDm, setSendingBulkDm] = useState<boolean>(false);
+  const [extractingNames, setExtractingNames] = useState<boolean>(false);
 
   useEffect(() => {
     const checkAdminAccess = async () => {
@@ -408,6 +427,201 @@ thanks and looking forward to what you curate!`;
     }
   };
 
+  // Bulk DM handlers
+  const handleOpenBulkDmModal = () => {
+    setBulkDmModalOpen(true);
+    setSelectedRole("");
+    setSalutation("");
+    setBulkDmMessage("");
+    setRecipientNames("");
+    setFilteredUsers([]);
+    setSelectedUserFids(new Set());
+  };
+
+  const handleCloseBulkDmModal = () => {
+    setBulkDmModalOpen(false);
+    setSelectedRole("");
+    setSalutation("");
+    setBulkDmMessage("");
+    setRecipientNames("");
+    setFilteredUsers([]);
+    setSelectedUserFids(new Set());
+    setExtractingNames(false);
+    setSendingBulkDm(false);
+  };
+
+  const extractFirstNames = async (usersToExtract: Array<{ fid: number; username: string | null; displayName: string | null }>) => {
+    if (!user?.fid) return [];
+
+    try {
+      const response = await fetch("/api/admin/extract-first-names", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          adminFid: user.fid,
+          users: usersToExtract,
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        return data.firstNames || [];
+      } else {
+        console.error("Failed to extract first names:", data.error);
+        // Fallback to capitalized usernames
+        return usersToExtract.map((u) => {
+          const username = u.username || "";
+          return username.charAt(0).toUpperCase() + username.slice(1);
+        });
+      }
+    } catch (error: any) {
+      console.error("Error extracting first names:", error);
+      // Fallback to capitalized usernames
+      return usersToExtract.map((u) => {
+        const username = u.username || "";
+        return username.charAt(0).toUpperCase() + username.slice(1);
+      });
+    }
+  };
+
+  const updateRecipientNames = (selectedFids: Set<number>, users: FilteredUser[]) => {
+    const selectedUsers = users.filter((u) => selectedFids.has(u.fid));
+    const names = selectedUsers.map((u) => u.extractedFirstName).join(", ");
+    setRecipientNames(names);
+  };
+
+  const handleRoleChange = async (role: ValidRole | "") => {
+    setSelectedRole(role);
+    setExtractingNames(true);
+    setFilteredUsers([]);
+    setSelectedUserFids(new Set());
+    setRecipientNames("");
+
+    if (!role) {
+      setExtractingNames(false);
+      return;
+    }
+
+    // Filter users by role
+    const usersWithRole = users.filter((u) => u.roles.includes(role));
+
+    if (usersWithRole.length === 0) {
+      setExtractingNames(false);
+      return;
+    }
+
+    // Extract first names
+    const usersToExtract = usersWithRole.map((u) => ({
+      fid: u.fid,
+      username: u.username,
+      displayName: u.displayName,
+    }));
+
+    const firstNames = await extractFirstNames(usersToExtract);
+
+    // Create filtered users with extracted first names
+    const filtered = usersWithRole.map((u, index) => ({
+      fid: u.fid,
+      username: u.username,
+      displayName: u.displayName,
+      pfpUrl: u.pfpUrl,
+      extractedFirstName: firstNames[index] || (u.username ? u.username.charAt(0).toUpperCase() + u.username.slice(1) : "User"),
+    }));
+
+    setFilteredUsers(filtered);
+    
+    // Select all users by default
+    const allFids = new Set(filtered.map((u) => u.fid));
+    setSelectedUserFids(allFids);
+    updateRecipientNames(allFids, filtered);
+    setExtractingNames(false);
+  };
+
+  const handleUserToggle = (fid: number) => {
+    const newSelected = new Set(selectedUserFids);
+    if (newSelected.has(fid)) {
+      newSelected.delete(fid);
+    } else {
+      newSelected.add(fid);
+    }
+    setSelectedUserFids(newSelected);
+    updateRecipientNames(newSelected, filteredUsers);
+  };
+
+  const handleSelectAll = () => {
+    const allFids = new Set(filteredUsers.map((u) => u.fid));
+    setSelectedUserFids(allFids);
+    updateRecipientNames(allFids, filteredUsers);
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedUserFids(new Set());
+    setRecipientNames("");
+  };
+
+  const assembleMessage = (): string => {
+    const parts: string[] = [];
+    if (salutation.trim()) {
+      parts.push(salutation.trim());
+    }
+    if (recipientNames.trim()) {
+      parts.push(recipientNames.trim());
+    }
+    if (bulkDmMessage.trim()) {
+      parts.push(bulkDmMessage.trim());
+    }
+    // Join with double newlines as specified in the plan
+    return parts.join("\n\n");
+  };
+
+  const handleSendBulkDm = async () => {
+    if (!user?.fid || selectedUserFids.size === 0) return;
+
+    setSendingBulkDm(true);
+    setMessage(null);
+
+    try {
+      const recipientFids = Array.from(selectedUserFids);
+      const finalMessage = assembleMessage();
+
+      const response = await fetch("/api/admin/send-dm", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          adminFid: user.fid,
+          recipientFids,
+          message: finalMessage,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        const successCount = data.results?.success || (data.success ? recipientFids.length : 0);
+        const failureCount = data.results?.failed || 0;
+        
+        if (failureCount === 0) {
+          setMessage({ type: "success", text: `Successfully sent ${successCount} DM(s)!` });
+        } else {
+          setMessage({ type: "success", text: `Sent ${successCount} DM(s), ${failureCount} failed` });
+        }
+        handleCloseBulkDmModal();
+      } else {
+        setMessage({ type: "error", text: data.error || "Failed to send bulk DM" });
+      }
+    } catch (error: any) {
+      console.error("Failed to send bulk DM:", error);
+      setMessage({ type: "error", text: error.message || "Failed to send bulk DM" });
+    } finally {
+      setSendingBulkDm(false);
+    }
+  };
+
   if (!user || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -426,13 +640,23 @@ thanks and looking forward to what you curate!`;
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
-      <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-          User Roles Management
-        </h1>
-        <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
-          Manage user roles: curator, admin, superadmin, tester, plus, and collector
-        </p>
+      <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+            User Roles Management
+          </h1>
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
+            Manage user roles: curator, admin, superadmin, tester, plus, and collector
+          </p>
+        </div>
+        {isSuperAdmin && (
+          <button
+            onClick={handleOpenBulkDmModal}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm sm:text-base whitespace-nowrap"
+          >
+            Send Bulk DM
+          </button>
+        )}
       </div>
 
         {message && (
@@ -790,6 +1014,196 @@ thanks and looking forward to what you curate!`;
                   className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {sendingDm !== null ? "Sending..." : "Send DM"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Bulk DM Modal */}
+        {bulkDmModalOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-lg max-w-4xl w-full max-h-[90vh] flex flex-col">
+              <div className="p-4 sm:p-6 border-b border-gray-200 dark:border-gray-800">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    Send Bulk DM
+                  </h3>
+                  <button
+                    onClick={handleCloseBulkDmModal}
+                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                    disabled={sendingBulkDm || extractingNames}
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              
+              <div className="p-4 sm:p-6 flex-1 overflow-y-auto space-y-4">
+                {/* Role Selector */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Select Role
+                  </label>
+                  <select
+                    value={selectedRole}
+                    onChange={(e) => handleRoleChange(e.target.value as ValidRole | "")}
+                    disabled={extractingNames || sendingBulkDm}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <option value="">-- Select a role --</option>
+                    {VALID_ROLES.map((role) => (
+                      <option key={role} value={role}>
+                        {role}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* User Selection List */}
+                {selectedRole && (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Select Recipients ({selectedUserFids.size} of {filteredUsers.length} selected)
+                      </label>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleSelectAll}
+                          disabled={extractingNames || sendingBulkDm || filteredUsers.length === 0}
+                          className="px-3 py-1 text-xs text-purple-600 dark:text-purple-400 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Select All
+                        </button>
+                        <button
+                          onClick={handleDeselectAll}
+                          disabled={extractingNames || sendingBulkDm || selectedUserFids.size === 0}
+                          className="px-3 py-1 text-xs text-purple-600 dark:text-purple-400 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Deselect All
+                        </button>
+                      </div>
+                    </div>
+                    {extractingNames ? (
+                      <div className="text-center py-8 text-gray-500">Extracting first names...</div>
+                    ) : filteredUsers.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">No users found with this role.</div>
+                    ) : (
+                      <div className="border border-gray-200 dark:border-gray-700 rounded-lg max-h-64 overflow-y-auto">
+                        {filteredUsers.map((filteredUser) => (
+                          <div
+                            key={filteredUser.fid}
+                            className="flex items-center gap-3 p-3 border-b border-gray-200 dark:border-gray-700 last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedUserFids.has(filteredUser.fid)}
+                              onChange={() => handleUserToggle(filteredUser.fid)}
+                              disabled={sendingBulkDm}
+                              className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 disabled:opacity-50"
+                            />
+                            <Link href={`/profile/${filteredUser.fid}`} className="flex-shrink-0">
+                              <AvatarImage
+                                src={filteredUser.pfpUrl}
+                                alt={filteredUser.username || "User"}
+                                size={32}
+                                className="w-8 h-8 rounded-full"
+                              />
+                            </Link>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-gray-900 dark:text-gray-100 truncate">
+                                {filteredUser.displayName || filteredUser.username || `FID: ${filteredUser.fid}`}
+                              </div>
+                              {filteredUser.username && (
+                                <div className="text-sm text-gray-600 dark:text-gray-400 truncate">
+                                  @{filteredUser.username}
+                                </div>
+                              )}
+                            </div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400">
+                              {filteredUser.extractedFirstName}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Salutation */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Salutation
+                  </label>
+                  <input
+                    type="text"
+                    value={salutation}
+                    onChange={(e) => setSalutation(e.target.value)}
+                    disabled={sendingBulkDm}
+                    placeholder="e.g., Hi everyone,"
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                </div>
+
+                {/* Recipient Names */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Recipient Names (editable)
+                  </label>
+                  <textarea
+                    value={recipientNames}
+                    onChange={(e) => setRecipientNames(e.target.value)}
+                    disabled={sendingBulkDm}
+                    placeholder="Names will be auto-populated from selected users"
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none disabled:opacity-50 disabled:cursor-not-allowed"
+                    rows={2}
+                  />
+                </div>
+
+                {/* Message */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Message
+                  </label>
+                  <textarea
+                    value={bulkDmMessage}
+                    onChange={(e) => setBulkDmMessage(e.target.value)}
+                    disabled={sendingBulkDm}
+                    placeholder="Enter your message..."
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none disabled:opacity-50 disabled:cursor-not-allowed"
+                    rows={6}
+                  />
+                </div>
+
+                {/* Preview */}
+                {salutation || recipientNames || bulkDmMessage ? (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Message Preview
+                    </label>
+                    <div className="p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
+                      {assembleMessage()}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="p-4 sm:p-6 border-t border-gray-200 dark:border-gray-800 flex gap-3 justify-end">
+                <button
+                  onClick={handleCloseBulkDmModal}
+                  disabled={sendingBulkDm || extractingNames}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSendBulkDm}
+                  disabled={sendingBulkDm || extractingNames || selectedUserFids.size === 0 || !bulkDmMessage.trim()}
+                  className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {sendingBulkDm ? `Sending to ${selectedUserFids.size} user(s)...` : `Send to ${selectedUserFids.size} user(s)`}
                 </button>
               </div>
             </div>
