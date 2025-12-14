@@ -672,18 +672,6 @@ export default function AdminPollsPage() {
                     </h3>
                     <div className="space-y-3">
                       {resultsData.collatedResults.map((result: any, index: number) => {
-                        // Color palette for options
-                        const optionColors = [
-                          { bg: "bg-blue-500", bgLight: "bg-blue-100", bgDark: "bg-blue-900/40", text: "text-blue-700", textDark: "text-blue-300", border: "border-blue-300", borderDark: "border-blue-700" },
-                          { bg: "bg-purple-500", bgLight: "bg-purple-100", bgDark: "bg-purple-900/40", text: "text-purple-700", textDark: "text-purple-300", border: "border-purple-300", borderDark: "border-purple-700" },
-                          { bg: "bg-green-500", bgLight: "bg-green-100", bgDark: "bg-green-900/40", text: "text-green-700", textDark: "text-green-300", border: "border-green-300", borderDark: "border-green-700" },
-                          { bg: "bg-orange-500", bgLight: "bg-orange-100", bgDark: "bg-orange-900/40", text: "text-orange-700", textDark: "text-orange-300", border: "border-orange-300", borderDark: "border-orange-700" },
-                          { bg: "bg-pink-500", bgLight: "bg-pink-100", bgDark: "bg-pink-900/40", text: "text-pink-700", textDark: "text-pink-300", border: "border-pink-300", borderDark: "border-pink-700" },
-                          { bg: "bg-indigo-500", bgLight: "bg-indigo-100", bgDark: "bg-indigo-900/40", text: "text-indigo-700", textDark: "text-indigo-300", border: "border-indigo-300", borderDark: "border-indigo-700" },
-                          { bg: "bg-teal-500", bgLight: "bg-teal-100", bgDark: "bg-teal-900/40", text: "text-teal-700", textDark: "text-teal-300", border: "border-teal-300", borderDark: "border-teal-700" },
-                          { bg: "bg-red-500", bgLight: "bg-red-100", bgDark: "bg-red-900/40", text: "text-red-700", textDark: "text-red-300", border: "border-red-300", borderDark: "border-red-700" },
-                        ];
-                        const color = optionColors[index % optionColors.length];
                         const maxVotes = resultsData.poll.pollType === "ranking" 
                           ? Math.max(...resultsData.collatedResults.map((r: any) => r.voteCount || 0))
                           : Math.max(...resultsData.collatedResults.map((r: any) => r.totalVotes || 0));
@@ -693,22 +681,22 @@ export default function AdminPollsPage() {
                         return (
                           <div
                             key={result.optionId}
-                            className={`border-2 ${color.border} dark:${color.borderDark} rounded-lg p-4 ${color.bgLight} dark:${color.bgDark} transition-all hover:shadow-md`}
+                            className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800 transition-all hover:shadow-md"
                           >
                             <div className="flex items-center justify-between mb-3">
                               <div className="flex items-center gap-3">
                                 {resultsData.poll.pollType === "ranking" && (
-                                  <div className={`w-10 h-10 rounded-full ${color.bg} flex items-center justify-center text-sm font-bold text-white shadow-md`}>
+                                  <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-sm font-bold text-white shadow-md">
                                     {index + 1}
                                   </div>
                                 )}
-                                <span className={`font-semibold text-lg ${color.text} dark:${color.textDark}`}>
+                                <span className="font-semibold text-lg text-gray-900 dark:text-gray-100">
                                   {result.optionText}
                                 </span>
                               </div>
                               {resultsData.poll.pollType === "ranking" && (
                                 <div className="text-right">
-                                  <div className={`text-lg font-bold ${color.text} dark:${color.textDark}`}>
+                                  <div className="text-lg font-bold text-gray-900 dark:text-gray-100">
                                     {result.averageRank.toFixed(2)}
                                   </div>
                                   <div className="text-xs text-gray-500 dark:text-gray-400">
@@ -727,7 +715,7 @@ export default function AdminPollsPage() {
                               </div>
                               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
                                 <div
-                                  className={`h-full ${color.bg} rounded-full transition-all duration-500 shadow-sm`}
+                                  className="h-full bg-blue-500 rounded-full transition-all duration-500 shadow-sm"
                                   style={{ width: `${votePercentage}%` }}
                                 />
                               </div>
@@ -739,7 +727,7 @@ export default function AdminPollsPage() {
                                 {result.rankings.map((rank: number, rankIndex: number) => (
                                   <span
                                     key={rankIndex}
-                                    className={`px-2 py-1 rounded text-xs font-medium ${color.bgLight} dark:${color.bgDark} ${color.text} dark:${color.textDark}`}
+                                    className="px-2 py-1 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
                                   >
                                     #{rank}
                                   </span>
@@ -752,10 +740,10 @@ export default function AdminPollsPage() {
                                     const total = result.totalVotes || 1;
                                     const percentage = (count / total) * 100;
                                     const choiceColors: Record<string, any> = {
-                                      love: { bg: "bg-red-500", text: "text-red-700", textDark: "text-red-300", bgLight: "bg-red-100", bgDark: "bg-red-900/40" },
+                                      love: { bg: "bg-pink-500", text: "text-pink-700", textDark: "text-pink-300", bgLight: "bg-pink-100", bgDark: "bg-pink-900/40" },
                                       like: { bg: "bg-green-500", text: "text-green-700", textDark: "text-green-300", bgLight: "bg-green-100", bgDark: "bg-green-900/40" },
                                       meh: { bg: "bg-yellow-500", text: "text-yellow-700", textDark: "text-yellow-300", bgLight: "bg-yellow-100", bgDark: "bg-yellow-900/40" },
-                                      hate: { bg: "bg-gray-500", text: "text-gray-700", textDark: "text-gray-300", bgLight: "bg-gray-100", bgDark: "bg-gray-900/40" },
+                                      hate: { bg: "bg-red-500", text: "text-red-700", textDark: "text-red-300", bgLight: "bg-red-100", bgDark: "bg-red-900/40" },
                                     };
                                     const choiceColor = choiceColors[choice.toLowerCase()] || { bg: "bg-blue-500", text: "text-blue-700", textDark: "text-blue-300", bgLight: "bg-blue-100", bgDark: "bg-blue-900/40" };
                                     
@@ -833,28 +821,15 @@ export default function AdminPollsPage() {
                             <div className="space-y-2">
                               {resultsData.poll.pollType === "ranking" ? (
                                 response.rankings.map((ranked: any, rankIndex: number) => {
-                                  const optionIndex = resultsData.options.findIndex((opt: any) => opt.id === ranked.optionId);
-                                  const optionColors = [
-                                    { bg: "bg-blue-500", bgLight: "bg-blue-100", bgDark: "bg-blue-900/40", text: "text-blue-700", textDark: "text-blue-300" },
-                                    { bg: "bg-purple-500", bgLight: "bg-purple-100", bgDark: "bg-purple-900/40", text: "text-purple-700", textDark: "text-purple-300" },
-                                    { bg: "bg-green-500", bgLight: "bg-green-100", bgDark: "bg-green-900/40", text: "text-green-700", textDark: "text-green-300" },
-                                    { bg: "bg-orange-500", bgLight: "bg-orange-100", bgDark: "bg-orange-900/40", text: "text-orange-700", textDark: "text-orange-300" },
-                                    { bg: "bg-pink-500", bgLight: "bg-pink-100", bgDark: "bg-pink-900/40", text: "text-pink-700", textDark: "text-pink-300" },
-                                    { bg: "bg-indigo-500", bgLight: "bg-indigo-100", bgDark: "bg-indigo-900/40", text: "text-indigo-700", textDark: "text-indigo-300" },
-                                    { bg: "bg-teal-500", bgLight: "bg-teal-100", bgDark: "bg-teal-900/40", text: "text-teal-700", textDark: "text-teal-300" },
-                                    { bg: "bg-red-500", bgLight: "bg-red-100", bgDark: "bg-red-900/40", text: "text-red-700", textDark: "text-red-300" },
-                                  ];
-                                  const color = optionColors[optionIndex % optionColors.length];
-                                  
                                   return (
                                     <div
                                       key={ranked.optionId}
-                                      className={`flex items-center gap-3 p-2 rounded-lg ${color.bgLight} dark:${color.bgDark} border border-transparent hover:border-current transition-colors`}
+                                      className="flex items-center gap-3 p-2 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
                                     >
-                                      <span className={`w-8 h-8 rounded-full ${color.bg} flex items-center justify-center text-xs font-bold text-white shadow-sm`}>
+                                      <span className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-xs font-bold text-white shadow-sm">
                                         {ranked.rank}
                                       </span>
-                                      <span className={`flex-1 font-medium ${color.text} dark:${color.textDark}`}>
+                                      <span className="flex-1 font-medium text-gray-900 dark:text-gray-100">
                                         {ranked.optionText}
                                       </span>
                                     </div>
@@ -862,32 +837,20 @@ export default function AdminPollsPage() {
                                 })
                               ) : (
                                 response.choices.map((optionChoice: any) => {
-                                  const optionIndex = resultsData.options.findIndex((opt: any) => opt.id === optionChoice.optionId);
-                                  const optionColors = [
-                                    { bg: "bg-blue-500", bgLight: "bg-blue-100", bgDark: "bg-blue-900/40", text: "text-blue-700", textDark: "text-blue-300" },
-                                    { bg: "bg-purple-500", bgLight: "bg-purple-100", bgDark: "bg-purple-900/40", text: "text-purple-700", textDark: "text-purple-300" },
-                                    { bg: "bg-green-500", bgLight: "bg-green-100", bgDark: "bg-green-900/40", text: "text-green-700", textDark: "text-green-300" },
-                                    { bg: "bg-orange-500", bgLight: "bg-orange-100", bgDark: "bg-orange-900/40", text: "text-orange-700", textDark: "text-orange-300" },
-                                    { bg: "bg-pink-500", bgLight: "bg-pink-100", bgDark: "bg-pink-900/40", text: "text-pink-700", textDark: "text-pink-300" },
-                                    { bg: "bg-indigo-500", bgLight: "bg-indigo-100", bgDark: "bg-indigo-900/40", text: "text-indigo-700", textDark: "text-indigo-300" },
-                                    { bg: "bg-teal-500", bgLight: "bg-teal-100", bgDark: "bg-teal-900/40", text: "text-teal-700", textDark: "text-teal-300" },
-                                    { bg: "bg-red-500", bgLight: "bg-red-100", bgDark: "bg-red-900/40", text: "text-red-700", textDark: "text-red-300" },
-                                  ];
-                                  const color = optionColors[optionIndex % optionColors.length];
                                   const choiceColors: Record<string, any> = {
-                                    love: { bg: "bg-red-500", text: "text-red-700", textDark: "text-red-300", bgLight: "bg-red-100", bgDark: "bg-red-900/40" },
+                                    love: { bg: "bg-pink-500", text: "text-pink-700", textDark: "text-pink-300", bgLight: "bg-pink-100", bgDark: "bg-pink-900/40" },
                                     like: { bg: "bg-green-500", text: "text-green-700", textDark: "text-green-300", bgLight: "bg-green-100", bgDark: "bg-green-900/40" },
                                     meh: { bg: "bg-yellow-500", text: "text-yellow-700", textDark: "text-yellow-300", bgLight: "bg-yellow-100", bgDark: "bg-yellow-900/40" },
-                                    hate: { bg: "bg-gray-500", text: "text-gray-700", textDark: "text-gray-300", bgLight: "bg-gray-100", bgDark: "bg-gray-900/40" },
+                                    hate: { bg: "bg-red-500", text: "text-red-700", textDark: "text-red-300", bgLight: "bg-red-100", bgDark: "bg-red-900/40" },
                                   };
                                   const choiceColor = choiceColors[optionChoice.choice.toLowerCase()] || { bg: "bg-blue-500", text: "text-blue-700", textDark: "text-blue-300", bgLight: "bg-blue-100", bgDark: "bg-blue-900/40" };
                                   
                                   return (
                                     <div
                                       key={optionChoice.optionId}
-                                      className={`flex items-center gap-3 p-2 rounded-lg ${color.bgLight} dark:${color.bgDark} border border-transparent hover:border-current transition-colors`}
+                                      className="flex items-center gap-3 p-2 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
                                     >
-                                      <span className={`flex-1 font-medium ${color.text} dark:${color.textDark}`}>
+                                      <span className="flex-1 font-medium text-gray-900 dark:text-gray-100">
                                         {optionChoice.optionText}
                                       </span>
                                       <span className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${choiceColor.bgLight} dark:${choiceColor.bgDark} ${choiceColor.text} dark:${choiceColor.textDark} border-2 ${choiceColor.bg} border-opacity-30`}>
