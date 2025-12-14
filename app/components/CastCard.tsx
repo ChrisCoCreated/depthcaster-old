@@ -2776,14 +2776,22 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                         
                         // URL embed (images, videos, links)
                         if (embed.url) {
-                          // Check if this is a blog link - render special preview
+                          // Check if this is a blog link - try to render special preview
                           const renderBlogPlatform = isBlogLink(embed.url);
                           if (renderBlogPlatform) {
-                            return (
-                              <div key={index} onClick={(e) => e.stopPropagation()}>
-                                <BlogPreview url={embed.url} />
-                              </div>
-                            );
+                            // Render BlogPreview - if it fails and returns null, 
+                            // we'll also render the normal embed below as fallback
+                            const blogPreview = <BlogPreview url={embed.url} />;
+                            // If BlogPreview returns null (error), it won't render anything
+                            // and we'll continue to render the normal embed metadata card
+                            if (blogPreview) {
+                              return (
+                                <div key={index} onClick={(e) => e.stopPropagation()}>
+                                  {blogPreview}
+                                </div>
+                              );
+                            }
+                            // If blogPreview is null, fall through to normal embed rendering
                           }
 
                           const metadata = embed.metadata;

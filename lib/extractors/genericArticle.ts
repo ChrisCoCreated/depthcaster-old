@@ -162,64 +162,6 @@ function extractPublicationName(html: string, domain: string, dom?: Document): s
 }
 
 /**
- * Extract Open Graph preview data from HTML
- * Used as fallback when full article extraction fails
- */
-function extractOGPreview(html: string, url: string, document: Document): GenericArticle {
-  const urlObj = new URL(url);
-  const domain = urlObj.hostname.replace('www.', '');
-  
-  // Extract OG title
-  const ogTitleMatch = html.match(/<meta\s+property=["']og:title["']\s+content=["']([^"']+)["']/i) ||
-                       html.match(/<meta\s+name=["']og:title["']\s+content=["']([^"']+)["']/i);
-  const ogTitle = ogTitleMatch ? ogTitleMatch[1] : extractTitle(html, document);
-  
-  // Extract OG description
-  const ogDescMatch = html.match(/<meta\s+property=["']og:description["']\s+content=["']([^"']+)["']/i) ||
-                       html.match(/<meta\s+name=["']og:description["']\s+content=["']([^"']+)["']/i);
-  const ogDescription = ogDescMatch ? ogDescMatch[1] : undefined;
-  
-  // Extract OG image
-  const ogImageMatch = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i) ||
-                       html.match(/<meta\s+name=["']og:image["']\s+content=["']([^"']+)["']/i);
-  const ogImageRaw = ogImageMatch ? ogImageMatch[1] : extractCoverImage(html, document);
-  const ogImage = ogImageRaw ? removeTrackingParams(ogImageRaw) : undefined;
-  
-  // Extract publication name
-  const publicationName = extractPublicationName(html, domain, document);
-  
-  // Extract published date
-  const publishedDateMatch = html.match(/<meta\s+property=["']article:published_time["']\s+content=["']([^"']+)["']/i) ||
-                                 html.match(/<time[^>]+datetime=["']([^"']+)["']/i);
-  const publishedAt = publishedDateMatch ? publishedDateMatch[1] : undefined;
-  
-  // Create a simple markdown preview from OG data
-  let markdown = `# ${ogTitle}\n\n`;
-  if (ogDescription) {
-    markdown += `${ogDescription}\n\n`;
-  }
-  markdown += `[View original article](${url})`;
-  
-  return {
-    id: url,
-    title: ogTitle,
-    subtitle: ogDescription,
-    markdown,
-    staticHtml: undefined, // No full HTML for OG preview
-    coverImage: ogImage,
-    publication: {
-      id: domain,
-      slug: domain,
-      name: publicationName,
-    },
-    publishedAt,
-    createdAt: publishedAt,
-    url: removeTrackingParams(url),
-  };
-}
-
-
-/**
  * Fallback: Extract content from <article> tag
  */
 function extractFromArticleTag(dom: Document): string | null {
@@ -346,18 +288,8 @@ export async function fetchGenericArticle(url: string): Promise<GenericArticle> 
       document = dom.window.document;
       console.log('[Generic Article] Created DOM successfully');
     } catch (error) {
-      console.error('[Generic Article] Failed to create DOM, falling back to OG preview:', error);
-      // If DOM creation fails, try to extract OG preview from raw HTML
-      try {
-        // Create a minimal DOM just for OG extraction
-        const minimalDom = new JSDOM('<!DOCTYPE html><html><head></head><body></body></html>', { url });
-        const minimalDoc = minimalDom.window.document;
-        // Parse HTML manually for OG tags (they're in <head>)
-        return extractOGPreview(html, url, minimalDoc);
-      } catch (ogError) {
-        console.error('[Generic Article] OG preview fallback also failed:', ogError);
-        throw new Error('Failed to parse HTML');
-      }
+      console.error('[Generic Article] Failed to create DOM:', error);
+      throw new Error('Failed to parse HTML');
     }
     
     // Attempt extraction (we try for all URLs)
@@ -373,9 +305,8 @@ export async function fetchGenericArticle(url: string): Promise<GenericArticle> 
       excerpt = extracted.excerpt;
       console.log('[Generic Article] Extraction successful, content length:', rawContent.length);
     } catch (error) {
-      console.error('[Generic Article] Extraction failed, falling back to OG preview:', error);
-      // Fallback to OG preview if extraction fails
-      return extractOGPreview(html, url, document);
+      console.error('[Generic Article] Extraction failed:', error);
+      throw error;
     }
     
     // Sanitize HTML
@@ -389,9 +320,8 @@ export async function fetchGenericArticle(url: string): Promise<GenericArticle> 
     // Check content length
     const textContent = markdown.replace(/[#*\[\]()]/g, '').trim();
     if (textContent.length < 200) {
-      console.warn('[Generic Article] Content too short, falling back to OG preview:', textContent.length);
-      // Fallback to OG preview if content is too short
-      return extractOGPreview(html, url, document);
+      console.warn('[Generic Article] Content too short:', textContent.length);
+      throw new Error('Extracted content is too short (< 200 characters)');
     }
     
     // Extract metadata
@@ -423,44 +353,7 @@ export async function fetchGenericArticle(url: string): Promise<GenericArticle> 
     };
   } catch (error) {
     console.error('[Generic Article] Error in fetchGenericArticle:', error);
-    
-    // If we have HTML from the initial fetch, try to extract OG preview
-    if (html) {
-      try {
-        console.log('[Generic Article] Attempting OG preview fallback with existing HTML...');
-        // Try to create a minimal DOM for OG extraction
-        const dom = new JSDOM(html, { url });
-        const document = dom.window.document;
-        console.log('[Generic Article] OG preview fallback successful');
-        return extractOGPreview(html, url, document);
-      } catch (ogError) {
-        console.error('[Generic Article] OG preview fallback failed:', ogError);
-      }
-    }
-    
-    // If we don't have HTML, try to fetch it again for OG preview
-    if (error instanceof Error && !error.message.includes('Failed to fetch article')) {
-      try {
-        console.log('[Generic Article] Attempting OG preview fallback with new fetch...');
-        const response = await fetch(url, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (compatible; Depthcaster/1.0)',
-          },
-        });
-        
-        if (response.ok) {
-          const fallbackHtml = await response.text();
-          const dom = new JSDOM(fallbackHtml, { url });
-          const document = dom.window.document;
-          console.log('[Generic Article] OG preview fallback successful');
-          return extractOGPreview(fallbackHtml, url, document);
-        }
-      } catch (fallbackError) {
-        console.error('[Generic Article] OG preview fallback also failed:', fallbackError);
-      }
-    }
-    
-    // If all else fails, throw the original error
+    // Let the error propagate - the existing embed metadata system will handle it
     if (error instanceof Error) {
       throw error;
     }

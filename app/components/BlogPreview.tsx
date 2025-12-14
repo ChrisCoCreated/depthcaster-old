@@ -80,13 +80,8 @@ export function BlogPreview({ url }: BlogPreviewProps) {
   }
 
   if (error || !post) {
-    return (
-      <div className="my-3 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
-        <div className="text-sm text-gray-600 dark:text-gray-400">
-          {error || "Unable to load article preview"}
-        </div>
-      </div>
-    );
+    // Return null to allow the existing embed metadata system to handle it
+    return null;
   }
 
   const displayContent = post.markdown || "";
