@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { polls, pollOptions, pollResponses } from "@/lib/schema";
-import { eq, asc, and } from "drizzle-orm";
+import { eq, asc, and, or } from "drizzle-orm";
 import { isAdmin, getUserRoles } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
@@ -22,11 +22,16 @@ export async function GET(
       );
     }
 
-    // Get poll
+    // Get poll by slug or castHash
     const poll = await db
       .select()
       .from(polls)
-      .where(eq(polls.castHash, castHash))
+      .where(
+        or(
+          eq(polls.slug, castHash),
+          eq(polls.castHash, castHash)
+        )
+      )
       .limit(1);
 
     if (poll.length === 0) {
@@ -69,6 +74,7 @@ export async function GET(
       poll: {
         id: pollData.id,
         castHash: pollData.castHash,
+        slug: pollData.slug,
         question: pollData.question,
         pollType: pollData.pollType || "ranking",
         choices: pollData.choices as string[] | null,
@@ -100,7 +106,7 @@ export async function POST(
   try {
     const { castHash } = await params;
     const body = await request.json();
-    const { question, options, userFid, pollType, choices } = body;
+    const { question, options, userFid, pollType, choices, slug } = body;
 
     if (!castHash) {
       return NextResponse.json(
@@ -142,6 +148,32 @@ export async function POST(
       }
     }
 
+    // Validate and normalize slug
+    let normalizedSlug: string | null = null;
+    if (slug && typeof slug === "string" && slug.trim().length > 0) {
+      normalizedSlug = slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+      if (normalizedSlug.length === 0) {
+        return NextResponse.json(
+          { error: "Invalid slug format" },
+          { status: 400 }
+        );
+      }
+      
+      // Check if slug is already taken by another poll
+      const existingSlugPoll = await db
+        .select()
+        .from(polls)
+        .where(eq(polls.slug, normalizedSlug))
+        .limit(1);
+      
+      if (existingSlugPoll.length > 0 && existingSlugPoll[0].castHash !== castHash) {
+        return NextResponse.json(
+          { error: "Slug is already taken" },
+          { status: 400 }
+        );
+      }
+    }
+
     // Check if user is admin
     const fid = parseInt(userFid);
     if (isNaN(fid)) {
@@ -177,6 +209,7 @@ export async function POST(
           question: question.trim(),
           pollType: validPollType,
           choices: validPollType === "choice" ? choices : null,
+          slug: normalizedSlug,
           updatedAt: new Date(),
         })
         .where(eq(polls.id, pollId));
@@ -189,6 +222,7 @@ export async function POST(
         .insert(polls)
         .values({
           castHash,
+          slug: normalizedSlug,
           question: question.trim(),
           pollType: validPollType,
           choices: validPollType === "choice" ? choices : null,

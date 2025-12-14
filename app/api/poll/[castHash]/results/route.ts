@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { polls, pollOptions, pollResponses, users } from "@/lib/schema";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, or } from "drizzle-orm";
 import { isAdmin, getUserRoles } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
@@ -46,11 +46,16 @@ export async function GET(
       );
     }
 
-    // Get poll
+    // Get poll by slug or castHash
     const poll = await db
       .select()
       .from(polls)
-      .where(eq(polls.castHash, castHash))
+      .where(
+        or(
+          eq(polls.slug, castHash),
+          eq(polls.castHash, castHash)
+        )
+      )
       .limit(1);
 
     if (poll.length === 0) {

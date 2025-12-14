@@ -641,6 +641,7 @@ export const castThanks = pgTable("cast_thanks", {
 export const polls = pgTable("polls", {
   id: uuid("id").defaultRandom().primaryKey(),
   castHash: text("cast_hash").notNull().unique().references(() => curatedCasts.castHash, { onDelete: "cascade" }),
+  slug: text("slug").unique(), // Optional slug for friendly URLs
   question: text("question").notNull(),
   pollType: text("poll_type").notNull().default("ranking"), // 'ranking' or 'choice'
   choices: jsonb("choices"), // For choice type: array of choice labels like ["love", "like", "meh", "hate"]
@@ -649,6 +650,7 @@ export const polls = pgTable("polls", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   castHashIdx: index("polls_cast_hash_idx").on(table.castHash),
+  slugIdx: index("polls_slug_idx").on(table.slug),
   createdByIdx: index("polls_created_by_idx").on(table.createdBy),
 }));
 

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useNeynarContext } from "@neynar/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, Edit, Trash2, ExternalLink, BarChart3, X } from "lucide-react";
+import { Plus, Edit, Trash2, ExternalLink, BarChart3, X, Trophy, Users, TrendingUp } from "lucide-react";
 import { extractCastHashFromUrl } from "@/lib/link-converter";
 import { AvatarImage } from "@/app/components/AvatarImage";
 
@@ -36,6 +36,7 @@ export default function AdminPollsPage() {
 
   // Form state
   const [castHash, setCastHash] = useState("");
+  const [slug, setSlug] = useState("");
   const [question, setQuestion] = useState("");
   const [pollType, setPollType] = useState<"ranking" | "choice">("ranking");
   const [choices, setChoices] = useState<string[]>([]);
@@ -94,6 +95,7 @@ export default function AdminPollsPage() {
 
   const handleCreate = () => {
     setCastHash("");
+    setSlug("");
     setQuestion("");
     setPollType("ranking");
     setChoices([]);
@@ -111,13 +113,14 @@ export default function AdminPollsPage() {
     setShowCreateModal(true);
     setError(null);
     setSuccess(null);
-    // Load poll data including type and choices
+    // Load poll data including type, choices, and slug
     try {
       const response = await fetch(`/api/poll/${poll.castHash}`);
       const data = await response.json();
       if (response.ok && data.poll) {
         setPollType(data.poll.pollType || "ranking");
         setChoices(data.poll.choices || []);
+        setSlug(data.poll.slug || "");
         setOptions(data.poll.options.map((opt: any) => opt.optionText));
       }
     } catch (err) {
@@ -265,6 +268,7 @@ export default function AdminPollsPage() {
           question: question.trim(),
           pollType,
           choices: pollType === "choice" ? choices.filter((c) => c.trim().length > 0) : undefined,
+          slug: slug.trim() || undefined,
           options: validOptions,
           userFid: user.fid,
         }),
@@ -464,6 +468,30 @@ export default function AdminPollsPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Slug (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={slug}
+                    onChange={(e) => {
+                      // Auto-format slug: lowercase, replace spaces/special chars with hyphens
+                      const formatted = e.target.value
+                        .toLowerCase()
+                        .replace(/[^a-z0-9-]/g, "-")
+                        .replace(/-+/g, "-")
+                        .replace(/^-|-$/g, "");
+                      setSlug(formatted);
+                    }}
+                    placeholder="my-poll-slug"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  />
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Friendly URL slug. If not set, the cast hash will be used. Only lowercase letters, numbers, and hyphens.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Poll Type
                   </label>
                   <select
@@ -602,13 +630,37 @@ export default function AdminPollsPage() {
               ) : resultsData ? (
                 <div className="space-y-6">
                   {/* Poll Info */}
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                      {resultsData.poll.question}
-                    </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {resultsData.totalResponses} response{resultsData.totalResponses !== 1 ? "s" : ""}
-                    </p>
+                  <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-blue-500 rounded-lg">
+                        <BarChart3 className="w-6 h-6 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+                          {resultsData.poll.question}
+                        </h3>
+                        <div className="flex items-center gap-4 text-sm">
+                          <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
+                            <Users className="w-4 h-4" />
+                            <span className="font-medium">
+                              {resultsData.totalResponses} response{resultsData.totalResponses !== 1 ? "s" : ""}
+                            </span>
+                          </div>
+                          {resultsData.poll.pollType === "ranking" && (
+                            <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
+                              <Trophy className="w-4 h-4" />
+                              <span>Ranking Poll</span>
+                            </div>
+                          )}
+                          {resultsData.poll.pollType === "choice" && (
+                            <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
+                              <TrendingUp className="w-4 h-4" />
+                              <span>Choice Poll</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Collated Results */}
@@ -619,60 +671,136 @@ export default function AdminPollsPage() {
                         : "Collated Results (Ranked by Average Position)"}
                     </h3>
                     <div className="space-y-3">
-                      {resultsData.collatedResults.map((result: any, index: number) => (
-                        <div
-                          key={result.optionId}
-                          className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800"
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-3">
+                      {resultsData.collatedResults.map((result: any, index: number) => {
+                        // Color palette for options
+                        const optionColors = [
+                          { bg: "bg-blue-500", bgLight: "bg-blue-100", bgDark: "bg-blue-900/40", text: "text-blue-700", textDark: "text-blue-300", border: "border-blue-300", borderDark: "border-blue-700" },
+                          { bg: "bg-purple-500", bgLight: "bg-purple-100", bgDark: "bg-purple-900/40", text: "text-purple-700", textDark: "text-purple-300", border: "border-purple-300", borderDark: "border-purple-700" },
+                          { bg: "bg-green-500", bgLight: "bg-green-100", bgDark: "bg-green-900/40", text: "text-green-700", textDark: "text-green-300", border: "border-green-300", borderDark: "border-green-700" },
+                          { bg: "bg-orange-500", bgLight: "bg-orange-100", bgDark: "bg-orange-900/40", text: "text-orange-700", textDark: "text-orange-300", border: "border-orange-300", borderDark: "border-orange-700" },
+                          { bg: "bg-pink-500", bgLight: "bg-pink-100", bgDark: "bg-pink-900/40", text: "text-pink-700", textDark: "text-pink-300", border: "border-pink-300", borderDark: "border-pink-700" },
+                          { bg: "bg-indigo-500", bgLight: "bg-indigo-100", bgDark: "bg-indigo-900/40", text: "text-indigo-700", textDark: "text-indigo-300", border: "border-indigo-300", borderDark: "border-indigo-700" },
+                          { bg: "bg-teal-500", bgLight: "bg-teal-100", bgDark: "bg-teal-900/40", text: "text-teal-700", textDark: "text-teal-300", border: "border-teal-300", borderDark: "border-teal-700" },
+                          { bg: "bg-red-500", bgLight: "bg-red-100", bgDark: "bg-red-900/40", text: "text-red-700", textDark: "text-red-300", border: "border-red-300", borderDark: "border-red-700" },
+                        ];
+                        const color = optionColors[index % optionColors.length];
+                        const maxVotes = resultsData.poll.pollType === "ranking" 
+                          ? Math.max(...resultsData.collatedResults.map((r: any) => r.voteCount || 0))
+                          : Math.max(...resultsData.collatedResults.map((r: any) => r.totalVotes || 0));
+                        const voteCount = resultsData.poll.pollType === "ranking" ? result.voteCount : result.totalVotes;
+                        const votePercentage = maxVotes > 0 ? (voteCount / maxVotes) * 100 : 0;
+
+                        return (
+                          <div
+                            key={result.optionId}
+                            className={`border-2 ${color.border} dark:${color.borderDark} rounded-lg p-4 ${color.bgLight} dark:${color.bgDark} transition-all hover:shadow-md`}
+                          >
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-3">
+                                {resultsData.poll.pollType === "ranking" && (
+                                  <div className={`w-10 h-10 rounded-full ${color.bg} flex items-center justify-center text-sm font-bold text-white shadow-md`}>
+                                    {index + 1}
+                                  </div>
+                                )}
+                                <span className={`font-semibold text-lg ${color.text} dark:${color.textDark}`}>
+                                  {result.optionText}
+                                </span>
+                              </div>
                               {resultsData.poll.pollType === "ranking" && (
-                                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-sm font-semibold text-blue-700 dark:text-blue-300">
-                                  {index + 1}
+                                <div className="text-right">
+                                  <div className={`text-lg font-bold ${color.text} dark:${color.textDark}`}>
+                                    {result.averageRank.toFixed(2)}
+                                  </div>
+                                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                                    Avg Rank
+                                  </div>
                                 </div>
                               )}
-                              <span className="font-medium text-gray-900 dark:text-gray-100">
-                                {result.optionText}
-                              </span>
                             </div>
-                            {resultsData.poll.pollType === "ranking" && (
-                              <div className="text-sm text-gray-600 dark:text-gray-400">
-                                Avg Rank: {result.averageRank.toFixed(2)}
+                            
+                            {/* Progress Bar */}
+                            <div className="mb-3">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                                  {voteCount} vote{voteCount !== 1 ? "s" : ""} ({votePercentage.toFixed(0)}%)
+                                </span>
+                              </div>
+                              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+                                <div
+                                  className={`h-full ${color.bg} rounded-full transition-all duration-500 shadow-sm`}
+                                  style={{ width: `${votePercentage}%` }}
+                                />
+                              </div>
+                            </div>
+
+                            {resultsData.poll.pollType === "ranking" ? (
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs text-gray-500 dark:text-gray-400">Rankings:</span>
+                                {result.rankings.map((rank: number, rankIndex: number) => (
+                                  <span
+                                    key={rankIndex}
+                                    className={`px-2 py-1 rounded text-xs font-medium ${color.bgLight} dark:${color.bgDark} ${color.text} dark:${color.textDark}`}
+                                  >
+                                    #{rank}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="mt-3">
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                  {Object.entries(result.choiceCounts || {}).map(([choice, count]: [string, any]) => {
+                                    const total = result.totalVotes || 1;
+                                    const percentage = (count / total) * 100;
+                                    const choiceColors: Record<string, any> = {
+                                      love: { bg: "bg-red-500", text: "text-red-700", textDark: "text-red-300", bgLight: "bg-red-100", bgDark: "bg-red-900/40" },
+                                      like: { bg: "bg-green-500", text: "text-green-700", textDark: "text-green-300", bgLight: "bg-green-100", bgDark: "bg-green-900/40" },
+                                      meh: { bg: "bg-yellow-500", text: "text-yellow-700", textDark: "text-yellow-300", bgLight: "bg-yellow-100", bgDark: "bg-yellow-900/40" },
+                                      hate: { bg: "bg-gray-500", text: "text-gray-700", textDark: "text-gray-300", bgLight: "bg-gray-100", bgDark: "bg-gray-900/40" },
+                                    };
+                                    const choiceColor = choiceColors[choice.toLowerCase()] || { bg: "bg-blue-500", text: "text-blue-700", textDark: "text-blue-300", bgLight: "bg-blue-100", bgDark: "bg-blue-900/40" };
+                                    
+                                    return (
+                                      <div
+                                        key={choice}
+                                        className={`border ${choiceColor.bgLight} dark:${choiceColor.bgDark} rounded-lg p-2`}
+                                      >
+                                        <div className="flex items-center justify-between mb-1">
+                                          <span className={`text-xs font-semibold capitalize ${choiceColor.text} dark:${choiceColor.textDark}`}>
+                                            {choice}
+                                          </span>
+                                          <span className={`text-xs font-bold ${choiceColor.text} dark:${choiceColor.textDark}`}>
+                                            {count}
+                                          </span>
+                                        </div>
+                                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+                                          <div
+                                            className={`h-full ${choiceColor.bg} rounded-full transition-all duration-300`}
+                                            style={{ width: `${percentage}%` }}
+                                          />
+                                        </div>
+                                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                          {percentage.toFixed(0)}%
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
                               </div>
                             )}
                           </div>
-                          {resultsData.poll.pollType === "ranking" ? (
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              {result.voteCount} vote{result.voteCount !== 1 ? "s" : ""} • 
-                              Ranks: {result.rankings.join(", ")}
-                            </div>
-                          ) : (
-                            <div className="mt-2">
-                              <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                                {result.totalVotes} vote{result.totalVotes !== 1 ? "s" : ""}
-                              </div>
-                              <div className="flex flex-wrap gap-2">
-                                {Object.entries(result.choiceCounts || {}).map(([choice, count]: [string, any]) => (
-                                  <div
-                                    key={choice}
-                                    className="px-3 py-1 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded-lg text-sm"
-                                  >
-                                    {choice}: {count}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
 
                   {/* Individual Responses */}
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                      Individual Responses
-                    </h3>
+                    <div className="flex items-center gap-2 mb-4">
+                      <Users className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                        Individual Responses
+                      </h3>
+                    </div>
                     <div className="space-y-3 max-h-96 overflow-y-auto">
                       {resultsData.individualResponses.length === 0 ? (
                         <p className="text-gray-500 dark:text-gray-400 text-center py-4">
@@ -702,35 +830,72 @@ export default function AdminPollsPage() {
                                 )}
                               </div>
                             </div>
-                            <div className="space-y-1">
+                            <div className="space-y-2">
                               {resultsData.poll.pollType === "ranking" ? (
-                                response.rankings.map((ranked: any) => (
-                                  <div
-                                    key={ranked.optionId}
-                                    className="flex items-center gap-2 text-sm"
-                                  >
-                                    <span className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-xs font-semibold text-blue-700 dark:text-blue-300">
-                                      {ranked.rank}
-                                    </span>
-                                    <span className="text-gray-700 dark:text-gray-300">
-                                      {ranked.optionText}
-                                    </span>
-                                  </div>
-                                ))
+                                response.rankings.map((ranked: any, rankIndex: number) => {
+                                  const optionIndex = resultsData.options.findIndex((opt: any) => opt.id === ranked.optionId);
+                                  const optionColors = [
+                                    { bg: "bg-blue-500", bgLight: "bg-blue-100", bgDark: "bg-blue-900/40", text: "text-blue-700", textDark: "text-blue-300" },
+                                    { bg: "bg-purple-500", bgLight: "bg-purple-100", bgDark: "bg-purple-900/40", text: "text-purple-700", textDark: "text-purple-300" },
+                                    { bg: "bg-green-500", bgLight: "bg-green-100", bgDark: "bg-green-900/40", text: "text-green-700", textDark: "text-green-300" },
+                                    { bg: "bg-orange-500", bgLight: "bg-orange-100", bgDark: "bg-orange-900/40", text: "text-orange-700", textDark: "text-orange-300" },
+                                    { bg: "bg-pink-500", bgLight: "bg-pink-100", bgDark: "bg-pink-900/40", text: "text-pink-700", textDark: "text-pink-300" },
+                                    { bg: "bg-indigo-500", bgLight: "bg-indigo-100", bgDark: "bg-indigo-900/40", text: "text-indigo-700", textDark: "text-indigo-300" },
+                                    { bg: "bg-teal-500", bgLight: "bg-teal-100", bgDark: "bg-teal-900/40", text: "text-teal-700", textDark: "text-teal-300" },
+                                    { bg: "bg-red-500", bgLight: "bg-red-100", bgDark: "bg-red-900/40", text: "text-red-700", textDark: "text-red-300" },
+                                  ];
+                                  const color = optionColors[optionIndex % optionColors.length];
+                                  
+                                  return (
+                                    <div
+                                      key={ranked.optionId}
+                                      className={`flex items-center gap-3 p-2 rounded-lg ${color.bgLight} dark:${color.bgDark} border border-transparent hover:border-current transition-colors`}
+                                    >
+                                      <span className={`w-8 h-8 rounded-full ${color.bg} flex items-center justify-center text-xs font-bold text-white shadow-sm`}>
+                                        {ranked.rank}
+                                      </span>
+                                      <span className={`flex-1 font-medium ${color.text} dark:${color.textDark}`}>
+                                        {ranked.optionText}
+                                      </span>
+                                    </div>
+                                  );
+                                })
                               ) : (
-                                response.choices.map((optionChoice: any) => (
-                                  <div
-                                    key={optionChoice.optionId}
-                                    className="flex items-center gap-2 text-sm"
-                                  >
-                                    <span className="text-gray-700 dark:text-gray-300 font-medium">
-                                      {optionChoice.optionText}:
-                                    </span>
-                                    <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded text-xs font-medium">
-                                      {optionChoice.choice}
-                                    </span>
-                                  </div>
-                                ))
+                                response.choices.map((optionChoice: any) => {
+                                  const optionIndex = resultsData.options.findIndex((opt: any) => opt.id === optionChoice.optionId);
+                                  const optionColors = [
+                                    { bg: "bg-blue-500", bgLight: "bg-blue-100", bgDark: "bg-blue-900/40", text: "text-blue-700", textDark: "text-blue-300" },
+                                    { bg: "bg-purple-500", bgLight: "bg-purple-100", bgDark: "bg-purple-900/40", text: "text-purple-700", textDark: "text-purple-300" },
+                                    { bg: "bg-green-500", bgLight: "bg-green-100", bgDark: "bg-green-900/40", text: "text-green-700", textDark: "text-green-300" },
+                                    { bg: "bg-orange-500", bgLight: "bg-orange-100", bgDark: "bg-orange-900/40", text: "text-orange-700", textDark: "text-orange-300" },
+                                    { bg: "bg-pink-500", bgLight: "bg-pink-100", bgDark: "bg-pink-900/40", text: "text-pink-700", textDark: "text-pink-300" },
+                                    { bg: "bg-indigo-500", bgLight: "bg-indigo-100", bgDark: "bg-indigo-900/40", text: "text-indigo-700", textDark: "text-indigo-300" },
+                                    { bg: "bg-teal-500", bgLight: "bg-teal-100", bgDark: "bg-teal-900/40", text: "text-teal-700", textDark: "text-teal-300" },
+                                    { bg: "bg-red-500", bgLight: "bg-red-100", bgDark: "bg-red-900/40", text: "text-red-700", textDark: "text-red-300" },
+                                  ];
+                                  const color = optionColors[optionIndex % optionColors.length];
+                                  const choiceColors: Record<string, any> = {
+                                    love: { bg: "bg-red-500", text: "text-red-700", textDark: "text-red-300", bgLight: "bg-red-100", bgDark: "bg-red-900/40" },
+                                    like: { bg: "bg-green-500", text: "text-green-700", textDark: "text-green-300", bgLight: "bg-green-100", bgDark: "bg-green-900/40" },
+                                    meh: { bg: "bg-yellow-500", text: "text-yellow-700", textDark: "text-yellow-300", bgLight: "bg-yellow-100", bgDark: "bg-yellow-900/40" },
+                                    hate: { bg: "bg-gray-500", text: "text-gray-700", textDark: "text-gray-300", bgLight: "bg-gray-100", bgDark: "bg-gray-900/40" },
+                                  };
+                                  const choiceColor = choiceColors[optionChoice.choice.toLowerCase()] || { bg: "bg-blue-500", text: "text-blue-700", textDark: "text-blue-300", bgLight: "bg-blue-100", bgDark: "bg-blue-900/40" };
+                                  
+                                  return (
+                                    <div
+                                      key={optionChoice.optionId}
+                                      className={`flex items-center gap-3 p-2 rounded-lg ${color.bgLight} dark:${color.bgDark} border border-transparent hover:border-current transition-colors`}
+                                    >
+                                      <span className={`flex-1 font-medium ${color.text} dark:${color.textDark}`}>
+                                        {optionChoice.optionText}
+                                      </span>
+                                      <span className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${choiceColor.bgLight} dark:${choiceColor.bgDark} ${choiceColor.text} dark:${choiceColor.textDark} border-2 ${choiceColor.bg} border-opacity-30`}>
+                                        {optionChoice.choice}
+                                      </span>
+                                    </div>
+                                  );
+                                })
                               )}
                             </div>
                           </div>
