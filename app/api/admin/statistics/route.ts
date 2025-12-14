@@ -699,7 +699,7 @@ export async function GET(request: NextRequest) {
 
         // Build admin exclusion clause
         const adminExclusion = adminFids.length > 0 
-          ? sql`AND ae.user_fid NOT IN (${sql.join(adminFids.map(fid => sql`${fid}`), sql`, `)})`
+          ? sql`AND ua.user_fid NOT IN (${sql.join(adminFids.map(fid => sql`${fid}`), sql`, `)})`
           : sql``;
 
         // Query active users for past 30 days using canonical activity_events
