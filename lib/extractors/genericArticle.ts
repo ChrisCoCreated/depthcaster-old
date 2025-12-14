@@ -182,7 +182,8 @@ function extractOGPreview(html: string, url: string, document: Document): Generi
   // Extract OG image
   const ogImageMatch = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i) ||
                        html.match(/<meta\s+name=["']og:image["']\s+content=["']([^"']+)["']/i);
-  const ogImage = ogImageMatch ? removeTrackingParams(ogImageMatch[1]) : extractCoverImage(html, document);
+  const ogImageRaw = ogImageMatch ? ogImageMatch[1] : extractCoverImage(html, document);
+  const ogImage = ogImageRaw ? removeTrackingParams(ogImageRaw) : undefined;
   
   // Extract publication name
   const publicationName = extractPublicationName(html, domain, document);
@@ -423,30 +424,40 @@ export async function fetchGenericArticle(url: string): Promise<GenericArticle> 
   } catch (error) {
     console.error('[Generic Article] Error in fetchGenericArticle:', error);
     
-    // If we have HTML, try to extract OG preview as last resort
-    if (error instanceof Error && error.message.includes('Failed to fetch article')) {
-      // Network error - can't extract OG preview
-      throw error;
-    }
-    
-    // For other errors, try to fetch HTML again for OG preview
-    try {
-      console.log('[Generic Article] Attempting OG preview fallback...');
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; Depthcaster/1.0)',
-        },
-      });
-      
-      if (response.ok) {
-        const html = await response.text();
+    // If we have HTML from the initial fetch, try to extract OG preview
+    if (html) {
+      try {
+        console.log('[Generic Article] Attempting OG preview fallback with existing HTML...');
+        // Try to create a minimal DOM for OG extraction
         const dom = new JSDOM(html, { url });
         const document = dom.window.document;
         console.log('[Generic Article] OG preview fallback successful');
         return extractOGPreview(html, url, document);
+      } catch (ogError) {
+        console.error('[Generic Article] OG preview fallback failed:', ogError);
       }
-    } catch (fallbackError) {
-      console.error('[Generic Article] OG preview fallback also failed:', fallbackError);
+    }
+    
+    // If we don't have HTML, try to fetch it again for OG preview
+    if (error instanceof Error && !error.message.includes('Failed to fetch article')) {
+      try {
+        console.log('[Generic Article] Attempting OG preview fallback with new fetch...');
+        const response = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; Depthcaster/1.0)',
+          },
+        });
+        
+        if (response.ok) {
+          const fallbackHtml = await response.text();
+          const dom = new JSDOM(fallbackHtml, { url });
+          const document = dom.window.document;
+          console.log('[Generic Article] OG preview fallback successful');
+          return extractOGPreview(fallbackHtml, url, document);
+        }
+      } catch (fallbackError) {
+        console.error('[Generic Article] OG preview fallback also failed:', fallbackError);
+      }
     }
     
     // If all else fails, throw the original error
