@@ -794,6 +794,7 @@ export function Header() {
                         top: `${helpDropdownPosition.top}px`,
                         right: `${helpDropdownPosition.right}px`,
                       }}
+                      onClick={(e) => e.stopPropagation()}
                     >
                       <button
                         onClick={() => {
@@ -846,6 +847,7 @@ export function Header() {
                         top: `${pfpDropdownPosition.top}px`,
                         right: `${pfpDropdownPosition.right}px`,
                       }}
+                      onClick={(e) => e.stopPropagation()}
                     >
                       <Link
                         href={`/profile/${user.fid}`}
