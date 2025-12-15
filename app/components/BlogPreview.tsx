@@ -238,11 +238,20 @@ export function BlogPreview({ url, onSuccess }: BlogPreviewProps) {
 
   // Determine platform name for "Read on..." link
   const platform = isBlogLink(url);
-  const platformName = platform === 'substack' 
-    ? 'Substack' 
-    : platform === 'generic_article' 
-    ? 'Article' 
-    : 'Paragraph';
+  let platformName: string;
+  if (platform === 'substack') {
+    platformName = 'Substack';
+  } else if (platform === 'generic_article') {
+    // Extract domain name from URL for generic articles
+    try {
+      const urlObj = new URL(url);
+      platformName = urlObj.hostname.replace(/^www\./, ''); // Remove www. prefix
+    } catch {
+      platformName = 'Article'; // Fallback if URL parsing fails
+    }
+  } else {
+    platformName = 'Paragraph';
+  }
 
   return (
     <div className="my-3 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-gray-300 dark:hover:border-gray-700 transition-colors">

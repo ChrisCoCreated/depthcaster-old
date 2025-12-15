@@ -31,7 +31,7 @@ import { useTouchSafeClick } from "@/lib/hooks/useTouchSafeClick";
 const CURATED_FEED_COLLAPSE_LINE_LIMIT = 8;
 
 // Helper function to convert URLs in text to clickable links
-function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>, insideLink: boolean = false, hideUrls: boolean = false) {
+function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>, insideLink: boolean = false, hideUrls: boolean = false, urlsToHide: string[] = []) {
   // First, convert base.app links inline
   const textWithConvertedBaseLinks = convertBaseAppLinksInline(text);
   
@@ -193,6 +193,29 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>,
       
       let url = urlMatch.url;
       let displayText = urlMatch.displayText;
+      
+      // Normalize URL for comparison (remove trailing slash, lowercase)
+      const normalizeUrl = (u: string) => {
+        try {
+          const urlObj = new URL(u.startsWith('http') ? u : `https://${u}`);
+          return urlObj.href.replace(/\/$/, '').toLowerCase().trim();
+        } catch {
+          return u.replace(/\/$/, '').toLowerCase().trim();
+        }
+      };
+      
+      // Check if this URL should be hidden (e.g., it's already being shown as BlogPreview)
+      const normalizedUrl = normalizeUrl(url);
+      const shouldHideUrl = urlsToHide.some(hideUrl => {
+        const normalizedHideUrl = normalizeUrl(hideUrl);
+        return normalizedUrl === normalizedHideUrl;
+      });
+      
+      if (shouldHideUrl) {
+        // Skip rendering this URL - it's already being shown elsewhere
+        lastIndex = match.index + match.length;
+        continue;
+      }
       
       // If inside a link, render as span with click handler instead of <a> tag
       if (insideLink) {
@@ -996,6 +1019,63 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
   const [showQuoteModal, setShowQuoteModal] = useState(false);
   // Track which blog previews have successfully loaded to hide OG preview
   const [blogPreviewLoaded, setBlogPreviewLoaded] = useState<Set<string>>(new Set());
+  
+  // Collect all blog URLs (from embeds and text) to hide from inline text rendering
+  const blogUrlsToHide = useMemo(() => {
+    const urls: string[] = [];
+    const normalizeUrl = (u: string) => {
+      try {
+        const urlObj = new URL(u.startsWith('http') ? u : `https://${u}`);
+        return urlObj.href.replace(/\/$/, '').toLowerCase().trim();
+      } catch {
+        return u.replace(/\/$/, '').toLowerCase().trim();
+      }
+    };
+    
+    // Collect from embeds
+    if (cast.embeds) {
+      cast.embeds.forEach((embed: any) => {
+        if (embed.url) {
+          const blogPlatform = isBlogLink(embed.url);
+          if (blogPlatform) {
+            urls.push(embed.url);
+          }
+        }
+      });
+    }
+    
+    // Collect from text
+    if (cast.text) {
+      const urlRegex = /(https?:\/\/[^\s<>"']+)|(www\.[^\s<>"']+)/g;
+      let match;
+      while ((match = urlRegex.exec(cast.text)) !== null) {
+        let url = match[1] || match[2];
+        if (url && !url.startsWith('http://') && !url.startsWith('https://')) {
+          url = 'https://' + url;
+        }
+        if (url) {
+          url = url.trim().replace(/[.,;:!?)\]'"`]+$/, '');
+        }
+        const blogPlatform = url ? isBlogLink(url) : null;
+        if (url && blogPlatform) {
+          // Check if already in embeds
+          const normalizedUrl = normalizeUrl(url);
+          const isInEmbeds = cast.embeds?.some((embed: any) => {
+            if (!embed.url) return false;
+            return normalizeUrl(embed.url) === normalizedUrl;
+          });
+          if (!isInEmbeds) {
+            urls.push(url);
+          } else {
+            // Still add to hide list even if in embeds
+            urls.push(url);
+          }
+        }
+      }
+    }
+    
+    return urls;
+  }, [cast.embeds, cast.text]);
   
   // Memoized callback for blog preview success
   const handleBlogPreviewSuccess = useCallback((url: string) => {
@@ -2621,13 +2701,13 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                 }
                 
                 const renderProcessedText = (text: string) => {
-                  return renderTextWithLinks(text, router, false, displayMode?.hideUrlLinks);
+                  return renderTextWithLinks(text, router, false, displayMode?.hideUrlLinks, blogUrlsToHide);
                 };
                 
                 return shouldCollapseCuratedCastText && !isCuratedCastExpanded && collapsedCuratedCastSegments ? (
                   <div className="space-y-1 whitespace-pre-wrap break-words">
                     {collapsedCuratedCastSegments.topText && (
-                      <div>{renderTextWithLinks(collapsedCuratedCastSegments.topText, router, false, displayMode?.hideUrlLinks)}</div>
+                      <div>{renderTextWithLinks(collapsedCuratedCastSegments.topText, router, false, displayMode?.hideUrlLinks, blogUrlsToHide)}</div>
                     )}
                     <button
                       type="button"
@@ -2642,7 +2722,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                       } hidden …`}
                     </button>
                     {collapsedCuratedCastSegments.bottomText && (
-                      <div>{renderTextWithLinks(collapsedCuratedCastSegments.bottomText, router, false, displayMode?.hideUrlLinks)}</div>
+                      <div>{renderTextWithLinks(collapsedCuratedCastSegments.bottomText, router, false, displayMode?.hideUrlLinks, blogUrlsToHide)}</div>
                     )}
                   </div>
                 ) : (
@@ -2728,16 +2808,19 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                   const blogPlatform = url ? isBlogLink(url) : null;
                   if (url && blogPlatform) {
                     // Check if this URL is already in embeds (normalize for comparison)
-                    const normalizedUrl = url.replace(/\/$/, ''); // Remove trailing slash
+                    // Normalize URLs by removing trailing slashes and converting to lowercase for comparison
+                    const normalizeUrl = (u: string) => u.replace(/\/$/, '').toLowerCase().trim();
+                    const normalizedUrl = normalizeUrl(url);
                     const isInEmbeds = cast.embeds?.some((embed: any) => {
                       if (!embed.url) return false;
-                      const normalizedEmbedUrl = embed.url.replace(/\/$/, '');
-                      return normalizedEmbedUrl === normalizedUrl || 
-                             normalizedEmbedUrl === url || 
-                             embed.url === url;
+                      const normalizedEmbedUrl = normalizeUrl(embed.url);
+                      // Also check if the embed is already being rendered as a blog
+                      return normalizedEmbedUrl === normalizedUrl;
                     });
                     if (!isInEmbeds) {
                       blogUrlsInText.push(url);
+                    } else if (process.env.NODE_ENV === 'development') {
+                      console.log('[Blog Text] Skipping blog URL already in embeds:', url);
                     }
                   }
                 }
@@ -2809,25 +2892,6 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                   });
                 }
                 
-                // Only check for blog links if it's NOT an image
-                // This prevents image URLs from being incorrectly detected as blog links
-                if (!isDirectImage) {
-                  const embedBlogPlatform = embed.url ? isBlogLink(embed.url) : null;
-                  if (process.env.NODE_ENV === 'development' && embedBlogPlatform) {
-                    console.log(`[Embed Grouping] Embed ${index} detected as blog link:`, embedBlogPlatform);
-                  }
-                  if (embed.url && embedBlogPlatform) {
-                    // Close current image group if exists
-                    if (currentImageGroup) {
-                      embedGroups.push({ type: 'images', embeds: currentImageGroup.embeds, indices: currentImageGroup.indices });
-                      currentImageGroup = null;
-                    }
-                    // Add as other embed (blog links get special treatment)
-                    embedGroups.push({ type: 'other', embeds: [embed], indices: [index] });
-                    return; // Skip the rest of the processing for this embed
-                  }
-                }
-                
                 if (process.env.NODE_ENV === 'development') {
                   console.log(`[Embed Grouping] Embed ${index} image detection:`, {
                     hasImageMetadata,
@@ -2839,9 +2903,18 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                   });
                 }
                 
+                // Check if this is a blog link - exclude from image-only detection
+                // Blog links should always be treated as links, not images, even if they have ogImages
+                // Check BEFORE isImageOnlyLink to prevent blog links from being misclassified
+                const embedBlogPlatform = !isDirectImage && embed.url ? isBlogLink(embed.url) : null;
+                if (process.env.NODE_ENV === 'development' && embedBlogPlatform) {
+                  console.log(`[Embed Grouping] Embed ${index} detected as blog link:`, embedBlogPlatform);
+                }
+                
                 // Check if this is an image-only link embed (no title/description, just image)
+                // BUT exclude blog links - they should always be treated as links
                 let isImageOnlyLink = false;
-                if (embed.url && !isDirectImage) {
+                if (embed.url && !isDirectImage && !embedBlogPlatform) {
                   const metadata = embed.metadata;
                   let imageUrl: string | null = null;
                   let title: string | null = null;
@@ -2880,6 +2953,21 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                   
                   // Consider it image-only if it has an image but no meaningful title/description
                   isImageOnlyLink = !!imageUrl && !title && !description;
+                }
+                
+                // Handle blog links - add to "other" group
+                if (embed.url && embedBlogPlatform) {
+                  // Close current image group if exists
+                  if (currentImageGroup) {
+                    embedGroups.push({ type: 'images', embeds: currentImageGroup.embeds, indices: currentImageGroup.indices });
+                    currentImageGroup = null;
+                  }
+                  // Add as other embed (blog links get special treatment)
+                  embedGroups.push({ type: 'other', embeds: [embed], indices: [index] });
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log(`[Embed Grouping] Added blog link embed ${index} to other group:`, embedBlogPlatform);
+                  }
+                  return; // Skip the rest of the processing for this embed
                 }
                 
                 if ((isDirectImage || isImageOnlyLink) && !hideImages) {
