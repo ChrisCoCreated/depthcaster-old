@@ -753,16 +753,18 @@ export default function AdminPollsPage() {
               <div className="mb-6">
                 <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg mb-4">
                   <p className="text-sm text-yellow-800 dark:text-yellow-200 font-medium mb-2">
-                    A poll already exists for this cast hash. Overwriting will:
+                    A poll already exists for this cast hash. Updating will:
                   </p>
                   <ul className="list-disc list-inside text-sm text-yellow-700 dark:text-yellow-300 space-y-1">
-                    <li>Replace the existing poll question and options</li>
+                    <li>Update the poll question and options</li>
+                    <li>Match existing options by text (case-insensitive) to preserve responses</li>
+                    <li>Add new options and remove unmatched options</li>
                     {existingPollData.responseCount > 0 && (
-                      <li className="font-semibold text-red-600 dark:text-red-400">
-                        Delete all {existingPollData.responseCount} existing response{existingPollData.responseCount !== 1 ? "s" : ""}
+                      <li className="font-semibold text-yellow-800 dark:text-yellow-200">
+                        Preserve responses for matched options ({existingPollData.responseCount} response{existingPollData.responseCount !== 1 ? "s" : ""} total)
                       </li>
                     )}
-                    <li>Permanently lose all existing poll data</li>
+                    <li>Responses referencing deleted options will be preserved but may show "[Deleted Option]"</li>
                   </ul>
                 </div>
 
@@ -796,9 +798,7 @@ export default function AdminPollsPage() {
                     htmlFor="confirmOverwrite"
                     className="text-sm text-red-800 dark:text-red-200 cursor-pointer"
                   >
-                    I understand that this will permanently delete the existing poll
-                    {existingPollData.responseCount > 0 && ` and all ${existingPollData.responseCount} response${existingPollData.responseCount !== 1 ? "s" : ""}`}
-                    . This action cannot be undone.
+                    I understand that this will update the existing poll. Options will be matched by text to preserve responses where possible. Unmatched options may be removed if not referenced in responses. This action cannot be undone.
                   </label>
                 </div>
               </div>
