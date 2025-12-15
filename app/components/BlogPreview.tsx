@@ -33,14 +33,20 @@ export function BlogPreview({ url, onSuccess }: BlogPreviewProps) {
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const onSuccessCalledRef = useRef(false);
+  const onSuccessRef = useRef(onSuccess);
+  
+  // Keep onSuccess ref up to date without triggering effects
+  useEffect(() => {
+    onSuccessRef.current = onSuccess;
+  }, [onSuccess]);
   
   // Signal success when post loads (only once per post)
   useEffect(() => {
-    if (!loading && post && !error && onSuccess && !onSuccessCalledRef.current) {
+    if (!loading && post && !error && onSuccessRef.current && !onSuccessCalledRef.current) {
       onSuccessCalledRef.current = true;
-      onSuccess();
+      onSuccessRef.current();
     }
-  }, [loading, post, error, onSuccess]);
+  }, [loading, post, error]);
   
   // Reset the ref when URL changes
   useEffect(() => {

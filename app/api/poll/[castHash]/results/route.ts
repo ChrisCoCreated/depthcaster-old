@@ -103,6 +103,7 @@ export async function GET(
         let totalRank = 0;
         let voteCount = 0;
         const rankings: number[] = [];
+        const voters: Array<{ userFid: number; username: string | null; displayName: string | null; pfpUrl: string | null }> = [];
 
         responses.forEach((response) => {
           // Handle JSONB - it might be a string that needs parsing
@@ -127,6 +128,13 @@ export async function GET(
               totalRank += displayRank;
               voteCount++;
               rankings.push(displayRank);
+              // Add voter info
+              voters.push({
+                userFid: response.userFid,
+                username: response.username,
+                displayName: response.displayName,
+                pfpUrl: response.pfpUrl,
+              });
             }
           }
         });
@@ -141,6 +149,7 @@ export async function GET(
           voteCount,
           totalRank,
           rankings, // Individual ranks for this option
+          voters, // Users who voted for this option
         };
       });
 
@@ -216,6 +225,7 @@ export async function GET(
         const option = existingOptionsMap.get(optionId);
         const choiceCounts: Record<string, number> = {};
         let totalVotes = 0;
+        const voters: Array<{ userFid: number; username: string | null; displayName: string | null; pfpUrl: string | null }> = [];
 
         responses.forEach((response) => {
           // Drizzle should automatically parse JSONB, but handle both cases
@@ -238,6 +248,15 @@ export async function GET(
             if (choice && typeof choice === 'string' && choice.trim() !== '') {
               choiceCounts[choice] = (choiceCounts[choice] || 0) + 1;
               totalVotes++;
+              // Add voter info (only once per voter)
+              if (!voters.find(v => v.userFid === response.userFid)) {
+                voters.push({
+                  userFid: response.userFid,
+                  username: response.username,
+                  displayName: response.displayName,
+                  pfpUrl: response.pfpUrl,
+                });
+              }
             }
           }
         });
@@ -272,6 +291,7 @@ export async function GET(
           negativeVotes,
           positivePercentage,
           negativePercentage,
+          voters, // Users who voted for this option
         };
       });
 

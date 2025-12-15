@@ -34,6 +34,7 @@ export default function AdminPollsPage() {
   const [loadingResults, setLoadingResults] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [showVoterPfps, setShowVoterPfps] = useState(true);
 
   // Form state
   const [castHash, setCastHash] = useState("");
@@ -690,11 +691,24 @@ export default function AdminPollsPage() {
 
                   {/* Collated Results */}
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                      {resultsData.poll.pollType === "choice" 
-                        ? "Results by Option" 
-                        : "Collated Results (Ranked by Average Position)"}
-                    </h3>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                        {resultsData.poll.pollType === "choice" 
+                          ? "Results by Option" 
+                          : "Collated Results (Ranked by Average Position)"}
+                      </h3>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={showVoterPfps}
+                          onChange={(e) => setShowVoterPfps(e.target.checked)}
+                          className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 dark:focus:ring-blue-400 dark:bg-gray-700"
+                        />
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                          Show voter avatars
+                        </span>
+                      </label>
+                    </div>
                     <div className="space-y-3">
                       {resultsData.collatedResults && resultsData.collatedResults.length > 0 ? (
                         resultsData.collatedResults.map((result: any, index: number) => {
@@ -751,6 +765,24 @@ export default function AdminPollsPage() {
                             {voteCount === 0 && (
                               <div className="mb-3 text-xs text-gray-500 dark:text-gray-400">
                                 No votes yet
+                              </div>
+                            )}
+
+                            {/* Voter Profile Pictures */}
+                            {showVoterPfps && result.voters && result.voters.length > 0 && (
+                              <div className="mt-3 flex items-center gap-2 flex-wrap">
+                                <span className="text-xs text-gray-500 dark:text-gray-400">Voters:</span>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  {result.voters.map((voter: any, voterIndex: number) => (
+                                    <AvatarImage
+                                      key={voterIndex}
+                                      src={voter.pfpUrl}
+                                      alt={voter.displayName || voter.username || `FID: ${voter.userFid}`}
+                                      size={24}
+                                      className="w-6 h-6 rounded-full border border-gray-300 dark:border-gray-600"
+                                    />
+                                  ))}
+                                </div>
                               </div>
                             )}
 
