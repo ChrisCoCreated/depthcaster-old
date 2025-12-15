@@ -581,8 +581,17 @@ function DynamicImageGrid({ embeds, indices, embedMetadata, onImageClick }: Dyna
 
   // Extract image URLs from embeds
   const extractImageUrl = (embed: any): { imageUrl: string | null; linkUrl: string } => {
-    let imageUrl = embed.url;
+    let imageUrl: string | null = null;
     const linkUrl = embed.url;
+    
+    // DEBUG: Log embed structure
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[extractImageUrl] Processing embed:', {
+        url: embed.url,
+        hasMetadata: !!embed.metadata,
+        metadata: embed.metadata,
+      });
+    }
     
     // Check if this is an X/Twitter link
     let isXEmbed = false;
@@ -595,15 +604,38 @@ function DynamicImageGrid({ embeds, indices, embedMetadata, onImageClick }: Dyna
       // Invalid URL, skip
     }
     
+    // Helper to check if URL looks like an image file
+    const isImageUrl = (url: string): boolean => {
+      return /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(url);
+    };
+    
     if (embed.metadata) {
       const metadata = embed.metadata;
-      if (metadata.image || (metadata.content_type && metadata.content_type.startsWith('image/'))) {
+      // Check if metadata indicates this is an image
+      // metadata.image can be an object (with width_px/height_px) or a string URL
+      const hasImageMetadata = metadata.image || (metadata.content_type && metadata.content_type.startsWith('image/'));
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[extractImageUrl] Metadata check:', {
+          hasImageMetadata,
+          'metadata.image': metadata.image,
+          'metadata.content_type': metadata.content_type,
+          'isImageUrl(embed.url)': embed.url ? isImageUrl(embed.url) : false,
+        });
+      }
+      
+      if (hasImageMetadata) {
+        // Use embed.url as the image URL when metadata confirms it's an image
         imageUrl = embed.url;
         // Check if it's a Twitter emoji SVG (only for X/Twitter links)
         if (isXEmbed && imageUrl && (imageUrl.includes('twimg.com/emoji') || imageUrl.includes('/svg/'))) {
           imageUrl = null;
         }
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[extractImageUrl] Set imageUrl from metadata:', imageUrl);
+        }
       } else {
+        // Try to extract image from link metadata
         if (metadata.html?.ogImage) {
           const ogImages = Array.isArray(metadata.html.ogImage) ? metadata.html.ogImage : [metadata.html.ogImage];
           const nonEmojiImage = ogImages.find((img: any) => {
@@ -616,6 +648,7 @@ function DynamicImageGrid({ embeds, indices, embedMetadata, onImageClick }: Dyna
           if (nonEmojiImage) imageUrl = nonEmojiImage.url;
         }
         if (!imageUrl && metadata.image) {
+          // metadata.image might be a string URL or an object with url property
           const img = typeof metadata.image === 'string' ? metadata.image : metadata.image?.url || null;
           // Filter out Twitter emoji SVGs (only for X/Twitter links)
           if (img && (!isXEmbed || (!img.includes('twimg.com/emoji') && !img.includes('/svg/')))) {
@@ -639,9 +672,21 @@ function DynamicImageGrid({ embeds, indices, embedMetadata, onImageClick }: Dyna
       }
     }
     
+    // Fallback: if no metadata but URL looks like an image file, use it
+    if (!imageUrl && embed.url && isImageUrl(embed.url)) {
+      imageUrl = embed.url;
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[extractImageUrl] Set imageUrl from URL extension fallback:', imageUrl);
+      }
+    }
+    
     // Final check: filter out Twitter emoji SVGs (only for X/Twitter links)
     if (isXEmbed && imageUrl && (imageUrl.includes('twimg.com/emoji') || imageUrl.includes('/svg/'))) {
       imageUrl = null;
+    }
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[extractImageUrl] Final result:', { imageUrl, linkUrl });
     }
     
     return { imageUrl, linkUrl };
@@ -857,6 +902,18 @@ function DynamicImageGrid({ embeds, indices, embedMetadata, onImageClick }: Dyna
     return { imageUrl, linkUrl, dimensions: dims };
   });
 
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[DynamicImageGrid] Rendering with:', {
+      embedsCount: embeds.length,
+      imageData: imageData.map((d, i) => ({
+        index: i,
+        imageUrl: d.imageUrl,
+        hasDimensions: !!d.dimensions,
+      })),
+      layout,
+    });
+  }
+
   return (
     <div
       className="w-full aspect-[2/1] rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900"
@@ -868,7 +925,12 @@ function DynamicImageGrid({ embeds, indices, embedMetadata, onImageClick }: Dyna
       }}
     >
       {imageData.map((data, imgIndex) => {
-        if (!data.imageUrl) return null;
+        if (!data.imageUrl) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`[DynamicImageGrid] Skipping image ${imgIndex} - no imageUrl`);
+          }
+          return null;
+        }
         const span = layout.spans[imgIndex] || { col: 2, row: 3 };
 
         return (
@@ -2705,29 +2767,77 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
               
               const hideImages = shouldHideImages();
               
+              if (process.env.NODE_ENV === 'development') {
+                console.log('[Embed Processing] Starting embed processing:', {
+                  castHash: cast.hash,
+                  embedsCount: cast.embeds?.length || 0,
+                  embeds: cast.embeds,
+                  hideImages,
+                });
+              }
+              
               // First pass: group embeds by type
               const embedGroups: Array<{ type: 'images' | 'other', embeds: any[], indices: number[] }> = [];
               let currentImageGroup: { embeds: any[], indices: number[] } | null = null;
               
               cast.embeds.forEach((embed: any, index: number) => {
-                // Check if this is a blog link first - these should always be in "other" group
-                const embedBlogPlatform = embed.url ? isBlogLink(embed.url) : null;
-                if (embed.url && embedBlogPlatform) {
-                  // Close current image group if exists
-                  if (currentImageGroup) {
-                    embedGroups.push({ type: 'images', embeds: currentImageGroup.embeds, indices: currentImageGroup.indices });
-                    currentImageGroup = null;
-                  }
-                  // Add as other embed (blog links get special treatment)
-                  embedGroups.push({ type: 'other', embeds: [embed], indices: [index] });
-                  return; // Skip the rest of the processing for this embed
+                // DEBUG: Log embed processing
+                if (process.env.NODE_ENV === 'development') {
+                  console.log(`[Embed Grouping] Processing embed ${index}:`, {
+                    url: embed.url,
+                    hasMetadata: !!embed.metadata,
+                    metadata: embed.metadata,
+                  });
                 }
                 
-                // Check if this is a direct image embed
-                const isDirectImage = embed.url && (
-                  embed.metadata?.image || 
-                  (embed.metadata?.content_type && embed.metadata.content_type.startsWith('image/'))
-                );
+                // Check if this is a direct image embed FIRST (before blog detection)
+                // metadata.image can be an object (with width_px/height_px) or a string URL
+                const hasImageMetadata = embed.metadata?.image || 
+                  (embed.metadata?.content_type && embed.metadata.content_type.startsWith('image/'));
+                // Fallback: check if URL looks like an image file
+                const isImageUrl = embed.url && /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(embed.url);
+                const isDirectImage = embed.url && (hasImageMetadata || isImageUrl);
+                
+                if (process.env.NODE_ENV === 'development') {
+                  console.log(`[Embed Grouping] Embed ${index} image detection:`, {
+                    hasImageMetadata,
+                    isImageUrl,
+                    isDirectImage,
+                    'metadata.image': embed.metadata?.image,
+                    'metadata.content_type': embed.metadata?.content_type,
+                    hideImages,
+                  });
+                }
+                
+                // Only check for blog links if it's NOT an image
+                // This prevents image URLs from being incorrectly detected as blog links
+                if (!isDirectImage) {
+                  const embedBlogPlatform = embed.url ? isBlogLink(embed.url) : null;
+                  if (process.env.NODE_ENV === 'development' && embedBlogPlatform) {
+                    console.log(`[Embed Grouping] Embed ${index} detected as blog link:`, embedBlogPlatform);
+                  }
+                  if (embed.url && embedBlogPlatform) {
+                    // Close current image group if exists
+                    if (currentImageGroup) {
+                      embedGroups.push({ type: 'images', embeds: currentImageGroup.embeds, indices: currentImageGroup.indices });
+                      currentImageGroup = null;
+                    }
+                    // Add as other embed (blog links get special treatment)
+                    embedGroups.push({ type: 'other', embeds: [embed], indices: [index] });
+                    return; // Skip the rest of the processing for this embed
+                  }
+                }
+                
+                if (process.env.NODE_ENV === 'development') {
+                  console.log(`[Embed Grouping] Embed ${index} image detection:`, {
+                    hasImageMetadata,
+                    isImageUrl,
+                    isDirectImage,
+                    'metadata.image': embed.metadata?.image,
+                    'metadata.content_type': embed.metadata?.content_type,
+                    hideImages,
+                  });
+                }
                 
                 // Check if this is an image-only link embed (no title/description, just image)
                 let isImageOnlyLink = false;
@@ -2779,14 +2889,23 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                   }
                   currentImageGroup.embeds.push(embed);
                   currentImageGroup.indices.push(index);
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log(`[Embed Grouping] Added embed ${index} to image group`);
+                  }
                 } else {
                   // Close current image group if exists
                   if (currentImageGroup) {
                     embedGroups.push({ type: 'images', embeds: currentImageGroup.embeds, indices: currentImageGroup.indices });
+                    if (process.env.NODE_ENV === 'development') {
+                      console.log('[Embed Grouping] Closed image group with', currentImageGroup.embeds.length, 'embeds');
+                    }
                     currentImageGroup = null;
                   }
                   // Add as other embed
                   embedGroups.push({ type: 'other', embeds: [embed], indices: [index] });
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log(`[Embed Grouping] Added embed ${index} to other group`);
+                  }
                 }
               });
               
@@ -2798,6 +2917,17 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                   embeds: imageGroup.embeds, 
                   indices: imageGroup.indices 
                 });
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('[Embed Grouping] Closed final image group with', imageGroup.embeds.length, 'embeds');
+                }
+              }
+              
+              if (process.env.NODE_ENV === 'development') {
+                console.log('[Embed Grouping] Final embed groups:', embedGroups.map(g => ({
+                  type: g.type,
+                  count: g.embeds.length,
+                  indices: g.indices,
+                })));
               }
               
               return (
@@ -2805,6 +2935,9 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                   {embedGroups.map((group, groupIndex) => {
                     if (group.type === 'images') {
                       // Render image group with dynamic layout based on actual image dimensions
+                      if (process.env.NODE_ENV === 'development') {
+                        console.log(`[Render] Rendering image group ${groupIndex} with`, group.embeds.length, 'embeds');
+                      }
                       return (
                         <DynamicImageGrid
                           key={`image-group-${groupIndex}`}
