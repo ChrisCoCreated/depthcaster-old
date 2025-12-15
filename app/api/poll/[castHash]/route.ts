@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { polls, pollOptions, pollResponses } from "@/lib/schema";
-import { eq, asc, and, or } from "drizzle-orm";
+import { eq, asc, and, or, sql } from "drizzle-orm";
 import { isAdmin, getUserRoles } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
@@ -109,7 +109,7 @@ export async function POST(
   try {
     const { castHash } = await params;
     const body = await request.json();
-    const { question, options, userFid, pollType, choices, slug } = body;
+    const { question, options, userFid, pollType, choices, slug, forceUpdate } = body;
 
     if (!castHash) {
       return NextResponse.json(
@@ -227,8 +227,55 @@ export async function POST(
     let pollId: string;
 
     if (existingPoll.length > 0) {
-      // Update existing poll
-      pollId = existingPoll[0].id;
+      // Poll exists - check if we're allowed to update
+      const pollData = existingPoll[0];
+      
+      // Check response count
+      const responseCountResult = await db
+        .select({ count: sql<number>`count(*)::int`.as("count") })
+        .from(pollResponses)
+        .where(eq(pollResponses.pollId, pollData.id));
+      
+      const responseCount = responseCountResult[0]?.count || 0;
+      
+      // If poll has responses, require forceUpdate flag
+      if (responseCount > 0 && !forceUpdate) {
+        return NextResponse.json(
+          {
+            error: "Poll already exists with responses",
+            existingPoll: {
+              id: pollData.id,
+              question: pollData.question,
+              responseCount,
+              createdAt: pollData.createdAt,
+              createdBy: pollData.createdBy,
+            },
+            requiresForceUpdate: true,
+          },
+          { status: 409 } // Conflict status
+        );
+      }
+      
+      // If poll exists but no forceUpdate flag, return error
+      if (!forceUpdate) {
+        return NextResponse.json(
+          {
+            error: "Poll already exists",
+            existingPoll: {
+              id: pollData.id,
+              question: pollData.question,
+              responseCount,
+              createdAt: pollData.createdAt,
+              createdBy: pollData.createdBy,
+            },
+            requiresForceUpdate: responseCount > 0,
+          },
+          { status: 409 } // Conflict status
+        );
+      }
+      
+      // Update existing poll (forceUpdate is true)
+      pollId = pollData.id;
       await db
         .update(polls)
         .set({

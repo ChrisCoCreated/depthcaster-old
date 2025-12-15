@@ -35,6 +35,10 @@ export default function AdminPollsPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [showVoterPfps, setShowVoterPfps] = useState(true);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [existingPollData, setExistingPollData] = useState<any>(null);
+  const [confirmOverwrite, setConfirmOverwrite] = useState(false);
+  const [pendingSubmitData, setPendingSubmitData] = useState<any>(null);
 
   // Form state
   const [castHash, setCastHash] = useState("");
@@ -232,7 +236,7 @@ export default function AdminPollsPage() {
     setOptions(newOptions);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent, forceUpdate: boolean = false) => {
     e.preventDefault();
     if (!user?.fid) return;
 
@@ -268,32 +272,112 @@ export default function AdminPollsPage() {
       }
     }
 
+    // Check for existing poll if not forcing update
+    if (!forceUpdate && !editingPoll) {
+      try {
+        const checkResponse = await fetch(`/api/poll/${finalCastHash}`);
+        const checkData = await checkResponse.json();
+        
+        if (checkResponse.ok && checkData.poll) {
+          // Poll exists - get response count
+          const responseCountResponse = await fetch(`/api/polls?userFid=${user.fid}`);
+          const responseCountData = await responseCountResponse.json();
+          const existingPoll = responseCountData.polls?.find((p: Poll) => p.castHash === finalCastHash);
+          
+          if (existingPoll) {
+            // Store pending submit data and show confirmation
+            setPendingSubmitData({
+              finalCastHash,
+              question: question.trim(),
+              pollType,
+              choices: pollType === "choice" ? choices.filter((c) => c.trim().length > 0) : undefined,
+              slug: slug.trim() || undefined,
+              options: validOptions.map(opt => ({ text: opt.text.trim(), markdown: opt.markdown.trim() || undefined })),
+            });
+            setExistingPollData({
+              question: checkData.poll.question,
+              responseCount: existingPoll.responseCount || 0,
+              createdAt: existingPoll.createdAt,
+            });
+            setShowConfirmModal(true);
+            return;
+          }
+        }
+      } catch (err) {
+        // If check fails, proceed with creation attempt
+        console.error("Failed to check for existing poll:", err);
+      }
+    }
+
+    // Proceed with submit
+    await performSubmit(finalCastHash, forceUpdate);
+  };
+
+  const performSubmit = async (finalCastHash: string, forceUpdate: boolean = false) => {
+    if (!user?.fid) return;
+
     setSaving(true);
     setError(null);
     setSuccess(null);
+    setShowConfirmModal(false);
+    setConfirmOverwrite(false);
+
+    // Use pending submit data if available, otherwise use current form state
+    const submitData = pendingSubmitData || {
+      question: question.trim(),
+      pollType,
+      choices: pollType === "choice" ? choices.filter((c) => c.trim().length > 0) : undefined,
+      slug: slug.trim() || undefined,
+      options: options.filter((opt) => opt.text.trim().length > 0).map(opt => ({ 
+        text: opt.text.trim(), 
+        markdown: opt.markdown.trim() || undefined 
+      })),
+    };
 
     try {
       const response = await fetch(`/api/poll/${finalCastHash}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          question: question.trim(),
-          pollType,
-          choices: pollType === "choice" ? choices.filter((c) => c.trim().length > 0) : undefined,
-          slug: slug.trim() || undefined,
-          options: validOptions.map(opt => ({ text: opt.text.trim(), markdown: opt.markdown.trim() || undefined })),
+          ...submitData,
           userFid: user.fid,
+          forceUpdate: forceUpdate || editingPoll !== null,
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
+        // Handle conflict error with existing poll details
+        if (response.status === 409 && data.existingPoll) {
+          setExistingPollData({
+            question: data.existingPoll.question,
+            responseCount: data.existingPoll.responseCount || 0,
+            createdAt: data.existingPoll.createdAt,
+          });
+          setPendingSubmitData({
+            finalCastHash,
+            ...submitData,
+          });
+          setShowConfirmModal(true);
+          setSaving(false);
+          return;
+        }
         throw new Error(data.error || "Failed to save poll");
       }
 
       setSuccess(editingPoll ? "Poll updated successfully" : "Poll created successfully");
       setShowCreateModal(false);
+      setPendingSubmitData(null);
+      setExistingPollData(null);
+      // Reset form
+      setCastHash("");
+      setSlug("");
+      setQuestion("");
+      setPollType("ranking");
+      setChoices([]);
+      setOptions([{ text: "", markdown: "" }]);
+      setEditingPoll(null);
       loadPolls();
     } catch (err: any) {
       setError(err.message || "Failed to save poll");
@@ -618,7 +702,12 @@ export default function AdminPollsPage() {
                 <div className="flex items-center justify-end gap-3 pt-4">
                   <button
                     type="button"
-                    onClick={() => setShowCreateModal(false)}
+                    onClick={() => {
+                      setShowCreateModal(false);
+                      setPendingSubmitData(null);
+                      setExistingPollData(null);
+                      setConfirmOverwrite(false);
+                    }}
                     className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
                   >
                     Cancel
@@ -632,6 +721,113 @@ export default function AdminPollsPage() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal for Overwriting Existing Poll */}
+      {showConfirmModal && existingPollData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-lg max-w-2xl w-full">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold text-red-600 dark:text-red-400">
+                  Warning: Poll Already Exists
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowConfirmModal(false);
+                    setConfirmOverwrite(false);
+                    setExistingPollData(null);
+                    setPendingSubmitData(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="mb-6">
+                <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg mb-4">
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200 font-medium mb-2">
+                    A poll already exists for this cast hash. Overwriting will:
+                  </p>
+                  <ul className="list-disc list-inside text-sm text-yellow-700 dark:text-yellow-300 space-y-1">
+                    <li>Replace the existing poll question and options</li>
+                    {existingPollData.responseCount > 0 && (
+                      <li className="font-semibold text-red-600 dark:text-red-400">
+                        Delete all {existingPollData.responseCount} existing response{existingPollData.responseCount !== 1 ? "s" : ""}
+                      </li>
+                    )}
+                    <li>Permanently lose all existing poll data</li>
+                  </ul>
+                </div>
+
+                <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg mb-4">
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    Existing Poll Details:
+                  </h3>
+                  <p className="text-sm text-gray-900 dark:text-gray-100 mb-1">
+                    <span className="font-medium">Question:</span> {existingPollData.question}
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                    <span className="font-medium">Responses:</span> {existingPollData.responseCount}
+                  </p>
+                  {existingPollData.createdAt && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <span className="font-medium">Created:</span>{" "}
+                      {new Date(existingPollData.createdAt).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-start gap-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                  <input
+                    type="checkbox"
+                    id="confirmOverwrite"
+                    checked={confirmOverwrite}
+                    onChange={(e) => setConfirmOverwrite(e.target.checked)}
+                    className="mt-1 w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                  />
+                  <label
+                    htmlFor="confirmOverwrite"
+                    className="text-sm text-red-800 dark:text-red-200 cursor-pointer"
+                  >
+                    I understand that this will permanently delete the existing poll
+                    {existingPollData.responseCount > 0 && ` and all ${existingPollData.responseCount} response${existingPollData.responseCount !== 1 ? "s" : ""}`}
+                    . This action cannot be undone.
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowConfirmModal(false);
+                    setConfirmOverwrite(false);
+                    setExistingPollData(null);
+                    setPendingSubmitData(null);
+                  }}
+                  className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (confirmOverwrite && pendingSubmitData) {
+                      await performSubmit(pendingSubmitData.finalCastHash, true);
+                    }
+                  }}
+                  disabled={!confirmOverwrite || saving}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {saving ? "Overwriting..." : "Overwrite Poll"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
