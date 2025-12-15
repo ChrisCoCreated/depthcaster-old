@@ -2248,7 +2248,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
 
             {/* Share dropdown menu */}
             {showShareMenu && (
-              <div className="absolute right-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-20 min-w-[180px]">
+              <div className="absolute right-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-20 min-w-[180px]" onClick={(e) => e.stopPropagation()}>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -3404,7 +3404,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
 
                 {/* Dropdown menu */}
                 {showRecastMenu && user && (
-                  <div className="absolute left-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10 min-w-[160px]">
+                  <div className="absolute left-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10 min-w-[160px]" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={(e) => {
                         e.preventDefault();
@@ -3750,8 +3750,9 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
         {showTopReplies && (feedType === "curated" || cast._curatorFid) && (
           <div className={`mt-3 border-t ${(cast as any)._isQuoteCast && (cast as any)._parentCast ? 'border-gray-200 dark:border-gray-700 bg-gray-50/30 dark:bg-gray-800/20' : 'border-gray-200 dark:border-gray-800'} pt-3 rounded-b-lg transition-colors group/replies hover:bg-gray-50 dark:hover:bg-gray-800/30`} onClick={(e) => {
               // Only stop propagation if clicking on interactive elements within replies section
+              // Don't stop for links - let them handle their own navigation
               const target = e.target as HTMLElement;
-              if (target.closest('a') || target.closest('button') || target.closest('[role="button"]') || target.closest('[data-reply-sort-button]') || target.closest('[data-reply-sort-menu]')) {
+              if (target.closest('button') || target.closest('[role="button"]') || target.closest('[data-reply-sort-button]') || target.closest('[data-reply-sort-menu]')) {
                 e.stopPropagation();
               }
             }}>
@@ -3781,7 +3782,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                     </svg>
                   </button>
                   {showReplySortMenu && (
-                    <div data-reply-sort-menu className="absolute left-0 top-6 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-lg py-1 min-w-[180px]">
+                    <div data-reply-sort-menu className="absolute left-0 top-6 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-lg py-1 min-w-[180px]" onClick={(e) => e.stopPropagation()}>
                       {[
                         { value: "highest-quality-replies", label: "Highest Quality Replies" },
                         { value: "highest-engagement", label: "Highest Engagement Replies" },
