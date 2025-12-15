@@ -417,10 +417,8 @@ export async function GET(request: NextRequest) {
       } else if (sortBy === "recently-curated") {
         // Recently-curated: Order by MIN(created_at) from curator_cast_curations DESC, limit early
         const curatedQueryStart = Date.now();
-        const cursorDate = cursor ? new Date(cursor) : null;
-        const cursorCondition = cursorDate && !isNaN(cursorDate.getTime())
-          ? sql`MIN(${curatorCastCurations.createdAt}) < ${cursorDate}`
-          : undefined;
+        // Fetch more results to account for cursor filtering (can't use aggregates in WHERE)
+        const fetchLimit = cursor ? (limit + 1) * 2 : limit + 1;
 
         const curatedCastsResult = await db
           .select({
@@ -435,28 +433,41 @@ export async function GET(request: NextRequest) {
           .where(
             and(
               curatorFilter,
-              curatedCastsFilter,
-              cursorCondition
+              curatedCastsFilter
             )
           )
           .groupBy(curatorCastCurations.castHash)
           .orderBy(desc(sql`MIN(${curatorCastCurations.createdAt})`))
-          .limit(limit + 1);
+          .limit(fetchLimit);
 
-        castsWithSortData = curatedCastsResult.map(c => ({
+        // Apply cursor filter in memory (can't use aggregates in WHERE clause)
+        let filteredResults = curatedCastsResult;
+        if (cursor) {
+          try {
+            const cursorDate = new Date(cursor);
+            if (!isNaN(cursorDate.getTime())) {
+              filteredResults = curatedCastsResult.filter(c => c.firstCurationTime < cursorDate);
+            }
+          } catch {
+            // Invalid cursor, ignore it
+          }
+        }
+        
+        // Limit to requested amount
+        const finalResults = filteredResults.slice(0, limit + 1);
+
+        castsWithSortData = finalResults.map(c => ({
           castHash: c.castHash,
           sortTime: c.firstCurationTime,
           qualityScore: null,
         }));
-        selectedCastHashes = curatedCastsResult.map(c => c.castHash);
+        selectedCastHashes = finalResults.map(c => c.castHash);
         console.log(`[Feed] Recently-curated query: ${Date.now() - curatedQueryStart}ms, got ${selectedCastHashes.length} casts`);
       } else {
         // recent-reply: Order by MAX(cast_created_at) from cast_replies DESC, limit early
         const replyQueryStart = Date.now();
-        const cursorDate = cursor ? new Date(cursor) : null;
-        const cursorCondition = cursorDate && !isNaN(cursorDate.getTime())
-          ? sql`MAX(${castReplies.castCreatedAt}) < ${cursorDate}`
-          : undefined;
+        // Fetch more results to account for cursor filtering (can't use aggregates in WHERE)
+        const fetchLimit = cursor ? (limit + 1) * 2 : limit + 1;
 
         // Use subquery to get cast hashes with latest reply times, then join with curated_casts for filters
         const replyCastsResult = await db
@@ -478,8 +489,7 @@ export async function GET(request: NextRequest) {
           .where(
             and(
               curatorFilter,
-              curatedCastsFilter,
-              cursorCondition
+              curatedCastsFilter
             )
           )
           .groupBy(
@@ -488,9 +498,29 @@ export async function GET(request: NextRequest) {
             curatedCasts.createdAt
           )
           .orderBy(desc(sql`MAX(${castReplies.castCreatedAt})`))
-          .limit(limit + 1);
+          .limit(fetchLimit);
 
-        castsWithSortData = replyCastsResult.map(c => {
+        // Apply cursor filter in memory (can't use aggregates in WHERE clause)
+        let filteredResults = replyCastsResult;
+        if (cursor) {
+          try {
+            const cursorDate = new Date(cursor);
+            if (!isNaN(cursorDate.getTime())) {
+              filteredResults = replyCastsResult.filter(c => {
+                const fallback = toDate(c.castCreatedAt, c.createdAt);
+                const replyTime = toDate(c.latestReplyTime, fallback);
+                return replyTime < cursorDate;
+              });
+            }
+          } catch {
+            // Invalid cursor, ignore it
+          }
+        }
+        
+        // Limit to requested amount
+        const finalResults = filteredResults.slice(0, limit + 1);
+
+        castsWithSortData = finalResults.map(c => {
           const fallback = toDate(c.castCreatedAt, c.createdAt);
           return {
             castHash: c.castHash,
@@ -498,7 +528,7 @@ export async function GET(request: NextRequest) {
             qualityScore: null,
           };
         });
-        selectedCastHashes = replyCastsResult.map(c => c.castHash);
+        selectedCastHashes = finalResults.map(c => c.castHash);
         console.log(`[Feed] Recent-reply query: ${Date.now() - replyQueryStart}ms, got ${selectedCastHashes.length} casts`);
       }
 
