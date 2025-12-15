@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo, type ReactElement } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback, type ReactElement } from "react";
 import { Cast } from "@neynar/nodejs-sdk/build/api";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -934,6 +934,16 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
   const [showQuoteModal, setShowQuoteModal] = useState(false);
   // Track which blog previews have successfully loaded to hide OG preview
   const [blogPreviewLoaded, setBlogPreviewLoaded] = useState<Set<string>>(new Set());
+  
+  // Memoized callback for blog preview success
+  const handleBlogPreviewSuccess = useCallback((url: string) => {
+    setBlogPreviewLoaded(prev => {
+      const newSet = new Set(prev);
+      newSet.add(url);
+      return newSet;
+    });
+  }, []);
+  
   const [showReplyBox, setShowReplyBox] = useState(false);
   const [isLiked, setIsLiked] = useState(cast.viewer_context?.liked || false);
   const [isRecasted, setIsRecasted] = useState(cast.viewer_context?.recasted || false);
@@ -2954,9 +2964,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                             <div onClick={(e) => e.stopPropagation()}>
                               <BlogPreview 
                                 url={embed.url} 
-                                onSuccess={() => {
-                                  setBlogPreviewLoaded(prev => new Set(prev).add(embed.url));
-                                }}
+                                onSuccess={() => handleBlogPreviewSuccess(embed.url)}
                               />
                             </div>
                           )}

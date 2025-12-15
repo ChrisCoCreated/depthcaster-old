@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 import { isBlogLink } from "@/lib/blog";
@@ -32,13 +32,20 @@ export function BlogPreview({ url, onSuccess }: BlogPreviewProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const onSuccessCalledRef = useRef(false);
   
-  // Signal success when post loads
+  // Signal success when post loads (only once per post)
   useEffect(() => {
-    if (!loading && post && !error && onSuccess) {
+    if (!loading && post && !error && onSuccess && !onSuccessCalledRef.current) {
+      onSuccessCalledRef.current = true;
       onSuccess();
     }
   }, [loading, post, error, onSuccess]);
+  
+  // Reset the ref when URL changes
+  useEffect(() => {
+    onSuccessCalledRef.current = false;
+  }, [url]);
 
   useEffect(() => {
     const fetchPost = async () => {
