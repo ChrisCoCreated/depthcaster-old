@@ -2198,7 +2198,9 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
       target.closest('[role="button"]') ||
       target.closest('.recast-menu') ||
       target.closest('.share-menu') ||
-      target.closest('img[onClick]')
+      target.closest('img[onClick]') ||
+      target.closest('[data-reply-sort-button]') ||
+      target.closest('[data-reply-sort-menu]')
     ) {
       return;
     }
@@ -3746,7 +3748,13 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
 
         {/* Top Replies Section */}
         {showTopReplies && (feedType === "curated" || cast._curatorFid) && (
-          <div className={`mt-3 border-t ${(cast as any)._isQuoteCast && (cast as any)._parentCast ? 'border-gray-200 dark:border-gray-700 bg-gray-50/30 dark:bg-gray-800/20' : 'border-gray-200 dark:border-gray-800'} pt-3 rounded-b-lg transition-colors group/replies hover:bg-gray-50 dark:hover:bg-gray-800/30`} onClick={(e) => e.stopPropagation()}>
+          <div className={`mt-3 border-t ${(cast as any)._isQuoteCast && (cast as any)._parentCast ? 'border-gray-200 dark:border-gray-700 bg-gray-50/30 dark:bg-gray-800/20' : 'border-gray-200 dark:border-gray-800'} pt-3 rounded-b-lg transition-colors group/replies hover:bg-gray-50 dark:hover:bg-gray-800/30`} onClick={(e) => {
+              // Only stop propagation if clicking on interactive elements within replies section
+              const target = e.target as HTMLElement;
+              if (target.closest('a') || target.closest('button') || target.closest('[role="button"]') || target.closest('[data-reply-sort-button]') || target.closest('[data-reply-sort-menu]')) {
+                e.stopPropagation();
+              }
+            }}>
             <div className="mb-1 px-1 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="relative">
