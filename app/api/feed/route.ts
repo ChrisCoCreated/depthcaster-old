@@ -850,6 +850,7 @@ export async function GET(request: NextRequest) {
       const totalTime = Date.now() - feedStartTime;
       console.log(`[Feed] Map cast data: ${mapTime}ms`);
       console.log(`[Feed] Total curated feed time: ${totalTime}ms (${(totalTime / 1000).toFixed(2)}s)`);
+      console.log(`[Feed] Returning ${casts.length} casts (requested limit: ${limit})`);
       
       // Update last session timestamp after successful feed fetch (non-blocking)
       // Don't await - let it run in background to not delay response
