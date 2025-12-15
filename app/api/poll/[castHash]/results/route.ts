@@ -225,11 +225,8 @@ export async function GET(
       collatedResults = Array.from(allOptionIds).map((optionId) => {
         const option = existingOptionsMap.get(optionId);
         const choiceCounts: Record<string, number> = {};
-        const choiceVoters: Record<string, Array<{ userFid: number; username: string | null; displayName: string | null; pfpUrl: string | null }>> = {};
         let totalVotes = 0;
         const voters: Array<{ userFid: number; username: string | null; displayName: string | null; pfpUrl: string | null }> = [];
-        const positiveVoters: Array<{ userFid: number; username: string | null; displayName: string | null; pfpUrl: string | null }> = [];
-        const negativeVoters: Array<{ userFid: number; username: string | null; displayName: string | null; pfpUrl: string | null }> = [];
 
         responses.forEach((response) => {
           // Drizzle should automatically parse JSONB, but handle both cases
@@ -250,24 +247,9 @@ export async function GET(
           if (choicesObj && typeof choicesObj === 'object' && !Array.isArray(choicesObj) && choicesObj !== null) {
             const choice = choicesObj[optionId];
             if (choice && typeof choice === 'string' && choice.trim() !== '') {
-              const normalizedChoice = choice.toLowerCase();
               choiceCounts[choice] = (choiceCounts[choice] || 0) + 1;
               totalVotes++;
-              
-              // Track voters per choice
-              if (!choiceVoters[choice]) {
-                choiceVoters[choice] = [];
-              }
-              if (!choiceVoters[choice].find(v => v.userFid === response.userFid)) {
-                choiceVoters[choice].push({
-                  userFid: response.userFid,
-                  username: response.username,
-                  displayName: response.displayName,
-                  pfpUrl: response.pfpUrl,
-                });
-              }
-              
-              // Add voter info (only once per voter for option-level)
+              // Add voter info (only once per voter)
               if (!voters.find(v => v.userFid === response.userFid)) {
                 voters.push({
                   userFid: response.userFid,
@@ -275,29 +257,6 @@ export async function GET(
                   displayName: response.displayName,
                   pfpUrl: response.pfpUrl,
                 });
-              }
-              
-              // Track sentiment voters
-              const positiveChoices = ['love', 'like'];
-              const negativeChoices = ['meh', 'hate'];
-              if (positiveChoices.includes(normalizedChoice)) {
-                if (!positiveVoters.find(v => v.userFid === response.userFid)) {
-                  positiveVoters.push({
-                    userFid: response.userFid,
-                    username: response.username,
-                    displayName: response.displayName,
-                    pfpUrl: response.pfpUrl,
-                  });
-                }
-              } else if (negativeChoices.includes(normalizedChoice)) {
-                if (!negativeVoters.find(v => v.userFid === response.userFid)) {
-                  negativeVoters.push({
-                    userFid: response.userFid,
-                    username: response.username,
-                    displayName: response.displayName,
-                    pfpUrl: response.pfpUrl,
-                  });
-                }
               }
             }
           }
@@ -327,16 +286,13 @@ export async function GET(
           optionText: option?.optionText || "[Deleted Option]",
           markdown: option?.markdown || null,
           choiceCounts,
-          choiceVoters, // Voters per choice (love, like, meh, hate)
           totalVotes,
           isDeleted: !option,
           positiveVotes,
           negativeVotes,
           positivePercentage,
           negativePercentage,
-          positiveVoters, // Voters who chose positive sentiment
-          negativeVoters, // Voters who chose negative sentiment
-          voters, // Users who voted for this option (all choices)
+          voters, // Users who voted for this option
         };
       });
 
