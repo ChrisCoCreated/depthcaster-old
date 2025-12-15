@@ -11,3 +11,4 @@ ALTER TABLE "poll_responses" ADD COLUMN IF NOT EXISTS "choices" jsonb;
 --> statement-breakpoint
 ALTER TABLE "poll_responses" ALTER COLUMN "rankings" DROP NOT NULL;
 
+

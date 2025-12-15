@@ -25,3 +25,4 @@ CREATE INDEX IF NOT EXISTS "activity_events_user_fid_created_at_idx" ON "activit
 CREATE INDEX IF NOT EXISTS "activity_events_created_at_idx" ON "activity_events" USING btree ("created_at");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "users_last_qualifying_activity_at_idx" ON "users" USING btree ("last_qualifying_activity_at");
 
+

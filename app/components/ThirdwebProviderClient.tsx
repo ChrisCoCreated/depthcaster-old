@@ -17,3 +17,4 @@ export function ThirdwebProviderClient({ children }: { children: React.ReactNode
   );
 }
 
+

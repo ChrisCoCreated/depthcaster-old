@@ -20,3 +20,4 @@ CREATE INDEX IF NOT EXISTS "miniapp_notification_queue_sent_at_idx" ON "miniapp_
 CREATE INDEX IF NOT EXISTS "miniapp_notification_queue_user_fid_scheduled_for_idx" ON "miniapp_notification_queue" USING btree ("user_fid", "scheduled_for");
 
 
+
