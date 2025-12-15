@@ -446,7 +446,11 @@ export async function GET(request: NextRequest) {
           try {
             const cursorDate = new Date(cursor);
             if (!isNaN(cursorDate.getTime())) {
-              filteredResults = curatedCastsResult.filter(c => c.firstCurationTime < cursorDate);
+              filteredResults = curatedCastsResult.filter(c => {
+                // Ensure firstCurationTime is a Date (SQL aggregates may return strings)
+                const curationTime = toDate(c.firstCurationTime, new Date());
+                return curationTime < cursorDate;
+              });
             }
           } catch {
             // Invalid cursor, ignore it
@@ -458,7 +462,7 @@ export async function GET(request: NextRequest) {
 
         castsWithSortData = finalResults.map(c => ({
           castHash: c.castHash,
-          sortTime: c.firstCurationTime,
+          sortTime: toDate(c.firstCurationTime, new Date()),
           qualityScore: null,
         }));
         selectedCastHashes = finalResults.map(c => c.castHash);
@@ -834,7 +838,9 @@ export async function GET(request: NextRequest) {
             neynarCursor = qualityScore !== null && qualityScore !== undefined ? qualityScore.toString() : null;
           } else {
             // For time-based sorting, use timestamp as cursor
-            neynarCursor = lastCast.sortTime.toISOString();
+            // Ensure sortTime is a Date object (SQL aggregates may return strings)
+            const sortTimeDate = toDate(lastCast.sortTime, new Date());
+            neynarCursor = sortTimeDate.toISOString();
           }
         } else {
           neynarCursor = null;
