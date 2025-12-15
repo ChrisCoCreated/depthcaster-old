@@ -19,7 +19,7 @@ interface Poll {
   id: string;
   castHash: string;
   question: string;
-  pollType: "ranking" | "choice";
+  pollType: "ranking" | "choice" | "distribution";
   choices?: string[] | null;
   createdBy: number;
   createdAt: string;
@@ -38,6 +38,7 @@ export default function PollPage({
   const [loading, setLoading] = useState(true);
   const [rankings, setRankings] = useState<string[]>([]);
   const [choices, setChoices] = useState<Record<string, string>>({});
+  const [allocations, setAllocations] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,6 +71,19 @@ export default function PollPage({
               initialChoices[opt.id] = "";
             });
             setChoices(initialChoices);
+          }
+        } else if (data.poll.pollType === "distribution") {
+          // Distribution type: initialize allocations object
+          if (data.userResponse && typeof data.userResponse === "object") {
+            setAllocations(data.userResponse as Record<string, number>);
+            setSubmitted(true);
+          } else {
+            // Initialize with 0 votes for each option
+            const initialAllocations: Record<string, number> = {};
+            data.poll.options.forEach((opt: PollOption) => {
+              initialAllocations[opt.id] = 0;
+            });
+            setAllocations(initialAllocations);
           }
         } else {
           // Ranking type: initialize rankings array
@@ -176,6 +190,15 @@ export default function PollPage({
       }
     }
 
+    // Validate distribution-based polls
+    if (poll.pollType === "distribution") {
+      const total = Object.values(allocations).reduce((sum, val) => sum + val, 0);
+      if (total !== 7) {
+        setError(`Please allocate exactly 7 votes. Currently allocated: ${total}`);
+        return;
+      }
+    }
+
     setSubmitting(true);
     setError(null);
 
@@ -186,6 +209,7 @@ export default function PollPage({
         body: JSON.stringify({
           rankings: poll.pollType === "ranking" ? rankings : undefined,
           choices: poll.pollType === "choice" ? choices : undefined,
+          allocations: poll.pollType === "distribution" ? allocations : undefined,
           userFid: user.fid,
         }),
       });
@@ -252,7 +276,117 @@ export default function PollPage({
           </div>
         ) : (
           <>
-            {poll.pollType === "choice" ? (
+            {poll.pollType === "distribution" ? (
+              <>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+                  Distribute exactly 7 votes across the options. You can allocate all 7 votes to one option or split them any way you want.
+                </p>
+
+                <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Votes Remaining:
+                    </span>
+                    <span className={`text-lg font-bold ${
+                      (7 - Object.values(allocations).reduce((sum, val) => sum + val, 0)) === 0
+                        ? "text-green-600 dark:text-green-400"
+                        : "text-blue-600 dark:text-blue-400"
+                    }`}>
+                      {7 - Object.values(allocations).reduce((sum, val) => sum + val, 0)} / 7
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-4 mb-6">
+                  {poll.options.map((option) => {
+                    const votes = allocations[option.id] || 0;
+                    const totalAllocated = Object.values(allocations).reduce((sum, val) => sum + val, 0);
+                    const remaining = 7 - totalAllocated;
+                    const maxAllowed = votes + remaining;
+
+                    return (
+                      <div
+                        key={option.id}
+                        className={`p-4 border rounded-lg bg-white dark:bg-gray-800 ${
+                          isDisabled ? "opacity-60 cursor-not-allowed" : ""
+                        } border-gray-200 dark:border-gray-700`}
+                      >
+                        <div className="mb-3 text-lg font-bold text-gray-900 dark:text-gray-100">
+                          {option.optionText}
+                        </div>
+                        {option.markdown && (
+                          <div className="mb-3 text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap">
+                            <MarkdownRenderer content={option.markdown} />
+                          </div>
+                        )}
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!isDisabled && votes > 0) {
+                                  setAllocations((prev) => ({
+                                    ...prev,
+                                    [option.id]: votes - 1,
+                                  }));
+                                }
+                              }}
+                              disabled={isDisabled || votes === 0}
+                              className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center font-bold"
+                            >
+                              -
+                            </button>
+                            <input
+                              type="number"
+                              min="0"
+                              max={maxAllowed}
+                              value={votes}
+                              onChange={(e) => {
+                                if (!isDisabled) {
+                                  const newValue = Math.max(0, Math.min(maxAllowed, parseInt(e.target.value) || 0));
+                                  setAllocations((prev) => ({
+                                    ...prev,
+                                    [option.id]: newValue,
+                                  }));
+                                }
+                              }}
+                              disabled={isDisabled}
+                              className="w-16 px-2 py-1 text-center border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!isDisabled && votes < maxAllowed) {
+                                  setAllocations((prev) => ({
+                                    ...prev,
+                                    [option.id]: votes + 1,
+                                  }));
+                                }
+                              }}
+                              disabled={isDisabled || votes >= maxAllowed}
+                              className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center font-bold"
+                            >
+                              +
+                            </button>
+                          </div>
+                          <div className="flex-1">
+                            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+                              <div
+                                className="h-full bg-blue-500 rounded-full transition-all duration-300"
+                                style={{ width: `${(votes / 7) * 100}%` }}
+                              />
+                            </div>
+                          </div>
+                          <div className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-[3rem] text-right">
+                            {votes} vote{votes !== 1 ? "s" : ""}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            ) : poll.pollType === "choice" ? (
               <>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
                   Select a choice for each option.

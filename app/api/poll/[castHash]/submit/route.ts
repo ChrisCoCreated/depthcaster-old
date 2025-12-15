@@ -13,7 +13,7 @@ export async function POST(
   try {
     const { castHash } = await params;
     const body = await request.json();
-    const { rankings, choices, userFid } = body;
+    const { rankings, choices, allocations, userFid } = body;
 
     if (!castHash) {
       return NextResponse.json(
@@ -142,6 +142,41 @@ export async function POST(
           );
         }
       }
+    } else if (pollType === "distribution") {
+      // Validate allocations - must have allocations for all options, sum must equal 7
+      if (!allocations || typeof allocations !== "object") {
+        return NextResponse.json(
+          { error: "Allocations object is required for distribution-type polls" },
+          { status: 400 }
+        );
+      }
+
+      // Check that all options have allocations
+      for (const optionId of optionIds) {
+        if (!(optionId in allocations)) {
+          return NextResponse.json(
+            { error: `Missing allocation for option ${optionId}` },
+            { status: 400 }
+          );
+        }
+
+        const allocation = allocations[optionId];
+        if (typeof allocation !== "number" || allocation < 0 || !Number.isInteger(allocation)) {
+          return NextResponse.json(
+            { error: `Invalid allocation for option ${optionId}. Must be a non-negative integer` },
+            { status: 400 }
+          );
+        }
+      }
+
+      // Validate that sum equals exactly 7
+      const total = Object.values(allocations as Record<string, number>).reduce((sum, val) => sum + val, 0);
+      if (total !== 7) {
+        return NextResponse.json(
+          { error: `Total allocations must equal exactly 7, but got ${total}` },
+          { status: 400 }
+        );
+      }
     } else {
       return NextResponse.json(
         { error: "Invalid poll type" },
@@ -168,6 +203,7 @@ export async function POST(
         .set({
           rankings: pollType === "ranking" ? rankings : null,
           choices: pollType === "choice" ? choices : null,
+          allocations: pollType === "distribution" ? allocations : null,
           updatedAt: new Date(),
         })
         .where(eq(pollResponses.id, existingResponse[0].id));
@@ -178,6 +214,7 @@ export async function POST(
         userFid: fid,
         rankings: pollType === "ranking" ? rankings : null,
         choices: pollType === "choice" ? choices : null,
+        allocations: pollType === "distribution" ? allocations : null,
       });
     }
 

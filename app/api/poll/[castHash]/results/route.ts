@@ -81,6 +81,7 @@ export async function GET(
         userFid: pollResponses.userFid,
         rankings: pollResponses.rankings,
         choices: pollResponses.choices,
+        allocations: pollResponses.allocations,
         createdAt: pollResponses.createdAt,
         username: users.username,
         displayName: users.displayName,
@@ -338,6 +339,98 @@ export async function GET(
           displayName: response.displayName,
           pfpUrl: response.pfpUrl,
           choices: optionChoices,
+          createdAt: response.createdAt,
+        };
+      });
+    } else if (pollType === "distribution") {
+      // Calculate collated results for distribution type
+      // Sum allocations per option across all responses
+      collatedResults = options.map((option) => {
+        let totalVotes = 0;
+        const voters: Array<{ userFid: number; username: string | null; displayName: string | null; pfpUrl: string | null }> = [];
+
+        responses.forEach((response) => {
+          // Handle JSONB - it might be a string that needs parsing
+          let allocationsObj: Record<string, number> | null = null;
+          if (response.allocations) {
+            if (typeof response.allocations === 'string') {
+              try {
+                allocationsObj = JSON.parse(response.allocations);
+              } catch (e) {
+                console.error("Failed to parse allocations JSON:", e);
+              }
+            } else if (typeof response.allocations === 'object' && response.allocations !== null && !Array.isArray(response.allocations)) {
+              allocationsObj = response.allocations as Record<string, number>;
+            }
+          }
+          
+          if (allocationsObj && typeof allocationsObj === 'object' && !Array.isArray(allocationsObj) && allocationsObj !== null) {
+            const allocation = allocationsObj[option.id];
+            if (typeof allocation === 'number' && allocation > 0) {
+              totalVotes += allocation;
+              // Add voter info (only once per voter)
+              if (!voters.find(v => v.userFid === response.userFid)) {
+                voters.push({
+                  userFid: response.userFid,
+                  username: response.username,
+                  displayName: response.displayName,
+                  pfpUrl: response.pfpUrl,
+                });
+              }
+            }
+          }
+        });
+
+        return {
+          optionId: option.id,
+          optionText: option.optionText,
+          markdown: option.markdown,
+          totalVotes,
+          voters, // Users who voted for this option
+        };
+      });
+
+      // Sort by total votes (descending)
+      collatedResults.sort((a, b) => b.totalVotes - a.totalVotes);
+
+      // Format individual responses for distribution type
+      individualResponses = responses.map((response) => {
+        // Handle JSONB - it might be a string that needs parsing
+        let allocationsObj: Record<string, number> | null = null;
+        if (response.allocations) {
+          if (typeof response.allocations === 'string') {
+            try {
+              allocationsObj = JSON.parse(response.allocations);
+            } catch (e) {
+              console.error("Failed to parse allocations JSON:", e);
+            }
+          } else if (typeof response.allocations === 'object' && response.allocations !== null && !Array.isArray(response.allocations)) {
+            allocationsObj = response.allocations as Record<string, number>;
+          }
+        }
+        
+        const optionAllocations: Array<{ optionId: string; optionText: string; votes: number }> = [];
+        
+        if (allocationsObj && typeof allocationsObj === 'object' && !Array.isArray(allocationsObj) && allocationsObj !== null) {
+          Object.entries(allocationsObj).forEach(([optionId, votes]) => {
+            if (typeof votes === 'number' && votes > 0) {
+              const option = options.find((opt) => opt.id === optionId);
+              optionAllocations.push({
+                optionId,
+                optionText: option?.optionText || "[Deleted Option]",
+                votes,
+              });
+            }
+          });
+        }
+
+        return {
+          id: response.id,
+          userFid: response.userFid,
+          username: response.username,
+          displayName: response.displayName,
+          pfpUrl: response.pfpUrl,
+          allocations: optionAllocations,
           createdAt: response.createdAt,
         };
       });

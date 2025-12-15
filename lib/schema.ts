@@ -672,6 +672,7 @@ export const pollResponses = pgTable("poll_responses", {
   userFid: bigint("user_fid", { mode: "number" }).notNull().references(() => users.fid, { onDelete: "cascade" }),
   rankings: jsonb("rankings"), // For ranking type: Array of option IDs in ranked order
   choices: jsonb("choices"), // For choice type: Object mapping optionId -> choice (e.g., { "option-id-1": "love", "option-id-2": "like" })
+  allocations: jsonb("allocations"), // For distribution type: Object mapping optionId -> vote count (e.g., { "option-id-1": 4, "option-id-2": 3 })
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({

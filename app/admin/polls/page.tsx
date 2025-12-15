@@ -40,7 +40,7 @@ export default function AdminPollsPage() {
   const [castHash, setCastHash] = useState("");
   const [slug, setSlug] = useState("");
   const [question, setQuestion] = useState("");
-  const [pollType, setPollType] = useState<"ranking" | "choice">("ranking");
+  const [pollType, setPollType] = useState<"ranking" | "choice" | "distribution">("ranking");
   const [choices, setChoices] = useState<string[]>([]);
   const [options, setOptions] = useState<Array<{ text: string; markdown: string }>>([{ text: "", markdown: "" }]);
   const [saving, setSaving] = useState(false);
@@ -509,7 +509,7 @@ export default function AdminPollsPage() {
                   <select
                     value={pollType}
                     onChange={(e) => {
-                      setPollType(e.target.value as "ranking" | "choice");
+                      setPollType(e.target.value as "ranking" | "choice" | "distribution");
                       if (e.target.value === "choice" && choices.length === 0) {
                         setChoices(["love", "like", "meh", "hate"]);
                       }
@@ -518,7 +518,13 @@ export default function AdminPollsPage() {
                   >
                     <option value="ranking">Ranking (rank all options)</option>
                     <option value="choice">Choice (rate each option)</option>
+                    <option value="distribution">Distribution (allocate 7 votes across options)</option>
                   </select>
+                  {pollType === "distribution" && (
+                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                      Users will distribute exactly 7 votes across the options (e.g., 7-0, 6-1, 5-2, 4-3).
+                    </p>
+                  )}
                 </div>
 
                 {pollType === "choice" && (
@@ -684,6 +690,12 @@ export default function AdminPollsPage() {
                               <span>Choice Poll</span>
                             </div>
                           )}
+                          {resultsData.poll.pollType === "distribution" && (
+                            <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
+                              <BarChart3 className="w-4 h-4" />
+                              <span>Distribution Poll</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -695,6 +707,8 @@ export default function AdminPollsPage() {
                       <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                         {resultsData.poll.pollType === "choice" 
                           ? "Results by Option" 
+                          : resultsData.poll.pollType === "distribution"
+                          ? "Results by Option (Total Votes)"
                           : "Collated Results (Ranked by Average Position)"}
                       </h3>
                       <label className="flex items-center gap-2 cursor-pointer">
@@ -714,9 +728,21 @@ export default function AdminPollsPage() {
                         resultsData.collatedResults.map((result: any, index: number) => {
                           const maxVotes = resultsData.poll.pollType === "ranking" 
                             ? Math.max(...resultsData.collatedResults.map((r: any) => r.voteCount || 0), 1)
+                            : resultsData.poll.pollType === "distribution"
+                            ? Math.max(...resultsData.collatedResults.map((r: any) => r.totalVotes || 0), 1)
                             : Math.max(...resultsData.collatedResults.map((r: any) => r.totalVotes || 0), 1);
-                          const voteCount = resultsData.poll.pollType === "ranking" ? (result.voteCount || 0) : (result.totalVotes || 0);
+                          const voteCount = resultsData.poll.pollType === "ranking" 
+                            ? (result.voteCount || 0) 
+                            : resultsData.poll.pollType === "distribution"
+                            ? (result.totalVotes || 0)
+                            : (result.totalVotes || 0);
                           const votePercentage = maxVotes > 0 ? (voteCount / maxVotes) * 100 : 0;
+                          const totalAllVotes = resultsData.poll.pollType === "distribution"
+                            ? resultsData.collatedResults.reduce((sum: number, r: any) => sum + (r.totalVotes || 0), 0)
+                            : 0;
+                          const votePercentageOfTotal = resultsData.poll.pollType === "distribution" && totalAllVotes > 0
+                            ? (voteCount / totalAllVotes) * 100
+                            : 0;
 
                         return (
                           <div
@@ -751,13 +777,16 @@ export default function AdminPollsPage() {
                               <div className="mb-3">
                                 <div className="flex items-center justify-between mb-1">
                                   <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                                    {voteCount} vote{voteCount !== 1 ? "s" : ""} {maxVotes > 1 ? `(${votePercentage.toFixed(0)}%)` : ""}
+                                    {voteCount} vote{voteCount !== 1 ? "s" : ""} 
+                                    {resultsData.poll.pollType === "distribution" && totalAllVotes > 0
+                                      ? ` (${votePercentageOfTotal.toFixed(1)}% of total)`
+                                      : maxVotes > 1 ? ` (${votePercentage.toFixed(0)}%)` : ""}
                                   </span>
                                 </div>
                                 <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
                                   <div
                                     className="h-full bg-blue-500 rounded-full transition-all duration-500 shadow-sm"
-                                    style={{ width: `${votePercentage}%` }}
+                                    style={{ width: `${resultsData.poll.pollType === "distribution" ? votePercentageOfTotal : votePercentage}%` }}
                                   />
                                 </div>
                               </div>
@@ -801,6 +830,10 @@ export default function AdminPollsPage() {
                                 ) : (
                                   <span className="text-xs text-gray-400 dark:text-gray-500">No rankings yet</span>
                                 )}
+                              </div>
+                            ) : resultsData.poll.pollType === "distribution" ? (
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                Total votes allocated: {voteCount}
                               </div>
                             ) : (
                               <div className="mt-3">
@@ -977,6 +1010,29 @@ export default function AdminPollsPage() {
                                   })
                                 ) : (
                                   <div className="text-sm text-gray-400 dark:text-gray-500">No rankings submitted</div>
+                                )
+                              ) : resultsData.poll.pollType === "distribution" ? (
+                                response.allocations && response.allocations.length > 0 ? (
+                                  response.allocations
+                                    .filter((allocation: any) => allocation.votes > 0)
+                                    .sort((a: any, b: any) => b.votes - a.votes)
+                                    .map((allocation: any) => {
+                                    return (
+                                      <div
+                                        key={allocation.optionId}
+                                        className="flex items-center gap-3 p-2 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
+                                      >
+                                        <span className="flex-1 font-medium text-gray-900 dark:text-gray-100">
+                                          {allocation.optionText}
+                                        </span>
+                                        <span className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border-2 border-blue-500 border-opacity-30">
+                                          {allocation.votes} vote{allocation.votes !== 1 ? "s" : ""}
+                                        </span>
+                                      </div>
+                                    );
+                                  })
+                                ) : (
+                                  <div className="text-sm text-gray-400 dark:text-gray-500">No allocations submitted</div>
                                 )
                               ) : (
                                 response.choices && response.choices.length > 0 ? (

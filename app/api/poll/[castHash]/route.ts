@@ -66,6 +66,8 @@ export async function GET(
           userResponse = response[0].rankings as string[];
         } else if (pollData.pollType === "choice") {
           userResponse = response[0].choices as Record<string, string>;
+        } else if (pollData.pollType === "distribution") {
+          userResponse = response[0].allocations as Record<string, number>;
         }
       }
     }
@@ -158,7 +160,7 @@ export async function POST(
       );
     }
 
-    const validPollType = pollType === "choice" ? "choice" : "ranking";
+    const validPollType = pollType === "choice" ? "choice" : pollType === "distribution" ? "distribution" : "ranking";
     
     // Validate choices for choice type
     if (validPollType === "choice") {
@@ -169,6 +171,8 @@ export async function POST(
         );
       }
     }
+    
+    // Distribution type doesn't need choices array
 
     // Validate and normalize slug
     let normalizedSlug: string | null = null;
