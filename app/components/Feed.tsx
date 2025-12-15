@@ -88,6 +88,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
   const [error, setError] = useState<string | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
+  const [showLoadMore, setShowLoadMore] = useState(false);
   const [selectedPackIds, setSelectedPackIds] = useState<string[]>([]);
   const [selectedPacks, setSelectedPacks] = useState<Pack[]>([]);
   const [favoritePacks, setFavoritePacks] = useState<Pack[]>([]);
@@ -456,9 +457,14 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       const preferences = getFeedPreferences();
 
       // Only fetch for visible feed types
+      // Use limit 3 for initial curated feed load, 10 for subsequent loads, 30 for other feeds
+      const isCuratedFeed = feedType === "curated";
+      const isInitialCuratedLoad = isCuratedFeed && isInitialLoad;
+      const requestLimit = isInitialCuratedLoad ? "3" : (isCuratedFeed ? "10" : "30");
+      
       const params = new URLSearchParams({
         feedType: feedType,
-        limit: "30",
+        limit: requestLimit,
       });
 
       if (viewerFid) {
@@ -516,10 +522,18 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       
       if (newCursor) {
         setCasts((prev) => [...prev, ...data.casts]);
+        // After loading more, hide Load More button and use infinite scroll
+        setShowLoadMore(false);
       } else {
         setCasts(data.casts);
         // Mark that we've fetched new casts, so restore effect won't overwrite them
         castsRestoredRef.current = true;
+        // Show Load More button for curated feed if we got 3 casts and there are more
+        if (isCuratedFeed && isInitialLoad && data.casts.length === 3 && data.next?.cursor) {
+          setShowLoadMore(true);
+        } else {
+          setShowLoadMore(false);
+        }
       }
 
       setCursor(data.next?.cursor || null);
@@ -872,6 +886,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       setCasts([]);
       setCursor(null);
       setHasMore(false);
+      setShowLoadMore(false);
       setLoading(true); // Set loading immediately when switching feeds
       fetchingRef.current = false;
       scrollRestoredRef.current = false; // Allow restoration for new feed type
@@ -886,6 +901,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       setCasts([]);
       setCursor(null);
       setHasMore(false);
+      setShowLoadMore(false);
       castsRestoredRef.current = false; // Reset casts restoration when sort changes
       prevSortByRef.current = sortBy;
     } else if (sortByChanged) {
@@ -898,6 +914,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       setCasts([]);
       setCursor(null);
       setHasMore(false);
+      setShowLoadMore(false);
       castsRestoredRef.current = false; // Reset casts restoration when curator filter changes
       prevSelectedCuratorFidsRef.current = [...selectedCuratorFids];
     } else if (curatorFidsChanged) {
@@ -910,6 +927,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       setCasts([]);
       setCursor(null);
       setHasMore(false);
+      setShowLoadMore(false);
       castsRestoredRef.current = false; // Reset casts restoration when category filter changes
       prevSelectedCategoryRef.current = selectedCategory;
     } else if (categoryChanged) {
@@ -922,6 +940,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       setCasts([]);
       setCursor(null);
       setHasMore(false);
+      setShowLoadMore(false);
       castsRestoredRef.current = false; // Reset casts restoration when quality filter changes
       prevMinQualityScoreRef.current = minQualityScore;
     } else if (qualityScoreChanged) {
@@ -2052,26 +2071,43 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
                 </div>
               </div>
             )}
-            {casts
-              .filter((cast) => feedType === "curated" || !shouldHideCast(cast))
-              .map((cast) => (
-                <CastCard
-                  key={cast.hash}
-                  cast={cast}
-                  showThread
-                  feedType={feedType}
-                  sortBy={feedType === "curated" ? sortBy : undefined}
-                  compressedView={compressedView}
-                  onUpdate={() => {
-                    // Refresh the feed to get updated reaction counts
-                    fetchFeed();
-                  }}
-                />
-              ))}
+            <div className="space-y-6">
+              {casts
+                .filter((cast) => feedType === "curated" || !shouldHideCast(cast))
+                .map((cast) => (
+                  <CastCard
+                    key={cast.hash}
+                    cast={cast}
+                    showThread
+                    feedType={feedType}
+                    sortBy={feedType === "curated" ? sortBy : undefined}
+                    compressedView={compressedView}
+                    onUpdate={() => {
+                      // Refresh the feed to get updated reaction counts
+                      fetchFeed();
+                    }}
+                  />
+                ))}
+            </div>
           </div>
 
-          {/* Infinite scroll trigger */}
-          {hasMore && (
+          {/* Load More button for curated feed (shown after initial 3 casts) */}
+          {showLoadMore && feedType === "curated" && !loading && (
+            <div className="flex justify-center py-6">
+              <button
+                onClick={() => {
+                  setShowLoadMore(false);
+                  fetchFeed(cursor);
+                }}
+                className="px-6 py-3 bg-blue-600 dark:bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              >
+                Load More
+              </button>
+            </div>
+          )}
+
+          {/* Infinite scroll trigger (hidden when Load More button is shown) */}
+          {hasMore && !showLoadMore && (
             <div ref={loadMoreRef} className="p-4 text-center">
               {loading && (
                 <div className="text-gray-500 dark:text-gray-400 text-sm">

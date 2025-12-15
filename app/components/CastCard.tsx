@@ -2367,12 +2367,13 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
 
   return (
     <>
-      <div 
-        ref={castCardRef}
-        data-cast-hash={cast.hash}
-        className={`border-b border-gray-200 dark:border-gray-800 py-4 sm:py-6 px-2 sm:px-4 transition-colors relative ${disableClick ? '' : 'hover:bg-gray-50 dark:hover:bg-gray-900 cursor-pointer'}`}
-        onClick={handleCardClick}
-      >
+      <div className="border-b-2 border-gray-400 dark:border-gray-600 pb-1">
+        <div 
+          ref={castCardRef}
+          data-cast-hash={cast.hash}
+          className={`border-b-2 border-gray-400 dark:border-gray-600 py-4 sm:py-6 px-2 sm:px-4 transition-colors relative ${disableClick ? '' : 'hover:bg-gray-50 dark:hover:bg-gray-900 cursor-pointer'}`}
+          onClick={handleCardClick}
+        >
         {/* Share menu and Curator badge - top right corner */}
         <div className="absolute top-2 right-2 sm:top-4 sm:right-4 z-10 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
           {/* Translation spinner */}
@@ -4147,6 +4148,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
             />
           </div>
         )}
+        </div>
       </div>
 
       {/* Image Modal */}

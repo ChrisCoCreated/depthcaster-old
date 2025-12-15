@@ -312,92 +312,15 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // Get last session timestamp and curator filter query in parallel
-      console.log(`[Feed] About to query curator_cast_curations with ${curatorWhereConditions.length} conditions`);
+      // Optimized approach: Use database-level LIMIT before expensive operations
+      // This dramatically reduces compute by processing only the top N casts
+      console.log(`[Feed] Starting optimized curated feed fetch - limit: ${limit}, sortBy: ${sortBy}, cursor: ${cursor || 'none'}`);
+      
       const queryStartTime = Date.now();
-      const [lastSessionTimestampResult, castHashesWithCurators] = await Promise.all([
-        viewerFid 
-          ? getLastCuratedFeedView(viewerFid).catch(() => null)
-          : Promise.resolve(null),
-        db
-          .selectDistinct({ castHash: curatorCastCurations.castHash })
-          .from(curatorCastCurations)
-          .where(curatorWhereConditions.length > 0 ? and(...curatorWhereConditions) : undefined),
-      ]);
-      console.log(`[Feed] Curator query completed in ${Date.now() - queryStartTime}ms, got ${castHashesWithCurators.length} results`);
-      
+      const lastSessionTimestampResult = viewerFid 
+        ? await getLastCuratedFeedView(viewerFid).catch(() => null)
+        : Promise.resolve(null);
       const lastSessionTimestamp: Date | null = lastSessionTimestampResult;
-      const curatorFilterStart = Date.now();
-
-      const castHashSet = new Set(castHashesWithCurators.map(c => c.castHash));
-      console.log(`[Feed] Curator filter query: ${Date.now() - curatorFilterStart}ms, found ${castHashSet.size} casts`);
-      
-      if (castHashSet.size === 0) {
-        return NextResponse.json({
-          casts: [],
-          next: { cursor: null },
-        });
-      }
-
-      // Two-phase approach: First get sorted cast hashes with times, then fetch full data
-      // This avoids fetching large JSONB data for casts we won't use
-      const castHashArray = Array.from(castHashSet);
-      
-      // Phase 1: Get aggregated times and cast metadata in parallel
-      // Run all independent queries simultaneously for maximum performance
-      const phase1Start = Date.now();
-      const [firstCurationTimes, latestReplyTimes, castsForSorting] = await Promise.all([
-        // Aggregation query for first curation times (uses composite index)
-        db
-          .select({
-            castHash: curatorCastCurations.castHash,
-            firstCurationTime: sql<Date>`MIN(${curatorCastCurations.createdAt})`.as("first_curation_time"),
-          })
-          .from(curatorCastCurations)
-          .where(inArray(curatorCastCurations.castHash, castHashArray))
-          .groupBy(curatorCastCurations.castHash),
-        // Aggregation query for latest reply times (uses composite index)
-        // Use castCreatedAt (when cast was created) not createdAt (when stored in DB) for recent-reply sorting
-        db
-          .select({
-            curatedCastHash: castReplies.curatedCastHash,
-            latestReplyTime: sql<Date>`MAX(${castReplies.castCreatedAt})`.as("latest_reply_time"),
-          })
-          .from(castReplies)
-          .where(inArray(castReplies.curatedCastHash, castHashArray))
-          .groupBy(castReplies.curatedCastHash),
-        // Get cast hashes with minimal data (use indexed castCreatedAt column)
-        // Include qualityScore for quality sorting
-        db
-          .select({
-            castHash: curatedCasts.castHash,
-            createdAt: curatedCasts.createdAt,
-            castTimestamp: curatedCasts.castCreatedAt,
-            qualityScore: curatedCasts.qualityScore,
-          })
-          .from(curatedCasts)
-          .where(
-            and(
-              inArray(curatedCasts.castHash, castHashArray),
-              category ? eq(curatedCasts.category, category) : undefined,
-              gte(curatedCasts.qualityScore, minQualityScore)
-            )
-          ),
-      ]);
-
-      const phase1Time = Date.now() - phase1Start;
-      console.log(`[Feed] Phase 1 (parallel queries): ${phase1Time}ms - curation times: ${firstCurationTimes.length}, reply times: ${latestReplyTimes.length}, casts for sorting: ${castsForSorting.length}`);
-      
-      // Create maps for quick lookup
-      const firstCurationTimeMap = new Map<string, Date>();
-      firstCurationTimes.forEach((row) => {
-        firstCurationTimeMap.set(row.castHash, row.firstCurationTime);
-      });
-
-      const latestReplyTimeMap = new Map<string, Date>();
-      latestReplyTimes.forEach((row) => {
-        latestReplyTimeMap.set(row.curatedCastHash, row.latestReplyTime);
-      });
 
       // Helper function to ensure we have a Date object
       const toDate = (value: Date | string | null | undefined, fallback: Date): Date => {
@@ -407,97 +330,189 @@ export async function GET(request: NextRequest) {
         return fallback;
       };
 
-      // Add sort times/values and sort in memory (lightweight - no JSONB)
-      let castsWithSortTimes: Array<{ castHash: string; createdAt: Date; castTimestamp: Date | null; qualityScore: number | null; sortTime: Date }>;
-      let filteredCasts: Array<{ castHash: string; createdAt: Date; castTimestamp: Date | null; qualityScore: number | null; sortTime: Date }>;
+      // Build base curator filter condition
+      const curatorFilter = curatorWhereConditions.length > 0 ? and(...curatorWhereConditions) : undefined;
       
+      // Build base curated_casts filter (category and quality)
+      const curatedCastsFilter = and(
+        category ? eq(curatedCasts.category, category) : undefined,
+        gte(curatedCasts.qualityScore, minQualityScore)
+      );
+
+      let selectedCastHashes: string[] = [];
+      let castsWithSortData: Array<{ castHash: string; sortTime: Date; qualityScore: number | null }> = [];
+
+      // Optimized queries per sort type - get top N cast hashes BEFORE expensive operations
       if (sortBy === "quality") {
-        // Sort by quality score (descending, nulls last)
-        // Secondary sort by createdAt descending for equal quality scores
-        const sortStart = Date.now();
-        castsForSorting.sort((a, b) => {
-          const aScore = a.qualityScore ?? -1;
-          const bScore = b.qualityScore ?? -1;
-          if (aScore === -1 && bScore === -1) return 0;
-          if (aScore === -1) return 1;
-          if (bScore === -1) return -1;
-          // Primary sort: quality score descending
-          const scoreDiff = bScore - aScore;
-          if (scoreDiff !== 0) return scoreDiff;
-          // Secondary sort: createdAt descending (newer first when scores are equal)
-          const aTime = a.createdAt.getTime();
-          const bTime = b.createdAt.getTime();
-          return bTime - aTime;
-        });
-        const sortTime = Date.now() - sortStart;
-        console.log(`[Feed] In-memory sort by quality: ${sortTime}ms for ${castsForSorting.length} casts`);
-        
-        // Debug: Log first few quality scores to verify sort order
-        if (castsForSorting.length > 0) {
-          const topScores = castsForSorting.slice(0, Math.min(10, castsForSorting.length))
-            .map(c => ({ hash: c.castHash.substring(0, 8), score: c.qualityScore }));
-          console.log(`[Feed] Quality sort order (top 10):`, topScores);
-        }
+        // Quality sort: Order by quality_score DESC, limit early
+        const qualityQueryStart = Date.now();
+        const cursorScore = cursor ? parseFloat(cursor) : null;
+        const cursorCondition = cursorScore && !isNaN(cursorScore)
+          ? sql`${curatedCasts.qualityScore} < ${cursorScore}`
+          : undefined;
 
-        // Map to include sortTime (using createdAt as fallback for cursor compatibility)
-        castsWithSortTimes = castsForSorting.map((cast) => ({ ...cast, sortTime: cast.createdAt }));
+        const qualityCasts = await db
+          .selectDistinct({
+            castHash: curatedCasts.castHash,
+            qualityScore: curatedCasts.qualityScore,
+            createdAt: curatedCasts.createdAt,
+          })
+          .from(curatedCasts)
+          .innerJoin(
+            curatorCastCurations,
+            eq(curatedCasts.castHash, curatorCastCurations.castHash)
+          )
+          .where(
+            and(
+              curatorFilter,
+              curatedCastsFilter,
+              cursorCondition
+            )
+          )
+          .orderBy(desc(curatedCasts.qualityScore), desc(curatedCasts.createdAt))
+          .limit(limit + 1);
 
-        // Apply cursor filter if provided (for quality, cursor is a quality score)
-        filteredCasts = castsWithSortTimes;
-        if (cursor) {
-          try {
-            const cursorScore = parseFloat(cursor);
-            if (!isNaN(cursorScore)) {
-              filteredCasts = castsWithSortTimes.filter((cast) => {
-                const score = cast.qualityScore ?? -1;
-                return score < cursorScore;
-              });
-              console.log(`[Feed] Quality cursor filter: ${castsWithSortTimes.length} -> ${filteredCasts.length} casts`);
-            }
-          } catch {
-            // Invalid cursor, ignore it
-          }
-        }
+        castsWithSortData = qualityCasts.map(c => ({
+          castHash: c.castHash,
+          sortTime: c.createdAt,
+          qualityScore: c.qualityScore,
+        }));
+        selectedCastHashes = qualityCasts.map(c => c.castHash);
+        console.log(`[Feed] Quality query: ${Date.now() - qualityQueryStart}ms, got ${selectedCastHashes.length} casts`);
+      } else if (sortBy === "time-of-cast") {
+        // Time-of-cast: Order by cast_created_at DESC, limit early
+        const timeQueryStart = Date.now();
+        const cursorDate = cursor ? new Date(cursor) : null;
+        const cursorCondition = cursorDate && !isNaN(cursorDate.getTime())
+          ? sql`${curatedCasts.castCreatedAt} < ${cursorDate}`
+          : undefined;
+
+        const timeCasts = await db
+          .selectDistinct({
+            castHash: curatedCasts.castHash,
+            castCreatedAt: curatedCasts.castCreatedAt,
+            createdAt: curatedCasts.createdAt,
+          })
+          .from(curatedCasts)
+          .innerJoin(
+            curatorCastCurations,
+            eq(curatedCasts.castHash, curatorCastCurations.castHash)
+          )
+          .where(
+            and(
+              curatorFilter,
+              curatedCastsFilter,
+              cursorCondition
+            )
+          )
+          .orderBy(desc(curatedCasts.castCreatedAt))
+          .limit(limit + 1);
+
+        castsWithSortData = timeCasts.map(c => ({
+          castHash: c.castHash,
+          sortTime: toDate(c.castCreatedAt, c.createdAt),
+          qualityScore: null,
+        }));
+        selectedCastHashes = timeCasts.map(c => c.castHash);
+        console.log(`[Feed] Time-of-cast query: ${Date.now() - timeQueryStart}ms, got ${selectedCastHashes.length} casts`);
+      } else if (sortBy === "recently-curated") {
+        // Recently-curated: Order by MIN(created_at) from curator_cast_curations DESC, limit early
+        const curatedQueryStart = Date.now();
+        const cursorDate = cursor ? new Date(cursor) : null;
+        const cursorCondition = cursorDate && !isNaN(cursorDate.getTime())
+          ? sql`MIN(${curatorCastCurations.createdAt}) < ${cursorDate}`
+          : undefined;
+
+        const curatedCastsResult = await db
+          .select({
+            castHash: curatorCastCurations.castHash,
+            firstCurationTime: sql<Date>`MIN(${curatorCastCurations.createdAt})`.as("first_curation_time"),
+          })
+          .from(curatorCastCurations)
+          .innerJoin(
+            curatedCasts,
+            eq(curatorCastCurations.castHash, curatedCasts.castHash)
+          )
+          .where(
+            and(
+              curatorFilter,
+              curatedCastsFilter,
+              cursorCondition
+            )
+          )
+          .groupBy(curatorCastCurations.castHash)
+          .orderBy(desc(sql`MIN(${curatorCastCurations.createdAt})`))
+          .limit(limit + 1);
+
+        castsWithSortData = curatedCastsResult.map(c => ({
+          castHash: c.castHash,
+          sortTime: c.firstCurationTime,
+          qualityScore: null,
+        }));
+        selectedCastHashes = curatedCastsResult.map(c => c.castHash);
+        console.log(`[Feed] Recently-curated query: ${Date.now() - curatedQueryStart}ms, got ${selectedCastHashes.length} casts`);
       } else {
-        // Time-based sorting
-        castsWithSortTimes = castsForSorting.map((cast) => {
-          let sortTime: Date;
-          if (sortBy === "recently-curated") {
-            sortTime = toDate(firstCurationTimeMap.get(cast.castHash), cast.createdAt);
-          } else if (sortBy === "time-of-cast") {
-            sortTime = toDate(cast.castTimestamp, cast.createdAt);
-          } else {
-            // recent-reply
-            const fallback = toDate(cast.castTimestamp, cast.createdAt);
-            sortTime = toDate(latestReplyTimeMap.get(cast.castHash), fallback);
-          }
-          return { ...cast, sortTime };
+        // recent-reply: Order by MAX(cast_created_at) from cast_replies DESC, limit early
+        const replyQueryStart = Date.now();
+        const cursorDate = cursor ? new Date(cursor) : null;
+        const cursorCondition = cursorDate && !isNaN(cursorDate.getTime())
+          ? sql`MAX(${castReplies.castCreatedAt}) < ${cursorDate}`
+          : undefined;
+
+        // Use subquery to get cast hashes with latest reply times, then join with curated_casts for filters
+        const replyCastsResult = await db
+          .select({
+            castHash: curatorCastCurations.castHash,
+            latestReplyTime: sql<Date>`MAX(${castReplies.castCreatedAt})`.as("latest_reply_time"),
+            castCreatedAt: curatedCasts.castCreatedAt,
+            createdAt: curatedCasts.createdAt,
+          })
+          .from(curatorCastCurations)
+          .leftJoin(
+            castReplies,
+            eq(curatorCastCurations.castHash, castReplies.curatedCastHash)
+          )
+          .innerJoin(
+            curatedCasts,
+            eq(curatorCastCurations.castHash, curatedCasts.castHash)
+          )
+          .where(
+            and(
+              curatorFilter,
+              curatedCastsFilter,
+              cursorCondition
+            )
+          )
+          .groupBy(
+            curatorCastCurations.castHash,
+            curatedCasts.castCreatedAt,
+            curatedCasts.createdAt
+          )
+          .orderBy(desc(sql`MAX(${castReplies.castCreatedAt})`))
+          .limit(limit + 1);
+
+        castsWithSortData = replyCastsResult.map(c => {
+          const fallback = toDate(c.castCreatedAt, c.createdAt);
+          return {
+            castHash: c.castHash,
+            sortTime: toDate(c.latestReplyTime, fallback),
+            qualityScore: null,
+          };
         });
-
-        // Sort by sortTime
-        const sortStart = Date.now();
-        castsWithSortTimes.sort((a, b) => b.sortTime.getTime() - a.sortTime.getTime());
-        const sortTime = Date.now() - sortStart;
-        console.log(`[Feed] In-memory sort: ${sortTime}ms for ${castsWithSortTimes.length} casts`);
-
-        // Apply cursor filter if provided
-        filteredCasts = castsWithSortTimes;
-        if (cursor) {
-          try {
-            const cursorDate = new Date(cursor);
-            filteredCasts = castsWithSortTimes.filter((cast) => cast.sortTime < cursorDate);
-            console.log(`[Feed] Cursor filter: ${castsWithSortTimes.length} -> ${filteredCasts.length} casts`);
-          } catch {
-            // Invalid cursor, ignore it
-          }
-        }
+        selectedCastHashes = replyCastsResult.map(c => c.castHash);
+        console.log(`[Feed] Recent-reply query: ${Date.now() - replyQueryStart}ms, got ${selectedCastHashes.length} casts`);
       }
 
-      // Get only the cast hashes we need (limit + 1)
-      const selectedCastHashes = filteredCasts.slice(0, limit + 1).map((c) => c.castHash);
-      console.log(`[Feed] Selected ${selectedCastHashes.length} casts for full data fetch`);
+      if (selectedCastHashes.length === 0) {
+        return NextResponse.json({
+          casts: [],
+          next: { cursor: null },
+        });
+      }
 
-      // Phase 3: Fetch full cast data only for selected casts
+      console.log(`[Feed] Optimized query completed in ${Date.now() - queryStartTime}ms, selected ${selectedCastHashes.length} casts`);
+
+      // Fetch full cast data only for selected casts (already limited)
       const phase3Start = Date.now();
       const curatedResults = await db
         .select({
@@ -511,7 +526,7 @@ export async function GET(request: NextRequest) {
         .from(curatedCasts)
         .where(inArray(curatedCasts.castHash, selectedCastHashes));
 
-      // Preserve sort order from Phase 2
+      // Preserve sort order from optimized query
       const castHashOrder = new Map(selectedCastHashes.map((hash, idx) => [hash, idx]));
       curatedResults.sort((a, b) => {
         const aIdx = castHashOrder.get(a.castHash) ?? Infinity;
@@ -520,14 +535,38 @@ export async function GET(request: NextRequest) {
       });
 
       const phase3Time = Date.now() - phase3Start;
-      console.log(`[Feed] Phase 3 (fetch full cast data): ${phase3Time}ms for ${curatedResults.length} casts`);
+      console.log(`[Feed] Fetch full cast data: ${phase3Time}ms for ${curatedResults.length} casts`);
       
-      // Debug: Verify order preservation after database query (for quality sort)
-      if (sortBy === "quality" && curatedResults.length > 0) {
-        const orderAfterDb = curatedResults.slice(0, Math.min(10, curatedResults.length))
-          .map(r => ({ hash: r.castHash.substring(0, 8), score: r.qualityScore }));
-        console.log(`[Feed] Order after DB query (top 10):`, orderAfterDb);
-      }
+      // Fetch firstCurationTimes and latestReplyTimes only for selected casts (much smaller set)
+      const [firstCurationTimes, latestReplyTimes] = await Promise.all([
+        db
+          .select({
+            castHash: curatorCastCurations.castHash,
+            firstCurationTime: sql<Date>`MIN(${curatorCastCurations.createdAt})`.as("first_curation_time"),
+          })
+          .from(curatorCastCurations)
+          .where(inArray(curatorCastCurations.castHash, selectedCastHashes))
+          .groupBy(curatorCastCurations.castHash),
+        db
+          .select({
+            curatedCastHash: castReplies.curatedCastHash,
+            latestReplyTime: sql<Date>`MAX(${castReplies.castCreatedAt})`.as("latest_reply_time"),
+          })
+          .from(castReplies)
+          .where(inArray(castReplies.curatedCastHash, selectedCastHashes))
+          .groupBy(castReplies.curatedCastHash),
+      ]);
+
+      // Create maps for quick lookup
+      const firstCurationTimeMap = new Map<string, Date>();
+      firstCurationTimes.forEach((row) => {
+        firstCurationTimeMap.set(row.castHash, row.firstCurationTime);
+      });
+
+      const latestReplyTimeMap = new Map<string, Date>();
+      latestReplyTimes.forEach((row) => {
+        latestReplyTimeMap.set(row.curatedCastHash, row.latestReplyTime);
+      });
 
       // Add latest times to results
       const resultsWithTimes = curatedResults.map((row) => ({
@@ -756,17 +795,17 @@ export async function GET(request: NextRequest) {
       // Set cursor to the last item's sort value based on sortBy mode
       // Limit to requested limit after all filtering and sorting
       const finalResults = filteredResults.slice(0, limit);
-      if (filteredResults.length > limit) {
-        // Get the sort value from the filtered casts (which we already computed)
-        const lastFilteredCast = filteredCasts[limit - 1];
-        if (lastFilteredCast) {
+      if (castsWithSortData.length > limit) {
+        // Get the sort value from the castsWithSortData (which we already computed)
+        const lastCast = castsWithSortData[limit - 1];
+        if (lastCast) {
           if (sortBy === "quality") {
             // For quality sorting, use quality score as cursor
-            const qualityScore = lastFilteredCast.qualityScore;
+            const qualityScore = lastCast.qualityScore;
             neynarCursor = qualityScore !== null && qualityScore !== undefined ? qualityScore.toString() : null;
           } else {
             // For time-based sorting, use timestamp as cursor
-            neynarCursor = lastFilteredCast.sortTime.toISOString();
+            neynarCursor = lastCast.sortTime.toISOString();
           }
         } else {
           neynarCursor = null;
