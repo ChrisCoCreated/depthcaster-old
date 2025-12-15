@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { polls, pollOptions, pollResponses } from "@/lib/schema";
-import { eq, asc, and, or, sql } from "drizzle-orm";
+import { eq, asc, and, or, sql, inArray } from "drizzle-orm";
 import { isAdmin, getUserRoles } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
@@ -139,12 +139,13 @@ export async function POST(
       );
     }
 
-    // Validate options structure - can be strings (backward compat) or objects with text and markdown
+    // Validate options structure - can be strings (backward compat) or objects with text, markdown, and optional id
     const normalizedOptions = options.map((opt: any, index: number) => {
       if (typeof opt === 'string') {
-        return { text: opt.trim(), markdown: null };
+        return { id: undefined, text: opt.trim(), markdown: null };
       } else if (typeof opt === 'object' && opt !== null) {
         return {
+          id: opt.id && typeof opt.id === 'string' ? opt.id : undefined,
           text: (opt.text || '').trim(),
           markdown: (opt.markdown || '').trim() || null,
         };
@@ -287,8 +288,186 @@ export async function POST(
         })
         .where(eq(polls.id, pollId));
 
-      // Delete existing options
-      await db.delete(pollOptions).where(eq(pollOptions.pollId, pollId));
+      // Load existing options for smart matching
+      const existingOptions = await db
+        .select()
+        .from(pollOptions)
+        .where(eq(pollOptions.pollId, pollId))
+        .orderBy(asc(pollOptions.order));
+
+      // Create maps for matching
+      const existingOptionsById = new Map(existingOptions.map(opt => [opt.id, opt]));
+      const existingOptionsByText = new Map(existingOptions.map(opt => [opt.optionText.toLowerCase(), opt]));
+      const matchedOptionIds = new Set<string>();
+      const optionsToInsert: Array<{ pollId: string; optionText: string; markdown: string | null; order: number }> = [];
+      const optionsToUpdate: Array<{ id: string; optionText: string; markdown: string | null; order: number }> = [];
+
+      // Match incoming options to existing ones
+      normalizedOptions.forEach((incomingOpt, index) => {
+        const order = index + 1;
+        let matchedOption = null;
+
+        // First try to match by ID if provided
+        if (incomingOpt.id && existingOptionsById.has(incomingOpt.id)) {
+          matchedOption = existingOptionsById.get(incomingOpt.id)!;
+          matchedOptionIds.add(matchedOption.id);
+        }
+        // Otherwise try to match by text (case-insensitive)
+        else if (!matchedOption && existingOptionsByText.has(incomingOpt.text.toLowerCase())) {
+          const candidate = existingOptionsByText.get(incomingOpt.text.toLowerCase())!;
+          // Only match if not already matched
+          if (!matchedOptionIds.has(candidate.id)) {
+            matchedOption = candidate;
+            matchedOptionIds.add(candidate.id);
+          }
+        }
+
+        if (matchedOption) {
+          // Update existing option if text, markdown, or order changed
+          if (
+            matchedOption.optionText !== incomingOpt.text ||
+            matchedOption.markdown !== incomingOpt.markdown ||
+            matchedOption.order !== order
+          ) {
+            optionsToUpdate.push({
+              id: matchedOption.id,
+              optionText: incomingOpt.text,
+              markdown: incomingOpt.markdown,
+              order,
+            });
+          }
+        } else {
+          // New option - insert it
+          optionsToInsert.push({
+            pollId,
+            optionText: incomingOpt.text,
+            markdown: incomingOpt.markdown,
+            order,
+          });
+        }
+      });
+
+      // Update matched options
+      for (const opt of optionsToUpdate) {
+        await db
+          .update(pollOptions)
+          .set({
+            optionText: opt.optionText,
+            markdown: opt.markdown,
+            order: opt.order,
+          })
+          .where(eq(pollOptions.id, opt.id));
+      }
+
+      // Insert new options
+      if (optionsToInsert.length > 0) {
+        await db.insert(pollOptions).values(optionsToInsert);
+      }
+
+      // Handle deleted options - check if they're referenced in responses
+      const deletedOptions = existingOptions.filter(opt => !matchedOptionIds.has(opt.id));
+      if (deletedOptions.length > 0) {
+        // Check which deleted options are referenced in responses
+        const deletedOptionIds = deletedOptions.map(opt => opt.id);
+        
+        // Check for references in rankings (array of option IDs)
+        const responsesWithRankings = await db
+          .select({ rankings: pollResponses.rankings })
+          .from(pollResponses)
+          .where(eq(pollResponses.pollId, pollId));
+
+        // Check for references in choices (object with option IDs as keys)
+        const responsesWithChoices = await db
+          .select({ choices: pollResponses.choices })
+          .from(pollResponses)
+          .where(eq(pollResponses.pollId, pollId));
+
+        // Check for references in allocations (object with option IDs as keys)
+        const responsesWithAllocations = await db
+          .select({ allocations: pollResponses.allocations })
+          .from(pollResponses)
+          .where(eq(pollResponses.pollId, pollId));
+
+        const referencedOptionIds = new Set<string>();
+
+        // Check rankings
+        responsesWithRankings.forEach(response => {
+          let rankingsArray: string[] | null = null;
+          if (response.rankings) {
+            if (typeof response.rankings === 'string') {
+              try {
+                rankingsArray = JSON.parse(response.rankings);
+              } catch (e) {
+                // Skip if parsing fails
+              }
+            } else if (Array.isArray(response.rankings)) {
+              rankingsArray = response.rankings;
+            }
+          }
+          if (rankingsArray) {
+            rankingsArray.forEach((optionId: string) => {
+              if (deletedOptionIds.includes(optionId)) {
+                referencedOptionIds.add(optionId);
+              }
+            });
+          }
+        });
+
+        // Check choices
+        responsesWithChoices.forEach(response => {
+          let choicesObj: Record<string, string> | null = null;
+          if (response.choices) {
+            if (typeof response.choices === 'string') {
+              try {
+                choicesObj = JSON.parse(response.choices);
+              } catch (e) {
+                // Skip if parsing fails
+              }
+            } else if (typeof response.choices === 'object' && !Array.isArray(response.choices)) {
+              choicesObj = response.choices as Record<string, string>;
+            }
+          }
+          if (choicesObj) {
+            Object.keys(choicesObj).forEach(optionId => {
+              if (deletedOptionIds.includes(optionId)) {
+                referencedOptionIds.add(optionId);
+              }
+            });
+          }
+        });
+
+        // Check allocations
+        responsesWithAllocations.forEach(response => {
+          let allocationsObj: Record<string, number> | null = null;
+          if (response.allocations) {
+            if (typeof response.allocations === 'string') {
+              try {
+                allocationsObj = JSON.parse(response.allocations);
+              } catch (e) {
+                // Skip if parsing fails
+              }
+            } else if (typeof response.allocations === 'object' && !Array.isArray(response.allocations)) {
+              allocationsObj = response.allocations as Record<string, number>;
+            }
+          }
+          if (allocationsObj) {
+            Object.keys(allocationsObj).forEach(optionId => {
+              if (deletedOptionIds.includes(optionId)) {
+                referencedOptionIds.add(optionId);
+              }
+            });
+          }
+        });
+
+        // Only delete options that aren't referenced
+        const safeToDelete = deletedOptions.filter(opt => !referencedOptionIds.has(opt.id));
+        if (safeToDelete.length > 0) {
+          const safeToDeleteIds = safeToDelete.map(opt => opt.id);
+          await db.delete(pollOptions).where(
+            inArray(pollOptions.id, safeToDeleteIds)
+          );
+        }
+      }
     } else {
       // Create new poll
       const newPoll = await db
@@ -303,17 +482,17 @@ export async function POST(
         })
         .returning();
       pollId = newPoll[0].id;
+
+      // Insert new options
+      const optionValues = normalizedOptions.map((opt: any, index: number) => ({
+        pollId,
+        optionText: opt.text,
+        markdown: opt.markdown || null,
+        order: index + 1,
+      }));
+
+      await db.insert(pollOptions).values(optionValues);
     }
-
-    // Insert new options
-    const optionValues = normalizedOptions.map((opt: any, index: number) => ({
-      pollId,
-      optionText: opt.text,
-      markdown: opt.markdown || null,
-      order: index + 1,
-    }));
-
-    await db.insert(pollOptions).values(optionValues);
 
     return NextResponse.json({
       success: true,

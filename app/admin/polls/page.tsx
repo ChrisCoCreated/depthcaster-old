@@ -46,7 +46,7 @@ export default function AdminPollsPage() {
   const [question, setQuestion] = useState("");
   const [pollType, setPollType] = useState<"ranking" | "choice" | "distribution">("ranking");
   const [choices, setChoices] = useState<string[]>([]);
-  const [options, setOptions] = useState<Array<{ text: string; markdown: string }>>([{ text: "", markdown: "" }]);
+  const [options, setOptions] = useState<Array<{ id?: string; text: string; markdown: string }>>([{ text: "", markdown: "" }]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -127,7 +127,7 @@ export default function AdminPollsPage() {
         setPollType(data.poll.pollType || "ranking");
         setChoices(data.poll.choices || []);
         setSlug(data.poll.slug || "");
-        setOptions(data.poll.options.map((opt: any) => ({ text: opt.optionText, markdown: opt.markdown || "" })));
+        setOptions(data.poll.options.map((opt: any) => ({ id: opt.id, text: opt.optionText, markdown: opt.markdown || "" })));
       }
     } catch (err) {
       console.error("Failed to load poll data:", err);
@@ -139,7 +139,7 @@ export default function AdminPollsPage() {
       const response = await fetch(`/api/poll/${castHash}`);
       const data = await response.json();
       if (response.ok && data.poll) {
-        setOptions(data.poll.options.map((opt: any) => ({ text: opt.optionText, markdown: opt.markdown || "" })));
+        setOptions(data.poll.options.map((opt: any) => ({ id: opt.id, text: opt.optionText, markdown: opt.markdown || "" })));
       }
     } catch (err) {
       console.error("Failed to load poll options:", err);
@@ -292,7 +292,7 @@ export default function AdminPollsPage() {
               pollType,
               choices: pollType === "choice" ? choices.filter((c) => c.trim().length > 0) : undefined,
               slug: slug.trim() || undefined,
-              options: validOptions.map(opt => ({ text: opt.text.trim(), markdown: opt.markdown.trim() || undefined })),
+              options: validOptions.map(opt => ({ id: opt.id, text: opt.text.trim(), markdown: opt.markdown.trim() || undefined })),
             });
             setExistingPollData({
               question: checkData.poll.question,
@@ -329,6 +329,7 @@ export default function AdminPollsPage() {
       choices: pollType === "choice" ? choices.filter((c) => c.trim().length > 0) : undefined,
       slug: slug.trim() || undefined,
       options: options.filter((opt) => opt.text.trim().length > 0).map(opt => ({ 
+        id: opt.id,
         text: opt.text.trim(), 
         markdown: opt.markdown.trim() || undefined 
       })),
@@ -1059,6 +1060,20 @@ export default function AdminPollsPage() {
                                         <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                           {result.positiveVotes} vote{result.positiveVotes !== 1 ? 's' : ''} (like + love)
                                         </div>
+                                        {/* Positive Voter Pfps */}
+                                        {showVoterPfps && result.positiveVoters && result.positiveVoters.length > 0 && (
+                                          <div className="mt-2 flex items-center gap-1 flex-wrap">
+                                            {result.positiveVoters.map((voter: any, voterIndex: number) => (
+                                              <AvatarImage
+                                                key={voterIndex}
+                                                src={voter.pfpUrl}
+                                                alt={voter.displayName || voter.username || `FID: ${voter.userFid}`}
+                                                size={20}
+                                                className="w-5 h-5 rounded-full border border-green-300 dark:border-green-600"
+                                              />
+                                            ))}
+                                          </div>
+                                        )}
                                       </div>
                                       <div className="flex-1">
                                         <div className="flex items-center justify-between mb-1">
@@ -1076,6 +1091,20 @@ export default function AdminPollsPage() {
                                         <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                           {result.negativeVotes} vote{result.negativeVotes !== 1 ? 's' : ''} (meh + hate)
                                         </div>
+                                        {/* Negative Voter Pfps */}
+                                        {showVoterPfps && result.negativeVoters && result.negativeVoters.length > 0 && (
+                                          <div className="mt-2 flex items-center gap-1 flex-wrap">
+                                            {result.negativeVoters.map((voter: any, voterIndex: number) => (
+                                              <AvatarImage
+                                                key={voterIndex}
+                                                src={voter.pfpUrl}
+                                                alt={voter.displayName || voter.username || `FID: ${voter.userFid}`}
+                                                size={20}
+                                                className="w-5 h-5 rounded-full border border-red-300 dark:border-red-600"
+                                              />
+                                            ))}
+                                          </div>
+                                        )}
                                       </div>
                                     </div>
                                   </div>
@@ -1107,6 +1136,8 @@ export default function AdminPollsPage() {
                                     };
                                     const choiceColor = choiceColors[choice.toLowerCase()] || { bg: "bg-blue-500", text: "text-blue-700", textDark: "text-blue-300", bgLight: "bg-blue-100", bgDark: "bg-blue-900/40" };
                                     
+                                    const choiceVoters = result.choiceVoters?.[choice] || [];
+                                    
                                     return (
                                       <div
                                         key={choice}
@@ -1129,6 +1160,20 @@ export default function AdminPollsPage() {
                                         <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                                           {percentage.toFixed(0)}%
                                         </div>
+                                        {/* Choice Voter Pfps */}
+                                        {showVoterPfps && choiceVoters.length > 0 && (
+                                          <div className="mt-2 flex items-center gap-1 flex-wrap">
+                                            {choiceVoters.map((voter: any, voterIndex: number) => (
+                                              <AvatarImage
+                                                key={voterIndex}
+                                                src={voter.pfpUrl}
+                                                alt={voter.displayName || voter.username || `FID: ${voter.userFid}`}
+                                                size={20}
+                                                className="w-5 h-5 rounded-full border border-gray-300 dark:border-gray-600"
+                                              />
+                                            ))}
+                                          </div>
+                                        )}
                                       </div>
                                     );
                                   })}
