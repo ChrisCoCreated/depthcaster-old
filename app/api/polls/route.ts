@@ -67,6 +67,7 @@ export async function GET(request: NextRequest) {
           slug: poll.slug,
           question: poll.question,
           createdBy: poll.createdBy,
+          closedAt: poll.closedAt,
           createdAt: poll.createdAt,
           updatedAt: poll.updatedAt,
           optionCount: options.length,

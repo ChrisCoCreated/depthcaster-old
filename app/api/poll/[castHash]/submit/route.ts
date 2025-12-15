@@ -68,6 +68,14 @@ export async function POST(
     const pollData = poll[0];
     const pollType = pollData.pollType || "ranking";
 
+    // Check if poll is closed
+    if (pollData.closedAt) {
+      return NextResponse.json(
+        { error: "This poll is closed and no longer accepting responses" },
+        { status: 403 }
+      );
+    }
+
     // Get all poll options
     const options = await db
       .select()

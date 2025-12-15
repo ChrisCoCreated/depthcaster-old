@@ -81,6 +81,7 @@ export async function GET(
         pollType: pollData.pollType || "ranking",
         choices: pollData.choices as string[] | null,
         createdBy: pollData.createdBy,
+        closedAt: pollData.closedAt,
         createdAt: pollData.createdAt,
         updatedAt: pollData.updatedAt,
         options: options.map((opt) => ({
@@ -504,6 +505,96 @@ export async function POST(
     console.error("Poll POST API error:", err.message || error);
     return NextResponse.json(
       { error: err.message || "Failed to create/update poll" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ castHash: string }> }
+) {
+  try {
+    const { castHash } = await params;
+    const body = await request.json();
+    const { userFid, closed } = body;
+
+    if (!castHash) {
+      return NextResponse.json(
+        { error: "Cast hash is required" },
+        { status: 400 }
+      );
+    }
+
+    if (!userFid) {
+      return NextResponse.json(
+        { error: "User FID is required" },
+        { status: 400 }
+      );
+    }
+
+    if (typeof closed !== "boolean") {
+      return NextResponse.json(
+        { error: "Closed status (boolean) is required" },
+        { status: 400 }
+      );
+    }
+
+    const fid = parseInt(userFid);
+    if (isNaN(fid)) {
+      return NextResponse.json(
+        { error: "Invalid FID" },
+        { status: 400 }
+      );
+    }
+
+    // Check if user is admin
+    const roles = await getUserRoles(fid);
+    if (!isAdmin(roles)) {
+      return NextResponse.json(
+        { error: "Unauthorized: Admin role required" },
+        { status: 403 }
+      );
+    }
+
+    // Check if poll exists
+    const existingPoll = await db
+      .select()
+      .from(polls)
+      .where(
+        or(
+          eq(polls.slug, castHash),
+          eq(polls.castHash, castHash)
+        )
+      )
+      .limit(1);
+
+    if (existingPoll.length === 0) {
+      return NextResponse.json(
+        { error: "Poll not found" },
+        { status: 404 }
+      );
+    }
+
+    // Update poll closed status
+    await db
+      .update(polls)
+      .set({
+        closedAt: closed ? new Date() : null,
+        updatedAt: new Date(),
+      })
+      .where(eq(polls.id, existingPoll[0].id));
+
+    return NextResponse.json({
+      success: true,
+      message: closed ? "Poll closed successfully" : "Poll opened successfully",
+      closedAt: closed ? new Date() : null,
+    });
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    console.error("Poll PATCH API error:", err.message || error);
+    return NextResponse.json(
+      { error: err.message || "Failed to update poll status" },
       { status: 500 }
     );
   }

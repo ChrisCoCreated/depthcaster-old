@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useNeynarContext } from "@neynar/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, Edit, Trash2, ExternalLink, BarChart3, X, Trophy, Users, TrendingUp } from "lucide-react";
+import { Plus, Edit, Trash2, ExternalLink, BarChart3, X, Trophy, Users, TrendingUp, Lock, Unlock } from "lucide-react";
 import { extractCastHashFromUrl } from "@/lib/link-converter";
 import { AvatarImage } from "@/app/components/AvatarImage";
 
@@ -14,6 +14,7 @@ interface Poll {
   slug?: string | null;
   question: string;
   createdBy: number;
+  closedAt: string | null;
   createdAt: string;
   updatedAt: string;
   optionCount: number;
@@ -197,6 +198,35 @@ export default function AdminPollsPage() {
       loadPolls();
     } catch (err: any) {
       setError(err.message || "Failed to delete poll");
+    }
+  };
+
+  const handleClosePoll = async (poll: Poll) => {
+    if (!user?.fid) return;
+
+    const isClosed = poll.closedAt !== null;
+    const action = isClosed ? "open" : "close";
+
+    try {
+      const response = await fetch(`/api/poll/${poll.slug || poll.castHash}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          userFid: user.fid,
+          closed: !isClosed 
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || `Failed to ${action} poll`);
+      }
+
+      setSuccess(`Poll ${action}d successfully`);
+      loadPolls();
+    } catch (err: any) {
+      setError(err.message || `Failed to ${action} poll`);
     }
   };
 
@@ -479,8 +509,15 @@ export default function AdminPollsPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="text-sm text-gray-900 dark:text-gray-100 max-w-md truncate">
-                      {poll.question}
+                    <div className="flex items-center gap-2">
+                      <div className="text-sm text-gray-900 dark:text-gray-100 max-w-md truncate">
+                        {poll.question}
+                      </div>
+                      {poll.closedAt && (
+                        <span className="px-2 py-0.5 text-xs font-medium bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full">
+                          Closed
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
@@ -497,6 +534,20 @@ export default function AdminPollsPage() {
                         title="View Results"
                       >
                         <BarChart3 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleClosePoll(poll)}
+                        className={poll.closedAt 
+                          ? "text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+                          : "text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-300"
+                        }
+                        title={poll.closedAt ? "Open Poll" : "Close Poll"}
+                      >
+                        {poll.closedAt ? (
+                          <Unlock className="w-4 h-4" />
+                        ) : (
+                          <Lock className="w-4 h-4" />
+                        )}
                       </button>
                       <button
                         onClick={() => handleEdit(poll)}

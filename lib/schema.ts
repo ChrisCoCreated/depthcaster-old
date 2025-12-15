@@ -646,6 +646,7 @@ export const polls = pgTable("polls", {
   pollType: text("poll_type").notNull().default("ranking"), // 'ranking' or 'choice'
   choices: jsonb("choices"), // For choice type: array of choice labels like ["love", "like", "meh", "hate"]
   createdBy: bigint("created_by", { mode: "number" }).notNull().references(() => users.fid),
+  closedAt: timestamp("closed_at"), // Timestamp when poll was closed, null if open
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({

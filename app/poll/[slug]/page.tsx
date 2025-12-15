@@ -22,6 +22,7 @@ interface Poll {
   pollType: "ranking" | "choice" | "distribution";
   choices?: string[] | null;
   createdBy: number;
+  closedAt: string | null;
   createdAt: string;
   updatedAt: string;
   options: PollOption[];
@@ -255,14 +256,28 @@ export default function PollPage({
       );
     }
 
-    const isDisabled = checkingCurator || isCurator === false;
+    const isPollClosed = poll.closedAt !== null;
+    const isDisabled = checkingCurator || isCurator === false || isPollClosed;
     const showCuratorMessage = !checkingCurator && isCurator === false;
 
     return (
       <div className={`bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 ${isDisabled ? "opacity-60" : ""}`}>
-        <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-gray-100">
-          {poll.question}
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+            {poll.question}
+          </h2>
+          {isPollClosed && (
+            <span className="px-3 py-1 text-sm font-medium bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full">
+              Closed
+            </span>
+          )}
+        </div>
+
+        {isPollClosed && (
+          <div className="mb-4 px-4 py-3 border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/60 text-sm text-gray-700 dark:text-gray-300 rounded-md">
+            This poll is closed and no longer accepting responses.
+          </div>
+        )}
 
         {showCuratorMessage && (
           <div className="mb-4 px-4 py-3 border border-yellow-200 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900/40 text-sm text-yellow-800 dark:text-yellow-100 rounded-md">
