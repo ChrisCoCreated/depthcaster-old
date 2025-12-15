@@ -317,10 +317,9 @@ export async function GET(request: NextRequest) {
       console.log(`[Feed] Starting optimized curated feed fetch - limit: ${limit}, sortBy: ${sortBy}, cursor: ${cursor || 'none'}`);
       
       const queryStartTime = Date.now();
-      const lastSessionTimestampResult = viewerFid 
+      const lastSessionTimestamp: Date | null = viewerFid 
         ? await getLastCuratedFeedView(viewerFid).catch(() => null)
-        : Promise.resolve(null);
-      const lastSessionTimestamp: Date | null = lastSessionTimestampResult;
+        : null;
 
       // Helper function to ensure we have a Date object
       const toDate = (value: Date | string | null | undefined, fallback: Date): Date => {
