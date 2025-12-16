@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
     );
 
     // Filter replies that belong to this curated cast (direct or via quotes)
-    const relevantReplies = [];
+    const relevantReplies: typeof storedReplies = [];
     const seenHashes = new Set<string>();
     for (const reply of repliesWithoutParentCasts) {
       const matchesCast = reply.curatedCastHash === castHash || reply.quotedCastHash === castHash;
