@@ -156,7 +156,7 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>,
         parts.push(
           <span
             key={match.index}
-            className="text-blue-600 dark:text-blue-400 underline cursor-pointer"
+            className="text-accent-dark dark:text-accent-dark underline cursor-pointer"
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -171,7 +171,7 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>,
           <Link
             key={match.index}
             href={`/profile/${encodeURIComponent(username)}`}
-            className="text-blue-600 dark:text-blue-400 underline"
+            className="text-accent-dark dark:text-accent-dark underline"
             onClick={(e) => {
               e.stopPropagation();
               e.preventDefault();
@@ -224,7 +224,7 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>,
           parts.push(
             <span
               key={match.index}
-              className="text-blue-600 dark:text-blue-400 hover:underline break-all cursor-pointer"
+              className="text-accent-dark dark:text-accent-dark hover:underline break-all cursor-pointer"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -251,7 +251,7 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>,
               parts.push(
                 <span
                   key={match.index}
-                  className="text-blue-600 dark:text-blue-400 hover:underline break-all cursor-pointer"
+                  className="text-accent-dark dark:text-accent-dark hover:underline break-all cursor-pointer"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -266,7 +266,7 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>,
               parts.push(
                 <span
                   key={match.index}
-                  className="text-blue-600 dark:text-blue-400 hover:underline break-all cursor-pointer"
+                  className="text-accent-dark dark:text-accent-dark hover:underline break-all cursor-pointer"
                   onClick={async (e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -303,7 +303,7 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>,
             parts.push(
               <span
                 key={match.index}
-                className="text-blue-600 dark:text-blue-400 hover:underline break-all cursor-pointer"
+                className="text-accent-dark dark:text-accent-dark hover:underline break-all cursor-pointer"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -323,7 +323,7 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>,
             <Link
               key={match.index}
               href={url}
-              className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+              className="text-accent-dark dark:text-accent-dark hover:underline break-all"
               onClick={(e) => e.stopPropagation()}
             >
               {displayText}
@@ -347,7 +347,7 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>,
                 <a
                   key={match.index}
                   href={`/cast/${hash}`}
-                  className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+                  className="text-accent-dark dark:text-accent-dark hover:underline break-all"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -363,7 +363,7 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>,
                 <a
                   key={match.index}
                   href={url}
-                  className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+                  className="text-accent-dark dark:text-accent-dark hover:underline break-all"
                   onClick={async (e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -403,7 +403,7 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>,
                 href={url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+                className="text-accent-dark dark:text-accent-dark hover:underline break-all"
                 onClick={(e) => e.stopPropagation()}
               >
                 {displayText}
@@ -2727,7 +2727,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                     )}
                     <button
                       type="button"
-                      className="w-full text-left text-blue-600 dark:text-blue-400 hover:underline focus:outline-none"
+                      className="w-full text-left text-accent-dark dark:text-accent-dark hover:underline focus:outline-none"
                       onClick={(e) => {
                         e.stopPropagation();
                         setIsCuratedCastExpanded(true);
@@ -2758,7 +2758,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
             {shouldCollapseCuratedCastText && isCuratedCastExpanded && (
               <button
                 type="button"
-                className="text-xs sm:text-sm text-blue-600 dark:text-blue-400 hover:underline mb-2 sm:mb-3"
+                className="text-xs sm:text-sm text-accent-dark dark:text-accent-dark hover:underline mb-2 sm:mb-3"
                 onClick={(e) => {
                   e.stopPropagation();
                   setIsCuratedCastExpanded(false);
@@ -3305,7 +3305,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                               href={embed.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-blue-600 dark:text-blue-400 hover:underline text-sm break-all"
+                              className="text-accent-dark dark:text-accent-dark hover:underline text-sm break-all"
                               onClick={(e) => e.stopPropagation()}
                             >
                               [Image hidden] {embed.url}
@@ -3390,7 +3390,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                           href={embed.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-blue-600 dark:text-blue-400 hover:underline text-sm break-all"
+                          className="text-accent-dark dark:text-accent-dark hover:underline text-sm break-all"
                         >
                           {embed.url}
                         </a>
@@ -3780,7 +3780,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                 <div className="flex items-center gap-3 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                   <Link
                     href={`/conversation/${cast.hash}`}
-                    className="text-blue-600 dark:text-blue-400 hover:underline hidden sm:inline font-medium"
+                    className="text-accent-dark dark:text-accent-dark hover:underline hidden sm:inline font-medium"
                   >
                     {topReplies.length === 0 && !cast._topReplies?.length ? "Start conversation →" : "View conversation →"}
                   </Link>
@@ -3844,7 +3844,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                       disabled={isTagging}
                       className={`flex items-center gap-1 sm:gap-2 text-xs sm:text-sm transition-colors py-1 px-1 sm:px-0 ${
                         tags.length > 0
-                          ? "text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+                          ? "text-accent-dark dark:text-accent-dark hover:text-blue-700 dark:hover:text-blue-300"
                           : "text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
                       } disabled:opacity-50 disabled:cursor-not-allowed`}
                       title="Tag cast"
@@ -4043,7 +4043,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                           }}
                           className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
                             replySortBy === option.value
-                              ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
+                              ? "bg-blue-50 dark:bg-blue-900/20 text-accent-dark dark:text-accent-dark"
                               : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
                           }`}
                         >
@@ -4127,7 +4127,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                         <Link
                           href={`/conversation/${cast.hash}${cluster.rootReplyHash ? `?replyHash=${cluster.rootReplyHash}` : ""}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="mt-3 inline-flex text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                          className="mt-3 inline-flex text-xs font-medium text-accent-dark dark:text-accent-dark hover:underline"
                         >
                           {topReplies.length === 1 ? "Start conversation →" : "View conversation →"}
                         </Link>
