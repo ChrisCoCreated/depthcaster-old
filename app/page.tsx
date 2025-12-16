@@ -7,14 +7,14 @@ export const metadata: Metadata = {
   other: {
     "fc:miniapp": JSON.stringify({
       version: "1",
-      imageUrl: `${appUrl}/icon-512x512.webp`,
+      imageUrl: `${appUrl}/icon-512x512.webp?v=2`,
       button: {
         title: "Open Sopha",
         action: {
           type: "launch_frame",
           name: "Sopha",
           url: `${appUrl}/miniapp`,
-          splashImageUrl: `${appUrl}/icon-512x512.webp`,
+          splashImageUrl: `${appUrl}/icon-512x512.webp?v=2`,
           splashBackgroundColor: "#000000",
         },
       },
