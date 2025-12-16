@@ -108,7 +108,7 @@ I'd love any feedback, here, GC or by clicking the ? icon in the app header.
 
 here is the group chat: https://farcaster.xyz/~/group/GpluEgXNiXtpW1XAO8ct5A
 
-and lastly I recommend adding the mini-app so you get notifications over in Farcaster: https://farcaster.xyz/miniapps/HtUwgAw4iQ2x/sopha
+and lastly I recommend adding the mini-app so you get notifications over in Farcaster: https://farcaster.xyz/miniapps/e8OvYCMqeXGJ/sopha
 
 thanks and looking forward to what you curate!`;
 
