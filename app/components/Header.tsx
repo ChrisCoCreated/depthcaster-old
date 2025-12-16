@@ -5,6 +5,7 @@ import { NotificationBell } from "./NotificationBell";
 import { HeaderUserSearch } from "./HeaderUserSearch";
 import { FeedbackModal } from "./FeedbackModal";
 import Link from "next/link";
+import Image from "next/image";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { createPortal } from "react-dom";
@@ -699,17 +700,26 @@ export function Header() {
         <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between">
           <div className="flex flex-col min-w-0">
             <div className="flex items-center gap-2">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2">
-                <Link href="/" className="text-xs sm:text-2xl font-bold text-gray-900 dark:text-gray-100 leading-tight">
-                  Sopha
-                </Link>
-                <span className="text-[10px] sm:text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider">
-                  Beta
-                </span>
-              </div>
+              <Link href="/" className="flex items-center gap-2">
+                <Image
+                  src="/images/logos/sopha_logo_sticker_b&w.avif"
+                  alt="Sopha Logo"
+                  width={32}
+                  height={32}
+                  className="w-6 h-6 sm:w-8 sm:h-8"
+                />
+                <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2">
+                  <span className="text-xs sm:text-2xl font-bold text-gray-900 dark:text-gray-100 leading-tight">
+                    Sopha
+                  </span>
+                  <span className="text-[10px] sm:text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                    Beta
+                  </span>
+                </div>
+              </Link>
             </div>
             <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-0.5 hidden sm:block">
-              Depth is a sharp insight, a strong contribution to a topic, a display of intellect and thoughtfulness
+              Deep Social - Comfortable Wisdom
             </p>
           </div>
           
