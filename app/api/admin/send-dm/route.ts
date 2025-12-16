@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
 
 www.sopha.social
 
-I've given you Curator role - guide here: www.sopha.social/curators
+I've given you Curator role - guide here: www.sopha.social/faq
 
 I'd love any feedback, here, GC or by clicking the ? icon in the app header.
 
