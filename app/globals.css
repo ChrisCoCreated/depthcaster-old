@@ -114,4 +114,10 @@ body {
   .dark .nested-curator-filter > div {
     border-top-color: rgb(31 41 55) !important;
   }
+  
+  /* Next.js portal positioning */
+  nextjs-portal {
+    left: 0px !important;
+    top: 0px !important;
+  }
 }
