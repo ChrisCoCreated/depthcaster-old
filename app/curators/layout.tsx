@@ -11,7 +11,7 @@ export const metadata: Metadata = {
     siteName: "Sopha",
     images: [
       {
-        url: "/icon-512x512.webp",
+        url: "/icon-512x512.webp?v=2",
         width: 512,
         height: 512,
         alt: "Sopha",
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Curator Guide - Sopha",
     description: "Guide for curators on Sopha. Learn how to curate casts and surface thoughtful conversations on Farcaster.",
-    images: ["/icon-512x512.webp"],
+    images: ["/icon-512x512.webp?v=2"],
   },
 };
 

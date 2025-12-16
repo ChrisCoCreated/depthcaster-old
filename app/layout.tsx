@@ -53,7 +53,7 @@ export const metadata: Metadata = {
     description: "A Long from farcaster client focused on philosophy, art, and meaningful conversations",
     images: [
       {
-        url: "/icon-512x512.webp",
+        url: "/icon-512x512.webp?v=2",
         width: 512,
         height: 512,
         alt: "Sopha",
@@ -64,7 +64,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Sopha - Deep Thoughts on Farcaster",
     description: "A Long from farcaster client focused on philosophy, art, and meaningful conversations",
-    images: ["/icon-512x512.webp"],
+    images: ["/icon-512x512.webp?v=2"],
     creator: "@sopha_social",
   },
   robots: {
@@ -81,20 +81,20 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
-      { url: "/icon-48x48.webp", sizes: "48x48", type: "image/webp" },
-      { url: "/icon-72x72.webp", sizes: "72x72", type: "image/webp" },
-      { url: "/icon-96x96.webp", sizes: "96x96", type: "image/webp" },
-      { url: "/icon-128x128.webp", sizes: "128x128", type: "image/webp" },
-      { url: "/icon-144x144.webp", sizes: "144x144", type: "image/webp" },
-      { url: "/icon-152x152.webp", sizes: "152x152", type: "image/webp" },
-      { url: "/icon-192x192.webp", sizes: "192x192", type: "image/webp" },
-      { url: "/icon-256x256.webp", sizes: "256x256", type: "image/webp" },
-      { url: "/icon-384x384.webp", sizes: "384x384", type: "image/webp" },
-      { url: "/icon-512x512.webp", sizes: "512x512", type: "image/webp" },
+      { url: "/icon-48x48.webp?v=2", sizes: "48x48", type: "image/webp" },
+      { url: "/icon-72x72.webp?v=2", sizes: "72x72", type: "image/webp" },
+      { url: "/icon-96x96.webp?v=2", sizes: "96x96", type: "image/webp" },
+      { url: "/icon-128x128.webp?v=2", sizes: "128x128", type: "image/webp" },
+      { url: "/icon-144x144.webp?v=2", sizes: "144x144", type: "image/webp" },
+      { url: "/icon-152x152.webp?v=2", sizes: "152x152", type: "image/webp" },
+      { url: "/icon-192x192.webp?v=2", sizes: "192x192", type: "image/webp" },
+      { url: "/icon-256x256.webp?v=2", sizes: "256x256", type: "image/webp" },
+      { url: "/icon-384x384.webp?v=2", sizes: "384x384", type: "image/webp" },
+      { url: "/icon-512x512.webp?v=2", sizes: "512x512", type: "image/webp" },
     ],
     apple: [
-      { url: "/icon-192x192.webp", sizes: "192x192", type: "image/webp" },
-      { url: "/icon-152x152.webp", sizes: "152x152", type: "image/webp" },
+      { url: "/icon-192x192.webp?v=2", sizes: "192x192", type: "image/webp" },
+      { url: "/icon-152x152.webp?v=2", sizes: "152x152", type: "image/webp" },
     ],
   },
   appleWebApp: {
