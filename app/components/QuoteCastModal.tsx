@@ -463,7 +463,7 @@ export function QuoteCastModal({ cast, isOpen, onClose, onSuccess }: QuoteCastMo
                 onChange={(e) => handleTextChange(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Add a comment..."
-                className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-black text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 resize-none"
+                className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-black text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-accent dark:focus:ring-accent resize-none"
                 rows={4}
               />
 
@@ -519,7 +519,7 @@ export function QuoteCastModal({ cast, isOpen, onClose, onSuccess }: QuoteCastMo
                   <button
                     type="submit"
                     disabled={isPosting || !text.trim() || isOverLimit}
-                    className="px-6 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 rounded-full hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="px-6 py-2 text-sm font-medium text-white bg-accent dark:bg-accent rounded-full hover:bg-accent-dark dark:hover:bg-accent-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {isPosting ? "Quoting..." : "Quote Cast"}
                   </button>

@@ -215,7 +215,7 @@ export default function PackDetailPage({ params }: { params: Promise<{ id: strin
             <button
               onClick={handleSubscribe}
               disabled={isSubscribing}
-              className="px-4 py-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50"
+              className="px-4 py-2 bg-accent text-white rounded-full hover:bg-accent-dark transition-colors disabled:opacity-50"
             >
               {isSubscribing ? "Subscribing..." : "Subscribe"}
             </button>
@@ -289,7 +289,7 @@ export default function PackDetailPage({ params }: { params: Promise<{ id: strin
                 <button
                   onClick={handleUpdate}
                   disabled={isEditing || !formData.name || selectedUsers.length === 0}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 bg-accent text-white rounded-full hover:bg-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isEditing ? "Updating..." : "Update Pack"}
                 </button>

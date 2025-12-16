@@ -85,7 +85,7 @@ export default function SettingsPage() {
               </h2>
               <Link
                 href="/admin"
-                className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="inline-block px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-dark transition-colors"
               >
                 Admin Panel
               </Link>
@@ -122,7 +122,7 @@ export default function SettingsPage() {
               </p>
               <Link
                 href="/updates"
-                className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="inline-block px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-dark transition-colors"
               >
                 View Updates
               </Link>

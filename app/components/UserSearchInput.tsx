@@ -122,7 +122,7 @@ export function UserSearchInput({
           onChange={(e) => setSearchTerm(e.target.value)}
           onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
           placeholder={placeholder}
-          className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
+          className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-accent dark:focus:ring-accent focus:border-transparent"
         />
         {isSearching && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2">

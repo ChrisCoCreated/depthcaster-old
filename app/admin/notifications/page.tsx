@@ -342,7 +342,7 @@ export default function AdminNotificationsPage() {
                 <button
                   onClick={sendDailyStatsTest}
                   disabled={isSendingDailyTest}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                  className="px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                 >
                   {isSendingDailyTest ? "Sending..." : "Send Test"}
                 </button>
@@ -366,7 +366,7 @@ export default function AdminNotificationsPage() {
                 <button
                   onClick={sendWeeklyContributorsTest}
                   disabled={isSendingWeeklyTest}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                  className="px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                 >
                   {isSendingWeeklyTest ? "Sending..." : "Send Test"}
                 </button>
@@ -390,7 +390,7 @@ export default function AdminNotificationsPage() {
                 <button
                   onClick={sendMiniappTest}
                   disabled={isSendingMiniappTest}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                  className="px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                 >
                   {isSendingMiniappTest ? "Sending..." : "Send Test"}
                 </button>
@@ -417,7 +417,7 @@ export default function AdminNotificationsPage() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g., New Feature: Enhanced Feed"
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-accent focus:border-transparent"
                 required
               />
             </div>
@@ -431,7 +431,7 @@ export default function AdminNotificationsPage() {
                 onChange={(e) => setBody(e.target.value)}
                 placeholder="Enter the notification message..."
                 rows={6}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-accent focus:border-transparent resize-y"
                 required
               />
             </div>
@@ -445,7 +445,7 @@ export default function AdminNotificationsPage() {
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="https://sopha.social/updates/..."
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-accent focus:border-transparent"
               />
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 Link users will be taken to when they click the notification
@@ -490,7 +490,7 @@ export default function AdminNotificationsPage() {
                       value={targetFids}
                       onChange={(e) => setTargetFids(e.target.value)}
                       placeholder="e.g., 123, 456, 789"
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-accent focus:border-transparent"
                     />
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                       Only users who have signed in will receive notifications
@@ -533,7 +533,7 @@ export default function AdminNotificationsPage() {
               <button
                 type="submit"
                 disabled={isSending}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                className="px-6 py-3 bg-accent text-white rounded-lg hover:bg-accent-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
               >
                 {isSending ? "Sending..." : "Send Notifications"}
               </button>

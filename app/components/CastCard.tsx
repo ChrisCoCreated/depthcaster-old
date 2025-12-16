@@ -4073,7 +4073,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                         }}
                         className={`px-1.5 py-0.5 text-xs rounded transition-colors ${
                           replyMinQuality === filter.value
-                            ? "bg-blue-600 text-white"
+                            ? "bg-accent text-white"
                             : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
                         }`}
                       >

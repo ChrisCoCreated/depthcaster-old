@@ -776,12 +776,12 @@ thanks and looking forward to what you curate!`;
               placeholder="Search users by username..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1 px-4 py-2.5 sm:py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+              className="flex-1 px-4 py-2.5 sm:py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent text-sm sm:text-base"
             />
             <button
               onClick={loadUsers}
               disabled={isLoadingUsers}
-              className="px-4 py-2.5 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm sm:text-base whitespace-nowrap"
+              className="px-4 py-2.5 sm:py-2 bg-accent text-white rounded-lg hover:bg-accent-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm sm:text-base whitespace-nowrap"
             >
               {isLoadingUsers ? "Loading..." : "Refresh"}
             </button>
@@ -1044,7 +1044,7 @@ thanks and looking forward to what you curate!`;
                             disabled={sendingDm === userWithRoles.fid}
                             className={`px-3 py-1.5 sm:py-1 text-xs rounded-lg transition-colors min-h-[32px] touch-manipulation ${
                               lastCuratorAssigned === userWithRoles.fid
-                                ? "bg-blue-600 text-white hover:bg-blue-700 font-medium"
+                                ? "bg-accent text-white hover:bg-accent-dark font-medium"
                                 : "bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200 border border-blue-300 dark:border-blue-700 hover:bg-blue-200 dark:hover:bg-blue-900/30"
                             } disabled:opacity-50 disabled:cursor-not-allowed`}
                             title="Send welcome DM"
@@ -1090,7 +1090,7 @@ thanks and looking forward to what you curate!`;
                   <textarea
                     value={dmMessage}
                     onChange={(e) => setDmMessage(e.target.value)}
-                    className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent resize-none"
                     rows={12}
                     disabled={sendingDm !== null}
                     placeholder="Enter your message..."
@@ -1109,7 +1109,7 @@ thanks and looking forward to what you curate!`;
                 <button
                   onClick={handleSendDm}
                   disabled={sendingDm !== null || !dmMessage.trim()}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-white bg-accent rounded-lg hover:bg-accent-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {sendingDm !== null ? "Sending..." : "Send DM"}
                 </button>

@@ -175,7 +175,7 @@ export function OnboardingFlow() {
                 key={index}
                 className={`h-1 flex-1 rounded ${
                   index <= currentStep
-                    ? "bg-blue-600 dark:bg-blue-500"
+                    ? "bg-accent dark:bg-accent"
                     : "bg-gray-200 dark:bg-gray-700"
                 }`}
               />
@@ -214,7 +214,7 @@ export function OnboardingFlow() {
                   disabled={isRequestingPermission || isGranted}
                   className={`px-4 py-3 sm:py-2 rounded-lg transition-colors min-h-[44px] sm:min-h-0 ${
                     currentStepData.action.variant === "primary"
-                      ? "bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                      ? "bg-accent text-white hover:bg-accent-dark disabled:opacity-50"
                       : "bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600"
                   }`}
                 >
@@ -223,7 +223,7 @@ export function OnboardingFlow() {
               )}
               <button
                 onClick={handleNext}
-                className="px-4 py-3 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors min-h-[44px] sm:min-h-0"
+                className="px-4 py-3 sm:py-2 bg-accent text-white rounded-lg hover:bg-accent-dark transition-colors min-h-[44px] sm:min-h-0"
               >
                 {isLastStep ? "Get Started" : "Next"}
               </button>

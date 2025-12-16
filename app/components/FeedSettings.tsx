@@ -123,7 +123,7 @@ export function FeedSettings() {
             type="checkbox"
             checked={preferences.hideDollarCasts}
             onChange={(e) => updatePreference("hideDollarCasts", e.target.checked)}
-            className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+            className="w-5 h-5 text-blue-600 rounded focus:ring-accent"
           />
         </label>
 
@@ -144,7 +144,7 @@ export function FeedSettings() {
               type="checkbox"
               checked={preferences.hideShortCasts}
               onChange={(e) => updatePreference("hideShortCasts", e.target.checked)}
-              className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+              className="w-5 h-5 text-blue-600 rounded focus:ring-accent"
             />
           </label>
           {preferences.hideShortCasts && (
@@ -159,7 +159,7 @@ export function FeedSettings() {
                       onClick={() => updatePreference("minCastLength", value)}
                       className={`px-2 py-1 text-xs rounded transition-colors ${
                         preferences.minCastLength === value
-                          ? "bg-blue-600 text-white"
+                          ? "bg-accent text-white"
                           : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
                       }`}
                     >
@@ -178,7 +178,7 @@ export function FeedSettings() {
                       updatePreference("minCastLength", value);
                     }
                   }}
-                  className="w-20 px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-20 px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent"
                 />
                 <span className="text-xs text-gray-500 dark:text-gray-400">characters</span>
               </div>
@@ -203,7 +203,7 @@ export function FeedSettings() {
               type="checkbox"
               checked={preferences.hideTradingWords}
               onChange={(e) => updatePreference("hideTradingWords", e.target.checked)}
-              className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+              className="w-5 h-5 text-blue-600 rounded focus:ring-accent"
             />
           </label>
           {preferences.hideTradingWords && (
@@ -233,7 +233,7 @@ export function FeedSettings() {
             type="checkbox"
             checked={preferences.hideImages}
             onChange={(e) => updatePreference("hideImages", e.target.checked)}
-            className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+            className="w-5 h-5 text-blue-600 rounded focus:ring-accent"
           />
         </label>
       </div>
@@ -332,7 +332,7 @@ function TradingWordsEditor({ words, defaultWords, onWordsChange }: TradingWords
             type="button"
             onClick={handleAddWord}
             disabled={!newWord.trim()}
-            className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-2 py-1 text-xs bg-accent text-white rounded hover:bg-accent-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Add
           </button>
@@ -574,7 +574,7 @@ function CuratorFilter({ selectedCuratorFids, onCuratorFidsChange }: CuratorFilt
                   type="checkbox"
                   checked={isSelected}
                   onChange={() => toggleCurator(curator.fid)}
-                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                  className="w-4 h-4 text-blue-600 rounded focus:ring-accent"
                 />
                 <AvatarImage
                   src={curator.pfpUrl || undefined}
@@ -705,7 +705,7 @@ export function FeedSettingsInline({ feedType }: { feedType?: string }) {
               type="checkbox"
               checked={preferences.hideDollarCasts}
               onChange={(e) => updatePreference("hideDollarCasts", e.target.checked)}
-              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+              className="w-4 h-4 text-blue-600 rounded focus:ring-accent"
             />
           </label>
 
@@ -720,7 +720,7 @@ export function FeedSettingsInline({ feedType }: { feedType?: string }) {
                 type="checkbox"
                 checked={preferences.hideShortCasts}
                 onChange={(e) => updatePreference("hideShortCasts", e.target.checked)}
-                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                className="w-4 h-4 text-blue-600 rounded focus:ring-accent"
               />
             </label>
             {preferences.hideShortCasts && (
@@ -735,7 +735,7 @@ export function FeedSettingsInline({ feedType }: { feedType?: string }) {
                         onClick={() => updatePreference("minCastLength", value)}
                         className={`px-2 py-0.5 text-xs rounded transition-colors ${
                           preferences.minCastLength === value
-                            ? "bg-blue-600 text-white"
+                            ? "bg-accent text-white"
                             : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
                         }`}
                       >
@@ -754,7 +754,7 @@ export function FeedSettingsInline({ feedType }: { feedType?: string }) {
                         updatePreference("minCastLength", value);
                       }
                     }}
-                    className="w-16 px-1.5 py-0.5 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-16 px-1.5 py-0.5 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent"
                   />
                   <span className="text-xs text-gray-500 dark:text-gray-400">chars</span>
                 </div>
@@ -773,7 +773,7 @@ export function FeedSettingsInline({ feedType }: { feedType?: string }) {
                 type="checkbox"
                 checked={preferences.hideTradingWords}
                 onChange={(e) => updatePreference("hideTradingWords", e.target.checked)}
-                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                className="w-4 h-4 text-blue-600 rounded focus:ring-accent"
               />
             </label>
             {preferences.hideTradingWords && (
@@ -795,7 +795,7 @@ export function FeedSettingsInline({ feedType }: { feedType?: string }) {
               type="checkbox"
               checked={preferences.hideImages}
               onChange={(e) => updatePreference("hideImages", e.target.checked)}
-              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+              className="w-4 h-4 text-blue-600 rounded focus:ring-accent"
             />
           </label>
         </div>
@@ -1106,7 +1106,7 @@ export function CuratorFilterInline({
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search for curators..."
-              className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent"
             />
             {isSearching && (
               <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">

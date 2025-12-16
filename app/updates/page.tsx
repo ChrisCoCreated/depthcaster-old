@@ -201,7 +201,7 @@ export default function UpdatesPage() {
               <button
                 onClick={handleSendNotification}
                 disabled={isSending || loading}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                className="px-6 py-3 bg-accent text-white rounded-lg hover:bg-accent-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
               >
                 {isSending ? "Sending..." : "Send Update as Notification"}
               </button>

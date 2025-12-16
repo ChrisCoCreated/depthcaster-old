@@ -424,7 +424,7 @@ export function CastThread({ castHash, viewerFid }: CastThreadProps) {
           <button
             type="button"
             onClick={() => router.push(`/conversation/${castHash}`)}
-            className="inline-flex items-center justify-center px-3 py-1.5 text-sm font-medium rounded-full bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400 transition-colors whitespace-nowrap"
+            className="inline-flex items-center justify-center px-3 py-1.5 text-sm font-medium rounded-full bg-accent text-white hover:bg-accent-dark dark:bg-accent dark:hover:bg-accent-dark transition-colors whitespace-nowrap"
           >
             Go to conversation view
           </button>

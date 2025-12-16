@@ -265,7 +265,7 @@ export default function CastQuotesPage() {
               value={castHash}
               onChange={(e) => setCastHash(e.target.value)}
               placeholder="0x12c9fa6b740e5243529fb7c8defd8a13938794c5"
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-accent focus:border-transparent"
             />
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Enter a cast hash (with or without 0x prefix)
@@ -274,7 +274,7 @@ export default function CastQuotesPage() {
           <button
             type="submit"
             disabled={loadingQuotes || !castHash.trim()}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loadingQuotes ? "Loading..." : "Fetch Quotes"}
           </button>

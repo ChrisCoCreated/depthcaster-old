@@ -480,7 +480,7 @@ export default function UserStatisticsPage() {
                     <button
                       onClick={() => setMiniview(!miniview)}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        miniview ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+                        miniview ? 'bg-accent' : 'bg-gray-300 dark:bg-gray-600'
                       }`}
                     >
                       <span
@@ -502,7 +502,7 @@ export default function UserStatisticsPage() {
                         placeholder="Search by name..."
                         value={userSearchQuery}
                         onChange={(e) => setUserSearchQuery(e.target.value)}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                       />
                     </div>
                     {(selectedUserFid !== null || userSearchQuery) && (
@@ -604,7 +604,7 @@ export default function UserStatisticsPage() {
                                             key={user.fid}
                                             onClick={() => setSelectedUserFid(isSelected ? null : user.fid)}
                                             className={`relative flex-shrink-0 group cursor-pointer transition-all ${
-                                              isSelected ? 'ring-2 ring-blue-500 ring-offset-2' : 'hover:ring-2 hover:ring-gray-300 dark:hover:ring-gray-600'
+                                              isSelected ? 'ring-2 ring-accent ring-offset-2' : 'hover:ring-2 hover:ring-gray-300 dark:hover:ring-gray-600'
                                             }`}
                                             title={displayName}
                                           >
@@ -691,7 +691,7 @@ export default function UserStatisticsPage() {
                                       onClick={() => setSelectedUserFid(isSelected ? null : user.fid)}
                                       className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full border flex-shrink-0 cursor-pointer transition-all ${
                                         isSelected
-                                          ? 'bg-blue-100 dark:bg-blue-900 border-blue-500 ring-2 ring-blue-500 ring-offset-1'
+                                          ? 'bg-blue-100 dark:bg-blue-900 border-blue-500 ring-2 ring-accent ring-offset-1'
                                           : 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700'
                                       }`}
                                       style={{ width: '110px', minWidth: '110px', maxWidth: '110px' }}
@@ -985,7 +985,7 @@ export default function UserStatisticsPage() {
                     <button
                       onClick={fetchAllMiniappNotifications}
                       disabled={isLoadingMiniappNotifications}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                      className="px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                     >
                       {isLoadingMiniappNotifications ? "Updating..." : "Update"}
                     </button>

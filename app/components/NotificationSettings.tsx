@@ -221,7 +221,7 @@ export function NotificationSettings() {
               checked={deviceNotificationsEnabled}
               onChange={(e) => handleDeviceNotificationsToggle(e.target.checked)}
               disabled={isDenied && !deviceNotificationsEnabled}
-              className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 disabled:opacity-50"
+              className="w-5 h-5 text-blue-600 rounded focus:ring-accent disabled:opacity-50"
             />
           </label>
         </div>
@@ -284,7 +284,7 @@ export function NotificationSettings() {
                 checked={preferences[key]}
                 onChange={(e) => updatePreference(key, e.target.checked)}
                 disabled={!hasPlus && !isCheckingPlus}
-                className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-5 h-5 text-blue-600 rounded focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </label>
           ))}
@@ -317,7 +317,7 @@ export function NotificationSettings() {
                 checked={curatedPreferences.notifyOnQualityReply}
                 onChange={(e) => saveCuratedPreferences({ notifyOnQualityReply: e.target.checked })}
                 disabled={saving}
-                className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 disabled:opacity-50"
+                className="w-5 h-5 text-blue-600 rounded focus:ring-accent disabled:opacity-50"
               />
             </label>
             
@@ -353,7 +353,7 @@ export function NotificationSettings() {
                       saveCuratedPreferences({ qualityReplyThreshold: threshold });
                     }}
                     disabled={saving}
-                    className="w-16 px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50"
+                    className="w-16 px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent dark:focus:ring-accent disabled:opacity-50"
                   />
                 </div>
                 <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -391,7 +391,7 @@ export function NotificationSettings() {
                 checked={curatedPreferences[key]}
                 onChange={(e) => saveCuratedPreferences({ [key]: e.target.checked })}
                 disabled={saving}
-                className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 disabled:opacity-50"
+                className="w-5 h-5 text-blue-600 rounded focus:ring-accent disabled:opacity-50"
               />
             </label>
           ))}

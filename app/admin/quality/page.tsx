@@ -251,7 +251,7 @@ export default function QualityPage() {
                   type="checkbox"
                   checked={includeNull}
                   onChange={(e) => setIncludeNull(e.target.checked)}
-                  className="mr-2 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  className="mr-2 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-accent"
                 />
                 <span className="text-sm text-gray-700 dark:text-gray-300">
                   Include null quality scores
@@ -270,7 +270,7 @@ export default function QualityPage() {
                   type="checkbox"
                   checked={showCasts}
                   onChange={(e) => setShowCasts(e.target.checked)}
-                  className="mr-2 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  className="mr-2 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-accent"
                 />
                 <span className="text-sm text-gray-700 dark:text-gray-300">
                   Show Casts
@@ -282,7 +282,7 @@ export default function QualityPage() {
                   type="checkbox"
                   checked={showReplies}
                   onChange={(e) => setShowReplies(e.target.checked)}
-                  className="mr-2 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  className="mr-2 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-accent"
                 />
                 <span className="text-sm text-gray-700 dark:text-gray-300">
                   Show Replies
@@ -293,7 +293,7 @@ export default function QualityPage() {
             <button
               onClick={handleSearch}
               disabled={loadingItems || (!showCasts && !showReplies)}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-2 bg-accent text-white rounded-lg hover:bg-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loadingItems ? "Searching..." : "Search"}
             </button>
@@ -407,7 +407,7 @@ export default function QualityPage() {
                           )}
                           <button
                             onClick={() => handleEdit(item)}
-                            className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                            className="px-3 py-1 text-xs bg-accent text-white rounded hover:bg-accent-dark transition-colors"
                           >
                             Edit
                           </button>

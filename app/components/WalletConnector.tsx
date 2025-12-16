@@ -180,7 +180,7 @@ export function WalletConnector({ onConnected, onInitialized }: WalletConnectorP
           <button
             onClick={connectWallet}
             disabled={isConnecting}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-accent hover:bg-accent-dark text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isConnecting ? "Connecting..." : "Connect Wallet"}
           </button>
@@ -188,7 +188,7 @@ export function WalletConnector({ onConnected, onInitialized }: WalletConnectorP
           <button
             onClick={() => initializeXmtp(walletAddress)}
             disabled={isInitializing}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-accent hover:bg-accent-dark text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isInitializing ? "Initializing..." : "Initialize XMTP"}
           </button>

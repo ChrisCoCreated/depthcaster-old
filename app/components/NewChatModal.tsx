@@ -184,7 +184,7 @@ export function NewChatModal({
               onClick={() => setChatType("1:1")}
               className={`flex-1 px-4 py-2 rounded-lg ${
                 chatType === "1:1"
-                  ? "bg-blue-600 text-white"
+                  ? "bg-accent text-white"
                   : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
               }`}
             >
@@ -194,7 +194,7 @@ export function NewChatModal({
               onClick={() => setChatType("group")}
               className={`flex-1 px-4 py-2 rounded-lg ${
                 chatType === "group"
-                  ? "bg-blue-600 text-white"
+                  ? "bg-accent text-white"
                   : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
               }`}
             >
@@ -238,7 +238,7 @@ export function NewChatModal({
               <button
                 onClick={handleCreate1to1}
                 disabled={loading || (!peerFid.trim() && !peerAddress.trim())}
-                className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-4 py-2 bg-accent hover:bg-accent-dark text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? "Creating..." : "Start Chat"}
               </button>
@@ -311,7 +311,7 @@ export function NewChatModal({
               <button
                 onClick={handleCreateGroup}
                 disabled={loading || memberAddresses.length === 0 || !groupName.trim()}
-                className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-4 py-2 bg-accent hover:bg-accent-dark text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? "Creating..." : "Create Group"}
               </button>

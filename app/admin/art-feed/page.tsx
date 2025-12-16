@@ -479,7 +479,7 @@ function ArtFeedContent() {
                     setModalImageUrl(image.imageUrl);
                     setCurrentIndex(index);
                   }}
-                  className="relative group aspect-square overflow-hidden rounded-xl bg-black/5 dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="relative group aspect-square overflow-hidden rounded-xl bg-black/5 dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent"
                 >
                   <img
                     src={image.imageUrl}

@@ -1483,9 +1483,9 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
         if (castElement) {
           castElement.scrollIntoView({ behavior: "smooth", block: "center" });
           // Add a highlight effect
-          castElement.classList.add("ring-4", "ring-blue-500", "ring-opacity-50");
+          castElement.classList.add("ring-4", "ring-accent", "ring-opacity-50");
           setTimeout(() => {
-            castElement.classList.remove("ring-4", "ring-blue-500", "ring-opacity-50");
+            castElement.classList.remove("ring-4", "ring-accent", "ring-opacity-50");
           }, 2000);
         } else {
           // Cast might not be in feed yet, refresh feed and try again
@@ -1495,9 +1495,9 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
                 const castElement = document.querySelector(`[data-cast-hash="${castHash}"]`);
                 if (castElement) {
                   castElement.scrollIntoView({ behavior: "smooth", block: "center" });
-                  castElement.classList.add("ring-4", "ring-blue-500", "ring-opacity-50");
+                  castElement.classList.add("ring-4", "ring-accent", "ring-opacity-50");
                   setTimeout(() => {
-                    castElement.classList.remove("ring-4", "ring-blue-500", "ring-opacity-50");
+                    castElement.classList.remove("ring-4", "ring-accent", "ring-opacity-50");
                   }, 2000);
                 }
               }, 500);
@@ -1613,7 +1613,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
                     setLoading(false);
                   }
                 }}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 rounded-lg transition-colors flex-shrink-0"
+                className="px-4 py-2 text-sm font-medium text-white bg-accent hover:bg-accent-dark dark:bg-accent dark:hover:bg-accent rounded-lg transition-colors flex-shrink-0"
               >
                 Reload feed with latest
               </button>
@@ -1725,7 +1725,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
               }}
               className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
                 compressedView
-                  ? "bg-blue-600"
+                  ? "bg-accent"
                   : "bg-gray-200 dark:bg-gray-700"
               }`}
             >
@@ -1932,7 +1932,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
                       }}
                       className={`px-2 py-0.5 text-xs rounded transition-colors whitespace-nowrap shrink-0 ${
                         !selectedCategory
-                          ? "bg-blue-600 text-white"
+                          ? "bg-accent text-white"
                           : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
                       }`}
                     >
@@ -1959,7 +1959,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
                         }}
                         className={`px-2 py-0.5 text-xs rounded transition-colors whitespace-nowrap shrink-0 ${
                           selectedCategory === option.value
-                            ? "bg-blue-600 text-white"
+                            ? "bg-accent text-white"
                             : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
                         }`}
                       >
@@ -1990,7 +1990,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
                         }}
                         className={`px-2 py-0.5 text-xs rounded transition-colors ${
                           sortBy === option.value
-                            ? "bg-blue-600 text-white"
+                            ? "bg-accent text-white"
                             : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
                         }`}
                       >
@@ -2099,7 +2099,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
                   setShowLoadMore(false);
                   fetchFeed(cursor);
                 }}
-                className="px-6 py-3 bg-blue-600 dark:bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                className="px-6 py-3 bg-accent dark:bg-accent text-white rounded-lg font-medium hover:bg-accent-dark dark:hover:bg-accent transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
               >
                 Load More
               </button>
@@ -2123,7 +2123,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       {showScrollToTop && (
         <button
           onClick={scrollToTop}
-          className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 z-50 p-3 bg-blue-600 dark:bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-all duration-200 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 z-50 p-3 bg-accent dark:bg-accent text-white rounded-full shadow-lg hover:bg-accent-dark dark:hover:bg-accent transition-all duration-200 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
           aria-label="Scroll to top"
         >
           <svg

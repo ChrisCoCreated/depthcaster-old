@@ -83,13 +83,13 @@ export function MessageComposer({
           onKeyDown={handleKeyDown}
           placeholder="Type a message..."
           rows={1}
-          className="flex-1 resize-none rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+          className="flex-1 resize-none rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent dark:focus:ring-accent"
           disabled={sending}
         />
         <button
           type="submit"
           disabled={!message.trim() || sending}
-          className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+          className="px-6 py-2 bg-accent hover:bg-accent-dark text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed font-medium"
         >
           {sending ? "Sending..." : "Send"}
         </button>

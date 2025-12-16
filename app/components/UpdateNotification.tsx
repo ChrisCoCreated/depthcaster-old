@@ -39,7 +39,7 @@ export function UpdateNotification() {
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               onClick={refresh}
-              className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+              className="flex-1 px-4 py-2 text-sm font-medium text-white bg-accent rounded-lg hover:bg-accent-dark transition-colors"
             >
               Refresh Now
             </button>

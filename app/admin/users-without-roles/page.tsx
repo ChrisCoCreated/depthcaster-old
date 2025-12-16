@@ -201,7 +201,7 @@ export default function AdminUsersWithoutRolesPage() {
             onClick={() => setFilter("both")}
             className={`px-4 py-2 rounded-lg transition-colors text-sm sm:text-base ${
               filter === "both"
-                ? "bg-blue-600 text-white"
+                ? "bg-accent text-white"
                 : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
             }`}
           >
@@ -211,7 +211,7 @@ export default function AdminUsersWithoutRolesPage() {
             onClick={() => setFilter("curator")}
             className={`px-4 py-2 rounded-lg transition-colors text-sm sm:text-base ${
               filter === "curator"
-                ? "bg-blue-600 text-white"
+                ? "bg-accent text-white"
                 : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
             }`}
           >
@@ -221,7 +221,7 @@ export default function AdminUsersWithoutRolesPage() {
             onClick={() => setFilter("plus")}
             className={`px-4 py-2 rounded-lg transition-colors text-sm sm:text-base ${
               filter === "plus"
-                ? "bg-blue-600 text-white"
+                ? "bg-accent text-white"
                 : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
             }`}
           >
@@ -238,12 +238,12 @@ export default function AdminUsersWithoutRolesPage() {
             placeholder="Search users by username..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 px-4 py-2.5 sm:py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+            className="flex-1 px-4 py-2.5 sm:py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent text-sm sm:text-base"
           />
           <button
             onClick={loadUsers}
             disabled={isLoadingUsers}
-            className="px-4 py-2.5 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm sm:text-base whitespace-nowrap"
+            className="px-4 py-2.5 sm:py-2 bg-accent text-white rounded-lg hover:bg-accent-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm sm:text-base whitespace-nowrap"
           >
             {isLoadingUsers ? "Loading..." : "Refresh"}
           </button>

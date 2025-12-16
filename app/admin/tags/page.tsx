@@ -130,7 +130,7 @@ export default function TagsPage() {
                   onClick={() => handleTagClick(tagCount.tag)}
                   className={`px-4 py-2 rounded-lg transition-colors ${
                     selectedTag === tagCount.tag
-                      ? "bg-blue-600 text-white"
+                      ? "bg-accent text-white"
                       : "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700"
                   }`}
                 >

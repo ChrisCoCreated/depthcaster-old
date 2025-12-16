@@ -279,7 +279,7 @@ export function QualityFeedbackModal({
                     setResult(null);
                     onClose();
                   }}
-                  className="px-6 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 rounded-full hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
+                  className="px-6 py-2 text-sm font-medium text-white bg-accent dark:bg-accent rounded-full hover:bg-accent-dark dark:hover:bg-accent transition-colors"
                 >
                   Close
                 </button>
@@ -314,7 +314,7 @@ export function QualityFeedbackModal({
                 onChange={(e) => handleFeedbackChange(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Explain why you think the quality score should be adjusted. Your feedback will be sent to DeepSeek along with the cast text, embedded casts, and links for re-analysis."
-                className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-black text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 resize-none"
+                className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-black text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-accent dark:focus:ring-accent resize-none"
                 rows={6}
               />
               </div>
@@ -337,7 +337,7 @@ export function QualityFeedbackModal({
                 <button
                   type="submit"
                   disabled={isSubmitting || !feedback.trim()}
-                  className="px-6 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 rounded-full hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="px-6 py-2 text-sm font-medium text-white bg-accent dark:bg-accent rounded-full hover:bg-accent-dark dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {isSubmitting ? "Submitting..." : "Submit Feedback"}
                 </button>

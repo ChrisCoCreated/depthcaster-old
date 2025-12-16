@@ -974,7 +974,7 @@ export function Header() {
                 <button
                   onClick={handleConfirmCurate}
                   disabled={isPasting}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isPasting ? "Curating..." : "Curate to your feed"}
                 </button>

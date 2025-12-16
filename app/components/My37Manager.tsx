@@ -532,7 +532,7 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
                     // Trigger feed refresh by dispatching event
                     window.dispatchEvent(new CustomEvent("my37PreferencesChanged"));
                   }}
-                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-accent dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
                 />
                 <label htmlFor="hideRecastsCollapsed" className="text-xs text-gray-600 dark:text-gray-400 cursor-pointer whitespace-nowrap">
                   Hide recasts
@@ -588,7 +588,7 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
                       // Trigger feed refresh by dispatching event
                       window.dispatchEvent(new CustomEvent("my37PreferencesChanged"));
                     }}
-                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-accent dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
                   />
                   <label htmlFor="hideRecastsExpanded" className="text-xs text-gray-600 dark:text-gray-400 cursor-pointer whitespace-nowrap">
                     Hide recasts
@@ -645,7 +645,7 @@ export function My37Manager({ onPackReady }: My37ManagerProps) {
                 className={`px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium ${
                   hasPendingChanges
                     ? "bg-amber-600 text-white hover:bg-amber-700 dark:bg-amber-600 dark:hover:bg-amber-700"
-                    : "bg-blue-600 text-white hover:bg-blue-700"
+                    : "bg-accent text-white hover:bg-accent-dark"
                 }`}
               >
                 {saving ? "Saving..." : "Save"}

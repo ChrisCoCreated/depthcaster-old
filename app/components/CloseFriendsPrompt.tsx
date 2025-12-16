@@ -154,7 +154,7 @@ export function CloseFriendsPrompt({ onPackCreated }: CloseFriendsPromptProps) {
               </div>
               <button
                 onClick={() => setShowForm(true)}
-                className="px-4 sm:px-5 py-2 sm:py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs sm:text-sm font-medium shadow-sm hover:shadow-md"
+                className="px-4 sm:px-5 py-2 sm:py-2.5 bg-accent text-white rounded-lg hover:bg-accent-dark transition-colors text-xs sm:text-sm font-medium shadow-sm hover:shadow-md"
               >
                 Create My 37 Pack
               </button>
@@ -232,7 +232,7 @@ export function CloseFriendsPrompt({ onPackCreated }: CloseFriendsPromptProps) {
             <button
               onClick={handleCreateCloseFriends}
               disabled={isCreating || selectedUsers.length === 0}
-              className="flex-1 px-4 sm:px-5 py-2.5 sm:py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold shadow-sm hover:shadow-md disabled:shadow-none"
+              className="flex-1 px-4 sm:px-5 py-2.5 sm:py-3 bg-accent text-white rounded-lg hover:bg-accent-dark transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold shadow-sm hover:shadow-md disabled:shadow-none"
             >
               {isCreating ? (
                 <span className="flex items-center justify-center gap-2">

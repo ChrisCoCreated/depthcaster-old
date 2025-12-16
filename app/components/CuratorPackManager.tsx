@@ -268,7 +268,7 @@ export function CuratorPackManager() {
               fetchSuggestedUsers();
             }
           }}
-          className="px-4 py-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
+          className="px-4 py-2 bg-accent text-white rounded-full hover:bg-accent-dark transition-colors"
         >
           {showCreateForm ? "Cancel" : "Create Pack"}
         </button>
@@ -344,7 +344,7 @@ export function CuratorPackManager() {
             <div className="flex gap-2">
               <button
                 onClick={editingPack ? handleUpdate : handleCreate}
-                className="px-4 py-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
+                className="px-4 py-2 bg-accent text-white rounded-full hover:bg-accent-dark transition-colors"
               >
                 {editingPack ? "Update" : "Create"}
               </button>

@@ -411,7 +411,7 @@ export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusR
       <div
         key={reply.hash}
         id={normalizedHash ? `reply-${normalizedHash}` : undefined}
-        className={`relative ${isHighlighted ? "ring-2 ring-blue-400 dark:ring-blue-500 rounded-lg" : ""}`}
+        className={`relative ${isHighlighted ? "ring-2 ring-blue-400 dark:ring-accent rounded-lg" : ""}`}
       >
         <div className="flex relative">
           {/* Thread line area */}

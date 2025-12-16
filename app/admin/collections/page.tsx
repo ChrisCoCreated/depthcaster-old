@@ -209,7 +209,7 @@ export default function AdminCollectionsPage() {
           </div>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-dark transition-colors"
           >
             Create Collection
           </button>
@@ -1608,7 +1608,7 @@ function CollectionModal({
               <button
                 type="submit"
                 disabled={saving}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-dark disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? "Saving..." : collection ? "Update" : "Create"}
               </button>
@@ -1859,7 +1859,7 @@ function ManageCastsModal({
             <button
               onClick={handleAddCast}
               disabled={adding || !castHash.trim()}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-dark disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {adding ? "Adding..." : "Add Cast"}
             </button>

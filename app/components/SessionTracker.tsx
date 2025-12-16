@@ -181,7 +181,7 @@ export function SessionTracker() {
               ? "bg-green-500 text-white"
               : toast.type === "error"
               ? "bg-red-500 text-white"
-              : "bg-blue-500 text-white"
+              : "bg-accent text-white"
           }`}
           role="alert"
         >

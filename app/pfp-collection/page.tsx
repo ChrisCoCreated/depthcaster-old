@@ -388,7 +388,7 @@ export default function PfpCollectionPage() {
             <button
               onClick={handleMint}
               disabled={isGenerating || isMinting || isSettingPrice || (stats?.remaining ?? 0) <= 0}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full bg-accent hover:bg-accent-dark text-white font-bold py-4 px-6 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isGenerating
                 ? "Generating Image..."

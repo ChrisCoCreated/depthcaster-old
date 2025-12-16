@@ -387,7 +387,7 @@ export default function PollPage({
                           <div className="flex-1">
                             <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
                               <div
-                                className="h-full bg-blue-500 rounded-full transition-all duration-300"
+                                className="h-full bg-accent rounded-full transition-all duration-300"
                                 style={{ width: `${(votes / 7) * 100}%` }}
                               />
                             </div>
@@ -438,7 +438,7 @@ export default function PollPage({
                                 px-4 py-2 rounded-lg text-sm font-medium transition-colors
                                 ${
                                   selectedChoice === choice
-                                    ? "bg-blue-600 text-white"
+                                    ? "bg-accent text-white"
                                     : "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600"
                                 }
                                 ${isDisabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}
@@ -535,7 +535,7 @@ export default function PollPage({
                 type="button"
                 onClick={handleSubmit}
                 disabled={isDisabled || submitting}
-                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                className="w-full px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
               >
                 {submitting ? "Submitting..." : "Submit Response"}
               </button>

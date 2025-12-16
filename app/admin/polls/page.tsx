@@ -444,7 +444,7 @@ export default function AdminPollsPage() {
         </div>
         <button
           onClick={handleCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-dark transition-colors"
         >
           <Plus className="w-5 h-5" />
           Create Poll
@@ -767,7 +767,7 @@ export default function AdminPollsPage() {
                   <button
                     type="submit"
                     disabled={saving}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-dark disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {saving ? "Saving..." : editingPoll ? "Update Poll" : "Create Poll"}
                   </button>
@@ -912,7 +912,7 @@ export default function AdminPollsPage() {
                   {/* Poll Info */}
                   <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
                     <div className="flex items-start gap-3">
-                      <div className="p-2 bg-blue-500 rounded-lg">
+                      <div className="p-2 bg-accent rounded-lg">
                         <BarChart3 className="w-6 h-6 text-white" />
                       </div>
                       <div className="flex-1">
@@ -964,7 +964,7 @@ export default function AdminPollsPage() {
                           type="checkbox"
                           checked={showVoterPfps}
                           onChange={(e) => setShowVoterPfps(e.target.checked)}
-                          className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 dark:focus:ring-blue-400 dark:bg-gray-700"
+                          className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-accent dark:focus:ring-accent dark:bg-gray-700"
                         />
                         <span className="text-sm text-gray-600 dark:text-gray-400">
                           Show voter avatars
@@ -1000,7 +1000,7 @@ export default function AdminPollsPage() {
                             <div className="flex items-center justify-between mb-3">
                               <div className="flex items-center gap-3">
                                 {resultsData.poll.pollType === "ranking" && (
-                                  <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-sm font-bold text-white shadow-md">
+                                  <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center text-sm font-bold text-white shadow-md">
                                     {index + 1}
                                   </div>
                                 )}
@@ -1033,7 +1033,7 @@ export default function AdminPollsPage() {
                                 </div>
                                 <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
                                   <div
-                                    className="h-full bg-blue-500 rounded-full transition-all duration-500 shadow-sm"
+                                    className="h-full bg-accent rounded-full transition-all duration-500 shadow-sm"
                                     style={{ width: `${resultsData.poll.pollType === "distribution" ? votePercentageOfTotal : votePercentage}%` }}
                                   />
                                 </div>
@@ -1185,7 +1185,7 @@ export default function AdminPollsPage() {
                                       meh: { bg: "bg-yellow-500", text: "text-yellow-700", textDark: "text-yellow-300", bgLight: "bg-yellow-100", bgDark: "bg-yellow-900/40" },
                                       hate: { bg: "bg-red-500", text: "text-red-700", textDark: "text-red-300", bgLight: "bg-red-100", bgDark: "bg-red-900/40" },
                                     };
-                                    const choiceColor = choiceColors[choice.toLowerCase()] || { bg: "bg-blue-500", text: "text-blue-700", textDark: "text-blue-300", bgLight: "bg-blue-100", bgDark: "bg-blue-900/40" };
+                                    const choiceColor = choiceColors[choice.toLowerCase()] || { bg: "bg-accent", text: "text-blue-700", textDark: "text-blue-300", bgLight: "bg-blue-100", bgDark: "bg-blue-900/40" };
                                     
                                     const choiceVoters = result.choiceVoters?.[choice] || [];
                                     
@@ -1291,7 +1291,7 @@ export default function AdminPollsPage() {
                                         key={ranked.optionId}
                                         className="flex items-center gap-3 p-2 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
                                       >
-                                        <span className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-xs font-bold text-white shadow-sm">
+                                        <span className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-xs font-bold text-white shadow-sm">
                                           {ranked.rank}
                                         </span>
                                         <span className="flex-1 font-medium text-gray-900 dark:text-gray-100">
@@ -1349,7 +1349,7 @@ export default function AdminPollsPage() {
                                       meh: { bg: "bg-yellow-500", text: "text-yellow-700", textDark: "text-yellow-300", bgLight: "bg-yellow-100", bgDark: "bg-yellow-900/40" },
                                       hate: { bg: "bg-red-500", text: "text-red-700", textDark: "text-red-300", bgLight: "bg-red-100", bgDark: "bg-red-900/40" },
                                     };
-                                    const choiceColor = choiceColors[optionChoice.choice.toLowerCase()] || { bg: "bg-blue-500", text: "text-blue-700", textDark: "text-blue-300", bgLight: "bg-blue-100", bgDark: "bg-blue-900/40" };
+                                    const choiceColor = choiceColors[optionChoice.choice.toLowerCase()] || { bg: "bg-accent", text: "text-blue-700", textDark: "text-blue-300", bgLight: "bg-blue-100", bgDark: "bg-blue-900/40" };
                                     
                                     return (
                                       <div

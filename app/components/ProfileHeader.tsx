@@ -314,7 +314,7 @@ export function ProfileHeader({
                       <button
                         onClick={handleSave}
                         disabled={updateLoading}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                        className="px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
                       >
                         {updateLoading ? "Saving..." : "Save"}
                       </button>
@@ -367,7 +367,7 @@ export function ProfileHeader({
                       className={`px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium ${
                         isFollowing
                           ? "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-                          : "bg-blue-600 text-white hover:bg-blue-700"
+                          : "bg-accent text-white hover:bg-accent-dark"
                       }`}
                     >
                       {followLoading ? "..." : isFollowing ? "Following" : "Follow"}
@@ -378,7 +378,7 @@ export function ProfileHeader({
                       className={`px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium ${
                         isWatching
                           ? "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-                          : "bg-blue-600 text-white hover:bg-blue-700"
+                          : "bg-accent text-white hover:bg-accent-dark"
                       }`}
                     >
                       {watchLoading ? "..." : isWatching ? "Unwatch" : "Watch"}

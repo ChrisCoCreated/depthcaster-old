@@ -103,7 +103,7 @@ export function CurationSettings() {
               savePreferences(e.target.checked, undefined);
             }}
             disabled={saving}
-            className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 disabled:opacity-50"
+            className="w-5 h-5 text-blue-600 rounded focus:ring-accent disabled:opacity-50"
           />
         </label>
 
@@ -129,7 +129,7 @@ export function CurationSettings() {
               savePreferences(undefined, e.target.checked);
             }}
             disabled={saving}
-            className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 disabled:opacity-50"
+            className="w-5 h-5 text-blue-600 rounded focus:ring-accent disabled:opacity-50"
           />
         </label>
       </div>

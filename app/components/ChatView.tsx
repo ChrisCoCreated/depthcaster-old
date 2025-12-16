@@ -129,7 +129,7 @@ export function ChatView({ conversationId, walletAddress, userFid }: ChatViewPro
                 <div
                   className={`max-w-[70%] rounded-lg px-4 py-2 ${
                     isOwn
-                      ? "bg-blue-600 text-white"
+                      ? "bg-accent text-white"
                       : "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                   }`}
                 >

@@ -161,7 +161,7 @@ export function CuratorPackCard({
                     analytics.trackPackUse(pack.id, pack.name);
                     onUse(pack.id);
                   }}
-                  className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
+                  className="px-3 py-1.5 text-sm bg-accent text-white rounded-full hover:bg-accent-dark transition-colors"
                 >
                   Use
                 </button>

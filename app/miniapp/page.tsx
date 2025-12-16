@@ -824,7 +824,7 @@ function MiniappContent() {
                     value={pasteInputValue}
                     onChange={(e) => setPasteInputValue(e.target.value)}
                     placeholder="Paste cast link or hash"
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent dark:focus:ring-accent"
                     autoFocus
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
@@ -842,7 +842,7 @@ function MiniappContent() {
                     <button
                       onClick={handlePasteInputSubmit}
                       disabled={isPasting || !pasteInputValue.trim()}
-                      className="flex-1 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex-1 px-3 py-1.5 bg-accent text-white rounded text-sm hover:bg-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Submit
                     </button>
@@ -1039,7 +1039,7 @@ function MiniappContent() {
                 <button
                   onClick={handleConfirmCurate}
                   disabled={isPasting}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isPasting ? "Curating..." : "Curate to your feed"}
                 </button>

@@ -150,7 +150,7 @@ export function BotSettings({}: BotSettingsProps) {
               savePreferences(e.target.checked, undefined);
             }}
             disabled={saving}
-            className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 disabled:opacity-50"
+            className="w-5 h-5 text-blue-600 rounded focus:ring-accent disabled:opacity-50"
           />
         </label>
 
@@ -210,7 +210,7 @@ export function BotSettings({}: BotSettingsProps) {
                   type="button"
                   onClick={handleAddBot}
                   disabled={!newBot.trim() || saving}
-                  className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="px-2 py-1 text-xs bg-accent text-white rounded hover:bg-accent-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   Add
                 </button>

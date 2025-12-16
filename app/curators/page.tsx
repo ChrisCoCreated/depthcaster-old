@@ -78,7 +78,7 @@ export default function CuratorsPage() {
                   href={farcasterDmLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  className="inline-block px-6 py-3 bg-accent text-white rounded-lg hover:bg-accent-dark transition-colors font-medium"
                 >
                   DM me on Farcaster to get started →
                 </a>
@@ -322,7 +322,7 @@ export default function CuratorsPage() {
             <div className="flex flex-col sm:flex-row gap-3">
               <button
                 onClick={() => setIsFeedbackModalOpen(true)}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                className="px-6 py-3 bg-accent text-white rounded-lg hover:bg-accent-dark transition-colors font-medium"
               >
                 Submit Feedback
               </button>

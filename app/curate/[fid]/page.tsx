@@ -345,7 +345,7 @@ export default function CuratePersonPage({
                     handleDeselectAll();
                   }
                 }}
-                className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-accent"
                 title="Select All"
               />
               
@@ -353,14 +353,14 @@ export default function CuratePersonPage({
               <div className="flex items-center gap-2 border border-gray-300 dark:border-gray-700 rounded-lg p-1">
                 <button
                   onClick={() => setViewMode("mini")}
-                  className={`p-1.5 rounded ${isMiniView ? "bg-blue-600 text-white" : "text-gray-600 dark:text-gray-400"}`}
+                  className={`p-1.5 rounded ${isMiniView ? "bg-accent text-white" : "text-gray-600 dark:text-gray-400"}`}
                   title="Mini View"
                 >
                   <List className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => setViewMode("standard")}
-                  className={`p-1.5 rounded ${!isMiniView ? "bg-blue-600 text-white" : "text-gray-600 dark:text-gray-400"}`}
+                  className={`p-1.5 rounded ${!isMiniView ? "bg-accent text-white" : "text-gray-600 dark:text-gray-400"}`}
                   title="Standard View"
                 >
                   <LayoutGrid className="w-4 h-4" />
@@ -384,7 +384,7 @@ export default function CuratePersonPage({
                 </button>
                 <button
                   onClick={() => setShowBulkModal(true)}
-                  className="px-4 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                  className="px-4 py-1.5 text-sm bg-accent text-white rounded hover:bg-accent-dark"
                 >
                   Add Selected to Collection
                 </button>
@@ -432,7 +432,7 @@ export default function CuratePersonPage({
                         type="checkbox"
                         checked={selectedCasts.has(cast.hash)}
                         onChange={() => toggleCastSelection(cast)}
-                        className="mt-4 w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        className="mt-4 w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-accent"
                         onClick={(e) => e.stopPropagation()}
                       />
                       <div className="flex-1">
@@ -508,7 +508,7 @@ export default function CuratePersonPage({
                         type="checkbox"
                         checked={selectedCasts.has(cast.hash)}
                         onChange={() => toggleCastSelection(cast)}
-                        className="mt-4 w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        className="mt-4 w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-accent"
                         onClick={(e) => e.stopPropagation()}
                       />
                       <div className="flex-1">

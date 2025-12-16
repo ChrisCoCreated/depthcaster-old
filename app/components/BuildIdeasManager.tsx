@@ -244,14 +244,14 @@ export function BuildIdeasManager() {
               type="checkbox"
               checked={hideCompleted}
               onChange={(e) => setHideCompleted(e.target.checked)}
-              className="w-4 h-4 rounded border-gray-300 dark:border-gray-700 text-blue-600 focus:ring-blue-500"
+              className="w-4 h-4 rounded border-gray-300 dark:border-gray-700 text-blue-600 focus:ring-accent"
             />
             <span>Hide completed</span>
           </label>
           {!showAddForm && !editingId && (
             <button
               onClick={() => setShowAddForm(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-dark transition-colors"
             >
               <Plus className="w-4 h-4" />
               Add Build Idea
