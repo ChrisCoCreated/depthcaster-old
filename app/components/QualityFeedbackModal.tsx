@@ -204,11 +204,11 @@ export function QualityFeedbackModal({
                     {currentQualityScore}/100
                   </div>
                 </div>
-                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 border-2 border-blue-200 dark:border-blue-800">
-                  <div className="text-sm text-blue-600 dark:text-blue-400 mb-1">
+                <div className="bg-accent/30 dark:bg-accent/20 rounded-lg p-3 border-2 border-accent/50 dark:border-accent-dark">
+                  <div className="text-sm text-accent-dark dark:text-accent mb-1">
                     New Score
                   </div>
-                  <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+                  <div className="text-2xl font-bold text-accent-dark dark:text-accent">
                     {result.newScore}/100
                   </div>
                 </div>

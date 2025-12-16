@@ -118,7 +118,7 @@ export default function CollectionsPage() {
                   <div className="flex items-center gap-1 ml-2">
                     <Link
                       href={`/collection/${collection.name}`}
-                      className="p-1.5 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                      className="p-1.5 text-gray-400 hover:text-accent-dark dark:hover:text-accent transition-colors"
                       aria-label="View collection"
                       title="View collection"
                     >
@@ -130,7 +130,7 @@ export default function CollectionsPage() {
                     {collection.creatorFid === user.fid && (
                       <button
                         onClick={() => setEditingCollection(collection)}
-                        className="p-1.5 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                        className="p-1.5 text-gray-400 hover:text-accent-dark dark:hover:text-accent transition-colors"
                         aria-label="Edit collection"
                         title="Edit collection"
                       >

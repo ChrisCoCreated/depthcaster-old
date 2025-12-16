@@ -147,7 +147,7 @@ export function UserActivitySection({
               <button
                 onClick={handleLoadMore}
                 disabled={loading}
-                className="px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 text-sm text-accent-dark dark:text-accent hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? "Loading..." : "Load More"}
               </button>

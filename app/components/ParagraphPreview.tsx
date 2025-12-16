@@ -160,7 +160,7 @@ export function ParagraphPreview({ url }: ParagraphPreviewProps) {
         {hasMoreContent && (
           <button
             onClick={() => setExpanded(!expanded)}
-            className="mt-4 flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
+            className="mt-4 flex items-center gap-1 text-sm text-accent-dark dark:text-accent hover:text-accent-dark dark:hover:text-accent font-medium"
           >
             {expanded ? (
               <>

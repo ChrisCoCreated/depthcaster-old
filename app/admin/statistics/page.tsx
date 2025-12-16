@@ -969,7 +969,7 @@ export default function AdminStatisticsPage() {
                   </div>
                   <div>
                     <p className="text-xs text-gray-500 dark:text-gray-400">Total CU Cost</p>
-                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                    <p className="text-2xl font-bold text-accent-dark dark:text-accent">
                       {formatNumber(statistics.apiCalls.reactionFetches.cuCost)}
                     </p>
                   </div>

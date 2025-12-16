@@ -297,7 +297,7 @@ export default function PollPage({
                   Distribute exactly 7 votes across the options. You can allocate all 7 votes to one option or split them any way you want.
                 </p>
 
-                <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <div className="mb-4 p-3 bg-accent/30 dark:bg-accent/20 border border-accent/50 dark:border-accent-dark rounded-lg">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       Votes Remaining:
@@ -305,7 +305,7 @@ export default function PollPage({
                     <span className={`text-lg font-bold ${
                       (7 - Object.values(allocations).reduce((sum, val) => sum + val, 0)) === 0
                         ? "text-green-600 dark:text-green-400"
-                        : "text-blue-600 dark:text-blue-400"
+                        : "text-accent-dark dark:text-accent"
                     }`}>
                       {7 - Object.values(allocations).reduce((sum, val) => sum + val, 0)} / 7
                     </span>
@@ -475,7 +475,7 @@ export default function PollPage({
                         className={`
                           flex items-center gap-3 p-4 border rounded-lg
                           ${draggedIndex === index ? "opacity-50" : ""}
-                          ${dragOverIndex === index ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" : "border-gray-200 dark:border-gray-700"}
+                          ${dragOverIndex === index ? "border-accent bg-accent/30 dark:bg-accent/20" : "border-gray-200 dark:border-gray-700"}
                           bg-white dark:bg-gray-800
                           ${isDisabled ? "cursor-not-allowed" : "cursor-move"}
                           transition-colors
@@ -484,7 +484,7 @@ export default function PollPage({
                         <div className="shrink-0 text-gray-400 dark:text-gray-500">
                           <GripVertical className="w-5 h-5" />
                         </div>
-                        <div className="shrink-0 w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-sm font-semibold text-blue-700 dark:text-blue-300">
+                        <div className="shrink-0 w-8 h-8 rounded-full bg-accent/40 dark:bg-accent/40 flex items-center justify-center text-sm font-semibold text-accent-dark dark:text-accent">
                           {index + 1}
                         </div>
                         <div className="flex-1">

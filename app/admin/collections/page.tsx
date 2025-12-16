@@ -332,7 +332,7 @@ export default function AdminCollectionsPage() {
                       {collection.displayName || "-"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">
+                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-accent/40 dark:bg-accent/30 text-accent-dark dark:text-accent">
                         {collection.accessType}
                       </span>
                     </td>
@@ -355,7 +355,7 @@ export default function AdminCollectionsPage() {
                         <Link
                           href={`/collection/${collection.name}`}
                           target="_blank"
-                          className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300"
+                          className="text-accent-dark dark:text-accent hover:text-accent-dark dark:hover:text-accent"
                         >
                           View
                         </Link>
@@ -1138,7 +1138,7 @@ function CollectionModal({
                         onClick={() => {
                           setStripTextPrefixes([...stripTextPrefixes, ""]);
                         }}
-                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                        className="text-xs text-accent-dark dark:text-accent hover:underline"
                       >
                         + Add Prefix
                       </button>
@@ -1190,7 +1190,7 @@ function CollectionModal({
                         onClick={() => {
                           setReplaceCharacters([...replaceCharacters, { from: "", to: "" }]);
                         }}
-                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                        className="text-xs text-accent-dark dark:text-accent hover:underline"
                       >
                         + Add Replacement
                       </button>
@@ -1474,7 +1474,7 @@ function CollectionModal({
                       onClick={() => {
                         setAutoCurationFilters([...autoCurationFilters, { type: "authorFid", value: "" }]);
                       }}
-                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                      className="text-xs text-accent-dark dark:text-accent hover:underline"
                     >
                       + Add Filter
                     </button>
@@ -1890,9 +1890,9 @@ function ManageCastsModal({
                   onDrop={(e) => handleDrop(e, index)}
                   className={`flex items-start justify-between p-4 border rounded-lg transition-colors ${
                     draggedIndex === index
-                      ? "opacity-50 border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20"
+                      ? "opacity-50 border-accent dark:border-accent bg-accent/30 dark:bg-accent/20"
                       : dragOverIndex === index
-                      ? "border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20"
+                      ? "border-accent dark:border-accent bg-accent/30 dark:bg-accent/20"
                       : "border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800"
                   } ${draggedIndex !== null && !isAutoOrdering ? "cursor-move" : ""}`}
                 >
@@ -1915,7 +1915,7 @@ function ManageCastsModal({
                         <Link
                           href={`/cast/${cast.hash}`}
                           target="_blank"
-                          className="text-blue-600 dark:text-blue-400 hover:underline font-mono text-sm"
+                          className="text-accent-dark dark:text-accent hover:underline font-mono text-sm"
                           onClick={(e) => e.stopPropagation()}
                         >
                           {cast.hash.substring(0, 16)}...
@@ -1944,7 +1944,7 @@ function ManageCastsModal({
               {hasMore && (
                 <button
                   onClick={() => loadCasts(true)}
-                  className="w-full py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg"
+                  className="w-full py-2 text-sm text-accent-dark dark:text-accent hover:bg-accent/30 dark:hover:bg-accent/20 rounded-lg"
                 >
                   Load More
                 </button>

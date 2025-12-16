@@ -2,13 +2,13 @@
     "frame": {
       "version": "1",
       "name": "Sopha",
-      "iconUrl": "https://sopha.social/icon-192x192.webp",
-      "splashImageUrl": "https://sopha.social/icon-512x512.webp",
+      "iconUrl": "https://sopha.social/icon-192x192.webp?v=2",
+      "splashImageUrl": "https://sopha.social/icon-512x512.webp?v=2",
       "splashBackgroundColor": "#000000",
       "homeUrl": "https://sopha.social",
       "webhookUrl": "https://api.neynar.com/f/app/4f4d94f9-c966-486b-ab8b-d4a33d52e8c2/event",
       "appUrl": "https://sopha.social",
-      "icon": "https://sopha.social/icon-192x192.webp",
+      "icon": "https://sopha.social/icon-192x192.webp?v=2",
       "castShareUrl": "https://sopha.social/share"
 
     },

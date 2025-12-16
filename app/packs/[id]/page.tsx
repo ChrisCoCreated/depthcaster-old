@@ -191,7 +191,7 @@ export default function PackDetailPage({ params }: { params: Promise<{ id: strin
     <div className="min-h-screen bg-white dark:bg-black">
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="mb-6">
-          <Link href="/packs" className="text-blue-600 dark:text-blue-400 hover:underline mb-4 inline-block">
+          <Link href="/packs" className="text-accent-dark dark:text-accent hover:underline mb-4 inline-block">
             ← Back to Packs
           </Link>
         </div>

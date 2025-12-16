@@ -254,8 +254,8 @@ function ShareContent() {
         {isCurator ? (
           <div className="mb-6">
             {hasCuratedByUser === true ? (
-              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg mb-3">
-                <p className="text-sm text-blue-800 dark:text-blue-200">
+              <div className="p-4 bg-accent/30 dark:bg-accent/20 border border-accent/50 dark:border-accent-dark rounded-lg mb-3">
+                <p className="text-sm text-accent-dark dark:text-accent">
                   You have already curated this cast
                 </p>
               </div>

@@ -1525,11 +1525,11 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       {/* New curated casts available banner */}
       {feedType === "curated" && hasNewCuratedCasts && latestNewCast && (
         <div className="mb-4 mx-2 sm:mx-4">
-          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+          <div className="bg-accent/30 dark:bg-accent/20 border border-accent/50 dark:border-accent-dark rounded-lg p-4">
             <div className="flex items-start justify-between gap-4 mb-3">
               <div className="flex items-center gap-2 flex-1">
                 <svg
-                  className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0"
+                  className="w-5 h-5 text-accent-dark dark:text-accent flex-shrink-0"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -1541,7 +1541,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
                     d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                   />
                 </svg>
-                <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                <span className="text-sm font-medium text-accent-dark dark:text-accent">
                   New curated casts available
                 </span>
               </div>
@@ -1619,7 +1619,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
               </button>
             </div>
             {/* Preview of latest new cast */}
-            <div className="mt-3 pl-7 border-l-2 border-blue-200 dark:border-blue-700">
+            <div className="mt-3 pl-7 border-l-2 border-accent/50 dark:border-accent-dark">
               <div className="flex gap-3">
                 <AvatarImage
                   src={latestNewCast.author.pfp_url}
@@ -1629,14 +1629,14 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="font-semibold text-sm text-blue-900 dark:text-blue-100">
+                    <span className="font-semibold text-sm text-accent-dark dark:text-accent">
                       {latestNewCast.author.display_name || latestNewCast.author.username}
                     </span>
-                    <span className="text-xs text-blue-600 dark:text-blue-400">
+                    <span className="text-xs text-accent-dark dark:text-accent">
                       @{latestNewCast.author.username}
                     </span>
                   </div>
-                  <div className="text-sm text-blue-800 dark:text-blue-200 line-clamp-2">
+                  <div className="text-sm text-accent-dark dark:text-accent line-clamp-2">
                     {latestNewCast.text}
                   </div>
                 </div>
@@ -1687,7 +1687,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
                         isDisabled
                           ? "text-gray-400 dark:text-gray-600 cursor-pointer"
                           : isActive
-                          ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
+                          ? "text-accent-dark dark:text-accent border-b-2 border-accent-dark dark:border-accent"
                           : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
                       }`}
                     >
@@ -2052,7 +2052,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
       ) : loading && casts.length === 0 ? (
         <div className="p-8 text-center text-gray-500 dark:text-gray-400">
           <div className="flex flex-col items-center gap-3">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 dark:border-blue-400"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-dark dark:border-accent"></div>
             <p>{feedType === "curated" ? "Building feed..." : "Loading feed..."}</p>
           </div>
         </div>
@@ -2066,7 +2066,7 @@ export function Feed({ viewerFid, initialFeedType = "curated" }: FeedProps) {
             {loading && casts.length > 0 && (
               <div className="absolute inset-0 bg-white/90 dark:bg-black/90 backdrop-blur-sm z-10 flex items-center justify-center">
                 <div className="flex flex-col items-center gap-3">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 dark:border-blue-400"></div>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-dark dark:border-accent"></div>
                   <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">{feedType === "curated" ? "Building feed..." : "Loading feed..."}</p>
                 </div>
               </div>

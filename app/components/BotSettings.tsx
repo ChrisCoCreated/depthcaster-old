@@ -150,7 +150,7 @@ export function BotSettings({}: BotSettingsProps) {
               savePreferences(e.target.checked, undefined);
             }}
             disabled={saving}
-            className="w-5 h-5 text-blue-600 rounded focus:ring-accent disabled:opacity-50"
+            className="w-5 h-5 text-accent-dark rounded focus:ring-accent disabled:opacity-50"
           />
         </label>
 
@@ -226,7 +226,7 @@ export function BotSettings({}: BotSettingsProps) {
                 <button
                   type="button"
                   onClick={handleAddAllDefaults}
-                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                  className="text-xs text-accent-dark dark:text-accent hover:underline"
                 >
                   Add all defaults
                 </button>
@@ -243,7 +243,7 @@ export function BotSettings({}: BotSettingsProps) {
                       }
                       className={`px-2 py-0.5 text-xs rounded-full transition-colors ${
                         isActive
-                          ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700"
+                          ? "bg-accent/40 dark:bg-accent-dark/90 text-accent-dark dark:text-accent border border-accent/60 dark:border-accent-dark"
                           : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
                       }`}
                     >

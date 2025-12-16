@@ -345,7 +345,7 @@ export default function CuratePersonPage({
                     handleDeselectAll();
                   }
                 }}
-                className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-accent"
+                className="w-5 h-5 text-accent-dark border-gray-300 rounded focus:ring-accent"
                 title="Select All"
               />
               
@@ -432,7 +432,7 @@ export default function CuratePersonPage({
                         type="checkbox"
                         checked={selectedCasts.has(cast.hash)}
                         onChange={() => toggleCastSelection(cast)}
-                        className="mt-4 w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-accent"
+                        className="mt-4 w-5 h-5 text-accent-dark border-gray-300 rounded focus:ring-accent"
                         onClick={(e) => e.stopPropagation()}
                       />
                       <div className="flex-1">
@@ -457,7 +457,7 @@ export default function CuratePersonPage({
                       <button
                         onClick={handleLoadMorePopular}
                         disabled={loadingPopular}
-                        className="px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-4 py-2 text-sm text-accent-dark dark:text-accent hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {loadingPopular ? "Loading..." : "Load More"}
                       </button>
@@ -508,7 +508,7 @@ export default function CuratePersonPage({
                         type="checkbox"
                         checked={selectedCasts.has(cast.hash)}
                         onChange={() => toggleCastSelection(cast)}
-                        className="mt-4 w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-accent"
+                        className="mt-4 w-5 h-5 text-accent-dark border-gray-300 rounded focus:ring-accent"
                         onClick={(e) => e.stopPropagation()}
                       />
                       <div className="flex-1">
@@ -533,7 +533,7 @@ export default function CuratePersonPage({
                       <button
                         onClick={handleLoadMoreChrono}
                         disabled={loadingChrono}
-                        className="px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-4 py-2 text-sm text-accent-dark dark:text-accent hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {loadingChrono ? "Loading..." : "Load More"}
                       </button>

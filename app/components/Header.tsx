@@ -702,7 +702,7 @@ export function Header() {
             <div className="flex items-center gap-2">
               <Link href="/" className="flex items-center gap-2">
                 <Image
-                  src="/images/logos/sopha_logo_sticker_b&w.avif"
+                  src="/images/logos/sopha_logo.png"
                   alt="Sopha Logo"
                   width={32}
                   height={32}

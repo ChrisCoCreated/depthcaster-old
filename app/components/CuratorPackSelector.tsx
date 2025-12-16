@@ -126,8 +126,8 @@ export function CuratorPackSelector({
       )}
 
       {selectedPacks.length > 0 && (
-        <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-          <p className="text-sm text-blue-900 dark:text-blue-100 mb-2">
+        <div className="mb-4 p-3 bg-accent/30 dark:bg-accent/20 rounded-lg">
+          <p className="text-sm text-accent-dark dark:text-accent mb-2">
             Selected packs: {selectedPacks.length}
           </p>
           <button
@@ -135,7 +135,7 @@ export function CuratorPackSelector({
               setSelectedPacks([]);
               onSelect?.([]);
             }}
-            className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+            className="text-sm text-accent-dark dark:text-accent hover:underline"
           >
             Clear selection
           </button>
@@ -154,7 +154,7 @@ export function CuratorPackSelector({
                   type="checkbox"
                   checked={selectedPacks.includes(pack.id)}
                   onChange={() => handleTogglePack(pack.id)}
-                  className="w-4 h-4 text-blue-600 rounded"
+                  className="w-4 h-4 text-accent-dark rounded"
                 />
                 <div className="flex-1">
                   <CuratorPackCard
@@ -193,7 +193,7 @@ export function CuratorPackSelector({
                     type="checkbox"
                     checked={selectedPacks.includes(pack.id)}
                     onChange={() => handleTogglePack(pack.id)}
-                    className="w-4 h-4 text-blue-600 rounded"
+                    className="w-4 h-4 text-accent-dark rounded"
                   />
                 )}
                 <div className="flex-1">

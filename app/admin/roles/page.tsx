@@ -332,7 +332,7 @@ export default function AdminRolesPage() {
       case "admin":
         return "bg-purple-100 dark:bg-purple-900/20 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700";
       case "curator":
-        return "bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700";
+        return "bg-accent/40 dark:bg-accent/20 text-accent-dark dark:text-accent border-accent/60 dark:border-accent-dark";
       case "tester":
         return "bg-orange-100 dark:bg-orange-900/20 text-orange-800 dark:text-orange-200 border-orange-300 dark:border-orange-700";
       case "plus":
@@ -851,14 +851,14 @@ thanks and looking forward to what you curate!`;
                             <div className="flex-1">
                               <Link 
                                 href={`/profile/${result.fid}`}
-                                className="font-semibold text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 hover:underline"
+                                className="font-semibold text-gray-900 dark:text-gray-100 hover:text-accent-dark dark:hover:text-accent hover:underline"
                               >
                                 {result.display_name || result.username || `FID: ${result.fid}`}
                               </Link>
                               {result.username && (
                                 <Link 
                                   href={`/profile/${result.fid}`}
-                                  className="text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:underline block"
+                                  className="text-sm text-gray-600 dark:text-gray-400 hover:text-accent-dark dark:hover:text-accent hover:underline block"
                                 >
                                   @{result.username}
                                 </Link>
@@ -969,14 +969,14 @@ thanks and looking forward to what you curate!`;
                       <div className="flex-1">
                         <Link 
                           href={`/profile/${userWithRoles.fid}`}
-                          className="font-semibold text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 hover:underline"
+                          className="font-semibold text-gray-900 dark:text-gray-100 hover:text-accent-dark dark:hover:text-accent hover:underline"
                         >
                           {userWithRoles.displayName || userWithRoles.username || `FID: ${userWithRoles.fid}`}
                         </Link>
                         {userWithRoles.username && (
                           <Link 
                             href={`/profile/${userWithRoles.fid}`}
-                            className="text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:underline block"
+                            className="text-sm text-gray-600 dark:text-gray-400 hover:text-accent-dark dark:hover:text-accent hover:underline block"
                           >
                             @{userWithRoles.username}
                           </Link>
@@ -1045,7 +1045,7 @@ thanks and looking forward to what you curate!`;
                             className={`px-3 py-1.5 sm:py-1 text-xs rounded-lg transition-colors min-h-[32px] touch-manipulation ${
                               lastCuratorAssigned === userWithRoles.fid
                                 ? "bg-accent text-white hover:bg-accent-dark font-medium"
-                                : "bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200 border border-blue-300 dark:border-blue-700 hover:bg-blue-200 dark:hover:bg-blue-900/30"
+                                : "bg-accent/40 dark:bg-accent/20 text-accent-dark dark:text-accent border border-accent/60 dark:border-accent-dark hover:bg-accent/50 dark:hover:bg-accent/30"
                             } disabled:opacity-50 disabled:cursor-not-allowed`}
                             title="Send welcome DM"
                           >

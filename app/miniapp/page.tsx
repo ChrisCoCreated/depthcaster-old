@@ -696,10 +696,10 @@ function MiniappContent() {
                 const isAppInstalled = installed || added;
                 const areNotificationsEnabled = !!notificationDetails;
                 const getButtonState = () => {
-                  if (!isAppInstalled) return { text: "➕ Add", label: "Add app to enable notifications", className: "bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300" };
+                  if (!isAppInstalled) return { text: "➕ Add", label: "Add app to enable notifications", className: "bg-accent/30 dark:bg-accent/20 border-accent/60 dark:border-accent-dark text-accent-dark dark:text-accent" };
                   if (!areNotificationsEnabled) return { text: "🔕 Off", label: "Notifications disabled - enable in Farcaster settings", className: "bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400" };
                   if (notificationFrequency === "all") return { text: "🔔 All", label: "All notifications enabled", className: "bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700 text-green-700 dark:text-green-300" };
-                  if (notificationFrequency === "daily") return { text: "📅 Daily", label: "Daily notifications enabled", className: "bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300" };
+                  if (notificationFrequency === "daily") return { text: "📅 Daily", label: "Daily notifications enabled", className: "bg-accent/30 dark:bg-accent/20 border-accent/60 dark:border-accent-dark text-accent-dark dark:text-accent" };
                   return { text: "📆 Weekly", label: "Weekly notifications enabled", className: "bg-purple-50 dark:bg-purple-900/20 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300" };
                 };
                 const state = getButtonState();

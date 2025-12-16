@@ -405,8 +405,8 @@ export default function PfpCollectionPage() {
 
         {/* Progress Message */}
         {uploadProgress && (
-          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
-            <p className="text-blue-800 dark:text-blue-200">{uploadProgress}</p>
+          <div className="bg-accent/30 dark:bg-accent/20 border border-accent/50 dark:border-accent-dark rounded-lg p-4 mb-6">
+            <p className="text-accent-dark dark:text-accent">{uploadProgress}</p>
           </div>
         )}
 

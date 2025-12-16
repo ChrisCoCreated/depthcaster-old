@@ -118,7 +118,7 @@ export function ChatList({ walletAddress, onSelectConversation }: ChatListProps)
         <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
         <button
           onClick={fetchConversations}
-          className="mt-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+          className="mt-2 text-sm text-accent-dark dark:text-accent hover:underline"
         >
           Retry
         </button>
@@ -152,7 +152,7 @@ export function ChatList({ walletAddress, onSelectConversation }: ChatListProps)
                     {conv.type === "group" ? "Group Chat" : conv.peerAddress?.slice(0, 6) + "..." + conv.peerAddress?.slice(-4)}
                   </span>
                   {conv.type === "group" && (
-                    <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-0.5 rounded">
+                    <span className="text-xs bg-accent/40 dark:bg-accent-dark/90 text-accent-dark dark:text-accent px-2 py-0.5 rounded">
                       Group
                     </span>
                   )}

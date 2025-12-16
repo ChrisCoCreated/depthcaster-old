@@ -145,7 +145,7 @@ export default function CuratorsLeaderboardPage() {
           </div>
           <Link
             href="/contributors"
-            className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
+            className="text-accent-dark dark:text-accent hover:text-accent-dark dark:hover:text-accent font-medium"
           >
             View Contributors Page →
           </Link>

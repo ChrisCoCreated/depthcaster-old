@@ -201,7 +201,7 @@ export function BuildIdeasManager() {
       case "backlog":
         return "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300";
       case "in-progress":
-        return "bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300";
+        return "bg-accent/40 dark:bg-accent/20 text-accent-dark dark:text-accent";
       case "complete":
         return "bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300";
       default:
@@ -244,7 +244,7 @@ export function BuildIdeasManager() {
               type="checkbox"
               checked={hideCompleted}
               onChange={(e) => setHideCompleted(e.target.checked)}
-              className="w-4 h-4 rounded border-gray-300 dark:border-gray-700 text-blue-600 focus:ring-accent"
+              className="w-4 h-4 rounded border-gray-300 dark:border-gray-700 text-accent-dark focus:ring-accent"
             />
             <span>Hide completed</span>
           </label>
@@ -436,7 +436,7 @@ export function BuildIdeasManager() {
                             {isFeedback && idea.castHash && (
                               <Link
                                 href={`/cast/${idea.castHash}`}
-                                className="inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline mt-2"
+                                className="inline-flex items-center gap-1 text-sm text-accent-dark dark:text-accent hover:underline mt-2"
                               >
                                 <ExternalLink className="w-3 h-3" />
                                 View Linked Cast
@@ -447,7 +447,7 @@ export function BuildIdeasManager() {
                                 href={idea.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-sm text-blue-600 dark:text-blue-400 hover:underline mt-1 block"
+                                className="text-sm text-accent-dark dark:text-accent hover:underline mt-1 block"
                               >
                                 {idea.url}
                               </a>
@@ -463,7 +463,7 @@ export function BuildIdeasManager() {
                                   />
                                   <Link
                                     href={`/profile/${idea.user.fid}`}
-                                    className="text-xs text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+                                    className="text-xs text-gray-600 dark:text-gray-400 hover:text-accent-dark dark:hover:text-accent"
                                   >
                                     {idea.user.displayName || idea.user.username || `FID ${idea.user.fid}`}
                                   </Link>
@@ -479,7 +479,7 @@ export function BuildIdeasManager() {
                               <div className="flex gap-2">
                                 <button
                                   onClick={() => handleEdit(idea)}
-                                  className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                  className="p-2 text-gray-600 dark:text-gray-400 hover:text-accent-dark dark:hover:text-accent transition-colors"
                                   title="Edit"
                                 >
                                   <Edit2 className="w-4 h-4" />

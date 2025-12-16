@@ -131,7 +131,7 @@ export default function AdminUsersWithoutRolesPage() {
       case "admin":
         return "bg-purple-100 dark:bg-purple-900/20 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700";
       case "curator":
-        return "bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700";
+        return "bg-accent/40 dark:bg-accent/20 text-accent-dark dark:text-accent border-accent/60 dark:border-accent-dark";
       case "tester":
         return "bg-orange-100 dark:bg-orange-900/20 text-orange-800 dark:text-orange-200 border-orange-300 dark:border-orange-700";
       case "plus":
@@ -282,14 +282,14 @@ export default function AdminUsersWithoutRolesPage() {
                     <div className="flex-1">
                       <Link 
                         href={`/profile/${userWithoutRoles.fid}`}
-                        className="font-semibold text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 hover:underline"
+                        className="font-semibold text-gray-900 dark:text-gray-100 hover:text-accent-dark dark:hover:text-accent hover:underline"
                       >
                         {userWithoutRoles.displayName || userWithoutRoles.username || `FID: ${userWithoutRoles.fid}`}
                       </Link>
                       {userWithoutRoles.username && (
                         <Link 
                           href={`/profile/${userWithoutRoles.fid}`}
-                          className="text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:underline block"
+                          className="text-sm text-gray-600 dark:text-gray-400 hover:text-accent-dark dark:hover:text-accent hover:underline block"
                         >
                           @{userWithoutRoles.username}
                         </Link>
@@ -320,7 +320,7 @@ export default function AdminUsersWithoutRolesPage() {
                     </div>
                     <Link
                       href={`/admin/roles?q=${encodeURIComponent(userWithoutRoles.username || userWithoutRoles.fid.toString())}`}
-                      className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                      className="text-sm text-accent-dark dark:text-accent hover:underline"
                     >
                       Manage roles →
                     </Link>

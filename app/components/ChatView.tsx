@@ -102,7 +102,7 @@ export function ChatView({ conversationId, walletAddress, userFid }: ChatViewPro
           <p className="text-sm text-red-600 dark:text-red-400 mb-2">{error}</p>
           <button
             onClick={fetchMessages}
-            className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+            className="text-sm text-accent-dark dark:text-accent hover:underline"
           >
             Retry
           </button>
@@ -141,7 +141,7 @@ export function ChatView({ conversationId, walletAddress, userFid }: ChatViewPro
                   <div
                     className={`text-xs ${
                       isOwn
-                        ? "text-blue-100"
+                        ? "text-accent"
                         : "text-gray-500 dark:text-gray-400"
                     }`}
                   >

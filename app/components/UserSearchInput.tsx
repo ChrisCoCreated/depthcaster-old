@@ -172,7 +172,7 @@ export function UserSearchInput({
                 </div>
                 {isSelected && (
                   <div className="flex-shrink-0">
-                    <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 text-accent-dark dark:text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                   </div>
@@ -189,7 +189,7 @@ export function UserSearchInput({
           {selectedUsers.map((selectedUser) => (
             <div
               key={selectedUser.fid}
-              className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-full"
+              className="inline-flex items-center gap-2 px-3 py-1.5 bg-accent/30 dark:bg-accent/20 border border-accent/50 dark:border-accent-dark rounded-full"
             >
               <AvatarImage
                 src={selectedUser.pfp_url}

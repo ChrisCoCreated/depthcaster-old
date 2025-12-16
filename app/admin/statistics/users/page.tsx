@@ -572,7 +572,7 @@ export default function UserStatisticsPage() {
                             return (
                               <tr
                                 key={idx}
-                                className={isToday ? 'bg-blue-50 dark:bg-blue-900/20' : ''}
+                                className={isToday ? 'bg-accent/30 dark:bg-accent/20' : ''}
                               >
                                 <td className="px-4 py-3 whitespace-nowrap">
                                   <div className="flex items-center gap-2">
@@ -580,7 +580,7 @@ export default function UserStatisticsPage() {
                                       {dateStr}
                                     </div>
                                     {isToday && (
-                                      <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">(Today)</span>
+                                      <span className="text-xs text-accent-dark dark:text-accent font-medium">(Today)</span>
                                     )}
                                     <div className="text-xs text-gray-500 dark:text-gray-400">
                                       {day.users.length > 0 ? (
@@ -621,7 +621,7 @@ export default function UserStatisticsPage() {
                                                 </span>
                                               )}
                                               {user.onchain && (
-                                                <span className="text-blue-500 text-[10px] bg-white dark:bg-gray-800 rounded-full" title="Onchain action">
+                                                <span className="text-accent text-[10px] bg-white dark:bg-gray-800 rounded-full" title="Onchain action">
                                                   ⛓️
                                                 </span>
                                               )}
@@ -657,7 +657,7 @@ export default function UserStatisticsPage() {
                             key={idx}
                             className={`border rounded-lg p-4 ${
                               isToday
-                                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                                ? 'border-accent bg-accent/30 dark:bg-accent/20'
                                 : 'border-gray-200 dark:border-gray-700'
                             }`}
                           >
@@ -667,7 +667,7 @@ export default function UserStatisticsPage() {
                                   {dateStr}
                                 </div>
                                 {isToday && (
-                                  <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">(Today)</span>
+                                  <span className="text-xs text-accent-dark dark:text-accent font-medium">(Today)</span>
                                 )}
                                 <div className="text-xs text-gray-500 dark:text-gray-400">
                                   {day.users.length > 0 ? (
@@ -691,7 +691,7 @@ export default function UserStatisticsPage() {
                                       onClick={() => setSelectedUserFid(isSelected ? null : user.fid)}
                                       className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full border flex-shrink-0 cursor-pointer transition-all ${
                                         isSelected
-                                          ? 'bg-blue-100 dark:bg-blue-900 border-blue-500 ring-2 ring-accent ring-offset-1'
+                                          ? 'bg-accent/40 dark:bg-accent-dark/90 border-accent ring-2 ring-accent ring-offset-1'
                                           : 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700'
                                       }`}
                                       style={{ width: '110px', minWidth: '110px', maxWidth: '110px' }}
@@ -714,7 +714,7 @@ export default function UserStatisticsPage() {
                                           </span>
                                         )}
                                         {user.onchain && (
-                                          <span className="text-blue-500 text-[10px]" title="Onchain action">
+                                          <span className="text-accent text-[10px]" title="Onchain action">
                                             ⛓️
                                           </span>
                                         )}

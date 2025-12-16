@@ -295,7 +295,7 @@ export function CastComposer({ parentHash, onSuccess }: CastComposerProps) {
                     type="checkbox"
                     checked={useThinkingParent}
                     onChange={(e) => setUseThinkingParent(e.target.checked)}
-                    className="w-4 h-4 rounded border-gray-300 dark:border-gray-700 text-blue-600 focus:ring-accent"
+                    className="w-4 h-4 rounded border-gray-300 dark:border-gray-700 text-accent-dark focus:ring-accent"
                   />
                   <span>Cast as reply to /thinking</span>
                 </label>

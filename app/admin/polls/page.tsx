@@ -502,7 +502,7 @@ export default function AdminPollsPage() {
                       <Link
                         href={`/poll/${poll.slug || poll.castHash}`}
                         target="_blank"
-                        className="text-blue-600 dark:text-blue-400 hover:underline"
+                        className="text-accent-dark dark:text-accent hover:underline"
                       >
                         <ExternalLink className="w-4 h-4" />
                       </Link>
@@ -538,7 +538,7 @@ export default function AdminPollsPage() {
                       <button
                         onClick={() => handleClosePoll(poll)}
                         className={poll.closedAt 
-                          ? "text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+                          ? "text-accent-dark dark:text-accent hover:text-accent-dark dark:hover:text-accent"
                           : "text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-300"
                         }
                         title={poll.closedAt ? "Open Poll" : "Close Poll"}
@@ -551,7 +551,7 @@ export default function AdminPollsPage() {
                       </button>
                       <button
                         onClick={() => handleEdit(poll)}
-                        className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+                        className="text-accent-dark dark:text-accent hover:text-accent-dark dark:hover:text-accent"
                         title="Edit"
                       >
                         <Edit className="w-4 h-4" />
@@ -694,7 +694,7 @@ export default function AdminPollsPage() {
                     <button
                       type="button"
                       onClick={handleAddChoice}
-                      className="mt-2 px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg"
+                      className="mt-2 px-4 py-2 text-sm text-accent-dark dark:text-accent hover:bg-accent/30 dark:hover:bg-accent/20 rounded-lg"
                     >
                       + Add Choice
                     </button>
@@ -745,7 +745,7 @@ export default function AdminPollsPage() {
                   <button
                     type="button"
                     onClick={handleAddOption}
-                    className="mt-2 px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg"
+                    className="mt-2 px-4 py-2 text-sm text-accent-dark dark:text-accent hover:bg-accent/30 dark:hover:bg-accent/20 rounded-lg"
                   >
                     + Add Option
                   </button>
@@ -910,7 +910,7 @@ export default function AdminPollsPage() {
               ) : resultsData ? (
                 <div className="space-y-6">
                   {/* Poll Info */}
-                  <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                  <div className="bg-gradient-to-r from-accent/30 to-purple-50 dark:from-accent/20 dark:to-purple-900/20 rounded-lg p-4 border border-accent/50 dark:border-accent-dark">
                     <div className="flex items-start gap-3">
                       <div className="p-2 bg-accent rounded-lg">
                         <BarChart3 className="w-6 h-6 text-white" />
@@ -964,7 +964,7 @@ export default function AdminPollsPage() {
                           type="checkbox"
                           checked={showVoterPfps}
                           onChange={(e) => setShowVoterPfps(e.target.checked)}
-                          className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-accent dark:focus:ring-accent dark:bg-gray-700"
+                          className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-accent-dark focus:ring-accent dark:focus:ring-accent dark:bg-gray-700"
                         />
                         <span className="text-sm text-gray-600 dark:text-gray-400">
                           Show voter avatars
@@ -1185,7 +1185,7 @@ export default function AdminPollsPage() {
                                       meh: { bg: "bg-yellow-500", text: "text-yellow-700", textDark: "text-yellow-300", bgLight: "bg-yellow-100", bgDark: "bg-yellow-900/40" },
                                       hate: { bg: "bg-red-500", text: "text-red-700", textDark: "text-red-300", bgLight: "bg-red-100", bgDark: "bg-red-900/40" },
                                     };
-                                    const choiceColor = choiceColors[choice.toLowerCase()] || { bg: "bg-accent", text: "text-blue-700", textDark: "text-blue-300", bgLight: "bg-blue-100", bgDark: "bg-blue-900/40" };
+                                    const choiceColor = choiceColors[choice.toLowerCase()] || { bg: "bg-accent", text: "text-accent-dark", textDark: "text-accent", bgLight: "bg-accent/40", bgDark: "bg-accent/40" };
                                     
                                     const choiceVoters = result.choiceVoters?.[choice] || [];
                                     
@@ -1317,7 +1317,7 @@ export default function AdminPollsPage() {
                                         <span className="flex-1 font-medium text-gray-900 dark:text-gray-100">
                                           {allocation.optionText}
                                         </span>
-                                        <span className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border-2 border-blue-500 border-opacity-30">
+                                        <span className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-accent/40 dark:bg-accent/40 text-accent-dark dark:text-accent border-2 border-accent border-opacity-30">
                                           {allocation.votes} vote{allocation.votes !== 1 ? "s" : ""}
                                         </span>
                                       </div>
@@ -1349,7 +1349,7 @@ export default function AdminPollsPage() {
                                       meh: { bg: "bg-yellow-500", text: "text-yellow-700", textDark: "text-yellow-300", bgLight: "bg-yellow-100", bgDark: "bg-yellow-900/40" },
                                       hate: { bg: "bg-red-500", text: "text-red-700", textDark: "text-red-300", bgLight: "bg-red-100", bgDark: "bg-red-900/40" },
                                     };
-                                    const choiceColor = choiceColors[optionChoice.choice.toLowerCase()] || { bg: "bg-accent", text: "text-blue-700", textDark: "text-blue-300", bgLight: "bg-blue-100", bgDark: "bg-blue-900/40" };
+                                    const choiceColor = choiceColors[optionChoice.choice.toLowerCase()] || { bg: "bg-accent", text: "text-accent-dark", textDark: "text-accent", bgLight: "bg-accent/40", bgDark: "bg-accent/40" };
                                     
                                     return (
                                       <div

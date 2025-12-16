@@ -151,7 +151,7 @@ export function MentionedProfileCard({ profile, viewerFid }: MentionedProfileCar
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
-                  className="text-blue-600 dark:text-blue-400 hover:underline truncate max-w-xs"
+                  className="text-accent-dark dark:text-accent hover:underline truncate max-w-xs"
                 >
                   {url}
                 </a>

@@ -142,7 +142,7 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>)
         <Link
           key={match.index}
           href={`/profile/${encodeURIComponent(username)}`}
-          className="text-blue-600 dark:text-blue-400 underline"
+          className="text-accent-dark dark:text-accent underline"
           onClick={(e) => {
             e.stopPropagation();
             e.preventDefault();
@@ -163,7 +163,7 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>)
           <Link
             key={match.index}
             href={url}
-            className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+            className="text-accent-dark dark:text-accent hover:underline break-all"
             onClick={(e) => e.stopPropagation()}
           >
             {displayText}
@@ -186,7 +186,7 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>)
               <a
                 key={match.index}
                 href={`/cast/${hash}`}
-                className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+                className="text-accent-dark dark:text-accent hover:underline break-all"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -202,7 +202,7 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>)
               <a
                 key={match.index}
                 href={url}
-                className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+                className="text-accent-dark dark:text-accent hover:underline break-all"
                 onClick={async (e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -241,7 +241,7 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>)
               href={url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+              className="text-accent-dark dark:text-accent hover:underline break-all"
               onClick={(e) => e.stopPropagation()}
             >
               {displayText}

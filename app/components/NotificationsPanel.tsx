@@ -1000,10 +1000,10 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
 
           {/* Informational note for non-curator users */}
           {isCurator === false && (
-            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-800">
+            <div className="p-4 bg-accent/30 dark:bg-accent/20 border-b border-accent/50 dark:border-accent-dark">
               <div className="flex items-start gap-2">
                 <svg
-                  className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5"
+                  className="w-5 h-5 text-accent-dark dark:text-accent flex-shrink-0 mt-0.5"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -1016,10 +1016,10 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
                   />
                 </svg>
                 <div className="flex-1">
-                  <p className="text-sm text-blue-900 dark:text-blue-100 font-medium">
+                  <p className="text-sm text-accent-dark dark:text-accent font-medium">
                     Curated Notifications
                   </p>
-                  <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                  <p className="text-sm text-accent-dark dark:text-accent mt-1">
                     You won't see curated notifications (notifications about casts you've curated) since you don't have a curator role. You will still see regular notifications (follows, likes, recasts, mentions, replies, quotes) if you have a plus role.
                   </p>
                 </div>
@@ -1075,7 +1075,7 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
                 const content = (
                   <div
                     className={`p-4 border-b border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors relative ${
-                      !notification.seen ? "bg-blue-50 dark:bg-blue-900/20" : ""
+                      !notification.seen ? "bg-accent/30 dark:bg-accent/20" : ""
                     }`}
                   >
                     {/* Delete button - only for database-stored notifications */}
@@ -1259,7 +1259,7 @@ export function NotificationsPanel({ isOpen, onClose, onNotificationsSeen }: Not
                         fetchNotifications(cursor);
                       }}
                       disabled={loading}
-                      className="px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
+                      className="px-4 py-2 text-sm text-accent-dark dark:text-accent hover:underline disabled:opacity-50"
                     >
                       {loading ? "Loading..." : "Load More"}
                     </button>

@@ -144,14 +144,14 @@ export default function PacksPage() {
 
         {/* Selected Packs Section */}
         {selectedPackIds.length > 0 && (
-          <div className="mb-6 sm:mb-8 p-3 sm:p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+          <div className="mb-6 sm:mb-8 p-3 sm:p-4 bg-accent/30 dark:bg-accent/20 rounded-lg border border-accent/50 dark:border-accent-dark">
             <div className="flex items-center justify-between mb-3 sm:mb-4">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100">
                 Selected Packs ({selectedPackIds.length})
               </h2>
               <button
                 onClick={handleClearAll}
-                className="text-xs sm:text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                className="text-xs sm:text-sm text-accent-dark dark:text-accent hover:underline"
               >
                 Clear All
               </button>
@@ -165,7 +165,7 @@ export default function PacksPage() {
                 {selectedPacks.map((pack) => (
                   <div key={pack.id} className="flex items-center gap-3 p-3 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
                     <div className="flex-1 min-w-0">
-                      <Link href={`/packs/${pack.id}`} className="font-medium text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 truncate block">
+                      <Link href={`/packs/${pack.id}`} className="font-medium text-gray-900 dark:text-gray-100 hover:text-accent-dark dark:hover:text-accent truncate block">
                         {pack.name}
                       </Link>
                       <div className="text-sm text-gray-500 dark:text-gray-400">

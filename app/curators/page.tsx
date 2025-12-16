@@ -60,7 +60,7 @@ export default function CuratorsPage() {
         <div className="space-y-6">
           {/* Invite Section - Only show if user is not already a curator */}
           {isCurator === false && (
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200 dark:border-blue-800 p-6">
+            <div className="bg-gradient-to-r from-accent/30 to-indigo-50 dark:from-accent/20 dark:to-indigo-900/20 rounded-lg border border-accent/50 dark:border-accent-dark p-6">
               <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-3">
                 🎯 Become a Curator
               </h2>
@@ -152,7 +152,7 @@ export default function CuratorsPage() {
                       Method 3: Sopha Mini-App
                     </h4>
                     <ol className="list-decimal list-inside text-gray-700 dark:text-gray-300 space-y-1 ml-4">
-                      <li>Add the <a href="https://farcaster.xyz/miniapps/HtUwgAw4iQ2x/sopha" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">Sopha Mini-App</a> to Farcaster</li>
+                      <li>Add the <a href="https://farcaster.xyz/miniapps/HtUwgAw4iQ2x/sopha" target="_blank" rel="noopener noreferrer" className="text-accent-dark dark:text-accent hover:underline">Sopha Mini-App</a> to Farcaster</li>
                       <li>Open the Sopha Mini-App in Farcaster</li>
                       <li>Click the <strong>paste button</strong> (clipboard icon) in the top right of the mini-app</li>
                     </ol>
@@ -230,7 +230,7 @@ export default function CuratorsPage() {
                   Auto-like is turned on by default. When you curate a cast for the first time, you&apos;ll be 
                   asked if you want to automatically like curated casts. This helps show your appreciation 
                   for the content you&apos;re curating. You can toggle this setting on or off in your{" "}
-                  <Link href="/settings" className="text-blue-600 dark:text-blue-400 hover:underline">Settings</Link> page.
+                  <Link href="/settings" className="text-accent-dark dark:text-accent hover:underline">Settings</Link> page.
                 </p>
               </div>
             </div>

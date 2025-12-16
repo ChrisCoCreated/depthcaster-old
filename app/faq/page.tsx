@@ -103,7 +103,7 @@ export default function FAQPage() {
               </ul>
               <p className="text-gray-700 dark:text-gray-300 mt-4">
                 For detailed instructions, best practices, and more information about curation, see our{" "}
-                <Link href="/curators" className="text-blue-600 dark:text-blue-400 hover:underline">
+                <Link href="/curators" className="text-accent-dark dark:text-accent hover:underline">
                   complete Curator Guide
                 </Link>.
               </p>
@@ -228,7 +228,7 @@ export default function FAQPage() {
         <div className="mt-12 pt-8 border-t border-gray-200 dark:border-gray-800">
           <p className="text-gray-600 dark:text-gray-400 text-center">
             Still have questions? Use the Feedback option in the help menu (?) or check out{" "}
-            <Link href="/curators" className="text-blue-600 dark:text-blue-400 hover:underline">
+            <Link href="/curators" className="text-accent-dark dark:text-accent hover:underline">
               Curators Instructions
             </Link>
           </p>

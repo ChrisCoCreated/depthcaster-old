@@ -411,7 +411,7 @@ export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusR
       <div
         key={reply.hash}
         id={normalizedHash ? `reply-${normalizedHash}` : undefined}
-        className={`relative ${isHighlighted ? "ring-2 ring-blue-400 dark:ring-accent rounded-lg" : ""}`}
+        className={`relative ${isHighlighted ? "ring-2 ring-accent dark:ring-accent rounded-lg" : ""}`}
       >
         <div className="flex relative">
           {/* Thread line area */}
@@ -506,7 +506,7 @@ export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusR
                   }}
                   className={`px-3 py-1 text-sm rounded-md transition-colors ${
                     qualityFilterEnabled
-                      ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-medium"
+                      ? "bg-accent/40 dark:bg-accent-dark/90 text-accent-dark dark:text-accent font-medium"
                       : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
                   }`}
                 >
@@ -535,7 +535,7 @@ export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusR
                 onClick={() => setSortBy("newest")}
                 className={`px-3 py-1 text-sm rounded-md transition-colors ${
                   sortBy === "newest"
-                    ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-medium"
+                    ? "bg-accent/40 dark:bg-accent-dark/90 text-accent-dark dark:text-accent font-medium"
                     : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
                 }`}
               >
@@ -545,7 +545,7 @@ export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusR
                 onClick={() => setSortBy("engagement")}
                 className={`px-3 py-1 text-sm rounded-md transition-colors ${
                   sortBy === "engagement"
-                    ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-medium"
+                    ? "bg-accent/40 dark:bg-accent-dark/90 text-accent-dark dark:text-accent font-medium"
                     : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
                 }`}
               >
@@ -555,7 +555,7 @@ export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusR
                 onClick={() => setSortBy("quality")}
                 className={`px-3 py-1 text-sm rounded-md transition-colors ${
                   sortBy === "quality"
-                    ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-medium"
+                    ? "bg-accent/40 dark:bg-accent-dark/90 text-accent-dark dark:text-accent font-medium"
                     : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
                 }`}
               >
@@ -631,7 +631,7 @@ export function ConversationView({ castHash, viewerFid, focusReplyHash, onFocusR
       <div className="mt-6 px-4 py-3 border-t border-gray-200 dark:border-gray-800">
         <button
           onClick={() => router.push(`/cast/${castHash}`)}
-          className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline transition-colors"
+          className="text-sm text-accent-dark dark:text-accent hover:text-accent-dark dark:hover:text-accent hover:underline transition-colors"
         >
           View full thread in algo mode
         </button>

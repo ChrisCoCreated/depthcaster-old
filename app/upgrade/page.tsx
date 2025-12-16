@@ -24,9 +24,9 @@ export default function UpgradePage() {
         <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-8">
           <div className="text-center py-12">
             <div className="mb-6">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 dark:bg-blue-900/20 rounded-full mb-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-accent/40 dark:bg-accent/20 rounded-full mb-4">
                 <svg
-                  className="w-8 h-8 text-blue-600 dark:text-blue-400"
+                  className="w-8 h-8 text-accent-dark dark:text-accent"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"

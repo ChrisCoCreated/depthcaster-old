@@ -179,7 +179,7 @@ export default function AdminLayout({
                   flex items-center gap-3 px-4 py-3 rounded-lg transition-colors
                   ${
                     isActive
-                      ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium"
+                      ? "bg-accent/40 dark:bg-accent/30 text-accent-dark dark:text-accent font-medium"
                       : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
                   }
                 `}
@@ -238,7 +238,7 @@ export default function AdminLayout({
                   {crumb.href ? (
                     <Link
                       href={crumb.href}
-                      className="text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap"
+                      className="text-accent-dark dark:text-accent hover:underline whitespace-nowrap"
                     >
                       {crumb.label}
                     </Link>

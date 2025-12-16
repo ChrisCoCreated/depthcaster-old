@@ -221,7 +221,7 @@ export function NotificationSettings() {
               checked={deviceNotificationsEnabled}
               onChange={(e) => handleDeviceNotificationsToggle(e.target.checked)}
               disabled={isDenied && !deviceNotificationsEnabled}
-              className="w-5 h-5 text-blue-600 rounded focus:ring-accent disabled:opacity-50"
+              className="w-5 h-5 text-accent-dark rounded focus:ring-accent disabled:opacity-50"
             />
           </label>
         </div>
@@ -284,7 +284,7 @@ export function NotificationSettings() {
                 checked={preferences[key]}
                 onChange={(e) => updatePreference(key, e.target.checked)}
                 disabled={!hasPlus && !isCheckingPlus}
-                className="w-5 h-5 text-blue-600 rounded focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-5 h-5 text-accent-dark rounded focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </label>
           ))}
@@ -317,7 +317,7 @@ export function NotificationSettings() {
                 checked={curatedPreferences.notifyOnQualityReply}
                 onChange={(e) => saveCuratedPreferences({ notifyOnQualityReply: e.target.checked })}
                 disabled={saving}
-                className="w-5 h-5 text-blue-600 rounded focus:ring-accent disabled:opacity-50"
+                className="w-5 h-5 text-accent-dark rounded focus:ring-accent disabled:opacity-50"
               />
             </label>
             
@@ -391,7 +391,7 @@ export function NotificationSettings() {
                 checked={curatedPreferences[key]}
                 onChange={(e) => saveCuratedPreferences({ [key]: e.target.checked })}
                 disabled={saving}
-                className="w-5 h-5 text-blue-600 rounded focus:ring-accent disabled:opacity-50"
+                className="w-5 h-5 text-accent-dark rounded focus:ring-accent disabled:opacity-50"
               />
             </label>
           ))}

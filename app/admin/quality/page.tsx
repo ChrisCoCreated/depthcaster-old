@@ -251,7 +251,7 @@ export default function QualityPage() {
                   type="checkbox"
                   checked={includeNull}
                   onChange={(e) => setIncludeNull(e.target.checked)}
-                  className="mr-2 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-accent"
+                  className="mr-2 w-4 h-4 text-accent-dark border-gray-300 rounded focus:ring-accent"
                 />
                 <span className="text-sm text-gray-700 dark:text-gray-300">
                   Include null quality scores
@@ -270,7 +270,7 @@ export default function QualityPage() {
                   type="checkbox"
                   checked={showCasts}
                   onChange={(e) => setShowCasts(e.target.checked)}
-                  className="mr-2 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-accent"
+                  className="mr-2 w-4 h-4 text-accent-dark border-gray-300 rounded focus:ring-accent"
                 />
                 <span className="text-sm text-gray-700 dark:text-gray-300">
                   Show Casts
@@ -282,7 +282,7 @@ export default function QualityPage() {
                   type="checkbox"
                   checked={showReplies}
                   onChange={(e) => setShowReplies(e.target.checked)}
-                  className="mr-2 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-accent"
+                  className="mr-2 w-4 h-4 text-accent-dark border-gray-300 rounded focus:ring-accent"
                 />
                 <span className="text-sm text-gray-700 dark:text-gray-300">
                   Show Replies
@@ -338,7 +338,7 @@ export default function QualityPage() {
                     <div className="mb-2 flex items-center gap-2 flex-wrap">
                       <span className={`px-2 py-1 text-xs rounded ${
                         item.type === "cast" 
-                          ? "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200"
+                          ? "bg-accent/40 dark:bg-accent/30 text-accent-dark dark:text-accent"
                           : "bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200"
                       }`}>
                         {item.type === "cast" ? "Cast" : "Reply"}

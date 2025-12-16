@@ -2394,7 +2394,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
           {/* Translation spinner */}
           {isTranslating && (
             <div className="flex items-center justify-center">
-              <svg className="animate-spin h-4 w-4 text-blue-500 dark:text-blue-400" fill="none" viewBox="0 0 24 24">
+              <svg className="animate-spin h-4 w-4 text-accent dark:text-accent" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
               </svg>
@@ -2474,7 +2474,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
               {tags.map((tag) => (
                 <span
                   key={tag}
-                  className="px-2 py-0.5 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full border border-blue-200 dark:border-blue-800"
+                  className="px-2 py-0.5 text-xs bg-accent/30 dark:bg-accent/30 text-accent-dark dark:text-accent rounded-full border border-accent/50 dark:border-accent-dark"
                 >
                   {tag}
                 </span>
@@ -2623,7 +2623,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                     </span>
                   )}
               {hasActiveProSubscription(author as any) && (
-                <span className="text-blue-500 text-sm" title="Pro User">
+                <span className="text-accent text-sm" title="Pro User">
                   ⚡
                 </span>
               )}
@@ -2633,7 +2633,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
               </span>
               {(cast as any)._isQuoteCast && (
                 <span 
-                  className="text-blue-500 dark:text-blue-400 text-xs sm:text-sm ml-0.5" 
+                  className="text-accent dark:text-accent text-xs sm:text-sm ml-0.5" 
                   title="Quote cast - This cast quotes the root cast of this conversation"
                   aria-label="Quote cast"
                 >
@@ -3604,7 +3604,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                     }
                     setShowReplyBox(!showReplyBox);
                   }}
-                  className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors py-1 px-1 sm:px-0"
+                  className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-gray-500 dark:text-gray-400 hover:text-accent-dark dark:hover:text-accent transition-colors py-1 px-1 sm:px-0"
                 >
                   <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5" />
                   {(cast.replies?.count || 0) > 0 && <span>{cast.replies?.count || 0}</span>}
@@ -3745,7 +3745,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                       className={`px-1.5 py-1 rounded text-xs transition-colors ${
                         isQualityScoreHovered
                           ? `${getQualityTextColor(qualityScore)} bg-gray-100 dark:bg-gray-800`
-                          : "text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                          : "text-gray-600 dark:text-gray-400 hover:text-accent-dark dark:hover:text-accent hover:bg-gray-100 dark:hover:bg-gray-800"
                       }`}
                       title="Provide feedback on quality score"
                     >
@@ -3844,8 +3844,8 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                       disabled={isTagging}
                       className={`flex items-center gap-1 sm:gap-2 text-xs sm:text-sm transition-colors py-1 px-1 sm:px-0 ${
                         tags.length > 0
-                          ? "text-accent-dark dark:text-accent-dark hover:text-blue-700 dark:hover:text-blue-300"
-                          : "text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+                          ? "text-accent-dark dark:text-accent-dark hover:text-accent-dark dark:hover:text-accent"
+                          : "text-gray-500 dark:text-gray-400 hover:text-accent-dark dark:hover:text-accent"
                       } disabled:opacity-50 disabled:cursor-not-allowed`}
                       title="Tag cast"
                     >
@@ -4043,7 +4043,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                           }}
                           className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
                             replySortBy === option.value
-                              ? "bg-blue-50 dark:bg-blue-900/20 text-accent-dark dark:text-accent-dark"
+                              ? "bg-accent/30 dark:bg-accent/20 text-accent-dark dark:text-accent-dark"
                               : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
                           }`}
                         >

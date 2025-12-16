@@ -123,7 +123,7 @@ export function FeedSettings() {
             type="checkbox"
             checked={preferences.hideDollarCasts}
             onChange={(e) => updatePreference("hideDollarCasts", e.target.checked)}
-            className="w-5 h-5 text-blue-600 rounded focus:ring-accent"
+            className="w-5 h-5 text-accent-dark rounded focus:ring-accent"
           />
         </label>
 
@@ -144,7 +144,7 @@ export function FeedSettings() {
               type="checkbox"
               checked={preferences.hideShortCasts}
               onChange={(e) => updatePreference("hideShortCasts", e.target.checked)}
-              className="w-5 h-5 text-blue-600 rounded focus:ring-accent"
+              className="w-5 h-5 text-accent-dark rounded focus:ring-accent"
             />
           </label>
           {preferences.hideShortCasts && (
@@ -203,7 +203,7 @@ export function FeedSettings() {
               type="checkbox"
               checked={preferences.hideTradingWords}
               onChange={(e) => updatePreference("hideTradingWords", e.target.checked)}
-              className="w-5 h-5 text-blue-600 rounded focus:ring-accent"
+              className="w-5 h-5 text-accent-dark rounded focus:ring-accent"
             />
           </label>
           {preferences.hideTradingWords && (
@@ -233,7 +233,7 @@ export function FeedSettings() {
             type="checkbox"
             checked={preferences.hideImages}
             onChange={(e) => updatePreference("hideImages", e.target.checked)}
-            className="w-5 h-5 text-blue-600 rounded focus:ring-accent"
+            className="w-5 h-5 text-accent-dark rounded focus:ring-accent"
           />
         </label>
       </div>
@@ -348,7 +348,7 @@ function TradingWordsEditor({ words, defaultWords, onWordsChange }: TradingWords
           <button
             type="button"
             onClick={() => setShowDefaults(!showDefaults)}
-            className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+            className="text-xs text-accent-dark dark:text-accent hover:underline"
           >
             {showDefaults ? "Hide" : "Show"}
           </button>
@@ -367,7 +367,7 @@ function TradingWordsEditor({ words, defaultWords, onWordsChange }: TradingWords
                     }
                     className={`px-2 py-0.5 text-xs rounded-full transition-colors ${
                       isActive
-                        ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700"
+                        ? "bg-accent/40 dark:bg-accent-dark/90 text-accent-dark dark:text-accent border border-accent/60 dark:border-accent-dark"
                         : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
                     }`}
                   >
@@ -380,7 +380,7 @@ function TradingWordsEditor({ words, defaultWords, onWordsChange }: TradingWords
             <button
               type="button"
               onClick={handleAddAllDefaults}
-              className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              className="text-xs text-accent-dark dark:text-accent hover:underline"
             >
               Add all defaults
             </button>
@@ -528,7 +528,7 @@ function CuratorFilter({ selectedCuratorFids, onCuratorFidsChange }: CuratorFilt
         <button
           type="button"
           onClick={() => setIsExpanded(!isExpanded)}
-          className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+          className="text-xs text-accent-dark dark:text-accent hover:underline"
         >
           {isExpanded ? "Hide" : "Show"}
         </button>
@@ -543,7 +543,7 @@ function CuratorFilter({ selectedCuratorFids, onCuratorFidsChange }: CuratorFilt
             <button
               type="button"
               onClick={selectAll}
-              className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              className="text-xs text-accent-dark dark:text-accent hover:underline"
             >
               Select all
             </button>
@@ -552,7 +552,7 @@ function CuratorFilter({ selectedCuratorFids, onCuratorFidsChange }: CuratorFilt
             <button
               type="button"
               onClick={deselectAll}
-              className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              className="text-xs text-accent-dark dark:text-accent hover:underline"
             >
               Deselect all
             </button>
@@ -574,7 +574,7 @@ function CuratorFilter({ selectedCuratorFids, onCuratorFidsChange }: CuratorFilt
                   type="checkbox"
                   checked={isSelected}
                   onChange={() => toggleCurator(curator.fid)}
-                  className="w-4 h-4 text-blue-600 rounded focus:ring-accent"
+                  className="w-4 h-4 text-accent-dark rounded focus:ring-accent"
                 />
                 <AvatarImage
                   src={curator.pfpUrl || undefined}
@@ -676,7 +676,7 @@ export function FeedSettingsInline({ feedType }: { feedType?: string }) {
             Filters
           </span>
           {activeFiltersCount > 0 && (
-            <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">
+            <span className="px-2 py-0.5 text-xs font-medium bg-accent/40 dark:bg-accent-dark/90 text-accent-dark dark:text-accent rounded-full">
               {activeFiltersCount}
             </span>
           )}
@@ -705,7 +705,7 @@ export function FeedSettingsInline({ feedType }: { feedType?: string }) {
               type="checkbox"
               checked={preferences.hideDollarCasts}
               onChange={(e) => updatePreference("hideDollarCasts", e.target.checked)}
-              className="w-4 h-4 text-blue-600 rounded focus:ring-accent"
+              className="w-4 h-4 text-accent-dark rounded focus:ring-accent"
             />
           </label>
 
@@ -720,7 +720,7 @@ export function FeedSettingsInline({ feedType }: { feedType?: string }) {
                 type="checkbox"
                 checked={preferences.hideShortCasts}
                 onChange={(e) => updatePreference("hideShortCasts", e.target.checked)}
-                className="w-4 h-4 text-blue-600 rounded focus:ring-accent"
+                className="w-4 h-4 text-accent-dark rounded focus:ring-accent"
               />
             </label>
             {preferences.hideShortCasts && (
@@ -773,7 +773,7 @@ export function FeedSettingsInline({ feedType }: { feedType?: string }) {
                 type="checkbox"
                 checked={preferences.hideTradingWords}
                 onChange={(e) => updatePreference("hideTradingWords", e.target.checked)}
-                className="w-4 h-4 text-blue-600 rounded focus:ring-accent"
+                className="w-4 h-4 text-accent-dark rounded focus:ring-accent"
               />
             </label>
             {preferences.hideTradingWords && (
@@ -795,7 +795,7 @@ export function FeedSettingsInline({ feedType }: { feedType?: string }) {
               type="checkbox"
               checked={preferences.hideImages}
               onChange={(e) => updatePreference("hideImages", e.target.checked)}
-              className="w-4 h-4 text-blue-600 rounded focus:ring-accent"
+              className="w-4 h-4 text-accent-dark rounded focus:ring-accent"
             />
           </label>
         </div>
@@ -1055,7 +1055,7 @@ export function CuratorFilterInline({
             </div>
           )}
           {isExpanded && selectedCuratorFids.length > 0 && selectedCuratorFids.length < allDisplayedCurators.length && (
-            <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">
+            <span className="px-2 py-0.5 text-xs font-medium bg-accent/40 dark:bg-accent-dark/90 text-accent-dark dark:text-accent rounded-full">
               {selectedCuratorFids.length}
             </span>
           )}
@@ -1083,7 +1083,7 @@ export function CuratorFilterInline({
                 <button
                   type="button"
                   onClick={selectAll}
-                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                  className="text-xs text-accent-dark dark:text-accent hover:underline"
                 >
                   Select all
                 </button>
@@ -1092,7 +1092,7 @@ export function CuratorFilterInline({
                 <button
                   type="button"
                   onClick={deselectAll}
-                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                  className="text-xs text-accent-dark dark:text-accent hover:underline"
                 >
                   Deselect all
                 </button>
@@ -1146,7 +1146,7 @@ export function CuratorFilterInline({
                       {isAlreadyAdded ? (
                         <span className="text-xs text-gray-500">Added</span>
                       ) : (
-                        <span className="text-xs text-blue-600 dark:text-blue-400">+ Add</span>
+                        <span className="text-xs text-accent-dark dark:text-accent">+ Add</span>
                       )}
                     </button>
                   );
@@ -1156,7 +1156,7 @@ export function CuratorFilterInline({
           </div>
 
           {/* Info box */}
-          <div className="mb-2 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded text-xs text-blue-800 dark:text-blue-200">
+          <div className="mb-2 p-2 bg-accent/30 dark:bg-accent/20 border border-accent/50 dark:border-accent-dark rounded text-xs text-accent-dark dark:text-accent">
             <div className="flex items-start gap-2">
               <svg
                 className="w-4 h-4 mt-0.5 flex-shrink-0"
@@ -1207,7 +1207,7 @@ export function CuratorFilterInline({
                       title="Click to toggle, Shift+click or long press to select only this"
                       className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-xs rounded-full transition-colors ${
                         isSelected
-                          ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700"
+                          ? "bg-accent/40 dark:bg-accent-dark/90 text-accent-dark dark:text-accent border border-accent/60 dark:border-accent-dark"
                           : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
                       }`}
                     >
@@ -1245,7 +1245,7 @@ export function CuratorFilterInline({
                       title="Right-click to remove, Shift+click or long press to select only this"
                       className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-xs rounded-full transition-colors ${
                         isSelected
-                          ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700"
+                          ? "bg-accent/40 dark:bg-accent-dark/90 text-accent-dark dark:text-accent border border-accent/60 dark:border-accent-dark"
                           : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
                       }`}
                     >

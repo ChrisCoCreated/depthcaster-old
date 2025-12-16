@@ -282,7 +282,7 @@ export function ProfileHeader({
                   )}
                 </h1>
                 {verified && (
-                  <span className="text-blue-500" title="Verified">
+                  <span className="text-accent" title="Verified">
                     <svg
                       className="w-5 h-5 sm:w-6 sm:h-6"
                       fill="currentColor"
