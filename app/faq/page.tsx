@@ -83,6 +83,33 @@ export default function FAQPage() {
             </div>
           </section>
 
+          {/* How to Curate */}
+          <section className="border-b border-gray-200 dark:border-gray-800 pb-6">
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-3">
+              How to curate
+            </h2>
+            <div className="prose prose-gray dark:prose-invert max-w-none">
+              <p className="text-gray-700 dark:text-gray-300 mb-4">
+                Curating is the process of selecting high-quality casts to surface in the Sopha feed. As a curator, you help shape the content that others see by identifying thoughtful, meaningful casts worth sharing.
+              </p>
+              <p className="text-gray-700 dark:text-gray-300 mb-4">
+                To curate a cast, you can:
+              </p>
+              <ul className="list-disc list-inside space-y-2 text-gray-700 dark:text-gray-300 ml-4">
+                <li>Click the <strong>curate button</strong> on any cast you find valuable</li>
+                <li>Use the <strong>paste button</strong> in the header to curate casts by link or hash</li>
+                <li>Use the <strong>Sopha Mini-App</strong> in Farcaster to curate directly from other clients</li>
+                <li>Mention <strong>@deepbot</strong> in a reply to automatically curate the parent cast</li>
+              </ul>
+              <p className="text-gray-700 dark:text-gray-300 mt-4">
+                For detailed instructions, best practices, and more information about curation, see our{" "}
+                <Link href="/curators" className="text-blue-600 dark:text-blue-400 hover:underline">
+                  complete Curator Guide
+                </Link>.
+              </p>
+            </div>
+          </section>
+
           {/* Invite People */}
           <section className="border-b border-gray-200 dark:border-gray-800 pb-6">
             <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-3">

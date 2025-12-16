@@ -145,7 +145,7 @@ export function CuratorBadge({ userFid, viewerFid, isCurator, className = "" }: 
   if (isCurator) {
     return (
       <span
-        className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 ${className}`}
+        className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full bg-accent-dark dark:bg-accent-dark text-white dark:text-white ${className}`}
         title="Curator"
       >
         <svg

@@ -2484,9 +2484,9 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
 
           {/* Curated by pill - show when cast has curators */}
           {curators.length > 0 && !displayMode?.hideCuratedButton && (
-            <div className="flex items-center gap-1.5 px-2 sm:px-3 py-1 bg-blue-50 dark:bg-blue-900/30 rounded-full border border-blue-200 dark:border-blue-800">
+            <div className="flex items-center gap-1.5 px-2 sm:px-3 py-1 bg-accent/30 dark:bg-accent/20 rounded-full border border-accent/50 dark:border-accent/40">
               {/* First curator name */}
-              <span className="hidden sm:inline text-xs text-blue-700 dark:text-blue-300 font-medium">
+              <span className="hidden sm:inline text-xs text-accent-dark dark:text-accent font-medium">
                 Curated by {curators[0]?.display_name || curators[0]?.username || `@user${curators[0]?.fid}`}
               </span>
               

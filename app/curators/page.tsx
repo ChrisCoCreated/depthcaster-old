@@ -105,6 +105,7 @@ export default function CuratorsPage() {
                   <li>Present interesting ideas or perspectives</li>
                   <li>Encourage meaningful engagement</li>
                   <li>Relate to philosophy, art, culture, or deep thinking</li>
+                  <li><strong>Include blog content:</strong> Blogs display fully in the feed, so any cast with a blog in it is well worth curating, including evergreen content</li>
                 </ul>
               </div>
 

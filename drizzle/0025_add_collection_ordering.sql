@@ -17,3 +17,4 @@ ALTER TABLE "collections" ADD COLUMN IF NOT EXISTS "order_direction" text DEFAUL
 
 
 
+
