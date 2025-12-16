@@ -262,7 +262,7 @@ export async function fetchGenericArticle(url: string): Promise<GenericArticle> 
     // Fetch HTML
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; Depthcaster/1.0)',
+        'User-Agent': 'Mozilla/5.0 (compatible; Sopha/1.0)',
       },
     });
     

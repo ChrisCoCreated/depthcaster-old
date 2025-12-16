@@ -70,7 +70,7 @@ export default function CuratorsPage() {
                 for quality content, we&apos;d love to have you join our curation team!
               </p>
               <p className="text-gray-700 dark:text-gray-300 mb-4">
-                As a curator, you&apos;ll help shape the Depthcaster feed by selecting casts that spark deep 
+                As a curator, you&apos;ll help shape the Sopha feed by selecting casts that spark deep 
                 conversations and meaningful engagement.
               </p>
               <div className="mt-4">
@@ -124,7 +124,7 @@ export default function CuratorsPage() {
                     <ol className="list-decimal list-inside text-gray-700 dark:text-gray-300 space-y-1 ml-4">
                       <li>Click the <strong>curate button</strong> (usually a star or bookmark icon) on the cast</li>
                       <li>The cast will be added to the curated feed</li>
-                      <li>Your curation will be visible to all Depthcaster users</li>
+                      <li>Your curation will be visible to all Sopha users</li>
                     </ol>
                     <p className="text-gray-600 dark:text-gray-400 text-sm mt-2 italic">
                       Note: Only users with curator permissions can curate casts. If you don&apos;t see the curate button, 
@@ -142,33 +142,33 @@ export default function CuratorsPage() {
                       <li>The cast will be automatically fetched and curated</li>
                     </ol>
                     <p className="text-gray-600 dark:text-gray-400 text-sm mt-2">
-                      This is useful for curating casts you see outside of Depthcaster or when you have a cast hash.
+                      This is useful for curating casts you see outside of Sopha or when you have a cast hash.
                     </p>
                   </div>
 
                   <div>
                     <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">
-                      Method 3: Depthcaster Mini-App
+                      Method 3: Sopha Mini-App
                     </h4>
                     <ol className="list-decimal list-inside text-gray-700 dark:text-gray-300 space-y-1 ml-4">
-                      <li>Add the <a href="https://farcaster.xyz/miniapps/HtUwgAw4iQ2x/depthcaster" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">Depthcaster Mini-App</a> to Farcaster</li>
-                      <li>Open the Depthcaster Mini-App in Farcaster</li>
+                      <li>Add the <a href="https://farcaster.xyz/miniapps/HtUwgAw4iQ2x/sopha" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">Sopha Mini-App</a> to Farcaster</li>
+                      <li>Open the Sopha Mini-App in Farcaster</li>
                       <li>Click the <strong>paste button</strong> (clipboard icon) in the top right of the mini-app</li>
                     </ol>
                     <div className="mt-3 mb-3">
                       <img 
                         src="/images/instructions/paste_mini-app.png" 
-                        alt="Paste button in Depthcaster Mini-App" 
+                        alt="Paste button in Sopha Mini-App" 
                         className="rounded-lg border border-gray-200 dark:border-gray-700 max-w-full h-auto"
                       />
                     </div>
                     <ol className="list-decimal list-inside text-gray-700 dark:text-gray-300 space-y-1 ml-4" start={4}>
-                      <li>Alternatively, click the <strong>share button</strong> on any cast and select <strong>Depthcaster</strong> from the share menu</li>
+                      <li>Alternatively, click the <strong>share button</strong> on any cast and select <strong>Sopha</strong> from the share menu</li>
                     </ol>
                     <div className="mt-3 mb-3">
                       <img 
                         src="/images/instructions/share_extentesnion.png" 
-                        alt="Share menu with Depthcaster option" 
+                        alt="Share menu with Sopha option" 
                         className="rounded-lg border border-gray-200 dark:border-gray-700 max-w-full h-auto"
                       />
                     </div>

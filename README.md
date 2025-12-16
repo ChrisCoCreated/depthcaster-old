@@ -1,4 +1,4 @@
-# Depthcaster
+# Sopha
 
 A Long from farcaster client focused on deep thoughts, philosophy, art, and meaningful conversations. Built with Next.js and Neynar.
 
@@ -77,7 +77,7 @@ A Long from farcaster client focused on deep thoughts, philosophy, art, and mean
 
 ## Webhook maintenance
 
-Depthcaster relies on three unified Neynar webhooks:
+Sopha relies on three unified Neynar webhooks:
 
 - `curated-replies-unified` (`01KA47AQSZV42RCY7B399X5PGM`)
 - `curated-quotes-unified` (`01KA47ARX6SMBHJ17V9ZCV10PX`)
@@ -133,7 +133,7 @@ The app uses Neynar's notification API efficiently with on-demand fetching:
 
 1. **Push to GitHub**:
    ```bash
-   git remote add origin https://github.com/yourusername/depthcaster.git
+   git remote add origin https://github.com/yourusername/sopha.git
    git push -u origin main
    ```
 
@@ -151,7 +151,7 @@ The app uses Neynar's notification API efficiently with on-demand fetching:
    In your Vercel project settings, add these environment variables:
    - `NEYNAR_API_KEY` - Your Neynar API key
    - `NEXT_PUBLIC_NEYNAR_CLIENT_ID` - Your Neynar client ID
-   - `NEXT_PUBLIC_APP_URL` - Your Vercel deployment URL (e.g., `https://depthcaster.vercel.app`)
+   - `NEXT_PUBLIC_APP_URL` - Your Vercel deployment URL (e.g., `https://sopha.vercel.app`)
    - `POSTGRES_URL` - Automatically set by Vercel Postgres
    - `DEEPSEEK_API_KEY` - Your DeepSeek API key (optional, for quality analysis)
    - `ENABLE_NEYNAR_NOTIFICATIONS` - Set to `"true"` or `"1"` to enable Neynar notifications (optional, defaults to disabled)
@@ -180,7 +180,7 @@ psql $POSTGRES_URL -f lib/db-setup.sql
 ## Project Structure
 
 ```
-depthcaster/
+sopha/
 ├── app/
 │   ├── api/              # API routes
 │   │   ├── feed/         # Feed fetching

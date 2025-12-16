@@ -1,8 +1,8 @@
-# Depthcaster - Complete Application Capabilities
+# Sopha - Complete Application Capabilities
 
 ## Overview
 
-Depthcaster is a sophisticated Farcaster client application focused on surfacing high-quality, thoughtful content. It combines algorithmic intelligence with human curation to create feeds that prioritize substance, quality, and meaningful conversations over viral metrics.
+Sopha is a sophisticated Farcaster client application focused on surfacing high-quality, thoughtful content. It combines algorithmic intelligence with human curation to create feeds that prioritize substance, quality, and meaningful conversations over viral metrics.
 
 ## Core Architecture
 
@@ -540,7 +540,8 @@ The system is designed to be extensible with:
 
 ---
 
-This document provides a comprehensive overview of all capabilities in the Depthcaster application. The system is designed to be modular, extensible, and focused on quality content discovery and meaningful conversations.
+This document provides a comprehensive overview of all capabilities in the Sopha application. The system is designed to be modular, extensible, and focused on quality content discovery and meaningful conversations.
+
 
 
 

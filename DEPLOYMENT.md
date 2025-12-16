@@ -1,6 +1,6 @@
 # Deployment Guide
 
-This guide will help you deploy Depthcaster to GitHub and Vercel.
+This guide will help you deploy Sopha to GitHub and Vercel.
 
 ## Prerequisites
 
@@ -12,13 +12,13 @@ This guide will help you deploy Depthcaster to GitHub and Vercel.
 
 1. **Create a new repository on GitHub**:
    - Go to [github.com/new](https://github.com/new)
-   - Name it `depthcaster` (or your preferred name)
+   - Name it `sopha` (or your preferred name)
    - Choose public or private
    - Don't initialize with README (we already have one)
 
 2. **Add the remote and push**:
    ```bash
-   git remote add origin https://github.com/YOUR_USERNAME/depthcaster.git
+   git remote add origin https://github.com/YOUR_USERNAME/sopha.git
    git branch -M main
    git push -u origin main
    ```
@@ -36,7 +36,7 @@ This guide will help you deploy Depthcaster to GitHub and Vercel.
    - Add the following:
      - `NEYNAR_API_KEY` - Your Neynar API key
      - `NEXT_PUBLIC_NEYNAR_CLIENT_ID` - Your Neynar client ID
-     - `NEXT_PUBLIC_APP_URL` - Will be set after first deployment (e.g., `https://depthcaster.vercel.app`)
+     - `NEXT_PUBLIC_APP_URL` - Will be set after first deployment (e.g., `https://sopha.vercel.app`)
 
 3. **Deploy**:
    - Click "Deploy"
@@ -54,7 +54,7 @@ This guide will help you deploy Depthcaster to GitHub and Vercel.
    - In your Vercel project dashboard, go to the "Storage" tab
    - Click "Create Database"
    - Select "Postgres"
-   - Choose a name (e.g., `depthcaster-db`)
+   - Choose a name (e.g., `sopha-db`)
    - Select a region close to your users
    - Click "Create"
 

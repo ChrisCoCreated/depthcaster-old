@@ -33,7 +33,7 @@ export function UpdateNotification() {
           </h3>
           
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            A new version of Depthcaster is available. Refresh the page to get the latest features and improvements.
+            A new version of Sopha is available. Refresh the page to get the latest features and improvements.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3">

@@ -19,7 +19,7 @@ const IMAGE_ERROR_RESPONSE = () =>
     headers: {
       "Content-Type": "image/png",
       "Cache-Control": "no-store, no-cache, must-revalidate",
-      "X-Depthcaster-Image-Error": "1",
+      "X-Sopha-Image-Error": "1",
     },
   });
 
@@ -79,8 +79,8 @@ export async function GET(request: NextRequest) {
       headers: {
         "Content-Type": contentType,
         "Cache-Control": "public, max-age=86400, immutable",
-        "X-Depthcaster-Image-Proxy": "1",
-        "X-Depthcaster-Proxy-Source": sanitized,
+        "X-Sopha-Image-Proxy": "1",
+        "X-Sopha-Proxy-Source": sanitized,
       },
     });
   } catch (error) {

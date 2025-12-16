@@ -3,7 +3,7 @@ import { neynarClient } from "@/lib/neynar";
 import { deduplicateRequest } from "@/lib/neynar-batch";
 import { enrichCastsWithViewerContext } from "@/lib/interactions";
 
-const THINKING_URL = "https://www.depthcaster.com/thinking";
+const THINKING_URL = "https://www.sopha.social/thinking";
 
 export async function GET(request: NextRequest) {
   try {

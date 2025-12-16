@@ -54,14 +54,14 @@ function MiniappContent() {
     return 70;
   });
   const [showQualityFilters, setShowQualityFilters] = useState(false);
-  const [openLinkPreference, setOpenLinkPreference] = useState<"auto" | "farcaster" | "depthcaster">(() => {
+  const [openLinkPreference, setOpenLinkPreference] = useState<"auto" | "farcaster" | "sopha">(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("miniappOpenLinkPreference");
-      if (saved === "farcaster" || saved === "depthcaster" || saved === "auto") {
+      if (saved === "farcaster" || saved === "sopha" || saved === "auto") {
         return saved;
       }
     }
-    return "depthcaster"; // Default to Depthcaster
+    return "sopha"; // Default to Sopha
   });
   const [notificationFrequency, setNotificationFrequency] = useState<"all" | "daily" | "weekly">(() => {
     if (typeof window !== "undefined") {
@@ -221,7 +221,7 @@ function MiniappContent() {
     if (openLinkPreference === "auto" && !hasAutoOpenedRef.current) {
       hasAutoOpenedRef.current = true;
       
-      // Auto-open in Depthcaster conversation view
+      // Auto-open in Sopha conversation view
       const url = `${appUrl}/conversation/${hashToOpen}`;
       if (actions?.openUrl) {
         actions.openUrl(url).catch((err) => {
@@ -581,7 +581,7 @@ function MiniappContent() {
         await sdk.actions.viewCast({ hash: castHash });
       } catch (error) {
         console.error("Error opening cast in Farcaster:", error);
-        // Fallback to Depthcaster on error
+        // Fallback to Sopha on error
         const url = `${appUrl}/conversation/${castHash}`;
         if (actions?.openUrl) {
           actions.openUrl(url);
@@ -590,7 +590,7 @@ function MiniappContent() {
         }
       }
     } else {
-      // Open in Depthcaster conversation view (for both "depthcaster" and "auto" preferences)
+      // Open in Sopha conversation view (for both "sopha" and "auto" preferences)
       const url = `${appUrl}/conversation/${castHash}`;
       if (actions?.openUrl) {
         actions.openUrl(url);
@@ -659,36 +659,36 @@ function MiniappContent() {
         <div className="max-w-2xl mx-auto px-4 py-2">
           <div className="flex items-center justify-between">
             <Link href="/" className="text-lg font-bold text-gray-900 dark:text-gray-100">
-              Depthcaster <span className="text-xs font-normal text-gray-500 dark:text-gray-400">Beta</span>
+              Sopha <span className="text-xs font-normal text-gray-500 dark:text-gray-400">Beta</span>
             </Link>
             <div className="flex items-center gap-3">
               {context?.user?.fid && (
                 <div className="relative flex items-center gap-1">
-              {/* Toggle for opening links: Auto Open Depthcaster, Farcaster, or Depthcaster */}
+              {/* Toggle for opening links: Auto Open Sopha, Farcaster, or Sopha */}
               <button
                 onClick={() => {
-                  // Cycle through: auto -> farcaster -> depthcaster -> auto
+                  // Cycle through: auto -> farcaster -> sopha -> auto
                   const nextPreference = 
                     openLinkPreference === "auto" ? "farcaster" :
-                    openLinkPreference === "farcaster" ? "depthcaster" : "auto";
+                    openLinkPreference === "farcaster" ? "sopha" : "auto";
                   setOpenLinkPreference(nextPreference);
                   localStorage.setItem("miniappOpenLinkPreference", nextPreference);
                 }}
                 className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                 aria-label={
-                  openLinkPreference === "auto" ? "Auto Open Depthcaster" :
+                  openLinkPreference === "auto" ? "Auto Open Sopha" :
                   openLinkPreference === "farcaster" ? "Open links in Farcaster" :
-                  "Open links in Depthcaster"
+                  "Open links in Sopha"
                 }
                 title={
-                  openLinkPreference === "auto" ? "Auto Open Depthcaster (click to change)" :
+                  openLinkPreference === "auto" ? "Auto Open Sopha (click to change)" :
                   openLinkPreference === "farcaster" ? "Open links in Farcaster (click to change)" :
-                  "Open links in Depthcaster (click to change)"
+                  "Open links in Sopha (click to change)"
                 }
               >
                 {openLinkPreference === "auto" ? "⚡ Auto" :
                  openLinkPreference === "farcaster" ? "🔗 Farcaster" :
-                 "📱 Depthcaster"}
+                 "📱 Sopha"}
               </button>
               {/* Notification frequency toggle: All / Daily / Weekly */}
               {/* Temporarily hidden */}

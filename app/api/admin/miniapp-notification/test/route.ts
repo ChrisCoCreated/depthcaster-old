@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     const testCastHash = `test-${Date.now()}`;
 
     // Build the payload that will be sent
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://depthcaster.com";
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://sopha.social";
     const targetUrl = `${appUrl}/`;
     const castText = testCastData?.text || "";
     const previewText = castText.length > 150 ? castText.substring(0, 150) + "..." : castText;

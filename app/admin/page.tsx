@@ -91,7 +91,7 @@ export default function AdminPage() {
         },
           body: JSON.stringify({
           userFid: user.fid,
-          title: "Depthcaster Test Notification",
+          title: "Sopha Test Notification",
           body: "This is a test notification sent from the admin page. It should appear on your other devices!",
           icon: "/icon-192x192.webp",
           badge: "/icon-96x96.webp",

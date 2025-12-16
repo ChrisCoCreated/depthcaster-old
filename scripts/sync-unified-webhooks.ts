@@ -1,5 +1,5 @@
 /**
- * Sync/refresh the unified Neynar webhooks used by Depthcaster.
+ * Sync/refresh the unified Neynar webhooks used by Sopha.
  * Includes: curated-reply, curated-quote, curated-reaction, and user-watch webhooks.
  *
  * Usage: npx tsx scripts/sync-unified-webhooks.ts

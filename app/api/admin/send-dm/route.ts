@@ -100,15 +100,15 @@ export async function POST(request: NextRequest) {
     // Default message if not provided
     const defaultMessage = `Here's the app, currently in private beta.
 
-www.depthcaster.com
+www.sopha.social
 
-I've given you Curator role - guide here: www.depthcaster.com/curators
+I've given you Curator role - guide here: www.sopha.social/curators
 
 I'd love any feedback, here, GC or by clicking the ? icon in the app header.
 
 here is the group chat: https://farcaster.xyz/~/group/GpluEgXNiXtpW1XAO8ct5A
 
-and lastly I recommend adding the mini-app so you get notifications over in Farcaster: https://farcaster.xyz/miniapps/HtUwgAw4iQ2x/depthcaster
+and lastly I recommend adding the mini-app so you get notifications over in Farcaster: https://farcaster.xyz/miniapps/HtUwgAw4iQ2x/sopha
 
 thanks and looking forward to what you curate!`;
 

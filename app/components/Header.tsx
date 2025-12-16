@@ -99,7 +99,7 @@ export function Header() {
       const hostname = window.location.hostname;
       if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.startsWith("192.168.") || hostname.startsWith("10.")) {
         setEnvironment("local");
-      } else if (hostname === "preview.depthcaster.com") {
+      } else if (hostname === "preview.sopha.social") {
         setEnvironment("preview");
         // Check if user has admin or tester role for preview access
         if (user?.fid) {
@@ -174,7 +174,7 @@ export function Header() {
       return;
     }
 
-    const originalTitle = "Depthcaster - Deep Thoughts on Farcaster";
+    const originalTitle = "Sopha - Deep Thoughts on Farcaster";
     
     const createFavicon = (color: string, letter: string): string => {
       // Create a canvas-based favicon for better browser compatibility
@@ -701,7 +701,7 @@ export function Header() {
             <div className="flex items-center gap-2">
               <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2">
                 <Link href="/" className="text-xs sm:text-2xl font-bold text-gray-900 dark:text-gray-100 leading-tight">
-                  Depthcaster
+                  Sopha
                 </Link>
                 <span className="text-[10px] sm:text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider">
                   Beta
@@ -818,7 +818,7 @@ export function Header() {
                         onClick={() => setIsHelpDropdownOpen(false)}
                         className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                       >
-                        Why Depthcaster
+                        Why Sopha
                       </Link>
                       <Link
                         href="/curators"
@@ -890,7 +890,7 @@ export function Header() {
                         My Collections
                       </Link>
                       <a
-                        href="https://farcaster.xyz/miniapps/HtUwgAw4iQ2x/depthcaster"
+                        href="https://farcaster.xyz/miniapps/HtUwgAw4iQ2x/sopha"
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={() => {

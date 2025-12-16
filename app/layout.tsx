@@ -36,36 +36,36 @@ export const viewport: Viewport = {
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: "Depthcaster - Deep Thoughts on Farcaster",
+  title: "Sopha - Deep Thoughts on Farcaster",
   description: "A Long from farcaster client focused on philosophy, art, and meaningful conversations",
   keywords: ["Farcaster", "social media", "philosophy", "art", "conversations", "web3", "decentralized"],
-  authors: [{ name: "Depthcaster" }],
-  creator: "Depthcaster",
-  publisher: "Depthcaster",
+  authors: [{ name: "Sopha" }],
+  creator: "Sopha",
+  publisher: "Sopha",
   manifest: "/manifest.json",
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://depthcaster.vercel.app"),
   openGraph: {
     type: "website",
     locale: "en_US",
     url: "/",
-    siteName: "Depthcaster",
-    title: "Depthcaster - Deep Thoughts on Farcaster",
+    siteName: "Sopha",
+    title: "Sopha - Deep Thoughts on Farcaster",
     description: "A Long from farcaster client focused on philosophy, art, and meaningful conversations",
     images: [
       {
         url: "/icon-512x512.webp",
         width: 512,
         height: 512,
-        alt: "Depthcaster",
+        alt: "Sopha",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Depthcaster - Deep Thoughts on Farcaster",
+    title: "Sopha - Deep Thoughts on Farcaster",
     description: "A Long from farcaster client focused on philosophy, art, and meaningful conversations",
     images: ["/icon-512x512.webp"],
-    creator: "@depthcaster",
+    creator: "@sopha_social",
   },
   robots: {
     index: true,
@@ -100,7 +100,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Depthcaster",
+    title: "Sopha",
   },
 };
 

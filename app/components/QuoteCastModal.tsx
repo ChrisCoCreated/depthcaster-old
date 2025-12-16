@@ -157,7 +157,7 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>)
       let url = urlMatch.url;
       let displayText = urlMatch.displayText;
     
-      // Check if it's a Depthcaster link (already converted base.app link)
+      // Check if it's a Sopha link (already converted base.app link)
       if (url && url.startsWith('/cast/')) {
         parts.push(
           <Link

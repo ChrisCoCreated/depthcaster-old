@@ -28,4 +28,4 @@ Get notified about activity on casts you've curated, including new replies and r
 
 ---
 
-*Thanks for using Depthcaster!*
+*Thanks for using Sopha!*

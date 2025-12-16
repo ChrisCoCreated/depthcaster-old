@@ -1,4 +1,4 @@
--- Database schema for Depthcaster
+-- Database schema for Sopha
 -- Run this script to initialize the database
 
 -- User preferences table

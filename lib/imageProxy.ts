@@ -80,7 +80,7 @@ export function isExternalUrl(url: string) {
 export async function proxyRemoteImage(url: string) {
   const response = await fetch(url, {
     headers: {
-      "User-Agent": "Depthcaster Image Proxy",
+      "User-Agent": "Sopha Image Proxy",
       Accept: "image/*",
     },
     cache: "no-store",

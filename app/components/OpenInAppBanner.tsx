@@ -38,11 +38,11 @@ export function OpenInAppBanner() {
     // Show instructions to user
     // On iOS, the best we can do is show a message
     alert(
-      "To open in Depthcaster:\n\n" +
+      "To open in Sopha:\n\n" +
       "1. Tap the Share button (square with arrow)\n" +
       "2. Scroll down and tap 'Add to Home Screen' if not already added\n" +
-      "3. Or tap 'Depthcaster' if it appears in the share menu\n\n" +
-      "If you already have Depthcaster installed, close Safari and open the Depthcaster app from your home screen."
+      "3. Or tap 'Sopha' if it appears in the share menu\n\n" +
+      "If you already have Sopha installed, close Safari and open the Sopha app from your home screen."
     );
     
     // Also try to trigger a navigation that might help
@@ -63,7 +63,7 @@ export function OpenInAppBanner() {
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate">
-            Open in Depthcaster for the best experience
+            Open in Sopha for the best experience
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">

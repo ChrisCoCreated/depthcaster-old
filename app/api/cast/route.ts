@@ -96,9 +96,9 @@ export async function POST(request: NextRequest) {
       }
 
       // Validate that it's the specific thinking URL
-      if (parent !== "https://www.depthcaster.com/thinking") {
+      if (parent !== "https://www.sopha.social/thinking") {
         return NextResponse.json(
-          { error: "Invalid parent URL. Only https://www.depthcaster.com/thinking is allowed" },
+          { error: "Invalid parent URL. Only https://www.sopha.social/thinking is allowed" },
           { status: 400 }
         );
       }

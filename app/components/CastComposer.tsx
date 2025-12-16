@@ -141,7 +141,7 @@ export function CastComposer({ parentHash, onSuccess }: CastComposerProps) {
 
       // Determine parent: use thinking URL if superadmin enabled it, otherwise use parentHash
       const finalParent = useThinkingParent && isSuperAdminUser && !parentHash
-        ? "https://www.depthcaster.com/thinking"
+        ? "https://www.sopha.social/thinking"
         : parentHash;
 
       const response = await fetch("/api/cast", {

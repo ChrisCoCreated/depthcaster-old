@@ -175,7 +175,7 @@ export default function AdminUsersWithoutRolesPage() {
           Users Without Roles
         </h1>
         <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
-          Users who have logged into depthcaster but don't have curator or plus roles
+          Users who have logged into sopha but don't have curator or plus roles
         </p>
       </div>
 

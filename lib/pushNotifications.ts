@@ -12,7 +12,7 @@ async function sendPushNotification(
     
     const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
     const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
-    const vapidEmail = process.env.VAPID_EMAIL || "mailto:admin@depthcaster.app";
+    const vapidEmail = process.env.VAPID_EMAIL || "mailto:admin@sopha.social";
 
     if (!vapidPublicKey || !vapidPrivateKey) {
       throw new Error("VAPID keys not configured. Please set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY environment variables.");

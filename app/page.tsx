@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { HomeContent } from "./components/HomeContent";
 
-const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://depthcaster.com";
+const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://sopha.social";
 
 export const metadata: Metadata = {
   other: {
@@ -9,10 +9,10 @@ export const metadata: Metadata = {
       version: "1",
       imageUrl: `${appUrl}/icon-512x512.webp`,
       button: {
-        title: "Open Depthcaster",
+        title: "Open Sopha",
         action: {
           type: "launch_frame",
-          name: "Depthcaster",
+          name: "Sopha",
           url: `${appUrl}/miniapp`,
           splashImageUrl: `${appUrl}/icon-512x512.webp`,
           splashBackgroundColor: "#000000",

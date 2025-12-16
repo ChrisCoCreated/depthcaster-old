@@ -1,5 +1,5 @@
 // Service Worker for PWA Device Notifications
-const CACHE_NAME = 'depthcaster-v1';
+const CACHE_NAME = 'sopha-v1';
 
 // Install event - cache static assets
 // Don't skip waiting - let the new service worker wait until user confirms update
@@ -62,7 +62,7 @@ function showNotification(notificationData) {
     body,
     icon: icon || '/icon-192x192.webp',
     badge: badge || '/icon-96x96.webp',
-    tag: tag || 'depthcaster-notification',
+    tag: tag || 'sopha-notification',
     data: data || {},
     requireInteraction: false,
     silent: false,
@@ -97,7 +97,7 @@ self.addEventListener('notificationclick', (event) => {
 // Handle push events (for cross-device notifications)
 self.addEventListener('push', (event) => {
   let notificationData = {
-    title: 'Depthcaster',
+    title: 'Sopha',
     body: 'You have a new notification',
     icon: '/icon-192x192.webp',
     badge: '/icon-96x96.webp',

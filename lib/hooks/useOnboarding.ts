@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { usePWAInstallation } from "./usePWAInstallation";
 
-const ONBOARDING_COMPLETED_KEY = "depthcaster_onboarding_completed";
+const ONBOARDING_COMPLETED_KEY = "sopha_onboarding_completed";
 const ONBOARDING_VERSION = "1"; // Increment to show onboarding again
 
 // Check if we're in a miniapp/frame context

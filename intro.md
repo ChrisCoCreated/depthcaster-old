@@ -1,12 +1,12 @@
-# Depthcaster
+# Sopha
 
 **A Long from farcaster client focused on deep thoughts, philosophy, art, and meaningful conversations.**
 
-Depthcaster is a thoughtfully designed social media client built for the Farcaster protocol. Unlike traditional social platforms that prioritize viral content and engagement metrics, Depthcaster is engineered to surface high-quality, substantive content that encourages genuine dialogue and intellectual exchange.
+Sopha is a thoughtfully designed social media client built for the Farcaster protocol. Unlike traditional social platforms that prioritize viral content and engagement metrics, Sopha is engineered to surface high-quality, substantive content that encourages genuine dialogue and intellectual exchange.
 
 ## Core Philosophy
 
-Depthcaster believes that the best conversations happen when we slow down, think deeply, and engage with ideas rather than algorithms. The platform combines algorithmic intelligence with human curation to create a feed that values:
+Sopha believes that the best conversations happen when we slow down, think deeply, and engage with ideas rather than algorithms. The platform combines algorithmic intelligence with human curation to create a feed that values:
 
 - **Substance over virality**: Longer, more thoughtful casts are prioritized
 - **Quality over quantity**: User quality scores and engagement depth matter more than raw metrics
@@ -17,7 +17,7 @@ Depthcaster believes that the best conversations happen when we slow down, think
 
 ### Multiple Feed Types
 
-Depthcaster offers several distinct feed experiences to match your mood and interests:
+Sopha offers several distinct feed experiences to match your mood and interests:
 
 - **Curated Feed**: Hand-picked content from high-quality users and channels, with customizable curator selection and multiple sorting options (Recently Curated, Time of Cast, Recent Reply)
 - **Trending**: Quality-filtered trending content that surfaces what's resonating across Farcaster
@@ -38,7 +38,7 @@ The platform uses a sophisticated hybrid filtering system that combines:
 
 Experience full conversation threads with quality-ranked replies. Every cast can be expanded to reveal the entire discussion, making it easy to follow complex, multi-participant conversations and dive deep into topics that matter to you.
 
-**Unique Feature**: Depthcaster treats quote casts as first-class conversation participants. When someone quotes a cast, that quote appears as a top-level reply in the original cast's thread, seamlessly integrating quoted commentary into the conversation flow. This innovative approach ensures that all responses—whether direct replies or quotes—are part of the same unified discussion, making it easier to follow the full context of any conversation.
+**Unique Feature**: Sopha treats quote casts as first-class conversation participants. When someone quotes a cast, that quote appears as a top-level reply in the original cast's thread, seamlessly integrating quoted commentary into the conversation flow. This innovative approach ensures that all responses—whether direct replies or quotes—are part of the same unified discussion, making it easier to follow the full context of any conversation.
 
 ### Curator Packs
 
@@ -61,7 +61,7 @@ Stay connected with a comprehensive notification system that tracks:
 
 ### Progressive Web App
 
-Depthcaster is a fully functional Progressive Web App (PWA), meaning you can:
+Sopha is a fully functional Progressive Web App (PWA), meaning you can:
 
 - Install it on your device like a native app
 - Use it offline with service worker support
@@ -70,7 +70,7 @@ Depthcaster is a fully functional Progressive Web App (PWA), meaning you can:
 
 ### Build Ideas & Feedback System
 
-Depthcaster includes a unified system for tracking build ideas and user feedback:
+Sopha includes a unified system for tracking build ideas and user feedback:
 
 - **Build Ideas**: Administrators can create and manage build ideas, feature requests, and development notes directly from the admin panel
 - **User Feedback**: Any user can submit feedback, suggestions, or ideas through the feedback icon in the header
@@ -92,7 +92,7 @@ The platform offers extensive customization options:
 
 ### Quality-Focused Design
 
-Every aspect of Depthcaster is designed to encourage quality interactions:
+Every aspect of Sopha is designed to encourage quality interactions:
 
 - **Cast Composer**: Clean, distraction-free interface for writing thoughtful posts
 - **Profile Pages**: Comprehensive user profiles showing activity, engagement, and conversation history
@@ -111,11 +111,11 @@ Built with modern web technologies:
 
 ## Getting Started
 
-Depthcaster is designed to be immediately usable—you can browse the curated feed without signing in. To unlock the full experience, including posting, creating packs, and personalized feeds, simply sign in with your Farcaster account via Neynar's Sign in with Neynar (SIWN).
+Sopha is designed to be immediately usable—you can browse the curated feed without signing in. To unlock the full experience, including posting, creating packs, and personalized feeds, simply sign in with your Farcaster account via Neynar's Sign in with Neynar (SIWN).
 
-Whether you're a philosopher sharing deep thoughts, an artist showcasing your work, or someone seeking meaningful conversations in a noisy digital world, Depthcaster provides the tools and environment to make those connections happen.
+Whether you're a philosopher sharing deep thoughts, an artist showcasing your work, or someone seeking meaningful conversations in a noisy digital world, Sopha provides the tools and environment to make those connections happen.
 
 ---
 
-*Depthcaster: Where quality conversations find their home.*
+*Sopha: Where quality conversations find their home.*
 

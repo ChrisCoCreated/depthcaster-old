@@ -1,5 +1,5 @@
 /**
- * Link conversion utilities for converting external Farcaster links to Depthcaster links
+ * Link conversion utilities for converting external Farcaster links to Sopha links
  * This avoids unnecessary Neynar API calls by extracting cast hashes directly from URLs
  */
 
@@ -41,11 +41,11 @@ export function extractCastHashFromUrl(url: string): string | null {
 }
 
 /**
- * Converts a Farcaster URL to a Depthcaster link
+ * Converts a Farcaster URL to a Sopha link
  * @param url - The external Farcaster URL
- * @returns Depthcaster link (/cast/[hash]) or original URL if hash not found
+ * @returns Sopha link (/cast/[hash]) or original URL if hash not found
  */
-export function convertToDepthcasterLink(url: string): string {
+export function convertToSophaLink(url: string): string {
   const hash = extractCastHashFromUrl(url);
   if (hash) {
     return `/cast/${hash}`;
@@ -68,7 +68,7 @@ export function isFarcasterLink(url: string): boolean {
 }
 
 /**
- * Converts base.app links to Depthcaster links inline
+ * Converts base.app links to Sopha links inline
  * This is used for rendering text where we want to convert links immediately
  */
 export function convertBaseAppLinksInline(text: string): string {

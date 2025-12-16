@@ -36,14 +36,14 @@ export function OnboardingFlow() {
 
   const steps: OnboardingStep[] = [
     {
-      title: "Welcome to Depthcaster",
+      title: "Welcome to Sopha",
       content: (
         <div className="space-y-4">
           <p className="text-gray-600 dark:text-gray-400">
             A Long from farcaster client focused on deep thoughts, philosophy, art, and meaningful conversations.
           </p>
           <p className="text-gray-600 dark:text-gray-400">
-            You&apos;ve installed Depthcaster as a Progressive Web App. Let&apos;s get you started!
+            You&apos;ve installed Sopha as a Progressive Web App. Let&apos;s get you started!
           </p>
         </div>
       ),
@@ -100,7 +100,7 @@ export function OnboardingFlow() {
       content: (
         <div className="space-y-4">
           <p className="text-gray-600 dark:text-gray-400">
-            Start exploring Depthcaster. You can customize your notification preferences and feed settings anytime in Settings.
+            Start exploring Sopha. You can customize your notification preferences and feed settings anytime in Settings.
           </p>
           <p className="text-sm text-gray-500 dark:text-gray-500">
             Tip: The app works offline and can be used like a native app!

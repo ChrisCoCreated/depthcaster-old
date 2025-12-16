@@ -219,7 +219,7 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>,
       
       // If inside a link, render as span with click handler instead of <a> tag
       if (insideLink) {
-        // Check if it's a Depthcaster link (already converted base.app link)
+        // Check if it's a Sopha link (already converted base.app link)
         if (url && url.startsWith('/cast/')) {
           parts.push(
             <span
@@ -317,7 +317,7 @@ function renderTextWithLinks(text: string, router: ReturnType<typeof useRouter>,
         }
       } else {
         // Not inside a link - render as normal <a> tags
-        // Check if it's a Depthcaster link (already converted base.app link)
+        // Check if it's a Sopha link (already converted base.app link)
         if (url && url.startsWith('/cast/')) {
           parts.push(
             <Link
@@ -2007,9 +2007,9 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
     }
   };
 
-  const deleteModalTitle = isReply ? "Remove Reply from Depthcaster" : "Remove Curation";
+  const deleteModalTitle = isReply ? "Remove Reply from Sopha" : "Remove Curation";
   const deleteModalDescription = isReply
-    ? "Are you sure you want to remove this reply from Depthcaster? This action cannot be undone."
+    ? "Are you sure you want to remove this reply from Sopha? This action cannot be undone."
     : "Are you sure you want to remove this curation? This action cannot be undone.";
 
   const handleDelete = async () => {

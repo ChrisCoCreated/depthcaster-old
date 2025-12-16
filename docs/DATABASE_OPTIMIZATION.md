@@ -1,10 +1,10 @@
 # Database Optimization Guide
 
-This document describes the database optimization strategies used in Depthcaster to improve query performance and reduce compute costs on Neon DB.
+This document describes the database optimization strategies used in Sopha to improve query performance and reduce compute costs on Neon DB.
 
 ## Overview
 
-Depthcaster uses a hybrid storage approach that balances flexibility with performance:
+Sopha uses a hybrid storage approach that balances flexibility with performance:
 
 - **JSONB storage**: Full cast data stored in `cast_data` JSONB column
 - **Extracted columns**: Frequently queried fields extracted to dedicated columns

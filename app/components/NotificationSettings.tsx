@@ -367,8 +367,8 @@ export function NotificationSettings() {
           {/* Other Curated Cast Notifications */}
           {[
             { key: "notifyOnCurated" as const, label: "When Cast is Curated", emoji: "✨", description: "Get notified when someone else curates a cast you curated" },
-            { key: "notifyOnLiked" as const, label: "When Cast is Liked", emoji: "❤️", description: "Get notified when someone likes a cast you curated (within DepthCaster)" },
-            { key: "notifyOnRecast" as const, label: "When Cast is Recast", emoji: "🔄", description: "Get notified when someone recasts a cast you curated (within DepthCaster)" },
+            { key: "notifyOnLiked" as const, label: "When Cast is Liked", emoji: "❤️", description: "Get notified when someone likes a cast you curated (within Sopha)" },
+            { key: "notifyOnRecast" as const, label: "When Cast is Recast", emoji: "🔄", description: "Get notified when someone recasts a cast you curated (within Sopha)" },
             { key: "notifyOnDailyStats" as const, label: "Daily Stats Summary", emoji: "📊", description: "Receive a daily notification with statistics from the past 24 hours" },
           ].map(({ key, label, emoji, description }) => (
             <label

@@ -190,7 +190,7 @@ export function NotificationBell() {
       for (const notification of notificationsToShow) {
         const notificationType = String(notification.type).toLowerCase();
         // Use more descriptive title for app updates
-        const title = notificationType === "app.update" ? "Depthcaster Update" : "Depthcaster";
+        const title = notificationType === "app.update" ? "Sopha Update" : "Sopha";
         const body = getNotificationText(notification);
         const url = getNotificationUrl(notification);
         
