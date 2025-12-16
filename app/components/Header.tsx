@@ -175,7 +175,7 @@ export function Header() {
       return;
     }
 
-    const originalTitle = "Sopha - Deep Thoughts on Farcaster";
+    const originalTitle = "Sopha - Deep Social on Farcaster";
     
     const createFavicon = (color: string, letter: string): string => {
       // Create a canvas-based favicon for better browser compatibility

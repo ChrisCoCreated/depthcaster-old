@@ -36,7 +36,7 @@ export const viewport: Viewport = {
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: "Sopha - Deep Thoughts on Farcaster",
+  title: "Sopha - Deep Social on Farcaster",
   description: "A Long from farcaster client focused on philosophy, art, and meaningful conversations",
   keywords: ["Farcaster", "social media", "philosophy", "art", "conversations", "web3", "decentralized"],
   authors: [{ name: "Sopha" }],
@@ -49,7 +49,7 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: "/",
     siteName: "Sopha",
-    title: "Sopha - Deep Thoughts on Farcaster",
+    title: "Sopha - Deep Social on Farcaster",
     description: "A Long from farcaster client focused on philosophy, art, and meaningful conversations",
     images: [
       {
@@ -62,8 +62,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Sopha - Deep Thoughts on Farcaster",
-    description: "A Long from farcaster client focused on philosophy, art, and meaningful conversations",
+    title: "Sopha - Deep Social on Farcaster",
+    description: "A Long from farcaster client focused on deep social, philosophy, art, and meaningful conversations",
     images: ["/icon-512x512.webp?v=2"],
     creator: "@sopha_social",
   },
