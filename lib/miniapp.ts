@@ -116,10 +116,11 @@ export async function sendMiniappNotification(
     
     // Handle different possible response structures
     // Response might be: { notification_deliveries: [...] } or { result: { notification_deliveries: [...] } }
+    const responseAny = response as any;
     const deliveries = 
       response?.notification_deliveries || 
-      response?.result?.notification_deliveries || 
-      (response as any)?.data?.notification_deliveries ||
+      responseAny?.result?.notification_deliveries || 
+      responseAny?.data?.notification_deliveries ||
       [];
     
     console.log(`[Miniapp] Found ${deliveries.length} delivery entries`);
