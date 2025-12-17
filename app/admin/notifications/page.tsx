@@ -950,7 +950,7 @@ export default function AdminNotificationsPage() {
               <div className="flex gap-4">
                 <button
                   type="submit"
-                  disabled={isSendingMiniapp || (eligibilityResult && eligibilityResult.eligibleCount === 0)}
+                  disabled={isSendingMiniapp || (eligibilityResult?.eligibleCount === 0) || false}
                   className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
                 >
                   {isSendingMiniapp ? "Sending..." : "Send Miniapp Notifications"}
