@@ -110,14 +110,49 @@ export async function sendMiniappNotification(
 
     const targetCount = requestPayload.target_fids.length === 0 ? "all users" : `${requestPayload.target_fids.length} users`;
     console.log(`[Miniapp] Sent notification to ${targetCount} via Neynar`);
+    console.log(`[Miniapp] Neynar response type:`, typeof response);
+    console.log(`[Miniapp] Neynar response keys:`, response ? Object.keys(response) : "null");
+    console.log(`[Miniapp] Neynar full response:`, JSON.stringify(response, null, 2));
+    
+    // Handle different possible response structures
+    // Response might be: { notification_deliveries: [...] } or { result: { notification_deliveries: [...] } }
+    const deliveries = 
+      response?.notification_deliveries || 
+      response?.result?.notification_deliveries || 
+      (response as any)?.data?.notification_deliveries ||
+      [];
+    
+    console.log(`[Miniapp] Found ${deliveries.length} delivery entries`);
     
     // Count successful deliveries
-    const successfulDeliveries = response?.notification_deliveries?.filter(
-      (delivery) => delivery.status === "success"
-    ) || [];
-    const failedDeliveries = response?.notification_deliveries?.filter(
-      (delivery) => delivery.status !== "success"
-    ) || [];
+    const successfulDeliveries = deliveries.filter(
+      (delivery: any) => delivery?.status === "success" || delivery?.status === "delivered"
+    );
+    const failedDeliveries = deliveries.filter(
+      (delivery: any) => delivery?.status !== "success" && delivery?.status !== "delivered"
+    );
+    
+    console.log(`[Miniapp] Delivery results: ${successfulDeliveries.length} successful, ${failedDeliveries.length} failed`);
+    
+    // Log failed delivery details
+    if (failedDeliveries.length > 0) {
+      console.error(`[Miniapp] Failed deliveries (${failedDeliveries.length}):`, JSON.stringify(failedDeliveries, null, 2));
+      failedDeliveries.forEach((delivery: any, index: number) => {
+        console.error(`[Miniapp] Failed delivery ${index + 1}:`, {
+          fid: delivery?.fid,
+          status: delivery?.status,
+          error: delivery?.error,
+          message: delivery?.message,
+          reason: delivery?.reason,
+          fullDelivery: delivery,
+        });
+      });
+    }
+    
+    // Log successful deliveries for debugging
+    if (successfulDeliveries.length > 0) {
+      console.log(`[Miniapp] Successful deliveries (${successfulDeliveries.length}):`, JSON.stringify(successfulDeliveries, null, 2));
+    }
     
     return {
       sent: successfulDeliveries.length,
@@ -245,6 +280,8 @@ export async function notifyAllMiniappUsersAboutNewCuratedCast(
   // Get all users with miniapp installed
   const installedFids = await getMiniappInstalledFids();
   
+  console.log(`[Miniapp] Total users with miniapp installed: ${installedFids.length}`);
+  
   if (installedFids.length === 0) {
     console.log("[Miniapp] No users with miniapp installed");
     return { sent: 0, errors: 0, queued: 0 };
@@ -255,6 +292,7 @@ export async function notifyAllMiniappUsersAboutNewCuratedCast(
   const usersToQueueDaily: number[] = [];
   const usersToQueueWeekly: number[] = [];
 
+  console.log(`[Miniapp] Checking notification frequency preferences for ${installedFids.length} users...`);
   for (const fid of installedFids) {
     const frequency = await getUserNotificationFrequency(fid);
     if (frequency === "all") {
@@ -266,18 +304,26 @@ export async function notifyAllMiniappUsersAboutNewCuratedCast(
     }
   }
 
+  console.log(`[Miniapp] Users to notify immediately: ${usersToNotifyImmediately.length} (FIDs: ${usersToNotifyImmediately.join(", ")})`);
+  console.log(`[Miniapp] Users to queue daily: ${usersToQueueDaily.length}`);
+  console.log(`[Miniapp] Users to queue weekly: ${usersToQueueWeekly.length}`);
+
   // Send immediate notifications to users with "all" frequency
   let sent = 0;
   let errors = 0;
   if (usersToNotifyImmediately.length > 0) {
     try {
+      console.log(`[Miniapp] Sending notifications to ${usersToNotifyImmediately.length} users with "all" frequency...`);
       const result = await sendMiniappNotification(usersToNotifyImmediately, title, body, targetUrl);
       sent = result.sent;
       errors = result.errors;
+      console.log(`[Miniapp] Notification send complete: ${sent} sent, ${errors} errors`);
     } catch (error) {
       console.error("[Miniapp] Error sending immediate notifications:", error);
       errors = usersToNotifyImmediately.length;
     }
+  } else {
+    console.log("[Miniapp] No users with 'all' frequency preference - nothing to send immediately");
   }
 
   // Queue notifications for daily/weekly users

@@ -3,6 +3,8 @@ import { notifyAllMiniappUsersAboutNewCuratedCast, buildMiniappNotificationPaylo
 
 export async function POST(request: NextRequest) {
   try {
+    console.log("[Admin] Test miniapp notification endpoint called");
+    
     // Create test cast data
     const testCastData = {
       text: "This is a test curated cast notification. Click to view the miniapp feed!",
@@ -15,8 +17,9 @@ export async function POST(request: NextRequest) {
     };
 
     const testCastHash = `test-${Date.now()}`;
+    console.log(`[Admin] Test cast hash: ${testCastHash}`);
 
-    // Build the payload that will be sent
+    // Build the payload that will be sent (for display purposes - actual payload is built in notifyAllMiniappUsersAboutNewCuratedCast)
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://sopha.social";
     const targetUrl = `${appUrl}/`;
     const castText = testCastData?.text || "";
@@ -26,18 +29,27 @@ export async function POST(request: NextRequest) {
     const body = previewText || `${authorName} curated a cast`;
     
     const payload = buildMiniappNotificationPayload([], title, body, targetUrl);
+    console.log(`[Admin] Example payload (empty target_fids for display):`, JSON.stringify(payload, null, 2));
 
     // Send test notification
+    console.log(`[Admin] Calling notifyAllMiniappUsersAboutNewCuratedCast...`);
     const result = await notifyAllMiniappUsersAboutNewCuratedCast(
       testCastHash,
       testCastData
     );
 
+    console.log(`[Admin] Test notification result:`, {
+      sent: result.sent,
+      errors: result.errors,
+      queued: result.queued,
+    });
+
     return NextResponse.json({
       success: true,
       sent: result.sent,
       errors: result.errors,
-      message: `Test miniapp notification sent! ${result.sent} notification(s) delivered, ${result.errors} error(s).`,
+      queued: result.queued,
+      message: `Test miniapp notification sent! ${result.sent} notification(s) delivered, ${result.errors} error(s), ${result.queued} queued.`,
       payload: payload,
     });
   } catch (error: any) {
