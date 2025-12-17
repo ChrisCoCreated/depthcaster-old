@@ -36,6 +36,14 @@ export default function AdminNotificationsPage() {
   const [miniappTargetRoles, setMiniappTargetRoles] = useState<string[]>([]);
   const [isSendingMiniapp, setIsSendingMiniapp] = useState(false);
   const [miniappMessage, setMiniappMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [isCheckingEligibility, setIsCheckingEligibility] = useState(false);
+  const [eligibilityResult, setEligibilityResult] = useState<{
+    requestedCount: number;
+    eligibleCount: number;
+    ineligibleCount: number;
+    eligibleFids: number[];
+    ineligibleFids: number[];
+  } | null>(null);
 
   useEffect(() => {
     const checkAdminAccess = async () => {
@@ -210,6 +218,65 @@ export default function AdminNotificationsPage() {
     }
   };
 
+  const checkEligibility = async () => {
+    if (!user || !user.fid) {
+      setMiniappMessage({ type: "error", text: "You must be logged in to check eligibility" });
+      return;
+    }
+
+    if (miniappTargetType === "targeted" && !miniappTargetFids.trim() && miniappTargetRoles.length === 0) {
+      setMiniappMessage({ type: "error", text: "Please provide target FIDs or select at least one role" });
+      return;
+    }
+
+    setIsCheckingEligibility(true);
+    setEligibilityResult(null);
+    setMiniappMessage(null);
+
+    try {
+      const payload: any = {
+        targetType: miniappTargetType,
+        adminFid: user.fid,
+      };
+
+      if (miniappTargetType === "targeted") {
+        if (miniappTargetFids.trim()) {
+          const fids = miniappTargetFids
+            .split(",")
+            .map((fid) => parseInt(fid.trim()))
+            .filter((fid) => !isNaN(fid));
+          if (fids.length > 0) {
+            payload.targetFids = fids;
+          }
+        }
+        if (miniappTargetRoles.length > 0) {
+          payload.targetRoles = miniappTargetRoles;
+        }
+      }
+
+      const response = await fetch("/api/admin/miniapp-notifications/check", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to check eligibility");
+      }
+
+      setEligibilityResult(data);
+    } catch (error: any) {
+      console.error("Failed to check eligibility:", error);
+      setMiniappMessage({ type: "error", text: error.message || "Failed to check eligibility" });
+    } finally {
+      setIsCheckingEligibility(false);
+    }
+  };
+
   const handleMiniappSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -269,12 +336,28 @@ export default function AdminNotificationsPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to send miniapp notifications");
+        // Enhanced error message with eligibility details
+        let errorMsg = data.error || "Failed to send miniapp notifications";
+        if (data.ineligibleCount > 0) {
+          errorMsg += `\n\n${data.ineligibleCount} user(s) do not have the miniapp installed and were excluded.`;
+          if (data.ineligibleFids && data.ineligibleFids.length > 0) {
+            errorMsg += `\nIneligible FIDs: ${data.ineligibleFids.join(", ")}${data.ineligibleCount > data.ineligibleFids.length ? " (and more...)" : ""}`;
+          }
+        }
+        throw new Error(errorMsg);
+      }
+
+      let successMsg = `Miniapp notifications sent successfully! Sent ${data.sent} notification(s) to ${data.eligibleCount} eligible user(s) (${data.errors} error(s)).`;
+      if (data.ineligibleCount > 0) {
+        successMsg += `\n\nNote: ${data.ineligibleCount} user(s) were excluded because they don't have the miniapp installed.`;
+        if (data.ineligibleFids && data.ineligibleFids.length > 0) {
+          successMsg += `\nExcluded FIDs: ${data.ineligibleFids.join(", ")}${data.ineligibleCount > data.ineligibleFids.length ? " (and more...)" : ""}`;
+        }
       }
 
       setMiniappMessage({
         type: "success",
-        text: `Miniapp notifications sent successfully! Sent ${data.sent} notification(s) to ${data.totalUsers} user(s) (${data.errors} error(s)).`,
+        text: successMsg,
       });
 
       // Reset form
@@ -691,7 +774,7 @@ export default function AdminNotificationsPage() {
             
             {miniappMessage && (
               <div
-                className={`mb-4 p-4 rounded-lg ${
+                className={`mb-4 p-4 rounded-lg whitespace-pre-wrap ${
                   miniappMessage.type === "success"
                     ? "bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200"
                     : "bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-200"
@@ -831,13 +914,54 @@ export default function AdminNotificationsPage() {
                 )}
               </div>
 
+              {/* Eligibility Check Results */}
+              {eligibilityResult && (
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">
+                    Eligibility Check Results
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <span className="font-medium">Requested:</span> {eligibilityResult.requestedCount} user(s)
+                    </div>
+                    <div className="text-green-600 dark:text-green-400">
+                      <span className="font-medium">Eligible:</span> {eligibilityResult.eligibleCount} user(s) (have miniapp installed)
+                    </div>
+                    {eligibilityResult.ineligibleCount > 0 && (
+                      <div className="text-orange-600 dark:text-orange-400">
+                        <span className="font-medium">Not Eligible:</span> {eligibilityResult.ineligibleCount} user(s) (don't have miniapp installed)
+                        {eligibilityResult.ineligibleFids.length > 0 && (
+                          <div className="mt-1 ml-4 text-xs">
+                            FIDs: {eligibilityResult.ineligibleFids.join(", ")}
+                            {eligibilityResult.ineligibleCount > eligibilityResult.ineligibleFids.length && " (and more...)"}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {eligibilityResult.eligibleFids.length > 0 && eligibilityResult.eligibleFids.length <= 50 && (
+                      <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+                        <span className="font-medium">Eligible FIDs:</span> {eligibilityResult.eligibleFids.join(", ")}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-4">
                 <button
                   type="submit"
-                  disabled={isSendingMiniapp}
+                  disabled={isSendingMiniapp || (eligibilityResult && eligibilityResult.eligibleCount === 0)}
                   className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
                 >
                   {isSendingMiniapp ? "Sending..." : "Send Miniapp Notifications"}
+                </button>
+                <button
+                  type="button"
+                  onClick={checkEligibility}
+                  disabled={isCheckingEligibility || miniappTargetType === "all"}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isCheckingEligibility ? "Checking..." : "Check Eligibility"}
                 </button>
                 <button
                   type="button"
@@ -849,6 +973,7 @@ export default function AdminNotificationsPage() {
                     setMiniappTargetFids("");
                     setMiniappTargetRoles([]);
                     setMiniappMessage(null);
+                    setEligibilityResult(null);
                   }}
                   className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
                 >

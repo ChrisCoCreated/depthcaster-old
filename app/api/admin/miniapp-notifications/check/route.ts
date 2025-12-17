@@ -1,22 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { miniappInstallations, userRoles } from "@/lib/schema";
-import { eq, inArray, and } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { isAdmin, getUserRoles } from "@/lib/roles";
-import { sendMiniappNotification, getMiniappInstalledFids } from "@/lib/miniapp";
+import { getMiniappInstalledFids } from "@/lib/miniapp";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { title, body: messageBody, url, targetType, targetFids, targetRoles, adminFid } = body;
-
-    // Validate required fields
-    if (!title || !messageBody || !targetType) {
-      return NextResponse.json(
-        { error: "Missing required fields: title, body, targetType" },
-        { status: 400 }
-      );
-    }
+    const { targetType, targetFids, targetRoles, adminFid } = body;
 
     if (!adminFid) {
       return NextResponse.json(
@@ -42,18 +34,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Determine target user FIDs (only those with miniapp installed)
-    let targetUserFids: number[] = [];
     let requestedFids: number[] = [];
+    let eligibleFids: number[] = [];
     let ineligibleFids: number[] = [];
 
     if (targetType === "all") {
       // Get all users who have the miniapp installed
-      targetUserFids = await getMiniappInstalledFids();
-      requestedFids = targetUserFids; // For "all", requested = eligible
+      eligibleFids = await getMiniappInstalledFids();
+      requestedFids = eligibleFids; // For "all", requested = eligible
     } else if (targetType === "targeted") {
       if (targetFids && Array.isArray(targetFids) && targetFids.length > 0) {
-        // Use provided FIDs, but filter to only those who have miniapp installed
+        // Check which of the provided FIDs have miniapp installed
         const validFids = targetFids.filter((fid: any) => typeof fid === "number" && !isNaN(fid));
         requestedFids = validFids;
         
@@ -62,12 +53,11 @@ export async function POST(request: NextRequest) {
             .select({ userFid: miniappInstallations.userFid })
             .from(miniappInstallations)
             .where(inArray(miniappInstallations.userFid, validFids));
-          targetUserFids = installations.map((inst) => inst.userFid);
-          ineligibleFids = validFids.filter((fid) => !targetUserFids.includes(fid));
+          eligibleFids = installations.map((inst) => inst.userFid);
+          ineligibleFids = validFids.filter((fid) => !eligibleFids.includes(fid));
         }
       } else if (targetRoles && Array.isArray(targetRoles) && targetRoles.length > 0) {
-        // Get users by roles (multiple roles supported)
-        // Filter to only users who have miniapp installed AND have one of the selected roles
+        // Get users by roles and check which have miniapp installed
         const validRoles = targetRoles.filter((role: any) => typeof role === "string" && role.trim().length > 0);
         if (validRoles.length > 0) {
           // Get all users with the selected roles
@@ -80,13 +70,13 @@ export async function POST(request: NextRequest) {
           requestedFids = roleUserFids;
           
           if (roleUserFids.length > 0) {
-            // Filter to only those who have miniapp installed
+            // Check which have miniapp installed
             const installations = await db
               .select({ userFid: miniappInstallations.userFid })
               .from(miniappInstallations)
               .where(inArray(miniappInstallations.userFid, roleUserFids));
-            targetUserFids = installations.map((inst) => inst.userFid);
-            ineligibleFids = roleUserFids.filter((fid) => !targetUserFids.includes(fid));
+            eligibleFids = installations.map((inst) => inst.userFid);
+            ineligibleFids = roleUserFids.filter((fid) => !eligibleFids.includes(fid));
           }
         }
       } else {
@@ -102,41 +92,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (targetUserFids.length === 0) {
-      return NextResponse.json(
-        { 
-          error: "No eligible users found (only users who have installed the miniapp are included)",
-          requestedCount: requestedFids.length,
-          eligibleCount: 0,
-          ineligibleCount: ineligibleFids.length,
-          ineligibleFids: ineligibleFids.slice(0, 20), // Limit to first 20 for response size
-        },
-        { status: 400 }
-      );
-    }
-
-    // Send miniapp notifications
-    const result = await sendMiniappNotification(
-      targetUserFids,
-      title.trim(),
-      messageBody.trim(),
-      url?.trim()
-    );
-
     return NextResponse.json({
       success: true,
-      totalUsers: targetUserFids.length,
       requestedCount: requestedFids.length,
-      eligibleCount: targetUserFids.length,
+      eligibleCount: eligibleFids.length,
       ineligibleCount: ineligibleFids.length,
-      sent: result.sent,
-      errors: result.errors,
-      ineligibleFids: ineligibleFids.length > 0 ? ineligibleFids.slice(0, 20) : [], // Limit to first 20 for response size
+      eligibleFids,
+      ineligibleFids,
     });
   } catch (error: any) {
-    console.error("Error sending miniapp notifications:", error);
+    console.error("Error checking miniapp notification eligibility:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to send miniapp notifications" },
+      { error: error.message || "Failed to check eligibility" },
       { status: 500 }
     );
   }
