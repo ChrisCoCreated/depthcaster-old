@@ -246,6 +246,28 @@ body {
     color: #ffffff !important;
   }
 
+  /* High contrast: Override tan colors with red for notification badge and like button */
+  .high-contrast .notification-badge {
+    background-color: #ef4444 !important; /* red-500 */
+  }
+  
+  /* Override like button colors in high contrast mode - target when it has accent-dark classes */
+  .high-contrast .like-button.text-accent-dark {
+    color: #dc2626 !important; /* red-600 */
+  }
+  
+  .high-contrast .like-button:hover {
+    color: #dc2626 !important; /* red-600 - override hover when it would be accent-dark */
+  }
+  
+  .high-contrast.dark .like-button.text-accent-dark {
+    color: #f87171 !important; /* red-400 */
+  }
+  
+  .high-contrast.dark .like-button:hover {
+    color: #f87171 !important; /* red-400 - override hover when it would be accent-dark */
+  }
+
   .high-contrast .border-gray-200,
   .high-contrast .border-gray-300 {
     border-color: #000000 !important;

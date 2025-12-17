@@ -3658,7 +3658,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                   handleLike();
                 }}
                 disabled={isReacting || !user}
-                className={`flex items-center gap-1 sm:gap-2 text-xs sm:text-sm transition-colors py-1 px-1 sm:px-0 ${
+                className={`flex items-center gap-1 sm:gap-2 text-xs sm:text-sm transition-colors py-1 px-1 sm:px-0 like-button ${
                   isLiked
                     ? "text-accent-dark dark:text-accent-dark"
                     : "text-gray-500 dark:text-gray-400 hover:text-accent-dark dark:hover:text-accent-dark"
