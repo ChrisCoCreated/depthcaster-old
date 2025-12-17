@@ -837,6 +837,16 @@ export function Header() {
                       >
                         Curators Instructions
                       </Link>
+                      <a
+                        href="https://farcaster.xyz/miniapps/HtUwgAw4iQ2x/sopha"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => setIsHelpDropdownOpen(false)}
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                      >
+                        <Download className="w-4 h-4" />
+                        Install Miniapp
+                      </a>
                     </div>,
                     document.body
                   )}
@@ -942,9 +952,35 @@ export function Header() {
               </>
             ) : (
               !isMiniapp && (
-                <div className="[&_button_img]:hidden [&_button_svg]:hidden">
-                  <NeynarAuthButton label="Sign in" />
-                </div>
+                <>
+                  {/* Expanded help menu for logged out users */}
+                  <div className="flex items-center gap-4 sm:gap-6">
+                    <Link
+                      href="/faq"
+                      className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+                    >
+                      FAQ
+                    </Link>
+                    <Link
+                      href="/why"
+                      className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+                    >
+                      Why Sopha
+                    </Link>
+                    <a
+                      href="https://farcaster.xyz/miniapps/HtUwgAw4iQ2x/sopha"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors flex items-center gap-1.5"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span className="hidden sm:inline">Install</span>
+                    </a>
+                    <div className="[&_button_img]:hidden [&_button_svg]:hidden [&_button]:bg-accent [&_button]:hover:bg-accent-dark [&_button]:text-gray-900 [&_button]:dark:text-gray-900 [&_button]:font-medium [&_button]:px-4 [&_button]:py-2 [&_button]:rounded-lg [&_button]:transition-colors">
+                      <NeynarAuthButton label="Sign in" />
+                    </div>
+                  </div>
+                </>
               )
             )}
           </div>
