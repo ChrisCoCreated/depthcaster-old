@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useRef, memo } from "react";
 import Image, { ImageProps } from "next/image";
 import { buildProxiedImageUrl, sanitizeImageUrl, shouldProxyImageUrl, isExternalUrl, getAlternativeImgurUrl } from "@/lib/imageProxy";
 
-const DEFAULT_AVATAR = "/default-avatar.png";
+const DEFAULT_AVATAR = "/images/logos/owl_only.png";
 
 type AvatarImageProps = {
   src?: string | null;

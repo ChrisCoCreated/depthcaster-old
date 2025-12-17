@@ -652,6 +652,32 @@ export async function analyzeCastQuality(
     }
   }
   
+  // Check if this is a recast of an already curated cast
+  // If so, we should only evaluate the text, not the embedded cast content
+  let isRecastOfCuratedCast = false;
+  if (!analyzingQuotedCast && isQuoteCast(castData)) {
+    const quotedCastHashes = extractQuotedCastHashes(castData as any);
+    if (quotedCastHashes.length > 0) {
+      const quotedCastHash = quotedCastHashes[0];
+      try {
+        // Check if the quoted cast is already curated
+        const curatedCast = await db
+          .select()
+          .from(curatedCasts)
+          .where(eq(curatedCasts.castHash, quotedCastHash))
+          .limit(1);
+        
+        if (curatedCast.length > 0) {
+          isRecastOfCuratedCast = true;
+          console.log(`[DeepSeek] Recast of already curated cast detected (${quotedCastHash}), evaluating only text content`);
+        }
+      } catch (error: any) {
+        console.error(`[DeepSeek] Error checking if quoted cast is curated:`, error.message);
+        // Continue with normal analysis on error
+      }
+    }
+  }
+  
   // Extract embed content (including Paragraph articles)
   const embedContent = await extractEmbedContent(castData);
   
@@ -662,8 +688,12 @@ export async function analyzeCastQuality(
     contentParts.push(`Cast text:\n${castText.substring(0, 2000)}${castText.length > 2000 ? "..." : ""}`);
   }
   
-  if (embedContent.quotedCastTexts.length > 0) {
+  // Only include quoted cast texts if it's a fresh curation (not a recast of already curated cast)
+  if (embedContent.quotedCastTexts.length > 0 && !isRecastOfCuratedCast) {
     contentParts.push(`\nQuoted casts:\n${embedContent.quotedCastTexts.map((text, i) => `[Quoted cast ${i + 1}]: ${text.substring(0, 500)}${text.length > 500 ? "..." : ""}`).join('\n')}`);
+  } else if (embedContent.quotedCastTexts.length > 0 && isRecastOfCuratedCast) {
+    // For recasts of curated casts, mention that embedded cast is excluded
+    contentParts.push(`\nNote: This cast quotes an already-curated cast. Only the additional text is being evaluated.`);
   }
   
   if (embedContent.paragraphArticles.length > 0) {
@@ -723,7 +753,12 @@ export async function analyzeCastQuality(
                      embedContent.linkMetadata.length === 0 &&
                      embedContent.paragraphArticles.length === 0;
 
-  const prompt = `Analyze this Farcaster cast and provide:
+  // Build prompt with context about recast of curated cast
+  const recastContext = isRecastOfCuratedCast 
+    ? `\n\nIMPORTANT: This cast is a recast (quote) of an already-curated cast. Only evaluate the additional text content on its own merits as a reply/commentary to the embedded cast. Do NOT consider the embedded cast content in your evaluation - it has already been curated separately. Focus solely on the quality and value of the additional text.` 
+    : '';
+
+  const prompt = `Analyze this Farcaster cast and provide:${recastContext}
 1. A quality score from 0-100 based on depth, clarity, and value
    - Extremely low-effort content (single emoji, "gm", "lol", "👀", or similar) should be scored between 0 and 5
    - Very short acknowledgements that add only a tiny bit of signal (e.g. "that's fair", "ok true") should typically be scored between 5 and 20
