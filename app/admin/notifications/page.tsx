@@ -19,13 +19,23 @@ export default function AdminNotificationsPage() {
   const [weeklyTestResult, setWeeklyTestResult] = useState<string | null>(null);
   const [miniappTestResult, setMiniappTestResult] = useState<string | null>(null);
 
-  // Form state
+  // Sopha App Notification Form state
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [url, setUrl] = useState("");
   const [targetType, setTargetType] = useState<"all" | "targeted">("all");
   const [targetFids, setTargetFids] = useState("");
   const [targetRoles, setTargetRoles] = useState<string[]>([]);
+
+  // Miniapp Notification Form state
+  const [miniappTitle, setMiniappTitle] = useState("");
+  const [miniappBody, setMiniappBody] = useState("");
+  const [miniappUrl, setMiniappUrl] = useState("");
+  const [miniappTargetType, setMiniappTargetType] = useState<"all" | "targeted">("all");
+  const [miniappTargetFids, setMiniappTargetFids] = useState("");
+  const [miniappTargetRoles, setMiniappTargetRoles] = useState<string[]>([]);
+  const [isSendingMiniapp, setIsSendingMiniapp] = useState(false);
+  const [miniappMessage, setMiniappMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
     const checkAdminAccess = async () => {
@@ -197,6 +207,88 @@ export default function AdminNotificationsPage() {
       setWeeklyTestResult(`Error: ${error.message || "Failed to send test notification"}`);
     } finally {
       setIsSendingWeeklyTest(false);
+    }
+  };
+
+  const handleMiniappSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!user || !user.fid) {
+      setMiniappMessage({ type: "error", text: "You must be logged in to send notifications" });
+      return;
+    }
+    
+    if (!miniappTitle.trim() || !miniappBody.trim()) {
+      setMiniappMessage({ type: "error", text: "Title and message are required" });
+      return;
+    }
+
+    if (miniappTargetType === "targeted" && !miniappTargetFids.trim() && miniappTargetRoles.length === 0) {
+      setMiniappMessage({ type: "error", text: "Please provide target FIDs or select at least one role" });
+      return;
+    }
+
+    setIsSendingMiniapp(true);
+    setMiniappMessage(null);
+
+    try {
+      const payload: any = {
+        title: miniappTitle.trim(),
+        body: miniappBody.trim(),
+        targetType: miniappTargetType,
+        adminFid: user.fid,
+      };
+
+      if (miniappUrl.trim()) {
+        payload.url = miniappUrl.trim();
+      }
+
+      if (miniappTargetType === "targeted") {
+        if (miniappTargetFids.trim()) {
+          const fids = miniappTargetFids
+            .split(",")
+            .map((fid) => parseInt(fid.trim()))
+            .filter((fid) => !isNaN(fid));
+          if (fids.length > 0) {
+            payload.targetFids = fids;
+          }
+        }
+        if (miniappTargetRoles.length > 0) {
+          payload.targetRoles = miniappTargetRoles;
+        }
+      }
+
+      const response = await fetch("/api/admin/miniapp-notifications/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to send miniapp notifications");
+      }
+
+      setMiniappMessage({
+        type: "success",
+        text: `Miniapp notifications sent successfully! Sent ${data.sent} notification(s) to ${data.totalUsers} user(s) (${data.errors} error(s)).`,
+      });
+
+      // Reset form
+      setMiniappTitle("");
+      setMiniappBody("");
+      setMiniappUrl("");
+      setMiniappTargetType("all");
+      setMiniappTargetFids("");
+      setMiniappTargetRoles([]);
+    } catch (error: any) {
+      console.error("Failed to send miniapp notifications:", error);
+      setMiniappMessage({ type: "error", text: error.message || "Failed to send miniapp notifications" });
+    } finally {
+      setIsSendingMiniapp(false);
     }
   };
 
@@ -557,7 +649,8 @@ export default function AdminNotificationsPage() {
             </p>
           </div>
 
-          <div className="bg-white dark:bg-gray-900 border-2 border-purple-200 dark:border-purple-800 rounded-lg p-6">
+          {/* Test Miniapp Notification */}
+          <div className="bg-white dark:bg-gray-900 border-2 border-purple-200 dark:border-purple-800 rounded-lg p-6 mb-6">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">
               Test Miniapp Notification
             </h3>
@@ -588,6 +681,181 @@ export default function AdminNotificationsPage() {
                 </pre>
               </div>
             )}
+          </div>
+
+          {/* Manual Miniapp Notification Form */}
+          <div className="bg-white dark:bg-gray-900 border-2 border-purple-200 dark:border-purple-800 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">
+              Send Manual Miniapp Notification
+            </h3>
+            
+            {miniappMessage && (
+              <div
+                className={`mb-4 p-4 rounded-lg ${
+                  miniappMessage.type === "success"
+                    ? "bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200"
+                    : "bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-200"
+                }`}
+              >
+                {miniappMessage.text}
+              </div>
+            )}
+
+            <form onSubmit={handleMiniappSubmit} className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Title <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={miniappTitle}
+                  onChange={(e) => setMiniappTitle(e.target.value)}
+                  placeholder="e.g., New Feature Available"
+                  maxLength={32}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  required
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Max 32 characters (will be truncated automatically)
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Message <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={miniappBody}
+                  onChange={(e) => setMiniappBody(e.target.value)}
+                  placeholder="Enter the notification message..."
+                  rows={6}
+                  maxLength={128}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-y"
+                  required
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Max 128 characters (will be truncated automatically)
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  URL (Optional)
+                </label>
+                <input
+                  type="url"
+                  value={miniappUrl}
+                  onChange={(e) => setMiniappUrl(e.target.value)}
+                  placeholder="https://sopha.social/miniapp..."
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Link users will be taken to when they click the notification (defaults to miniapp home)
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  Target Audience <span className="text-red-500">*</span>
+                </label>
+                <div className="space-y-3">
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      value="all"
+                      checked={miniappTargetType === "all"}
+                      onChange={(e) => setMiniappTargetType(e.target.value as "all" | "targeted")}
+                      className="mr-2"
+                    />
+                    <span className="text-gray-900 dark:text-gray-100">All users (who have installed the miniapp)</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      value="targeted"
+                      checked={miniappTargetType === "targeted"}
+                      onChange={(e) => setMiniappTargetType(e.target.value as "all" | "targeted")}
+                      className="mr-2"
+                    />
+                    <span className="text-gray-900 dark:text-gray-100">Targeted users</span>
+                  </label>
+                </div>
+
+                {miniappTargetType === "targeted" && (
+                  <div className="mt-4 space-y-4 pl-6 border-l-2 border-gray-200 dark:border-gray-700">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        User FIDs (comma-separated)
+                      </label>
+                      <input
+                        type="text"
+                        value={miniappTargetFids}
+                        onChange={(e) => setMiniappTargetFids(e.target.value)}
+                        placeholder="e.g., 123, 456, 789"
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      />
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Only users who have installed the miniapp will receive notifications
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Or select by role(s)
+                      </label>
+                      <div className="space-y-2">
+                        {["curator", "admin", "superadmin", "tester"].map((role) => (
+                          <label key={role} className="flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={miniappTargetRoles.includes(role)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setMiniappTargetRoles([...miniappTargetRoles, role]);
+                                } else {
+                                  setMiniappTargetRoles(miniappTargetRoles.filter((r) => r !== role));
+                                }
+                              }}
+                              className="mr-2"
+                            />
+                            <span className="text-gray-900 dark:text-gray-100 capitalize">
+                              {role === "superadmin" ? "Super Admins" : role === "admin" ? "Admins" : `${role}s`}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        You can select multiple roles. Only users who have installed the miniapp will receive notifications.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-4">
+                <button
+                  type="submit"
+                  disabled={isSendingMiniapp}
+                  className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                >
+                  {isSendingMiniapp ? "Sending..." : "Send Miniapp Notifications"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMiniappTitle("");
+                    setMiniappBody("");
+                    setMiniappUrl("");
+                    setMiniappTargetType("all");
+                    setMiniappTargetFids("");
+                    setMiniappTargetRoles([]);
+                    setMiniappMessage(null);
+                  }}
+                  className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                >
+                  Clear
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       </div>
