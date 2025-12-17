@@ -2,18 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
-import { AuthProvider } from "./components/AuthProvider";
-import { ConditionalHeader } from "./components/ConditionalHeader";
-import { ServiceWorkerRegistration } from "./components/ServiceWorkerRegistration";
-import { OnboardingFlow } from "./components/OnboardingFlow";
-import { UpdateNotification } from "./components/UpdateNotification";
-import { PushSubscriptionManager } from "./components/PushSubscriptionManager";
-import { SessionTracker } from "./components/SessionTracker";
-import { NavigationManager } from "./components/NavigationManager";
-import { PortalErrorHandler } from "./components/PortalErrorHandler";
-import { XmtpProvider } from "./contexts/XmtpContext";
-import { ThirdwebProviderClient } from "./components/ThirdwebProviderClient";
-import { AccessibilityManager } from "./components/AccessibilityManager";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -105,7 +93,6 @@ export const metadata: Metadata = {
   },
 };
 
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -117,22 +104,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white dark:bg-black text-gray-900 dark:text-gray-100`}
       >
         <Analytics />
-        <PortalErrorHandler />
-        <ServiceWorkerRegistration />
-        <AccessibilityManager />
-        <AuthProvider>
-          <ThirdwebProviderClient>
-            <XmtpProvider>
-              <SessionTracker />
-              <PushSubscriptionManager />
-              <OnboardingFlow />
-              <UpdateNotification />
-              <NavigationManager />
-              <ConditionalHeader />
-              {children}
-            </XmtpProvider>
-          </ThirdwebProviderClient>
-        </AuthProvider>
+        {children}
       </body>
     </html>
   );
