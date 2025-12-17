@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    // Build URL with pagination
+    // Build URL with pagination - ensure trailing slash is present
     let url = `https://api.neynar.com/v2/farcaster/frame/notification_tokens/?limit=${limit}`;
     if (cursor) {
       url += `&cursor=${cursor}`;

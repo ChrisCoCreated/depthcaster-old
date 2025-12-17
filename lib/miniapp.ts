@@ -4,28 +4,121 @@ import { miniappInstallations, miniappNotificationQueue, users } from "./schema"
 import { eq, and, isNull, lte, inArray } from "drizzle-orm";
 import { getUser } from "./users";
 
-/**
- * Check if a user has the miniapp installed
- */
-export async function hasMiniappInstalled(userFid: number): Promise<boolean> {
-  const installation = await db
-    .select()
-    .from(miniappInstallations)
-    .where(eq(miniappInstallations.userFid, userFid))
-    .limit(1);
+const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY;
 
-  return installation.length > 0;
+interface NotificationToken {
+  token: string;
+  fid: number;
+  created_at: string;
+  updated_at: string;
+  status?: string;
+  [key: string]: any;
+}
+
+interface NeynarNotificationTokensResponse {
+  result?: {
+    notification_tokens?: NotificationToken[];
+    next?: {
+      cursor?: string | null;
+    };
+  };
+  notification_tokens?: NotificationToken[];
+  next?: {
+    cursor?: string | null;
+  };
 }
 
 /**
- * Get all FIDs that have the miniapp installed
+ * Fetch all notification tokens from Neynar API
+ */
+async function fetchAllNotificationTokens(): Promise<NotificationToken[]> {
+  if (!NEYNAR_API_KEY) {
+    console.error("[Miniapp] NEYNAR_API_KEY not set, cannot fetch notification tokens");
+    return [];
+  }
+
+  const allTokens: NotificationToken[] = [];
+  let cursor: string | null = null;
+  let hasMore = true;
+
+  while (hasMore) {
+    let url = `https://api.neynar.com/v2/farcaster/frame/notification_tokens/?limit=100`;
+    if (cursor) {
+      url += `&cursor=${cursor}`;
+    }
+
+    try {
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "x-api-key": NEYNAR_API_KEY,
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[Miniapp] Failed to fetch notification tokens: ${response.status} ${errorText}`);
+        break;
+      }
+
+      const data: NeynarNotificationTokensResponse = await response.json();
+      const tokens = data.result?.notification_tokens || data.notification_tokens || [];
+      allTokens.push(...tokens);
+
+      cursor = data.result?.next?.cursor || data.next?.cursor || null;
+      hasMore = !!cursor;
+    } catch (error) {
+      console.error("[Miniapp] Error fetching notification tokens:", error);
+      break;
+    }
+  }
+
+  return allTokens;
+}
+
+/**
+ * Get FIDs with enabled notification tokens (users who have miniapp installed)
+ */
+async function getInstalledFidsFromNotificationTokens(): Promise<Set<number>> {
+  const tokens = await fetchAllNotificationTokens();
+  const installedFids = new Set<number>();
+
+  // Group tokens by FID and check if user has at least one enabled token
+  const tokensByFid = new Map<number, NotificationToken[]>();
+  for (const token of tokens) {
+    if (!tokensByFid.has(token.fid)) {
+      tokensByFid.set(token.fid, []);
+    }
+    tokensByFid.get(token.fid)!.push(token);
+  }
+
+  // A user is considered to have the miniapp installed if they have at least one enabled token
+  for (const [fid, userTokens] of tokensByFid.entries()) {
+    const hasEnabledToken = userTokens.some(
+      (token) => token.status === "enabled" || !token.status
+    );
+    if (hasEnabledToken) {
+      installedFids.add(fid);
+    }
+  }
+
+  return installedFids;
+}
+
+/**
+ * Check if a user has the miniapp installed based on notification tokens
+ */
+export async function hasMiniappInstalled(userFid: number): Promise<boolean> {
+  const installedFids = await getInstalledFidsFromNotificationTokens();
+  return installedFids.has(userFid);
+}
+
+/**
+ * Get all FIDs that have the miniapp installed based on notification tokens
  */
 export async function getMiniappInstalledFids(): Promise<number[]> {
-  const installations = await db
-    .select({ userFid: miniappInstallations.userFid })
-    .from(miniappInstallations);
-
-  return installations.map((inst) => inst.userFid);
+  const installedFids = await getInstalledFidsFromNotificationTokens();
+  return Array.from(installedFids);
 }
 
 /**

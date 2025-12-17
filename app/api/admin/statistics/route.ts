@@ -28,6 +28,7 @@ import {
 } from "@/lib/schema";
 import { isAdmin, getUserRoles, getAllAdminFids, getAllCuratorFids } from "@/lib/roles";
 import { get14DayActiveUsers, getSignedInEver, getMiniappOnlyUsers } from "@/lib/canonicalMetrics";
+import { getMiniappInstalledFids } from "@/lib/miniapp";
 
 function getTimeRangeFilter(period: string) {
   const now = new Date();
@@ -897,13 +898,10 @@ export async function GET(request: NextRequest) {
           notVisited7Days.sort((a, b) => a.lastVisit.getTime() - b.lastVisit.getTime());
           notVisited14Days.sort((a, b) => a.lastVisit.getTime() - b.lastVisit.getTime());
 
-          // Get miniapp installation status for all curators (including active ones for the miniapp status section)
-          const miniappInstalledFids = await db
-            .select({ userFid: miniappInstallations.userFid })
-            .from(miniappInstallations)
-            .where(sql`user_fid = ANY(${sql.raw(`ARRAY[${curatorFids.length > 0 ? curatorFids.join(',') : 'NULL'}]`)})`);
-          
-          const installedFidSet = new Set(miniappInstalledFids.map(m => m.userFid));
+          // Get miniapp installation status for all curators from notification tokens
+          // This uses the Neynar API to determine who has the miniapp installed
+          const allInstalledFids = await getMiniappInstalledFids();
+          const installedFidSet = new Set(allInstalledFids);
           
           // Get all curator user data for miniapp status
           const allCuratorUsers = await db
