@@ -31,6 +31,11 @@ export function middleware(request: NextRequest) {
       return NextResponse.next();
     }
     
+    // Allow .well-known directory (needed for Farcaster and other protocol files)
+    if (pathname.startsWith("/.well-known/")) {
+      return NextResponse.next();
+    }
+    
     // Allow static assets (images, icons, manifest, etc.)
     if (
       pathname.startsWith("/_next/") ||
