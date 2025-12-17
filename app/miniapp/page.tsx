@@ -164,8 +164,25 @@ function MiniappContent() {
       actions.ready().catch((err) => {
         console.error("Error calling ready():", err);
       });
+      
+      // Log that Depthcaster miniapp opened
+      console.log("[Miniapp] Depthcaster opened");
+      
+      // Log to backend API (non-blocking)
+      if (context?.user?.fid) {
+        fetch("/api/miniapp/open", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userFid: context.user.fid,
+          }),
+        }).catch((err) => {
+          console.error("Error logging miniapp open:", err);
+          // Don't block if logging fails
+        });
+      }
     }
-  }, [isSDKLoaded, actions]);
+  }, [isSDKLoaded, actions, context?.user?.fid]);
 
   // Track notification on initial mount
   useEffect(() => {
