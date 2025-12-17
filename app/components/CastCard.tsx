@@ -3660,8 +3660,8 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                 disabled={isReacting || !user}
                 className={`flex items-center gap-1 sm:gap-2 text-xs sm:text-sm transition-colors py-1 px-1 sm:px-0 ${
                   isLiked
-                    ? "text-red-600 dark:text-red-400"
-                    : "text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400"
+                    ? "text-accent-dark dark:text-accent-dark"
+                    : "text-gray-500 dark:text-gray-400 hover:text-accent-dark dark:hover:text-accent-dark"
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 <Heart className={`w-4 h-4 sm:w-5 sm:h-5 ${isLiked ? "fill-current" : ""}`} />
@@ -3906,8 +3906,8 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                     disabled={isCurating}
                     className={`flex items-center gap-1 sm:gap-2 text-xs sm:text-sm transition-colors py-1 px-1 sm:px-0 ${
                       isCurated && curators.some(c => c.fid === user.fid)
-                        ? "text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300"
-                        : "text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400"
+                        ? "text-accent-dark dark:text-accent-dark hover:text-accent-dark dark:hover:text-accent-dark"
+                        : "text-gray-500 dark:text-gray-400 hover:text-accent-dark dark:hover:text-accent-dark"
                     } disabled:opacity-50 disabled:cursor-not-allowed`}
                     title={
                       isCurated && curators.some(c => c.fid === user.fid)
@@ -3917,7 +3917,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                         : "Curate to your feed"
                     }
                   >
-                    <span className={isCurated && curators.some(c => c.fid === user.fid) ? "text-purple-600 dark:text-purple-400" : "text-gray-400 dark:text-gray-500"}>
+                    <span className={isCurated && curators.some(c => c.fid === user.fid) ? "text-accent-dark dark:text-accent-dark" : "text-gray-400 dark:text-gray-500"}>
                       {isCurated && curators.some(c => c.fid === user.fid) ? "Curated" : "Curate to your feed"}
                     </span>
                     <Star className={`w-4 h-4 sm:w-5 sm:h-5 ${isCurated && curators.some(c => c.fid === user.fid) ? "fill-current" : ""}`} />
@@ -3996,7 +3996,7 @@ export function CastCard({ cast, showThread = false, showTopReplies = true, onUp
                       setShowDeleteConfirm(true);
                     }}
                     disabled={isDeleting}
-                    className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm transition-colors py-1 px-1 sm:px-0 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm transition-colors py-1 px-1 sm:px-0 text-gray-500 dark:text-gray-400 hover:text-accent-dark dark:hover:text-accent-dark disabled:opacity-50 disabled:cursor-not-allowed"
                     title={isReply ? "Delete reply" : "Delete cast"}
                   >
                     <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />

@@ -175,7 +175,7 @@ export function CuratorBadge({ userFid, viewerFid, isCurator, className = "" }: 
       className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full transition-all duration-300 ease-in-out whitespace-nowrap overflow-hidden ${
         isRecommended
           ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 cursor-default"
-          : "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 hover:bg-purple-100 dark:hover:bg-purple-900/30 hover:text-purple-600 dark:hover:text-purple-400 cursor-pointer"
+          : "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 hover:bg-accent/30 dark:hover:bg-accent/20 hover:text-accent-dark dark:hover:text-accent-dark cursor-pointer"
       } ${isLoading ? "opacity-50 cursor-not-allowed" : ""} ${className}`}
     >
       <svg

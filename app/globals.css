@@ -558,4 +558,45 @@ body {
     color: #000000;
     border-color: #000000;
   }
+
+  /* High Contrast: Curated Pills and Badges */
+  /* Light mode: White background with black border and text */
+  .high-contrast [class*="bg-accent/30"],
+  .high-contrast [class*="bg-accent/20"],
+  .high-contrast [class*="bg-accent/40"] {
+    background-color: #ffffff !important;
+    border-color: #000000 !important;
+    color: #000000 !important;
+  }
+
+  .high-contrast [class*="border-accent/50"],
+  .high-contrast [class*="border-accent/40"],
+  .high-contrast [class*="border-accent"] {
+    border-color: #000000 !important;
+  }
+
+  .high-contrast [class*="text-accent-dark"],
+  .high-contrast [class*="text-accent"] {
+    color: #000000 !important;
+  }
+
+  /* Dark mode: Black background with white border and text */
+  .high-contrast.dark [class*="bg-accent/30"],
+  .high-contrast.dark [class*="bg-accent/20"],
+  .high-contrast.dark [class*="bg-accent/40"] {
+    background-color: #000000 !important;
+    border-color: #ffffff !important;
+    color: #ffffff !important;
+  }
+
+  .high-contrast.dark [class*="border-accent/50"],
+  .high-contrast.dark [class*="border-accent/40"],
+  .high-contrast.dark [class*="border-accent"] {
+    border-color: #ffffff !important;
+  }
+
+  .high-contrast.dark [class*="text-accent-dark"],
+  .high-contrast.dark [class*="text-accent"] {
+    color: #ffffff !important;
+  }
 }
