@@ -691,6 +691,7 @@ export function Header() {
         </div>
       )}
       <header 
+        id="navigation"
         className="sticky top-0 z-[200] bg-white/80 dark:bg-black/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 overflow-x-hidden w-full transition-transform duration-300 ease-in-out" 
         style={{ 
           paddingTop: 'env(safe-area-inset-top, 0px)',

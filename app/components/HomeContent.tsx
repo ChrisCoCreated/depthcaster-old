@@ -52,7 +52,7 @@ function HomeContentInner() {
   return (
     <div className="min-h-screen" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
       {/* Main content */}
-      <main className="max-w-7xl mx-auto px-2 sm:px-4 py-4 sm:py-8">
+      <main id="main-content" className="max-w-7xl mx-auto px-2 sm:px-4 py-4 sm:py-8" tabIndex={-1}>
         <div className="flex gap-4 sm:gap-8">
           {/* Feed */}
           <div className="flex-1 min-w-0">

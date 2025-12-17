@@ -280,6 +280,9 @@ export const analytics = {
   trackSettingsCurationChange: (settingName: string, settingValue: any) => {
     trackIfEssential("settings_curation_change", { settingName, settingValue });
   },
+  trackSettingsAccessibilityChange: (settingName: string, settingValue: any) => {
+    trackIfEssential("settings_accessibility_change", { settingName, settingValue });
+  },
   
   // Authentication
   trackAuthSignIn: (fid: number) => {

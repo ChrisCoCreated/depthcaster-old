@@ -7,6 +7,7 @@ import { AvatarImage } from "@/app/components/AvatarImage";
 import Link from "next/link";
 import { analytics } from "@/lib/analytics";
 import { sdk } from "@farcaster/miniapp-sdk";
+import Image from "next/image";
 
 interface FeedItem {
   castHash: string;
@@ -72,6 +73,7 @@ function MiniappContent() {
     }
     return "all"; // Default to All
   });
+  const [isViewingOnWeb, setIsViewingOnWeb] = useState(false);
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://depthcaster.vercel.app";
   
@@ -617,8 +619,51 @@ function MiniappContent() {
     );
   }
 
+  // Check if user is viewing on depthcaster.com (not in miniapp context)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const hostname = window.location.hostname;
+      const isOnDepthcaster = hostname === "depthcaster.com" || hostname === "www.depthcaster.com";
+      // Show banner if on depthcaster.com and not in miniapp context (context will be null/undefined on web)
+      setIsViewingOnWeb(isOnDepthcaster && !context);
+    }
+  }, [context]);
+
   return (
     <div className="min-h-screen bg-white dark:bg-black">
+      {/* Banner for users viewing on depthcaster.com */}
+      {isViewingOnWeb && (
+        <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 border-b border-blue-200 dark:border-blue-800">
+          <div className="max-w-2xl mx-auto px-4 py-6">
+            <div className="flex items-center gap-4 mb-4">
+              <Image
+                src="/images/logos/sopha_logo.png"
+                alt="Sopha Logo"
+                width={64}
+                height={64}
+                className="w-16 h-16"
+              />
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  Sopha
+                </h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  New miniapp available
+                </p>
+              </div>
+            </div>
+            <p className="text-base text-gray-700 dark:text-gray-300 mb-4">
+              Install the new Sopha miniapp to get notifications and access curated quality content directly in Farcaster.
+            </p>
+            <button
+              onClick={handleInstall}
+              className="px-6 py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
+            >
+              Install Miniapp
+            </button>
+          </div>
+        </div>
+      )}
       {/* Toast Notification */}
       {toast && (
         <div

@@ -6,6 +6,7 @@ import { FeedSettings } from "../components/FeedSettings";
 import { BotSettings } from "../components/BotSettings";
 import { WatchSettings } from "../components/WatchSettings";
 import { CurationSettings } from "../components/CurationSettings";
+import { AccessibilitySettings } from "../components/AccessibilitySettings";
 import { useNeynarContext } from "@neynar/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -72,7 +73,7 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen">
       {/* Main content */}
-      <main className="max-w-4xl mx-auto px-4 py-8">
+      <main id="main-content" className="max-w-4xl mx-auto px-4 py-8" tabIndex={-1}>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-8">
           Settings
         </h1>
@@ -110,6 +111,10 @@ export default function SettingsPage() {
 
           <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-6">
             <CurationSettings />
+          </div>
+
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+            <AccessibilitySettings />
           </div>
 
           {!isCheckingAccess && hasUpdatesAccess && (

@@ -13,6 +13,7 @@ import { NavigationManager } from "./components/NavigationManager";
 import { PortalErrorHandler } from "./components/PortalErrorHandler";
 import { XmtpProvider } from "./contexts/XmtpContext";
 import { ThirdwebProviderClient } from "./components/ThirdwebProviderClient";
+import { AccessibilityManager } from "./components/AccessibilityManager";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -118,6 +119,7 @@ export default function RootLayout({
         <Analytics />
         <PortalErrorHandler />
         <ServiceWorkerRegistration />
+        <AccessibilityManager />
         <AuthProvider>
           <ThirdwebProviderClient>
             <XmtpProvider>

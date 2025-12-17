@@ -199,4 +199,167 @@ body {
   .dark input[type="range"]::-moz-range-thumb:hover {
     background: var(--accent);
   }
+
+  /* Accessibility: High Contrast Mode */
+  .high-contrast {
+    --background: #ffffff;
+    --foreground: #000000;
+    --accent: #0000ff;
+    --accent-dark: #000080;
+  }
+
+  .high-contrast.dark {
+    --background: #000000;
+    --foreground: #ffffff;
+    --accent: #ffff00;
+    --accent-dark: #ffcc00;
+  }
+
+  .high-contrast body {
+    background: var(--background) !important;
+    color: var(--foreground) !important;
+  }
+
+  .high-contrast .bg-white,
+  .high-contrast .bg-gray-50,
+  .high-contrast .bg-gray-100 {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  .high-contrast.dark .bg-black,
+  .high-contrast.dark .bg-gray-900,
+  .high-contrast.dark .bg-gray-800 {
+    background: #000000 !important;
+    color: #ffffff !important;
+  }
+
+  .high-contrast .text-gray-900,
+  .high-contrast .text-gray-800,
+  .high-contrast .text-gray-700 {
+    color: #000000 !important;
+  }
+
+  .high-contrast.dark .text-gray-100,
+  .high-contrast.dark .text-gray-200,
+  .high-contrast.dark .text-gray-300 {
+    color: #ffffff !important;
+  }
+
+  .high-contrast .border-gray-200,
+  .high-contrast .border-gray-300 {
+    border-color: #000000 !important;
+  }
+
+  .high-contrast.dark .border-gray-700,
+  .high-contrast.dark .border-gray-800 {
+    border-color: #ffffff !important;
+  }
+
+  /* Accessibility: Font Size Classes */
+  .font-size-small {
+    font-size: 87.5% !important; /* 0.875x */
+  }
+
+  .font-size-medium {
+    font-size: 100% !important; /* 1x - default */
+  }
+
+  .font-size-large {
+    font-size: 125% !important; /* 1.25x */
+  }
+
+  .font-size-extra-large {
+    font-size: 150% !important; /* 1.5x */
+  }
+
+  /* Accessibility: Enhanced Focus Indicators */
+  .enhanced-focus *:focus-visible {
+    outline: 4px solid #0000ff !important;
+    outline-offset: 2px !important;
+  }
+
+  .enhanced-focus.dark *:focus-visible {
+    outline: 4px solid #ffff00 !important;
+    outline-offset: 2px !important;
+  }
+
+  .enhanced-focus button:focus-visible,
+  .enhanced-focus a:focus-visible,
+  .enhanced-focus input:focus-visible,
+  .enhanced-focus textarea:focus-visible,
+  .enhanced-focus select:focus-visible {
+    outline: 4px solid #0000ff !important;
+    outline-offset: 2px !important;
+  }
+
+  .enhanced-focus.dark button:focus-visible,
+  .enhanced-focus.dark a:focus-visible,
+  .enhanced-focus.dark input:focus-visible,
+  .enhanced-focus.dark textarea:focus-visible,
+  .enhanced-focus.dark select:focus-visible {
+    outline: 4px solid #ffff00 !important;
+    outline-offset: 2px !important;
+  }
+
+  /* Ensure focus is visible even when high contrast is enabled */
+  .high-contrast.enhanced-focus *:focus-visible {
+    outline: 4px solid #0000ff !important;
+    outline-offset: 2px !important;
+  }
+
+  .high-contrast.dark.enhanced-focus *:focus-visible {
+    outline: 4px solid #ffff00 !important;
+    outline-offset: 2px !important;
+  }
+
+  /* Accessibility: Skip Links */
+  .skip-links {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 10000;
+  }
+
+  .skip-link {
+    position: absolute;
+    top: -100px;
+    left: 0;
+    background: #0000ff;
+    color: #ffffff;
+    padding: 12px 24px;
+    text-decoration: none;
+    font-weight: 600;
+    z-index: 10001;
+    border: 2px solid #ffffff;
+    transition: top 0.2s ease;
+  }
+
+  .skip-link:focus {
+    top: 0;
+    outline: 4px solid #ffff00;
+    outline-offset: 2px;
+  }
+
+  .dark .skip-link {
+    background: #ffff00;
+    color: #000000;
+    border-color: #000000;
+  }
+
+  .dark .skip-link:focus {
+    outline: 4px solid #0000ff;
+  }
+
+  .high-contrast .skip-link {
+    background: #0000ff;
+    color: #ffffff;
+    border-color: #ffffff;
+  }
+
+  .high-contrast.dark .skip-link {
+    background: #ffff00;
+    color: #000000;
+    border-color: #000000;
+  }
 }
