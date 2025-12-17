@@ -298,7 +298,7 @@ export default function AdminNotificationsPage() {
       <div className="max-w-4xl mx-auto">
         <div className="mb-6 flex items-center justify-between">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-            Send App Update Notifications
+            Admin Notifications
           </h1>
           <Link
             href="/admin"
@@ -320,94 +320,83 @@ export default function AdminNotificationsPage() {
           </div>
         )}
 
-        {/* Test Automated Notifications Section */}
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
-            Test Automated Notifications
-          </h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Send test notifications for automated notification systems. These will be sent to all admins and superadmins.
-          </p>
-          <div className="space-y-4">
-            <div>
-              <div className="flex items-center gap-4">
-                <div className="flex-1">
-                  <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-1">
-                    Daily Stats Notification
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Test the daily statistics notification sent to curators at 6 AM UTC
+        {/* Sopha App Notifications Section */}
+        <div className="mb-8">
+          <div className="mb-4">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+              Sopha App Notifications
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Push notifications sent to users who have signed in to the Sopha app. These appear in the app's notification center and as browser push notifications.
+            </p>
+          </div>
+
+          {/* Test Automated Sopha App Notifications */}
+          <div className="bg-white dark:bg-gray-900 border-2 border-blue-200 dark:border-blue-800 rounded-lg p-6 mb-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">
+              Test Automated Notifications
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Send test notifications for automated notification systems. These will be sent to all admins and superadmins.
+            </p>
+            <div className="space-y-4">
+              <div>
+                <div className="flex items-center gap-4">
+                  <div className="flex-1">
+                    <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-1">
+                      Daily Stats Notification
+                    </h4>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Test the daily statistics notification sent to curators at 6 AM UTC
+                    </p>
+                  </div>
+                  <button
+                    onClick={sendDailyStatsTest}
+                    disabled={isSendingDailyTest}
+                    className="px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                  >
+                    {isSendingDailyTest ? "Sending..." : "Send Test"}
+                  </button>
+                </div>
+                {dailyTestResult && (
+                  <p className={`mt-2 text-sm ${dailyTestResult.startsWith("Error") ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>
+                    {dailyTestResult}
                   </p>
-                </div>
-                <button
-                  onClick={sendDailyStatsTest}
-                  disabled={isSendingDailyTest}
-                  className="px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                >
-                  {isSendingDailyTest ? "Sending..." : "Send Test"}
-                </button>
+                )}
               </div>
-              {dailyTestResult && (
-                <p className={`mt-2 text-sm ${dailyTestResult.startsWith("Error") ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>
-                  {dailyTestResult}
-                </p>
-              )}
-            </div>
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-              <div className="flex items-center gap-4">
-                <div className="flex-1">
-                  <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-1">
-                    Weekly Contributors Notification
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Test the weekly contributors notification sent to curators on Mondays at 12 PM UTC
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex-1">
+                    <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-1">
+                      Weekly Contributors Notification
+                    </h4>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Test the weekly contributors notification sent to curators on Mondays at 12 PM UTC
+                    </p>
+                  </div>
+                  <button
+                    onClick={sendWeeklyContributorsTest}
+                    disabled={isSendingWeeklyTest}
+                    className="px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                  >
+                    {isSendingWeeklyTest ? "Sending..." : "Send Test"}
+                  </button>
+                </div>
+                {weeklyTestResult && (
+                  <p className={`mt-2 text-sm ${weeklyTestResult.startsWith("Error") ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>
+                    {weeklyTestResult}
                   </p>
-                </div>
-                <button
-                  onClick={sendWeeklyContributorsTest}
-                  disabled={isSendingWeeklyTest}
-                  className="px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                >
-                  {isSendingWeeklyTest ? "Sending..." : "Send Test"}
-                </button>
+                )}
               </div>
-              {weeklyTestResult && (
-                <p className={`mt-2 text-sm ${weeklyTestResult.startsWith("Error") ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>
-                  {weeklyTestResult}
-                </p>
-              )}
-            </div>
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-              <div className="flex items-center gap-4">
-                <div className="flex-1">
-                  <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-1">
-                    Miniapp Notification
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Test the miniapp notification sent to all users when a new cast is curated
-                  </p>
-                </div>
-                <button
-                  onClick={sendMiniappTest}
-                  disabled={isSendingMiniappTest}
-                  className="px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                >
-                  {isSendingMiniappTest ? "Sending..." : "Send Test"}
-                </button>
-              </div>
-              {miniappTestResult && (
-                <div className={`mt-2 text-sm ${miniappTestResult.startsWith("Error") ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>
-                  <pre className="whitespace-pre-wrap font-mono text-xs bg-red-50 dark:bg-red-900/20 p-2 rounded border border-red-200 dark:border-red-800">
-                    {miniappTestResult}
-                  </pre>
-                </div>
-              )}
             </div>
           </div>
-        </div>
 
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
-          <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Manual Sopha App Notification Form */}
+          <div className="bg-white dark:bg-gray-900 border-2 border-blue-200 dark:border-blue-800 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">
+              Send Manual Notification
+            </h3>
+            <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Title <span className="text-red-500">*</span>
@@ -554,6 +543,52 @@ export default function AdminNotificationsPage() {
               </button>
             </div>
           </form>
+          </div>
+        </div>
+
+        {/* Miniapp Notifications Section */}
+        <div className="mb-8">
+          <div className="mb-4">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+              Miniapp Notifications
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Farcaster miniapp notifications sent to users who have installed the Sopha miniapp. These appear as native Farcaster notifications in the Warpcast app.
+            </p>
+          </div>
+
+          <div className="bg-white dark:bg-gray-900 border-2 border-purple-200 dark:border-purple-800 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">
+              Test Miniapp Notification
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Send a test miniapp notification to all users who have installed the miniapp. This simulates the notification sent when a new cast is curated.
+            </p>
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-1">
+                  Miniapp Notification
+                </h4>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Test the miniapp notification sent to all users when a new cast is curated
+                </p>
+              </div>
+              <button
+                onClick={sendMiniappTest}
+                disabled={isSendingMiniappTest}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+              >
+                {isSendingMiniappTest ? "Sending..." : "Send Test"}
+              </button>
+            </div>
+            {miniappTestResult && (
+              <div className={`mt-4 text-sm ${miniappTestResult.startsWith("Error") ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>
+                <pre className="whitespace-pre-wrap font-mono text-xs bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                  {miniappTestResult}
+                </pre>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

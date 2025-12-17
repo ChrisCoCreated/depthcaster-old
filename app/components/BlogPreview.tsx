@@ -66,7 +66,7 @@ export function BlogPreview({ url, onSuccess }: BlogPreviewProps) {
         console.log('[BlogPreview] Response status:', response.status);
         if (!response.ok) {
           const errorText = await response.text();
-          console.error('[BlogPreview] Error response:', errorText);
+          console.warn('[BlogPreview] Error response:', errorText);
           if (response.status === 404) {
             setError("Article not found");
           } else {
