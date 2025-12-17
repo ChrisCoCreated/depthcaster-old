@@ -21,6 +21,7 @@ import { curatedCasts, castReplies } from "../lib/schema";
 import { eq, isNotNull, sql } from "drizzle-orm";
 import { analyzeCastQuality } from "../lib/deepseek-quality";
 import { extractQuotedCastHashes, isQuoteCast } from "../lib/conversation";
+import { Cast } from "@neynar/nodejs-sdk/build/api";
 
 /**
  * Rescore all recasts of curated casts
@@ -50,8 +51,8 @@ async function rescoreRecastsOfCuratedCasts() {
       .from(curatedCasts);
     
     for (const cast of allCuratedCastsWithData) {
-      if (isQuoteCast(cast.castData)) {
-        const quotedHashes = extractQuotedCastHashes(cast.castData);
+      if (cast.castData && isQuoteCast(cast.castData as Cast)) {
+        const quotedHashes = extractQuotedCastHashes(cast.castData as Cast);
         // Check if any quoted cast is in curatedCasts
         const quotesCuratedCast = quotedHashes.some(hash => 
           curatedCastHashes.has(hash.toLowerCase())
@@ -87,9 +88,9 @@ async function rescoreRecastsOfCuratedCasts() {
           replyCastHash: reply.replyCastHash,
           castData: reply.castData,
         });
-      } else if (reply.castData && isQuoteCast(reply.castData)) {
+      } else if (reply.castData && isQuoteCast(reply.castData as Cast)) {
         // Also check embeds in case quotedCastHash wasn't set
-        const quotedHashes = extractQuotedCastHashes(reply.castData);
+        const quotedHashes = extractQuotedCastHashes(reply.castData as Cast);
         const quotesCuratedCast = quotedHashes.some(hash => 
           curatedCastHashes.has(hash.toLowerCase())
         );
