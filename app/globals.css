@@ -200,19 +200,19 @@ body {
     background: var(--accent);
   }
 
-  /* Accessibility: High Contrast Mode */
+  /* Accessibility: High Contrast Mode - Pure Black & White */
   .high-contrast {
     --background: #ffffff;
     --foreground: #000000;
-    --accent: #0000ff;
-    --accent-dark: #000080;
+    --accent: #000000;
+    --accent-dark: #000000;
   }
 
   .high-contrast.dark {
     --background: #000000;
     --foreground: #ffffff;
-    --accent: #ffff00;
-    --accent-dark: #ffcc00;
+    --accent: #ffffff;
+    --accent-dark: #ffffff;
   }
 
   .high-contrast body {
@@ -256,6 +256,202 @@ body {
     border-color: #ffffff !important;
   }
 
+  /* High Contrast: Buttons and Interactive Elements - Pure Black/White */
+  /* Light mode: Black buttons with white text (21:1 contrast - maximum) */
+  .high-contrast .bg-accent,
+  .high-contrast button.bg-accent,
+  .high-contrast [class*="bg-accent"] {
+    background-color: #000000 !important;
+    color: #ffffff !important;
+    border: 2px solid #000000 !important;
+  }
+
+  .high-contrast .bg-accent:hover,
+  .high-contrast button.bg-accent:hover,
+  .high-contrast [class*="bg-accent"]:hover {
+    background-color: #000000 !important;
+    border: 3px solid #000000 !important;
+    box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #000000 !important;
+  }
+
+  .high-contrast .bg-accent-dark,
+  .high-contrast button.bg-accent-dark {
+    background-color: #000000 !important;
+    color: #ffffff !important;
+    border: 2px solid #000000 !important;
+  }
+
+  .high-contrast .bg-accent-dark:hover {
+    background-color: #000000 !important;
+    border: 3px solid #000000 !important;
+    box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #000000 !important;
+  }
+
+  /* Dark mode: White buttons with black text (21:1 contrast - maximum) */
+  .high-contrast.dark .bg-accent,
+  .high-contrast.dark button.bg-accent,
+  .high-contrast.dark [class*="bg-accent"] {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    border: 2px solid #ffffff !important;
+  }
+
+  .high-contrast.dark .bg-accent:hover,
+  .high-contrast.dark button.bg-accent:hover,
+  .high-contrast.dark [class*="bg-accent"]:hover {
+    background-color: #ffffff !important;
+    border: 3px solid #ffffff !important;
+    box-shadow: 0 0 0 2px #000000, 0 0 0 4px #ffffff !important;
+  }
+
+  .high-contrast.dark .bg-accent-dark,
+  .high-contrast.dark button.bg-accent-dark {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    border: 2px solid #ffffff !important;
+  }
+
+  .high-contrast.dark .bg-accent-dark:hover {
+    background-color: #ffffff !important;
+    border: 3px solid #ffffff !important;
+    box-shadow: 0 0 0 2px #000000, 0 0 0 4px #ffffff !important;
+  }
+
+  /* High Contrast: Text colors - Pure Black/White */
+  .high-contrast .text-accent,
+  .high-contrast [class*="text-accent"] {
+    color: #000000 !important;
+  }
+
+  .high-contrast.dark .text-accent,
+  .high-contrast.dark [class*="text-accent"] {
+    color: #ffffff !important;
+  }
+
+  .high-contrast .text-accent-dark {
+    color: #000000 !important;
+  }
+
+  .high-contrast.dark .text-accent-dark {
+    color: #ffffff !important;
+  }
+
+  /* High Contrast: Border colors - Pure Black/White */
+  .high-contrast .border-accent,
+  .high-contrast [class*="border-accent"] {
+    border-color: #000000 !important;
+  }
+
+  .high-contrast.dark .border-accent,
+  .high-contrast.dark [class*="border-accent"] {
+    border-color: #ffffff !important;
+  }
+
+  .high-contrast .border-accent-dark {
+    border-color: #000000 !important;
+  }
+
+  .high-contrast.dark .border-accent-dark {
+    border-color: #ffffff !important;
+  }
+
+  /* High Contrast: Links - Underlined for visibility */
+  .high-contrast a {
+    color: #000000 !important;
+    text-decoration: underline !important;
+  }
+
+  .high-contrast a:hover,
+  .high-contrast a:focus {
+    color: #000000 !important;
+    text-decoration: underline !important;
+    outline: 2px solid #000000 !important;
+    outline-offset: 2px !important;
+  }
+
+  .high-contrast.dark a {
+    color: #ffffff !important;
+    text-decoration: underline !important;
+  }
+
+  .high-contrast.dark a:hover,
+  .high-contrast.dark a:focus {
+    color: #ffffff !important;
+    text-decoration: underline !important;
+    outline: 2px solid #ffffff !important;
+    outline-offset: 2px !important;
+  }
+
+  /* High Contrast: Input fields and form controls */
+  .high-contrast input[type="text"],
+  .high-contrast input[type="email"],
+  .high-contrast input[type="password"],
+  .high-contrast input[type="number"],
+  .high-contrast input[type="search"],
+  .high-contrast textarea,
+  .high-contrast select {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    border: 2px solid #000000 !important;
+  }
+
+  .high-contrast input[type="text"]:focus,
+  .high-contrast input[type="email"]:focus,
+  .high-contrast input[type="password"]:focus,
+  .high-contrast input[type="number"]:focus,
+  .high-contrast input[type="search"]:focus,
+  .high-contrast textarea:focus,
+  .high-contrast select:focus {
+    border-color: #000000 !important;
+    outline: 3px solid #000000 !important;
+    outline-offset: 2px !important;
+  }
+
+  .high-contrast.dark input[type="text"],
+  .high-contrast.dark input[type="email"],
+  .high-contrast.dark input[type="password"],
+  .high-contrast.dark input[type="number"],
+  .high-contrast.dark input[type="search"],
+  .high-contrast.dark textarea,
+  .high-contrast.dark select {
+    background-color: #000000 !important;
+    color: #ffffff !important;
+    border: 2px solid #ffffff !important;
+  }
+
+  .high-contrast.dark input[type="text"]:focus,
+  .high-contrast.dark input[type="email"]:focus,
+  .high-contrast.dark input[type="password"]:focus,
+  .high-contrast.dark input[type="number"]:focus,
+  .high-contrast.dark input[type="search"]:focus,
+  .high-contrast.dark textarea:focus,
+  .high-contrast.dark select:focus {
+    border-color: #ffffff !important;
+    outline: 3px solid #ffffff !important;
+    outline-offset: 2px !important;
+  }
+
+  /* High Contrast: Range sliders - Pure Black/White */
+  .high-contrast input[type="range"]::-webkit-slider-thumb {
+    background: #000000 !important;
+    border: 2px solid #ffffff !important;
+  }
+
+  .high-contrast input[type="range"]::-moz-range-thumb {
+    background: #000000 !important;
+    border: 2px solid #ffffff !important;
+  }
+
+  .high-contrast.dark input[type="range"]::-webkit-slider-thumb {
+    background: #ffffff !important;
+    border: 2px solid #000000 !important;
+  }
+
+  .high-contrast.dark input[type="range"]::-moz-range-thumb {
+    background: #ffffff !important;
+    border: 2px solid #000000 !important;
+  }
+
   /* Accessibility: Font Size Classes */
   .font-size-small {
     font-size: 87.5% !important; /* 0.875x */
@@ -273,14 +469,14 @@ body {
     font-size: 150% !important; /* 1.5x */
   }
 
-  /* Accessibility: Enhanced Focus Indicators */
+  /* Accessibility: Enhanced Focus Indicators - Pure Black/White */
   .enhanced-focus *:focus-visible {
-    outline: 4px solid #0000ff !important;
+    outline: 4px solid #000000 !important;
     outline-offset: 2px !important;
   }
 
   .enhanced-focus.dark *:focus-visible {
-    outline: 4px solid #ffff00 !important;
+    outline: 4px solid #ffffff !important;
     outline-offset: 2px !important;
   }
 
@@ -289,7 +485,7 @@ body {
   .enhanced-focus input:focus-visible,
   .enhanced-focus textarea:focus-visible,
   .enhanced-focus select:focus-visible {
-    outline: 4px solid #0000ff !important;
+    outline: 4px solid #000000 !important;
     outline-offset: 2px !important;
   }
 
@@ -298,18 +494,18 @@ body {
   .enhanced-focus.dark input:focus-visible,
   .enhanced-focus.dark textarea:focus-visible,
   .enhanced-focus.dark select:focus-visible {
-    outline: 4px solid #ffff00 !important;
+    outline: 4px solid #ffffff !important;
     outline-offset: 2px !important;
   }
 
   /* Ensure focus is visible even when high contrast is enabled */
   .high-contrast.enhanced-focus *:focus-visible {
-    outline: 4px solid #0000ff !important;
+    outline: 4px solid #000000 !important;
     outline-offset: 2px !important;
   }
 
   .high-contrast.dark.enhanced-focus *:focus-visible {
-    outline: 4px solid #ffff00 !important;
+    outline: 4px solid #ffffff !important;
     outline-offset: 2px !important;
   }
 
@@ -325,7 +521,7 @@ body {
     position: absolute;
     top: -100px;
     left: 0;
-    background: #0000ff;
+    background: #000000;
     color: #ffffff;
     padding: 12px 24px;
     text-decoration: none;
@@ -337,28 +533,28 @@ body {
 
   .skip-link:focus {
     top: 0;
-    outline: 4px solid #ffff00;
+    outline: 4px solid #ffffff;
     outline-offset: 2px;
   }
 
   .dark .skip-link {
-    background: #ffff00;
+    background: #ffffff;
     color: #000000;
     border-color: #000000;
   }
 
   .dark .skip-link:focus {
-    outline: 4px solid #0000ff;
+    outline: 4px solid #000000;
   }
 
   .high-contrast .skip-link {
-    background: #0000ff;
+    background: #000000;
     color: #ffffff;
     border-color: #ffffff;
   }
 
   .high-contrast.dark .skip-link {
-    background: #ffff00;
+    background: #ffffff;
     color: #000000;
     border-color: #000000;
   }
