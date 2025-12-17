@@ -1,21 +1,21 @@
 {
-    "frame": {
-      "version": "1",
-      "name": "Sopha",
-      "iconUrl": "https://sopha.social/icon-192x192.webp?v=2",
-      "splashImageUrl": "https://sopha.social/icon-512x512.webp?v=2",
-      "splashBackgroundColor": "#000000",
-      "homeUrl": "https://sopha.social",
-      "webhookUrl": "https://api.neynar.com/f/app/4f4d94f9-c966-486b-ab8b-d4a33d52e8c2/event",
-      "appUrl": "https://sopha.social",
-      "icon": "https://sopha.social/icon-192x192.webp?v=2",
-      "castShareUrl": "https://sopha.social/share"
-
-    },
-        "accountAssociation": {
+  "frame": {
+    "version": "1",
+    "name": "Depthcaster",
+    "iconUrl": "https://depthcaster.com/icon-192x192.webp?v=2",
+    "splashImageUrl": "https://depthcaster.com/icon-512x512.webp?v=2",
+    "splashBackgroundColor": "#000000",
+    "homeUrl": "https://depthcaster.com",
+    "webhookUrl": "https://api.neynar.com/f/app/4f4d94f9-c966-486b-ab8b-d4a33d52e8c2/event",
+    "appUrl": "https://depthcaster.com",
+    "icon": "https://depthcaster.com/icon-192x192.webp?v=2",
+    "castShareUrl": "https://depthcaster.com/share",
+    "canonicalDomain": "sopha.social"
+  },
+  "accountAssociation": {
     "header": "eyJmaWQiOjU3MDEsInR5cGUiOiJhdXRoIiwia2V5IjoiMHgzMDdmOWNDODY1MDg2MkUwODE1QWRmODMzQjkxMjVGNGUwZWQ0MDU1In0",
     "payload": "eyJkb21haW4iOiJzb3BoYS5zb2NpYWwifQ",
     "signature": "8jg3MDLaJSJ24OsbYxbBlKNqRDjVn+DaKtoW26WkEFYNGEwleiS6qGBNj8V4XeHyEGyFSOwwfUvlT9OtxoEhshs="
   }
-  }
+}
   
